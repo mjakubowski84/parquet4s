@@ -39,11 +39,10 @@ lazy val root = (project in file("."))
     Keys.scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8"),
     Keys.javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature"),
     Keys.resolvers := resolvers,
-    Keys.concurrentRestrictions in Global += Tags.limit(Tags.Test, 1),
     Keys.libraryDependencies := libraryDependencies,
     Keys.credentials ++= Seq(
-      Credentials(Path.userHome / ".ivy2" / ".publicCredentials"), // TODO
-      Credentials(Path.userHome / ".sbt" / "pgp.credentials") // TODO
+      Credentials(Path.userHome / ".ivy2" / ".publicCredentials"), // TODO use env vars
+      Credentials(Path.userHome / ".sbt" / "pgp.credentials") // TODO use env vars
     ),
     PgpKeys.useGpg := true,
     Keys.pomIncludeRepository := { _ => false },

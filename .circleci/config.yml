@@ -36,6 +36,7 @@ jobs:
     - save_cache:
         paths:
         - ~/.ivy2
+        - ~/.sbt
         key: v1-deps--{{ checksum "build.sbt" }}
 
     # run tests!
