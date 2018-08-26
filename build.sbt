@@ -23,7 +23,7 @@ lazy val libraryDependencies = {
     "org.scalatest" %% "scalatest" % "3.0.5" % "test,it",
     "org.apache.spark" %% "spark-core" % sparkVersion % "it"
       exclude(org = "org.apache.hadoop", name = "hadoop-client"),
-    "org.apache.spark" %% "spark-sql" % sparkVersion
+    "org.apache.spark" %% "spark-sql" % sparkVersion % "it"
       exclude(org = "org.apache.hadoop", name = "hadoop-client")
   )
 }
