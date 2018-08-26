@@ -1,7 +1,7 @@
-import sbt._
-import sbt.io.Path
-import sbt.librarymanagement.{Developer, Resolver, ScmInfo}
-import sbt.librarymanagement.ivy.Credentials
+//import sbt._
+//import sbt.io.Path
+//import sbt.librarymanagement.{Developer, Resolver, ScmInfo}
+//import sbt.librarymanagement.ivy.Credentials
 
 lazy val resolvers =  Seq(
   Opts.resolver.sonatypeReleases,
@@ -14,11 +14,22 @@ lazy val itSettings = Defaults.itSettings ++ Project.inConfig(IntegrationTest)(S
 ))
 
 lazy val libraryDependencies = {
-  val parquetVersion = "2.4.19" // TODO
+  val parquetVersion = "1.8.3"
+  val sparkVersion = "2.3.1"
+  val hadoopVersion = "2.9.1"
   Seq(
+    "org.apache.parquet" % "parquet-hadoop" % parquetVersion,
+    "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
+    "com.chuusai" %% "shapeless" % "2.3.3",
+    "org.typelevel" %% "cats-core" % "1.1.0", // TODO probably will not be needed
+
 
     // tests
-    "org.scalatest" %% "scalatest" % "3.0.5" % "test,it"
+    "org.scalatest" %% "scalatest" % "3.0.5" % "test,it",
+    "org.apache.spark" %% "spark-core" % sparkVersion % "it"
+      exclude(org = "org.apache.hadoop", name = "hadoop-client"),
+    "org.apache.spark" %% "spark-sql" % sparkVersion
+      exclude(org = "org.apache.hadoop", name = "hadoop-client")
   )
 }
 
