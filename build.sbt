@@ -1,8 +1,3 @@
-//import sbt._
-//import sbt.io.Path
-//import sbt.librarymanagement.{Developer, Resolver, ScmInfo}
-//import sbt.librarymanagement.ivy.Credentials
-
 lazy val resolvers =  Seq(
   Opts.resolver.sonatypeReleases,
   Resolver.jcenterRepo

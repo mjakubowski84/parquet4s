@@ -55,15 +55,15 @@ class ParquetReaderITSpec
     }
   }
 
-
   "Parquet reader" should "be able to read data with primitive types" in new Fixture(Seq(
     RowWithPrimitives(b = true, i = 1, l = 100, f = 0.1f, d = 10.1, s = "some string"),
     RowWithPrimitives(b = false, i = -1, l = -100, f = -0.1f, d = -10.1, s = "")
   ))
 
-  it should "be able to read data with time types" in new Fixture(Seq(
+  // FIXME feature
+  ignore should "be able to read data with time types" in new Fixture(Seq(
     RowWithTime(
-      // FIXME
+      // FIXME constructors
       timestamp = new java.sql.Timestamp(2018, 1, 1, 12, 30, 21, 0),
       date = new java.sql.Date(2018, 6, 1)
     )
