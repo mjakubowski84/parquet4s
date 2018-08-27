@@ -35,29 +35,30 @@ private class ParquetReaderImpl[T : MapReader](builder: ParquetReader.Builder) e
     private val reader = builder.build()
     openCloseables.synchronized(openCloseables.append(reader))
 
-    private var nextPreCalled = false
-    private var nextValue: Option[T] = None
+    private var recordPreRead = false
+    private var nextRecord: Option[T] = None
 
     override def hasNext: Boolean = {
-      if (!nextPreCalled) {
-        nextPreCalled = true
-        nextValue = Option(reader.read()).map(_.toObject)
+      if (!recordPreRead) {
+        nextRecord = Option(reader.read()).map(_.toObject)
+        recordPreRead = true
       }
-      nextValue.nonEmpty
+      nextRecord.nonEmpty
     }
 
     override def next(): T = {
-      if (!nextPreCalled) {
-        nextValue = Option(reader.read()).map(_.toObject)
+      if (!recordPreRead) {
+        nextRecord = Option(reader.read()).map(_.toObject)
+        recordPreRead = true
       }
-      nextPreCalled = false
 
-      nextValue match {
+      nextRecord match {
         case None =>
-          Option(reader.read()).getOrElse(throw new NoSuchElementException).toObject
-        case Some(element) =>
-          nextValue = None
-          element
+          throw new NoSuchElementException
+        case Some(record) =>
+          nextRecord = None
+          recordPreRead = false
+          record
       }
     }
   }
