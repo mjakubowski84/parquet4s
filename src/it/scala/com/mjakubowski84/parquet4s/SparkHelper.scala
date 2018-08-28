@@ -1,4 +1,4 @@
-package com.mjakubowski84
+package com.mjakubowski84.parquet4s
 
 import java.nio.file.{Path, Paths}
 

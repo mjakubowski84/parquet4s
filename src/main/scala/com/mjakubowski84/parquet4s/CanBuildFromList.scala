@@ -1,4 +1,4 @@
-package com.mjakubowski84
+package com.mjakubowski84.parquet4s
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable

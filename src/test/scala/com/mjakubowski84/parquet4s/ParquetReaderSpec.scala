@@ -1,12 +1,12 @@
-package com.mjakubowski84
+package com.mjakubowski84.parquet4s
 
 import java.nio.file.Paths
 
 import com.google.common.io.Files
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FlatSpec, Matchers}
-import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 
 object ParquetReaderSpec {
 
@@ -27,7 +27,7 @@ object ParquetReaderSpec {
 class ParquetReaderSpec extends FlatSpec with Matchers with MockFactory {
 
   import ParquetReaderSpec._
-  import MapReader._
+  import com.mjakubowski84.parquet4s.MapReader._
 
   "iterator" should "build instance of iterator over row class containing record reader" in {
     val builder = mock[TestBuilder]
