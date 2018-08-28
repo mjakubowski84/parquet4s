@@ -1,5 +1,8 @@
 package com.mjakubowski84
 
+import java.nio.{ByteBuffer, ByteOrder}
+import java.util.TimeZone
+
 import cats.Monoid
 
 import scala.collection.generic.CanBuildFrom
@@ -70,35 +73,40 @@ trait PrimitiveValueDecoders {
 
 trait TimeValueDecoders {
 
+  /**
+    * Uses decoding that is implemented in Apache Spark.
+    */
   implicit val timestampDecoder: ValueDecoder[java.sql.Timestamp] = new ValueDecoder[java.sql.Timestamp] {
 
     override def decode(s: Any): java.sql.Timestamp = {
       s match {
-        case t: java.sql.Timestamp => t
-        case d: java.sql.Date => java.sql.Timestamp.from(d.toInstant)
+        case t: java.sql.Timestamp =>
+          t
+        case d: java.sql.Date =>
+          java.sql.Timestamp.from(d.toInstant)
         case bs: Array[Byte] =>
-          // TODO look into Spark and see how it works
-          new java.sql.Timestamp(0)
-//          val buf = ByteBuffer.wrap(bs).order(ByteOrder.LITTLE_ENDIAN)
-//          val timeOfDayNanos = buf.getLong
-//          val julianDay = buf.getInt
-//          val rawTime = DateTimeUtils.fromJulianDay(julianDay, timeOfDayNanos)
-//          new java.sql.Timestamp(DateTimeUtils.toMillis(rawTime))
+          val buf = ByteBuffer.wrap(bs).order(ByteOrder.LITTLE_ENDIAN)
+          val timeOfDayNanos = buf.getLong
+          val julianDay = buf.getInt
+          val rawTime = DateTimeUtils.fromJulianDay(julianDay, timeOfDayNanos)
+          new java.sql.Timestamp(DateTimeUtils.toMillis(rawTime))
       }
     }
   }
 
+  /**
+    * Uses decoding that is implemented in Apache Spark.
+    */
   implicit val dateDecoder: ValueDecoder[java.sql.Date] = new ValueDecoder[java.sql.Date] {
 
     override def decode(s: Any): java.sql.Date = {
       s match {
-        case t: java.sql.Timestamp => java.sql.Date.valueOf(t.toLocalDateTime.toLocalDate)
-        case d: java.sql.Date => d
-        case i : java.lang.Integer =>
-          // TODO look into Spark code and see how it works
-//          val rawTime = DateTimeUtils.daysToMillis(i, TimeZone.getTimeZone("UTC"))
-//          new java.sql.Date(rawTime)
-          new java.sql.Date(0)
+        case t: java.sql.Timestamp =>
+          java.sql.Date.valueOf(t.toLocalDateTime.toLocalDate)
+        case d: java.sql.Date =>
+          d
+        case daysSinceEpoch : java.lang.Integer =>
+          new java.sql.Date(DateTimeUtils.daysToMillis(daysSinceEpoch, TimeZone.getDefault))
       }
     }
   }
