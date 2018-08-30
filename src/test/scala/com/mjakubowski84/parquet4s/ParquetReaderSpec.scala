@@ -12,14 +12,14 @@ object ParquetReaderSpec {
 
   case class TestRow(int: Int)
 
-  def testRecord(int: Int): ParquetRowRecord = {
-    val record = new ParquetRowRecord()
+  def testRecord(int: Int): RowParquetRecord = {
+    val record = new RowParquetRecord()
     record.add(name = "int", value = int)
     record
   }
 
   private lazy val path = new Path(Paths.get(Files.createTempDir().getAbsolutePath).toString)
-  class TestReader extends HadoopParquetReader[ParquetRecord](path, null)
+  class TestReader extends HadoopParquetReader[RowParquetRecord](path, null)
   class TestBuilder extends ParquetReader.Builder(path)
 
 }

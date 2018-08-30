@@ -48,7 +48,7 @@ object MapReader
     override def read(m: Map[String, Any]): FieldType[K, H] :: T = {
       val key = witness.value.name
       // TODO consider throwing exception if subMap field is missing (key is missing in m)
-      val subMap = m.get(key).map(_.asInstanceOf[ParquetRowRecord].getMap).getOrElse(Map.empty)
+      val subMap = m.get(key).map(_.asInstanceOf[RowParquetRecord].getMap).getOrElse(Map.empty)
       val value = hReader.value.read(subMap)
       field[K](value) :: tReader.read(m)
     }
@@ -63,11 +63,11 @@ object MapReader
     override def read(m: Map[String, Any]): FieldType[K, Col[H]] :: T = {
       val key = witness.value.name
       val valuesOpt = m.get(key).map {
-        case rowRecord: ParquetRowRecord =>
+        case rowRecord: RowParquetRecord =>
           val listOfValues: List[H] = List(hReader.value.read(rowRecord.getMap))
           listOfValues.to[Col]
         case listRecord: ListParquetRecord =>
-          val listOfSubMaps: List[Map[String, Any]] = listRecord.getList.map(_.asInstanceOf[ParquetRowRecord].getMap)
+          val listOfSubMaps: List[Map[String, Any]] = listRecord.getList.map(_.asInstanceOf[RowParquetRecord].getMap)
           val listOfValues: List[H] = listOfSubMaps.map(hReader.value.read)
           listOfValues.to[Col]
         // TODO is it possible to have map record here?
