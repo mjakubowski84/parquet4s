@@ -12,9 +12,14 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
 
 
-class ParquetReadSupport extends ReadSupport[ParquetRecord] {
+class ParquetReadSupport extends ReadSupport[RowParquetRecord] {
 
-  override def prepareForRead(configuration: Configuration, keyValueMetaData: util.Map[String, String], fileSchema: MessageType, readContext: ReadSupport.ReadContext): RecordMaterializer[ParquetRecord] =
+  override def prepareForRead(
+                               configuration: Configuration,
+                               keyValueMetaData: util.Map[String, String],
+                               fileSchema: MessageType,
+                               readContext: ReadSupport.ReadContext
+                             ): RecordMaterializer[RowParquetRecord] =
     new ParquetRecordMaterializer(fileSchema)
 
   override def init(context: InitContext): ReadSupport.ReadContext = new ReadSupport.ReadContext(context.getFileSchema)
@@ -22,25 +27,33 @@ class ParquetReadSupport extends ReadSupport[ParquetRecord] {
 }
 
 
-class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[ParquetRecord] {
+class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[RowParquetRecord] {
 
-  private val root = new ParquetRecordConverter(schema)
+  private val root = new RowParquetRecordConverter(schema)
 
-  override def getCurrentRecord: ParquetRecord = root.getCurrentRecord
+  override def getCurrentRecord: RowParquetRecord = root.getCurrentRecord
 
   override def getRootConverter: GroupConverter = root
 
 }
 
-// TODO maybe it would be better if we have parquet-row-record converter and abstract ParquetRecordConverter?
-class ParquetRecordConverter(schema: GroupType, name: Option[String], parent: Option[ParquetRecordConverter]) extends GroupConverter {
+sealed trait ParquetRecord {
 
-  def this(schema: GroupType) {
-    this(schema, None, None)
-  }
+  def add(name: String, value: Any): Unit
+
+  override def toString: String
+
+}
+
+abstract class ParquetRecordConverter[R <: ParquetRecord](
+                                                           schema: GroupType,
+                                                           name: Option[String],
+                                                           parent: Option[ParquetRecordConverter[_ <: ParquetRecord]]
+                                                         ) extends GroupConverter {
+
+  protected var record: R = _
 
   private val converters: List[Converter] = schema.getFields.asScala.toList.map(createConverter)
-  protected var record: ParquetRecord = _ // TODO probably var is not needed, maybe start can be empty, check with test with multi row data
 
   private def createConverter(field: Type): Converter = {
     Option(field.getOriginalType) match {
@@ -55,20 +68,15 @@ class ParquetRecordConverter(schema: GroupType, name: Option[String], parent: Op
         new MapParquetRecordConverter(field.asGroupType(), field.getName, this)
       case Some(OriginalType.LIST) =>
         new ListParquetRecordConverter(field.asGroupType(), field.getName, this)
-
       case _ =>
-        new ParquetRecordConverter(field.asGroupType(), Option(field.getName), Some(this))
+        new RowParquetRecordConverter(field.asGroupType(), Option(field.getName), Some(this))
 
     }
   }
 
   override def getConverter(fieldIndex: Int): Converter = converters(fieldIndex)
 
-  def getCurrentRecord: ParquetRecord = record
-
-  override def start(): Unit = {
-    record = new ParquetRowRecord()
-  }
+  def getCurrentRecord: R = record
 
   override def end(): Unit = {
     parent.foreach(_.getCurrentRecord.add(name.get, record))
@@ -114,17 +122,20 @@ class ParquetRecordConverter(schema: GroupType, name: Option[String], parent: Op
 
 }
 
-trait ParquetRecord {
+class RowParquetRecordConverter(schema: GroupType, name: Option[String], parent: Option[ParquetRecordConverter[_ <: ParquetRecord]])
+  extends ParquetRecordConverter[RowParquetRecord](schema, name, parent) {
 
-  def add(name: String, value: Any): Unit
+  def this(schema: GroupType) {
+    this(schema, None, None)
+  }
 
-  override def toString: String
-
-  def toObject[T: MapReader]: T = throw new NotImplementedError(s"Object creation impossible for ${this.getClass.getSimpleName}")
-
+  override def start(): Unit = {
+    record = new RowParquetRecord()
+  }
+  
 }
 
-class ParquetRowRecord extends ParquetRecord {
+class RowParquetRecord extends ParquetRecord {
 
   private val values = ArrayBuffer.empty[(String, Any)]
 
@@ -136,7 +147,7 @@ class ParquetRowRecord extends ParquetRecord {
 
   override def toString: String = getMap.toString
 
-  override def toObject[T: MapReader]: T = MapReader.apply[T].read(getMap) // will not be needed if we read record not map
+  def toObject[T: MapReader]: T = MapReader.apply[T].read(getMap) // TODO will not be needed if we read record not map
 
 }
 
@@ -144,17 +155,18 @@ class ListParquetRecord extends ParquetRecord {
   private val values = ArrayBuffer.empty[Any]
 
   override def add(name: String, value: Any): Unit = {
-    val element = value.asInstanceOf[ParquetRowRecord].getMap("element")
+    val element = value.asInstanceOf[RowParquetRecord].getMap("element")
     values.append(element)
   }
 
+  def getList: List[Any] = values.toList
+
   override def toString: String = values.toString()
 
-  def getList: List[Any] = values.toList
 }
 
-class ListParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter)
-  extends ParquetRecordConverter(schema, Option(name), Option(parent)){
+class ListParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter[_ <: ParquetRecord])
+  extends ParquetRecordConverter[ListParquetRecord](schema, Option(name), Option(parent)){
 
   override def start(): Unit = {
     this.record = new ListParquetRecord()
@@ -164,23 +176,23 @@ class ListParquetRecordConverter(schema: GroupType, name: String, parent: Parque
 
 class MapParquetRecord extends ParquetRecord {
 
-  private val values = ArrayBuffer.empty[(Any, Any)]
+  private val values = scala.collection.mutable.Map.empty[Any, Any]
 
   override def add(name: String, value: Any): Unit = {
-    val keyValueRecord = value.asInstanceOf[ParquetRowRecord]
+    val keyValueRecord = value.asInstanceOf[RowParquetRecord]
     val mapKey = keyValueRecord.getMap("key")
     val mapValue = keyValueRecord.getMap("value")
-    values.append((mapKey, mapValue))
+    values.put(mapKey, mapValue)
   }
 
   def getMap: Map[Any, Any] = values.toMap
 
-  override def toString: String = getMap.toString()
+  override def toString: String = values.toString()
 
 }
 
-class MapParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter)
-  extends ParquetRecordConverter(schema, Option(name), Option(parent)) {
+class MapParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter[_ <: ParquetRecord])
+  extends ParquetRecordConverter[MapParquetRecord](schema, Option(name), Option(parent)) {
 
   override def start(): Unit = {
     this.record = new MapParquetRecord()

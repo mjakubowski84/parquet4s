@@ -8,7 +8,7 @@ import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 
 object ParquetReader {
 
-  type Builder = HadoopParquetReader.Builder[ParquetRecord]
+  type Builder = HadoopParquetReader.Builder[RowParquetRecord]
 
   /**
     * Creates new iterable instance of reader.
@@ -19,7 +19,7 @@ object ParquetReader {
     * @tparam T type of iterable elements
     */
   def apply[T : MapReader](path: String): ParquetReader[T] =
-    apply(HadoopParquetReader.builder[ParquetRecord](new ParquetReadSupport(), new Path(path)))
+    apply(HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)))
 
   private[mjakubowski84] def apply[T : MapReader](builder: Builder): ParquetReader[T] =
     new ParquetReaderImpl(builder)
