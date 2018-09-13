@@ -12,11 +12,7 @@ object ParquetReaderSpec {
 
   case class TestRow(int: Int)
 
-  def testRecord(int: Int): RowParquetRecord = {
-    val record = new RowParquetRecord()
-    record.add(name = "int", value = int)
-    record
-  }
+  def testRecord(int: Int): RowParquetRecord = RowParquetRecord("int" -> int)
 
   private lazy val path = new Path(Paths.get(Files.createTempDir().getAbsolutePath).toString)
   class TestReader extends HadoopParquetReader[RowParquetRecord](path, null)
@@ -27,7 +23,7 @@ object ParquetReaderSpec {
 class ParquetReaderSpec extends FlatSpec with Matchers with MockFactory {
 
   import ParquetReaderSpec._
-  import com.mjakubowski84.parquet4s.MapReader._
+  import com.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
   "iterator" should "build instance of iterator over row class containing record reader" in {
     val builder = mock[TestBuilder]

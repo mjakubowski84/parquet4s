@@ -21,8 +21,8 @@ object ParquetReaderITSpec {
   case class RowWithSetOfNestedClass(nested: Set[NestedClass])
   case class RowWithArrayOfNestedClass(nested: Array[NestedClass])
   case class RowWithSequenceOfNestedClass(nested: Seq[NestedClass])
+  case class RowWithVectorOfNestedClass(nested: Vector[NestedClass])
 
-  type Hmm[Row] = ParquetRecordDecoder[Row, RowParquetRecord]
 }
 
 class ParquetReaderITSpec
@@ -38,7 +38,7 @@ class ParquetReaderITSpec
     clearTemp()
   }
 
-  class Fixture[Row <: Product : TypeTag : Hmm](rows: Seq[Row]) {
+  class Fixture[Row <: Product : TypeTag : ParquetRecordDecoder](rows: Seq[Row]) {
     private val reader = ParquetReader[Row](tempPathString)
     writeToTemp(rows)
     try {
@@ -48,7 +48,7 @@ class ParquetReaderITSpec
     }
   }
 
-  class FixtureWithMapping[Row <: Product : TypeTag : Hmm, Mapped](rows: Seq[Row], mapping: Row => Mapped) {
+  class FixtureWithMapping[Row <: Product : TypeTag : ParquetRecordDecoder, Mapped](rows: Seq[Row], mapping: Row => Mapped) {
     private val reader = ParquetReader[Row](tempPathString)
     writeToTemp(rows)
     try {
@@ -123,6 +123,11 @@ class ParquetReaderITSpec
   it should "be able to read data with sequence of nested class" in new Fixture(Seq(
     RowWithSequenceOfNestedClass(Seq(NestedClass(1), NestedClass(2), NestedClass(3))),
     RowWithSequenceOfNestedClass(Seq.empty)
+  ))
+
+  it should "be able to read data with vector of nested class" in new Fixture(Seq(
+    RowWithVectorOfNestedClass(Vector(NestedClass(1), NestedClass(2), NestedClass(3))),
+    RowWithVectorOfNestedClass(Vector.empty)
   ))
 
 }

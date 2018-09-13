@@ -39,7 +39,9 @@ class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[
 
 sealed trait ParquetRecord {
 
-  def add(name: String, value: Any): Unit
+  type Self
+
+  def add(name: String, value: Any): Self
 
   override def toString: String
 
@@ -130,33 +132,56 @@ class RowParquetRecordConverter(schema: GroupType, name: Option[String], parent:
   }
 
   override def start(): Unit = {
-    record = new RowParquetRecord()
+    record = RowParquetRecord()
   }
   
 }
 
-class RowParquetRecord extends ParquetRecord {
+object RowParquetRecord {
+
+  def apply(entries : (String, Any)*): RowParquetRecord =
+    entries.foldLeft(new RowParquetRecord()) {
+      case (record, (key, value)) => record.add(key, value)
+    }
+
+}
+
+class RowParquetRecord private extends ParquetRecord {
+
+  override type Self = this.type
 
   private val values = ArrayBuffer.empty[(String, Any)]
 
-  def add(name: String, value: Any): Unit = {
+  override def add(name: String, value: Any): Self = {
     values.append((name, value))
+    this
   }
 
   def getMap: Map[String, Any] = values.toMap
 
   override def toString: String = getMap.toString
 
-  def toObject[T: MapReader]: T = MapReader.apply[T].read(getMap) // TODO will not be needed if we read record not map
+}
+
+object ListParquetRecord {
+
+  def apply(elements: Any*): ListParquetRecord =
+    elements.foldLeft(new ListParquetRecord()) {
+      case (record, element) => record.add("list", RowParquetRecord("element" -> element))
+    }
 
 }
 
-class ListParquetRecord extends ParquetRecord {
+class ListParquetRecord private extends ParquetRecord {
+
+  override type Self = this.type
+
   private val values = ArrayBuffer.empty[Any]
 
-  override def add(name: String, value: Any): Unit = {
+  override def add(name: String, value: Any): Self = {
     val element = value.asInstanceOf[RowParquetRecord].getMap("element")
     values.append(element)
+    this
   }
 
   def getList: List[Any] = values.toList
@@ -169,20 +194,33 @@ class ListParquetRecordConverter(schema: GroupType, name: String, parent: Parque
   extends ParquetRecordConverter[ListParquetRecord](schema, Option(name), Option(parent)){
 
   override def start(): Unit = {
-    this.record = new ListParquetRecord()
+    this.record = ListParquetRecord()
   }
 
 }
 
-class MapParquetRecord extends ParquetRecord {
+object MapParquetRecord {
+
+  def apply(entries : (String, Any)*): MapParquetRecord = {
+    entries.foldLeft(new MapParquetRecord()) {
+      case (record, (key, value)) => record.add("key_value", RowParquetRecord("key" -> key, "value" -> value))
+    }
+  }
+
+}
+
+class MapParquetRecord private extends ParquetRecord {
+
+  override type Self = this.type
 
   private val values = scala.collection.mutable.Map.empty[Any, Any]
 
-  override def add(name: String, value: Any): Unit = {
+  override def add(name: String, value: Any): Self = {
     val keyValueRecord = value.asInstanceOf[RowParquetRecord]
     val mapKey = keyValueRecord.getMap("key")
     val mapValue = keyValueRecord.getMap("value")
     values.put(mapKey, mapValue)
+    this
   }
 
   def getMap: Map[Any, Any] = values.toMap
@@ -195,7 +233,7 @@ class MapParquetRecordConverter(schema: GroupType, name: String, parent: Parquet
   extends ParquetRecordConverter[MapParquetRecord](schema, Option(name), Option(parent)) {
 
   override def start(): Unit = {
-    this.record = new MapParquetRecord()
+    this.record = MapParquetRecord()
   }
 
 }

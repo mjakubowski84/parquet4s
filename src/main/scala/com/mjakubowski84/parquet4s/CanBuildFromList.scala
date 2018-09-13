@@ -27,6 +27,13 @@ trait CanBuildFromList {
     }
   }
 
+  implicit def cbfForVector[H]: CanBuildFrom[List[H], H, Vector[H]] = {
+    new CanBuildFrom[List[H], H, Vector[H]] {
+      override def apply(from: List[H]): mutable.Builder[H, Vector[H]] = apply() ++= from
+      override def apply(): mutable.Builder[H, Vector[H]] = Vector.newBuilder[H]
+    }
+  }
+
   implicit def cbfForOption[H]: CanBuildFrom[List[H], H, Option[H]] = {
     new CanBuildFrom[List[H], H, Option[H]] {
       override def apply(from: List[H]): mutable.Builder[H, Option[H]] = {
