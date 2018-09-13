@@ -30,11 +30,13 @@ trait CanBuildFromList {
   implicit def cbfForOption[H]: CanBuildFrom[List[H], H, Option[H]] = {
     new CanBuildFrom[List[H], H, Option[H]] {
       override def apply(from: List[H]): mutable.Builder[H, Option[H]] = {
+        require(from.size <= 1, s"Input list have size of ${from.size} what is more than Option can handle.")
         from.headOption.foldLeft(apply())((b, elem) => b += elem)
       }
       override def apply(): mutable.Builder[H, Option[H]] = new mutable.Builder[H, Option[H]]  {
         private var content: Option[H] = None
         override def +=(elem: H): this.type = {
+          assert(content.isEmpty, s"Cannot add $elem to the option, option has value already assigned")
           content = Some(elem)
           this
         }

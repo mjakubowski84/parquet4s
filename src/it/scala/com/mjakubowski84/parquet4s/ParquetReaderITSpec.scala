@@ -22,6 +22,7 @@ object ParquetReaderITSpec {
   case class RowWithArrayOfNestedClass(nested: Array[NestedClass])
   case class RowWithSequenceOfNestedClass(nested: Seq[NestedClass])
 
+  type Hmm[Row] = ParquetRecordDecoder[Row, RowParquetRecord]
 }
 
 class ParquetReaderITSpec
@@ -30,14 +31,14 @@ class ParquetReaderITSpec
     with BeforeAndAfter
     with SparkHelper {
 
-  import MapReader._
+  import ParquetRecordDecoder._
   import ParquetReaderITSpec._
 
   before {
     clearTemp()
   }
 
-  class Fixture[Row <: Product : MapReader : TypeTag](rows: Seq[Row]) {
+  class Fixture[Row <: Product : TypeTag : Hmm](rows: Seq[Row]) {
     private val reader = ParquetReader[Row](tempPathString)
     writeToTemp(rows)
     try {
@@ -47,7 +48,7 @@ class ParquetReaderITSpec
     }
   }
 
-  class FixtureWithMapping[Row <: Product : MapReader : TypeTag, Mapped](rows: Seq[Row], mapping: Row => Mapped) {
+  class FixtureWithMapping[Row <: Product : TypeTag : Hmm, Mapped](rows: Seq[Row], mapping: Row => Mapped) {
     private val reader = ParquetReader[Row](tempPathString)
     writeToTemp(rows)
     try {

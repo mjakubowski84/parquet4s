@@ -18,16 +18,17 @@ object ParquetReader {
     * @param path URI to read the files from
     * @tparam T type of iterable elements
     */
-  def apply[T : MapReader](path: String): ParquetReader[T] =
+  def apply[T](path: String)(implicit decoder: ParquetRecordDecoder[T, RowParquetRecord]): ParquetReader[T] =
     apply(HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)))
 
-  private[mjakubowski84] def apply[T : MapReader](builder: Builder): ParquetReader[T] =
+  private[mjakubowski84] def apply[T](builder: Builder)(implicit decoder: ParquetRecordDecoder[T, RowParquetRecord]): ParquetReader[T] =
     new ParquetReaderImpl(builder)
 }
 
 trait ParquetReader[T] extends Iterable[T] with Closeable
 
-private class ParquetReaderImpl[T : MapReader](builder: ParquetReader.Builder) extends ParquetReader[T] {
+private class ParquetReaderImpl[T](builder: ParquetReader.Builder)(implicit decoder: ParquetRecordDecoder[T, RowParquetRecord])
+    extends ParquetReader[T] {
 
   private val openCloseables = new scala.collection.mutable.ArrayBuffer[Closeable]()
 
@@ -40,7 +41,7 @@ private class ParquetReaderImpl[T : MapReader](builder: ParquetReader.Builder) e
 
     override def hasNext: Boolean = {
       if (!recordPreRead) {
-        nextRecord = Option(reader.read()).map(_.toObject)
+        nextRecord = Option(reader.read()).map(ParquetRecordDecoder.decode[T, RowParquetRecord])
         recordPreRead = true
       }
       nextRecord.nonEmpty
@@ -48,7 +49,7 @@ private class ParquetReaderImpl[T : MapReader](builder: ParquetReader.Builder) e
 
     override def next(): T = {
       if (!recordPreRead) {
-        nextRecord = Option(reader.read()).map(_.toObject)
+        nextRecord = Option(reader.read()).map(ParquetRecordDecoder.decode[T, RowParquetRecord])
         recordPreRead = true
       }
 
