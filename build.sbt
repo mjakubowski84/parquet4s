@@ -16,8 +16,6 @@ lazy val libraryDependencies = {
     "org.apache.parquet" % "parquet-hadoop" % parquetVersion,
     "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
     "com.chuusai" %% "shapeless" % "2.3.3",
-    "org.typelevel" %% "cats-core" % "1.1.0", // TODO probably will not be needed
-
 
     // tests
     "org.scalamock" %% "scalamock" % "4.1.0" % "test",

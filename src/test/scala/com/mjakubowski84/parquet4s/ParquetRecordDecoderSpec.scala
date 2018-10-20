@@ -22,6 +22,32 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     ParquetRecordDecoder.decode[Primitives](record) should be(data)
   }
 
+  it should "throw exception if record is missing data for non-optional field" in {
+    case class Row(requiredField: Int)
+
+    val record = RowParquetRecord()
+
+    a[ParquetRecordDecoder.DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
+  }
+
+  it should "decode record with optional field that has no value" in {
+    case class Row(optionalField: Option[Int])
+
+    val record = RowParquetRecord()
+
+    ParquetRecordDecoder.decode[Row](record) should be(Row(None))
+  }
+
+
+  it should "throw exception if type of input filed does not match expected type" in {
+    case class Row(int: Int)
+
+    val record = RowParquetRecord("int" -> "I am string but I should be int")
+
+    // TODO should be DecodingException with nice explanation
+    a[scala.MatchError] should be thrownBy ParquetRecordDecoder.decode[Row](record)
+  }
+
   "Product decoder" should "decode record containing nested records" in {
     case class NestedRow(int: Int, string: String)
     case class Row(nested1: NestedRow, nested2: NestedRow)
@@ -34,6 +60,24 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     )
 
     ParquetRecordDecoder.decode[Row](record) should be(data)
+  }
+
+  it should "throw exception if record is missing data for field" in {
+    case class NestedRow(int: Int, string: String)
+    case class Row(nested: NestedRow)
+
+    val record = RowParquetRecord()
+
+    a[ParquetRecordDecoder.DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
+  }
+
+  it should "throw exception if input record does not match expected type" in {
+    case class NestedRow(int: Int, string: String)
+    case class Row(nested: NestedRow)
+
+    val record = RowParquetRecord("nested" -> ListParquetRecord("a", "b", "c"))
+
+    a[ParquetRecordDecoder.DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
   }
 
   "Collection of products decoder" should "decode record containing optional nested record" in {
@@ -54,7 +98,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     case class NestedRow(int: Int)
     case class Row(sequence: Seq[NestedRow])
 
-    val dataWithSome = Row(Seq(NestedRow(1), NestedRow(2), NestedRow(3)))
+    val data = Row(Seq(NestedRow(1), NestedRow(2), NestedRow(3)))
 
     val listParquetRecord = ListParquetRecord(
       RowParquetRecord("int" -> 1),
@@ -64,14 +108,14 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
     val record = RowParquetRecord("sequence" -> listParquetRecord)
 
-    ParquetRecordDecoder.decode[Row](record) should be(dataWithSome)
+    ParquetRecordDecoder.decode[Row](record) should be(data)
   }
 
   it should "decode record containing list of nested records" in {
     case class NestedRow(int: Int)
     case class Row(list: List[NestedRow])
 
-    val dataWithSome = Row(List(NestedRow(1), NestedRow(2), NestedRow(3)))
+    val data = Row(List(NestedRow(1), NestedRow(2), NestedRow(3)))
 
     val listParquetRecord = ListParquetRecord(
       RowParquetRecord("int" -> 1),
@@ -81,14 +125,14 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
     val record = RowParquetRecord("list" -> listParquetRecord)
 
-    ParquetRecordDecoder.decode[Row](record) should be(dataWithSome)
+    ParquetRecordDecoder.decode[Row](record) should be(data)
   }
 
   it should "decode record containing array of nested records" in {
     case class NestedRow(int: Int)
     case class Row(array: Array[NestedRow])
 
-    val dataWithSome = Row(Array(NestedRow(1), NestedRow(2), NestedRow(3)))
+    val data = Row(Array(NestedRow(1), NestedRow(2), NestedRow(3)))
 
     val listParquetRecord = ListParquetRecord(
       RowParquetRecord("int" -> 1),
@@ -98,14 +142,14 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
     val record = RowParquetRecord("array" -> listParquetRecord)
 
-    ParquetRecordDecoder.decode[Row](record).array should be(dataWithSome.array)
+    ParquetRecordDecoder.decode[Row](record).array should be(data.array)
   }
 
   it should "decode record containing vector of nested records" in {
     case class NestedRow(int: Int)
     case class Row(vector: Vector[NestedRow])
 
-    val dataWithSome = Row(Vector(NestedRow(1), NestedRow(2), NestedRow(3)))
+    val data = Row(Vector(NestedRow(1), NestedRow(2), NestedRow(3)))
 
     val listParquetRecord = ListParquetRecord(
       RowParquetRecord("int" -> 1),
@@ -115,14 +159,14 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
     val record = RowParquetRecord("vector" -> listParquetRecord)
 
-    ParquetRecordDecoder.decode[Row](record) should be(dataWithSome)
+    ParquetRecordDecoder.decode[Row](record) should be(data)
   }
 
   it should "decode record containing set of nested records" in {
     case class NestedRow(int: Int)
     case class Row(set: Set[NestedRow])
 
-    val dataWithSome = Row(Set(NestedRow(1), NestedRow(2), NestedRow(3)))
+    val data = Row(Set(NestedRow(1), NestedRow(2), NestedRow(3)))
 
     val listParquetRecord = ListParquetRecord(
       RowParquetRecord("int" -> 1),
@@ -132,7 +176,16 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
     val record = RowParquetRecord("set" -> listParquetRecord)
 
-    ParquetRecordDecoder.decode[Row](record) should be(dataWithSome)
+    ParquetRecordDecoder.decode[Row](record) should be(data)
+  }
+
+  it should "throw exception if input does not match expected type" in {
+    case class NestedRow(int: Int)
+    case class Row(set: Set[NestedRow])
+
+    val record = RowParquetRecord("set" -> MapParquetRecord("a" -> 1))
+
+    a[DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
   }
 
 }

@@ -1,6 +1,5 @@
 package com.mjakubowski84.parquet4s
 
-import cats.Monoid
 import shapeless.labelled.{FieldType, field}
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
@@ -14,10 +13,32 @@ trait ParquetRecordDecoder[T] {
 
 }
 
+
+trait CanBeEmpty[T] {
+  def canBeEmpty: Boolean
+  def emptyValue: T
+}
+
+trait CanBeEmpties {
+
+  implicit def optCanBeEmpty[T]: CanBeEmpty[Option[T]] = new CanBeEmpty[Option[T]] {
+    override val canBeEmpty: Boolean = true
+    override val emptyValue: Option[T] = None
+  }
+
+  implicit def defaultCanBeEmpty[T]: CanBeEmpty[T] = new CanBeEmpty[T] {
+    override val canBeEmpty: Boolean = false
+    override def emptyValue: T = throw new UnsupportedOperationException("No empty value can be provided.")
+  }
+
+}
+
 object ParquetRecordDecoder
-  extends cats.instances.AllInstances
-    with CanBuildFromList
+  extends CanBuildFromList
+    with CanBeEmpties
     with AllValueDecoders {
+
+  case class DecodingException(msg: String) extends RuntimeException(msg)
 
   def apply[T](implicit ev: ParquetRecordDecoder[T]): ParquetRecordDecoder[T] = ev
 
@@ -27,54 +48,55 @@ object ParquetRecordDecoder
     override def decode(record: RowParquetRecord): HNil.type = HNil
   }
 
-  implicit def headValueDecoder[Key <: Symbol, Head, Tail <: HList](implicit
-                                                                    witness: Witness.Aux[Key],
-                                                                    headDecoder: ValueDecoder[Head],
-                                                                    headMonoid: Monoid[Head],
-                                                                    tailDecoder: ParquetRecordDecoder[Tail]
-                                                                   ): ParquetRecordDecoder[FieldType[Key, Head] :: Tail] =
-    new ParquetRecordDecoder[FieldType[Key, Head] :: Tail] {
-      override def decode(record: RowParquetRecord): FieldType[Key, Head] :: Tail = {
-        val key = witness.value.name
-        // TODO consider throwing exception in place of using a monoid in case of missing entry in map for the key
-        val value = record.getMap.get(key).map(headDecoder.decode).getOrElse(headMonoid.empty)
-        field[Key](value) :: tailDecoder.decode(record)
+  implicit def headValueDecoder[FieldName <: Symbol, Head, Tail <: HList](implicit
+                                                                          witness: Witness.Aux[FieldName],
+                                                                          headDecoder: ValueDecoder[Head],
+                                                                          tailDecoder: ParquetRecordDecoder[Tail],
+                                                                          canBeEmpty: CanBeEmpty[Head]
+                                                                         ): ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] =
+    new ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] {
+      override def decode(record: RowParquetRecord): FieldType[FieldName, Head] :: Tail = {
+        val fieldName = witness.value.name
+
+        val value = record.getMap.get(fieldName).map(headDecoder.decode).getOrElse {
+          if (canBeEmpty.canBeEmpty) canBeEmpty.emptyValue
+          else throw DecodingException(s"Missing field $fieldName in record: $record")
+        }
+        field[FieldName](value) :: tailDecoder.decode(record)
       }
     }
 
-  implicit def headProductDecoder[Key <: Symbol, Head, Tail <: HList](implicit
-                                                                      witness: Witness.Aux[Key],
-                                                                      headDecoder: Lazy[ParquetRecordDecoder[Head]],
-                                                                      tailDecoder: ParquetRecordDecoder[Tail]
-                                                                     ): ParquetRecordDecoder[FieldType[Key, Head] :: Tail] =
-    new ParquetRecordDecoder[FieldType[Key, Head] :: Tail] {
-      override def decode(record: RowParquetRecord): FieldType[Key, Head] :: Tail = {
-        val key = witness.value.name
-        record.getMap.get(key) match {
+  implicit def headProductDecoder[FieldName <: Symbol, Head, Tail <: HList](implicit
+                                                                            witness: Witness.Aux[FieldName],
+                                                                            headDecoder: Lazy[ParquetRecordDecoder[Head]],
+                                                                            tailDecoder: ParquetRecordDecoder[Tail]
+                                                                           ): ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] =
+    new ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] {
+      override def decode(record: RowParquetRecord): FieldType[FieldName, Head] :: Tail = {
+        val fieldName = witness.value.name
+        record.getMap.get(fieldName) match {
           case Some(nestedRecord: RowParquetRecord) =>
             val value = headDecoder.value.decode(nestedRecord)
-            field[Key](value) :: tailDecoder.decode(record)
+            field[FieldName](value) :: tailDecoder.decode(record)
           case Some(other) =>
-            // TODO introduce proper exception type and proper message
-            throw new RuntimeException(s"$other of type ${other.getClass.getCanonicalName} is unexpected input for $key")
+            throw DecodingException(s"$other is unexpected input for field $fieldName in record: $record")
           case None =>
-            // TODO introduce proper exception type and proper message
-            throw new RuntimeException(s"Missing input for required field $key")
+            throw DecodingException(s"Missing field $fieldName in record: $record")
         }
       }
     }
 
 
-  implicit def headCollectionOfProductsDecoder[Key <: Symbol, Head, Col[_], Tail <: HList](implicit
-                                                                                           witness: Witness.Aux[Key],
-                                                                                           headDecoder: Lazy[ParquetRecordDecoder[Head]],
-                                                                                           tailDecoder: ParquetRecordDecoder[Tail],
-                                                                                           cbf: CanBuildFrom[List[Head], Head, Col[Head]]
-                                                                                          ): ParquetRecordDecoder[FieldType[Key, Col[Head]] :: Tail] =
-    new ParquetRecordDecoder[FieldType[Key, Col[Head]] :: Tail] {
-      override def decode(record: RowParquetRecord): FieldType[Key, Col[Head]] :: Tail = {
-        val key = witness.value.name
-        val values = record.getMap.get(key) match {
+  implicit def headCollectionOfProductsDecoder[FieldName <: Symbol, Head, Col[_], Tail <: HList](implicit
+                                                                                                 witness: Witness.Aux[FieldName],
+                                                                                                 headDecoder: Lazy[ParquetRecordDecoder[Head]],
+                                                                                                 tailDecoder: ParquetRecordDecoder[Tail],
+                                                                                                 cbf: CanBuildFrom[List[Head], Head, Col[Head]]
+                                                                                                ): ParquetRecordDecoder[FieldType[FieldName, Col[Head]] :: Tail] =
+    new ParquetRecordDecoder[FieldType[FieldName, Col[Head]] :: Tail] {
+      override def decode(record: RowParquetRecord): FieldType[FieldName, Col[Head]] :: Tail = {
+        val fieldName = witness.value.name
+        val values = record.getMap.get(fieldName) match {
           case Some(rowRecord: RowParquetRecord) =>
             val listOfValues: List[Head] = List(headDecoder.value.decode(rowRecord))
             listOfValues.to[Col]
@@ -83,12 +105,11 @@ object ParquetRecordDecoder
             val listOfValues: List[Head] = listOfNestedRecords.map(headDecoder.value.decode)
             listOfValues.to[Col]
           case Some(other) =>
-            // TODO proper exception with proper message
-            throw new RuntimeException(s"Unexpected input: $other")
+            throw DecodingException(s"$other is unexpected input for field $fieldName in record: $record")
           case None =>
             cbf().result()
         }
-        field[Key](values) :: tailDecoder.decode(record)
+        field[FieldName](values) :: tailDecoder.decode(record)
       }
     }
 

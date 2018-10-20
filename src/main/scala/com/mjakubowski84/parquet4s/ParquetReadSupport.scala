@@ -159,7 +159,10 @@ class RowParquetRecord private extends ParquetRecord {
 
   def getMap: Map[String, Any] = values.toMap
 
-  override def toString: String = getMap.toString
+  override def toString: String =
+    values
+      .map { case (key, value) => s"$key=$value"}
+      .mkString(getClass.getSimpleName + " (", ",", ")")
 
 }
 
@@ -186,7 +189,7 @@ class ListParquetRecord private extends ParquetRecord {
 
   def getList: List[Any] = values.toList
 
-  override def toString: String = values.toString()
+  override def toString: String = values.mkString(getClass.getSimpleName + " (", ",", ")")
 
 }
 
@@ -225,7 +228,10 @@ class MapParquetRecord private extends ParquetRecord {
 
   def getMap: Map[Any, Any] = values.toMap
 
-  override def toString: String = values.toString()
+  override def toString: String =
+    values
+      .map { case (key, value) => s"$key=$value"}
+      .mkString(getClass.getSimpleName + " (", ",", ")")
 
 }
 

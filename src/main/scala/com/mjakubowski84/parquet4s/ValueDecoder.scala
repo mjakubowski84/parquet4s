@@ -3,11 +3,8 @@ package com.mjakubowski84.parquet4s
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.TimeZone
 
-import cats.Monoid
-
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
-import scala.reflect.ClassTag
 
 
 trait ValueDecoder[T] {
@@ -24,13 +21,6 @@ trait PrimitiveValueDecoders {
       s match {
         case b : Boolean => b
       }
-    }
-  }
-
-  implicit val booleanMonoid: Monoid[Boolean] = new Monoid[Boolean] {
-    override def empty: Boolean = false
-    override def combine(x: Boolean, y: Boolean): Boolean = {
-      x || y
     }
   }
 
@@ -111,21 +101,6 @@ trait TimeValueDecoders {
     }
   }
 
-  implicit val timestampMonoid: Monoid[java.sql.Timestamp] = new Monoid[java.sql.Timestamp] {
-    override def empty: java.sql.Timestamp = new java.sql.Timestamp(0)
-    override def combine(x: java.sql.Timestamp, y: java.sql.Timestamp): java.sql.Timestamp = {
-      if (x.after(y)) x
-      else y
-    }
-  }
-
-  implicit val dateMonoid: Monoid[java.sql.Date] = new Monoid[java.sql.Date] {
-    override def empty: java.sql.Date = new java.sql.Date(0)
-    override def combine(x: java.sql.Date, y: java.sql.Date): java.sql.Date = {
-      if (x.after(y)) x
-      else y
-    }
-  }
 }
 
 trait CollectionValueDecoders {
@@ -138,20 +113,6 @@ trait CollectionValueDecoders {
         case other: T =>
           List(other).to[Col]
       }
-    }
-  }
-
-  implicit def arrayMonoid[T : ClassTag]: Monoid[Array[T]] = new Monoid[Array[T]] {
-    override def empty: Array[T] = Array.empty
-    override def combine(x: Array[T], y: Array[T]): Array[T] = {
-      x ++ y
-    }
-  }
-
-  implicit def seqMonoid[T : ClassTag]: Monoid[Seq[T]] = new Monoid[Seq[T]] {
-    override def empty: Seq[T] = Seq.empty
-    override def combine(x: Seq[T], y: Seq[T]): Seq[T] = {
-      x ++ y
     }
   }
 
