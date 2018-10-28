@@ -44,8 +44,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
     val record = RowParquetRecord("int" -> "I am string but I should be int")
 
-    // TODO should be DecodingException with nice explanation
-    a[scala.MatchError] should be thrownBy ParquetRecordDecoder.decode[Row](record)
+    a[ParquetRecordDecoder.DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
   }
 
   "Product decoder" should "decode record containing nested records" in {
