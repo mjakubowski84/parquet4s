@@ -5,6 +5,7 @@ import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
+import scala.util.{Failure, Success, Try}
 
 
 trait ParquetRecordDecoder[T] {
@@ -38,6 +39,13 @@ object ParquetRecordDecoder
     with CanBeEmpties
     with AllValueDecoders {
 
+  object DecodingException {
+    def apply(msg: String, cause: Throwable): DecodingException = {
+      val decodingException = DecodingException(msg)
+      decodingException.initCause(cause)
+      decodingException
+    }
+  }
   case class DecodingException(msg: String) extends RuntimeException(msg)
 
   def apply[T](implicit ev: ParquetRecordDecoder[T]): ParquetRecordDecoder[T] = ev
@@ -57,10 +65,15 @@ object ParquetRecordDecoder
     new ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] {
       override def decode(record: RowParquetRecord): FieldType[FieldName, Head] :: Tail = {
         val fieldName = witness.value.name
-
-        val value = record.getMap.get(fieldName).map(headDecoder.decode).getOrElse {
-          if (canBeEmpty.canBeEmpty) canBeEmpty.emptyValue
-          else throw DecodingException(s"Missing field $fieldName in record: $record")
+        val value = record.getMap.get(fieldName).map(value => Try(headDecoder.decode(value))) match {
+          case Some(Success(decodedValue)) =>
+            decodedValue
+          case Some(Failure(cause)) =>
+            throw DecodingException(s"Failed to decode field $fieldName in record: $record", cause)
+          case None if canBeEmpty.canBeEmpty =>
+            canBeEmpty.emptyValue
+          case None =>
+            throw DecodingException(s"Missing field $fieldName in record: $record")
         }
         field[FieldName](value) :: tailDecoder.decode(record)
       }
