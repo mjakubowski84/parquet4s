@@ -22,6 +22,7 @@ object ParquetReaderITSpec {
   case class RowWithArrayOfNestedClass(nested: Array[NestedClass])
   case class RowWithSequenceOfNestedClass(nested: Seq[NestedClass])
   case class RowWithVectorOfNestedClass(nested: Vector[NestedClass])
+  case class RowWithMapOfNestedClassAsValue(nested: Map[String, NestedClass])
 
 }
 
@@ -128,6 +129,11 @@ class ParquetReaderITSpec
   it should "be able to read data with vector of nested class" in new Fixture(Seq(
     RowWithVectorOfNestedClass(Vector(NestedClass(1), NestedClass(2), NestedClass(3))),
     RowWithVectorOfNestedClass(Vector.empty)
+  ))
+
+  it should "be able to read data with map that contains nested class as a value" in new Fixture(Seq(
+    RowWithMapOfNestedClassAsValue(Map("1" -> NestedClass(1), "2" -> NestedClass(2), "3" -> NestedClass(3))),
+    RowWithMapOfNestedClassAsValue(Map.empty)
   ))
 
 }
