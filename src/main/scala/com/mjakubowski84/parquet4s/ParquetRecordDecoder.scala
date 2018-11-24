@@ -5,6 +5,7 @@ import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 
@@ -99,7 +100,6 @@ object ParquetRecordDecoder
       }
     }
 
-
   implicit def headCollectionOfProductsDecoder[FieldName <: Symbol, Head, Col[_], Tail <: HList](implicit
                                                                                                  witness: Witness.Aux[FieldName],
                                                                                                  headDecoder: Lazy[ParquetRecordDecoder[Head]],
@@ -121,6 +121,33 @@ object ParquetRecordDecoder
             throw DecodingException(s"$other is unexpected input for field $fieldName in record: $record")
           case None =>
             cbf().result()
+        }
+        field[FieldName](values) :: tailDecoder.decode(record)
+      }
+    }
+
+  implicit def headMapOfProductsDecoder[FieldName <: Symbol, Key, Value, Tail <: HList](implicit
+                                                                                        witness: Witness.Aux[FieldName],
+                                                                                        mapKeyDecoder: ValueDecoder[Key],
+                                                                                        mapValueDecoder: Lazy[ParquetRecordDecoder[Value]],
+                                                                                        tailDecoder: ParquetRecordDecoder[Tail]
+                                                                                      ): ParquetRecordDecoder[FieldType[FieldName, Map[Key, Value]] :: Tail] =
+    new ParquetRecordDecoder[FieldType[FieldName, Map[Key, Value]] :: Tail] {
+      override def decode(record: RowParquetRecord): FieldType[FieldName, Map[Key, Value]] :: Tail = {
+        val fieldName = witness.value.name
+        val values = record.getMap.get(fieldName) match {
+          case Some(mapRecord: MapParquetRecord) =>
+            for ((mapKey, mapValue: RowParquetRecord) <- mapRecord.getMap) yield {
+              val decodedKey = try mapKeyDecoder.decode(mapKey) catch {
+                case NonFatal(cause) =>
+                  throw DecodingException(s"Failed to decode a key $mapKey of a map field $fieldName in record: $record", cause)
+              }
+              decodedKey -> mapValueDecoder.value.decode(mapValue)
+            }
+          case Some(other) =>
+            throw DecodingException(s"$other is unexpected input for field $fieldName in record: $record")
+          case None =>
+            Map.empty[Key, Value]
         }
         field[FieldName](values) :: tailDecoder.decode(record)
       }
