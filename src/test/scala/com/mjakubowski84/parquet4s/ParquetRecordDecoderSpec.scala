@@ -187,4 +187,36 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     a[DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
   }
 
+  "Map of products decoder" should "decode record containing map of records" in {
+    case class NestedRow(int: Int)
+    case class Row(nestedMap: Map[String, NestedRow])
+
+    val dataWithMap = Row(Map("1" -> NestedRow(1), "2" -> NestedRow(2)))
+    val dataWithEmptyMap = Row(Map.empty[String, NestedRow])
+
+    val record = RowParquetRecord()
+    ParquetRecordDecoder.decode[Row](record) should be(dataWithEmptyMap)
+
+    record.add("nestedMap", MapParquetRecord("1" -> RowParquetRecord("int" -> 1), "2" -> RowParquetRecord("int" -> 2)))
+    ParquetRecordDecoder.decode[Row](record) should be(dataWithMap)
+  }
+
+  it should "throw exception when failed to decode a key of a map" in {
+    case class NestedRow(int: Int)
+    case class Row(nestedMap: Map[Int, NestedRow])
+
+    val record = RowParquetRecord("nestedMap" -> MapParquetRecord("invalidKey" -> RowParquetRecord("int" -> 1)))
+
+    a[DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
+  }
+
+  it should "throw exception when encountered implementation of ParquetRecord unsuitable for map" in {
+    case class NestedRow(int: Int)
+    case class Row(nestedMap: Map[String, NestedRow])
+
+    val record = RowParquetRecord("nestedMap" -> ListParquetRecord("key" -> RowParquetRecord("int" -> 1)))
+
+    a[DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
+  }
+
 }
