@@ -2,4 +2,6 @@
 *.log
 *.iml
 
+.idea
 target
+spark-warehouse
