@@ -1,4 +1,4 @@
-package com.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s
 
 import shapeless.labelled.{FieldType, field}
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}

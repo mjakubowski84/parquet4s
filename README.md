@@ -30,8 +30,8 @@ Following you can see examples how to read Parquet from local files or AWS S3.
 ## Local files
 
 ```scala
-import com.mjakubowski84.parquet4s.ParquetReader
-import com.mjakubowski84.parquet4s.ParquetRecordDecoder._
+import com.github.mjakubowski84.parquet4s.ParquetReader
+import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
@@ -59,8 +59,8 @@ export AWS_SECRET_ACCESS_KEY=my.secret.key
 And then just use the iterable:
 
 ```scala
-import com.mjakubowski84.parquet4s.ParquetReader
-import com.mjakubowski84.parquet4s.ParquetRecordDecoder._
+import com.github.mjakubowski84.parquet4s.ParquetReader
+import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
 case class Data(id: Int, name: String, description: String)
 

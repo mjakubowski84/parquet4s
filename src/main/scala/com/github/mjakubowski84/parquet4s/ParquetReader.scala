@@ -1,4 +1,4 @@
-package com.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s
 
 import java.io.Closeable
 
