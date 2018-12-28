@@ -31,7 +31,7 @@ lazy val root = (project in file("."))
   .configs(IntegrationTest)
   .settings(
     Keys.name := "parquet4s",
-    Keys.organization := "com.mjakubowski84",
+    Keys.organization := "com.github.mjakubowski84",
     Keys.version := "0.1.0",
     Keys.isSnapshot := true,
     Keys.scalaVersion := "2.11.12",

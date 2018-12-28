@@ -1,4 +1,4 @@
-package com.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s
 
 import java.nio.file.Paths
 
@@ -23,7 +23,7 @@ object ParquetReaderSpec {
 class ParquetReaderSpec extends FlatSpec with Matchers with MockFactory {
 
   import ParquetReaderSpec._
-  import com.mjakubowski84.parquet4s.ParquetRecordDecoder._
+  import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
   "iterator" should "build instance of iterator over row class containing record reader" in {
     val builder = mock[TestBuilder]
