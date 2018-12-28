@@ -9,8 +9,8 @@ lazy val itSettings = Defaults.itSettings ++ Project.inConfig(IntegrationTest)(S
 ))
 
 lazy val libraryDependencies = {
-  val parquetVersion = "1.8.3"
-  val sparkVersion = "2.3.1"
+  val parquetVersion = "1.10.0"
+  val sparkVersion = "2.4.0"
   val hadoopVersion = "2.9.1"
   Seq(
     "org.apache.parquet" % "parquet-hadoop" % parquetVersion,
@@ -33,8 +33,9 @@ lazy val root = (project in file("."))
     Keys.name := "parquet4s",
     Keys.organization := "com.mjakubowski84",
     Keys.version := "0.1.0",
+    Keys.isSnapshot := true,
     Keys.scalaVersion := "2.11.12",
-    Keys.crossScalaVersions := Seq("2.11.8", "2.12.6"),
+    Keys.crossScalaVersions := Seq("2.11.12", "2.12.8"),
     Keys.scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8"),
     Keys.javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature"),
     Keys.resolvers := resolvers,
@@ -64,7 +65,7 @@ lazy val root = (project in file("."))
     Keys.publishMavenStyle := true,
     Keys.publishTo := Some(
       if (isSnapshot.value)
-        Opts.resolver.sonatypeSnapshots
+        Opts.resolver.mavenLocalFile
       else
         Opts.resolver.sonatypeStaging
     ),

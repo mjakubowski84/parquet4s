@@ -37,6 +37,7 @@ jobs:
         paths:
         - ~/.ivy2
         - ~/.sbt
+        - ~/.m2
         key: v1-deps--{{ checksum "build.sbt" }}
 
     # run tests!
