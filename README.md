@@ -17,11 +17,13 @@ Based on official Parquet library, Hadoop Client and Shapeless.
 Add the library to your dependencies:
 
 ```
-"com.mjakubowski84" %% "parquet4s" % "0.1.0"
+"com.github.mjakubowski84" %% "parquet4s" % "0.1.0"
 
 ```
 
 The library contains simple implementation of Scala's Iterable that allows reading Parquet from a single file or a directory.
+You may also use `org.apache.parquet.hadoop.ParquetReader` directly and use our `RowParquetRecord` and `ParquetRecordDecoder`
+to decode your data.
 
 Library supports by default connection to your local files and hdfs. There's also plenty of connectors to other systems like
 Google Storage, Amazon's S3, Azure, OpenStack. Please look at Hadoop's or your storage provider's documentation.
@@ -35,7 +37,9 @@ import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
-ParquetReader[User]("file:///data/users").foreach(println)
+val parquetIterable = ParquetReader[User]("file:///data/users")
+parquetIterable.foreach(println)
+parquetIterable.close()
 
 ```
 
@@ -64,6 +68,8 @@ import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
 case class Data(id: Int, name: String, description: String)
 
-ParquetReader[Data]("s3a:/my-bucket/data").foreach(println)
+val parquetIterable = ParquetReader[Data]("s3a:/my-bucket/data")
+parquetIterable.foreach(println)
+parquetIterable.close()
 
 ```

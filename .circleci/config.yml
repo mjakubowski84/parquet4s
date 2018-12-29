@@ -1,44 +1,82 @@
-# Scala CircleCI 2.0 configuration file
-#
-# Check https://circleci.com/docs/2.0/sample-config/ for more details
-#
-version: 2
+version: 2.0
+
 jobs:
+
   build:
     docker:
-    # specify the version you desire here
-    - image: circleci/openjdk:8-jdk
-
-    # Specify service dependencies here if necessary
-    # CircleCI maintains a library of pre-built images
-    # documented at https://circleci.com/docs/2.0/circleci-images/
-    # - image: circleci/postgres:9.4
-
+      - image: circleci/openjdk:8-jdk
     working_directory: ~/repo
-
     environment:
-      # Customize the JVM maximum heap limit
-      JVM_OPTS: -Xmx3200m
+      JVM_OPTS: -Xmx1024m
       TERM: dumb
-
     steps:
-    - checkout
+      - checkout
+      # Download cached dependencies
+      - restore_cache:
+          keys:
+          - v1-deps-{{ checksum "build.sbt" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-deps-
+      # compile all sources
+      - run: cat /dev/null | sbt test:compile it:compile
+      # cache dependencies
+      - save_cache:
+          paths:
+          - ~/.ivy2
+          - ~/.sbt
+          key: v1-deps--{{ checksum "build.sbt" }}
+      # run tests!
+      - run: cat /dev/null | sbt test it:test
 
-    # Download and cache dependencies
-    - restore_cache:
-        keys:
-        - v1-deps-{{ checksum "build.sbt" }}
-        # fallback to using the latest cache if no exact match is found
-        - v1-deps-
+  deploy:
+    docker:
+      - image: circleci/openjdk:8-jdk
+    working_directory: ~/repo
+    environment:
+      JVM_OPTS: -Xmx1024m
+      TERM: dumb
+    steps:
+      - checkout
+      # set required GPG_TTY
+      - run: echo 'export GPG_TTY=$(tty)' >> $BASH_ENV
+      # import public key
+      - run: echo $GPG_PUBLIC_KEY | base64 --decode | gpg --import --batch --no-tty --yes
+      # import private key
+      - run: echo $GPG_PRIVATE_KEY | base64 --decode | gpg --import --batch --no-tty --yes
+      # download cached dependencies
+      - restore_cache:
+          keys:
+            - v1-deps-{{ checksum "build.sbt" }}
+            - v1-deps-
+      # build
+      - run: cat /dev/null | sbt packageBin
+      - run: cat /dev/null | sbt packageDoc
+      - run: cat /dev/null | sbt packageSrc
+      # create Pom
+      - run: cat /dev/null | sbt makePom
+      # sign!
+      - run: gpg --no-default-keyring --keyring /home/circleci/.gnupg/pubring.kbx --detach-sign --armor --pinentry-mode loopback --passphrase $GPG_PASSWORD --output /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0.pom.asc /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0.pom
+      - run: gpg --no-default-keyring --keyring /home/circleci/.gnupg/pubring.kbx --detach-sign --armor --pinentry-mode loopback --passphrase $GPG_PASSWORD --output /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0.jar.asc /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0.jar
+      - run: gpg --no-default-keyring --keyring /home/circleci/.gnupg/pubring.kbx --detach-sign --armor --pinentry-mode loopback --passphrase $GPG_PASSWORD --output /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0-javadoc.jar.asc /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0-javadoc.jar
+      - run: gpg --no-default-keyring --keyring /home/circleci/.gnupg/pubring.kbx --detach-sign --armor --pinentry-mode loopback --passphrase $GPG_PASSWORD --output /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0-sources.jar.asc /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0-sources.jar
+      # publish TODO misses asc files :(
+      - run: cat /dev/null | sbt publish
+      # cache dependencies
+      - save_cache:
+          paths:
+            - ~/.ivy2
+            - ~/.sbt
+          key: v1-deps--{{ checksum "build.sbt" }}
 
-    - run: cat /dev/null | sbt test:compile it:compile
-
-    - save_cache:
-        paths:
-        - ~/.ivy2
-        - ~/.sbt
-        - ~/.m2
-        key: v1-deps--{{ checksum "build.sbt" }}
-
-    # run tests!
-    - run: cat /dev/null | sbt test it:test
+workflows:
+  version: 2
+  
+  trying-stage:
+    jobs:
+      - build
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: stage
