@@ -28,7 +28,7 @@ jobs:
       # run tests!
       - run: cat /dev/null | sbt test it:test
 
-  deploy:
+  release:
     docker:
       - image: circleci/openjdk:8-jdk
     working_directory: ~/repo
@@ -48,19 +48,10 @@ jobs:
           keys:
             - v1-deps-{{ checksum "build.sbt" }}
             - v1-deps-
-      # build
-      - run: cat /dev/null | sbt packageBin
-      - run: cat /dev/null | sbt packageDoc
-      - run: cat /dev/null | sbt packageSrc
-      # create Pom
-      - run: cat /dev/null | sbt makePom
-      # sign!
-      - run: gpg --no-default-keyring --keyring /home/circleci/.gnupg/pubring.kbx --detach-sign --armor --pinentry-mode loopback --passphrase $GPG_PASSWORD --output /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0.pom.asc /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0.pom
-      - run: gpg --no-default-keyring --keyring /home/circleci/.gnupg/pubring.kbx --detach-sign --armor --pinentry-mode loopback --passphrase $GPG_PASSWORD --output /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0.jar.asc /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0.jar
-      - run: gpg --no-default-keyring --keyring /home/circleci/.gnupg/pubring.kbx --detach-sign --armor --pinentry-mode loopback --passphrase $GPG_PASSWORD --output /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0-javadoc.jar.asc /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0-javadoc.jar
-      - run: gpg --no-default-keyring --keyring /home/circleci/.gnupg/pubring.kbx --detach-sign --armor --pinentry-mode loopback --passphrase $GPG_PASSWORD --output /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0-sources.jar.asc /home/circleci/repo/target/scala-2.11/parquet4s_2.11-0.1.0-sources.jar
-      # publish TODO misses asc files :(
-      - run: cat /dev/null | sbt publish
+      # publish signed artifacts to sonatype
+      - run: cat /dev/null | sbt +publish
+      # release
+      - run: cat /dev/null | sbt sonatypeReleaseAll
       # cache dependencies
       - save_cache:
           paths:
@@ -74,9 +65,9 @@ workflows:
   trying-stage:
     jobs:
       - build
-      - deploy:
+      - release:
           requires:
             - build
           filters:
-            branches:
-              only: stage
+            tags:
+              only: /^v.*

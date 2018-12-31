@@ -29,8 +29,6 @@ lazy val libraryDependencies = {
 
 import xerial.sbt.Sonatype._
 
-useGpg := true
-
 lazy val root = (project in file("."))
   .configs(IntegrationTest)
   .settings(
@@ -50,15 +48,8 @@ lazy val root = (project in file("."))
         host = "oss.sonatype.org",
         userName = sys.env("SONATYPE_USER_NAME"),
         passwd = sys.env("SONATYPE_PASSWORD")
-      ),
-      Credentials(
-        realm = "PGP Secret Key",
-        host = "pgp",
-        userName = "sbt",
-        passwd = sys.env("GPG_PASSWORD")
       )
     ),
-    PgpKeys.useGpg := true,
     Keys.licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT")),
     Keys.homepage := Some(url("https://github.com/mjakubowski84/parquet4s")),
     Keys.scmInfo := Some(
@@ -90,3 +81,4 @@ lazy val root = (project in file("."))
     Keys.publishArtifact in IntegrationTest := false
   )
   .settings(itSettings: _*)
+  .settings(Signing.signingSettings: _*)
