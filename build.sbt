@@ -27,13 +27,17 @@ lazy val libraryDependencies = {
   )
 }
 
+import xerial.sbt.Sonatype._
+
+useGpg := true
+
 lazy val root = (project in file("."))
   .configs(IntegrationTest)
   .settings(
     Keys.name := "parquet4s",
     Keys.organization := "com.github.mjakubowski84",
     Keys.version := "0.1.0",
-    Keys.isSnapshot := true,
+    Keys.isSnapshot := false,
     Keys.scalaVersion := "2.11.12",
     Keys.crossScalaVersions := Seq("2.11.12", "2.12.8"),
     Keys.scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8"),
@@ -41,11 +45,20 @@ lazy val root = (project in file("."))
     Keys.resolvers := resolvers,
     Keys.libraryDependencies := libraryDependencies,
     Keys.credentials ++= Seq(
-      Credentials(Path.userHome / ".ivy2" / ".publicCredentials"), // TODO use env vars
-      Credentials(Path.userHome / ".sbt" / "pgp.credentials") // TODO use env vars
+      Credentials(
+        realm = "Sonatype Nexus Repository Manager",
+        host = "oss.sonatype.org",
+        userName = sys.env("SONATYPE_USER_NAME"),
+        passwd = sys.env("SONATYPE_PASSWORD")
+      ),
+      Credentials(
+        realm = "PGP Secret Key",
+        host = "pgp",
+        userName = "sbt",
+        passwd = sys.env("GPG_PASSWORD")
+      )
     ),
     PgpKeys.useGpg := true,
-    Keys.pomIncludeRepository := { _ => false },
     Keys.licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT")),
     Keys.homepage := Some(url("https://github.com/mjakubowski84/parquet4s")),
     Keys.scmInfo := Some(
@@ -54,6 +67,10 @@ lazy val root = (project in file("."))
         connection = "scm:git@github.com:mjakubowski84/parquet4s.git"
       )
     ),
+    SonatypeKeys.sonatypeProjectHosting := Some(GitHubHosting(
+      user = "mjakubowski84", repository = "parquet4s", email = "mjakubowski84@gmail.com")
+    ),
+    SonatypeKeys.sonatypeProfileName := "com.github.mjakubowski84",
     Keys.developers := List(
       Developer(
         id    = "mjakubowski84",
