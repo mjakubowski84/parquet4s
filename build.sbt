@@ -5,8 +5,8 @@ lazy val resolvers =  Seq(
 
 lazy val commonSettings = Seq(
   Keys.organization := "com.github.mjakubowski84",
-  Keys.version := "0.2.0-SNAPSHOT",
-  Keys.isSnapshot := true,
+  Keys.version := "0.2.0",
+  Keys.isSnapshot := false,
   Keys.scalaVersion := "2.11.12",
   Keys.crossScalaVersions := Seq("2.11.12", "2.12.8"),
   Keys.scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8"),
