@@ -14,7 +14,7 @@ lazy val commonSettings = Seq(
   Keys.resolvers := resolvers
 )
 
-lazy val releaseSettings = {
+lazy val publishSettings = {
   import xerial.sbt.Sonatype._
   Seq(
     Keys.credentials ++= Seq(
@@ -39,10 +39,10 @@ lazy val releaseSettings = {
     SonatypeKeys.sonatypeProfileName := "com.github.mjakubowski84",
     Keys.developers := List(
       Developer(
-        id    = "mjakubowski84",
-        name  = "Marcin Jakubowski",
+        id = "mjakubowski84",
+        name = "Marcin Jakubowski",
         email = "mjakubowski84@gmail.com",
-        url   = url("https://github.com/mjakubowski84")
+        url = url("https://github.com/mjakubowski84")
       )
     ),
     Keys.publishMavenStyle := true,
@@ -69,7 +69,7 @@ lazy val core = (project in file("core"))
   )
   .settings(commonSettings)
   .settings(itSettings)
-  .settings(releaseSettings)
+  .settings(publishSettings)
 
 lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
@@ -78,8 +78,14 @@ lazy val akka = (project in file("akka"))
   )
   .settings(commonSettings)
   .settings(itSettings)
-  .settings(releaseSettings)
+  .settings(publishSettings)
   .dependsOn(core % "compile->compile;it->it")
 
 lazy val root = (project in file("."))
+  .settings(commonSettings)
+  .settings(publishSettings)
+  .settings(
+    skip in publish := true,
+    skip in publishLocal := true,
+  )
   .aggregate(core, akka)
