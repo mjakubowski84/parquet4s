@@ -5,7 +5,9 @@ import java.io.Closeable
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 
-
+/**
+  * Holds factory that builds iterable instance of Parquet data source.
+  */
 object ParquetReader {
 
   type Builder = HadoopParquetReader.Builder[RowParquetRecord]
@@ -13,10 +15,17 @@ object ParquetReader {
   /**
     * Creates new iterable instance of reader.
     * <br/>
-    * <b>Note:</b> Remember to call <pre>close()</pre> to clean resources!
+    * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
+    * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
+    * <br/>
+    * <b>Note:</b> Remember to call {{{ close() }}} to clean resources!
     *
-    * @param path URI to read the files from
-    * @tparam T type of iterable elements
+    * @param path URI to Parquet files, e.g.:
+    *             {{{ "file:///data/users" }}}
+    * @tparam T type of data that represent the schema of the Parquet data, e.g.:
+    *           {{{
+    *              case class MyData(id: Long, name: String, created: java.sql.Timestamp)
+    *           }}}
     */
   def apply[T : ParquetRecordDecoder](path: String): ParquetReader[T] =
     apply(HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)))
