@@ -4,7 +4,6 @@ lazy val resolvers =  Seq(
 )
 
 lazy val commonSettings = Seq(
-  Keys.name := "parquet4s-core",
   Keys.organization := "com.github.mjakubowski84",
   Keys.version := "0.2.0-SNAPSHOT",
   Keys.isSnapshot := true,
@@ -72,5 +71,15 @@ lazy val core = (project in file("core"))
   .settings(itSettings)
   .settings(releaseSettings)
 
+lazy val akka = (project in file("akka"))
+  .configs(IntegrationTest)
+  .settings(
+    Keys.name := "parquet4s-akka"
+  )
+  .settings(commonSettings)
+  .settings(itSettings)
+  .settings(releaseSettings)
+  .dependsOn(core % "compile->compile;it->it")
+
 lazy val root = (project in file("."))
-  .aggregate(core)
+  .aggregate(core, akka)
