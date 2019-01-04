@@ -61,10 +61,19 @@ jobs:
 
 workflows:
   version: 2
-  
+
+  only-build:
+    - build:
+        filters:
+          tags:
+            ignore: /.*/
+
   build-and-release:
     jobs:
-      - build
+      - build:
+          filters:
+            tags:
+              only: /.*/
       - release:
           requires:
             - build
