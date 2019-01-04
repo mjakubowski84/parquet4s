@@ -17,7 +17,7 @@ Based on official Parquet library, Hadoop Client and Shapeless.
 Add the library to your dependencies:
 
 ```
-"com.github.mjakubowski84" %% "parquet4s" % "0.1.0"
+"com.github.mjakubowski84" %% "parquet4s-core" % "0.2.0"
 
 ```
 
@@ -71,5 +71,34 @@ case class Data(id: Int, name: String, description: String)
 val parquetIterable = ParquetReader[Data]("s3a:/my-bucket/data")
 parquetIterable.foreach(println)
 parquetIterable.close()
+
+```
+
+# How to use Parquet4S with Akka Streams?
+
+Parquet4S has a simple integration module that allows you to read Parquet file using Akka Streams!
+Just import it:
+
+```
+"com.github.mjakubowski84" %% "parquet4s-akka" % "0.2.0"
+
+```
+
+And now you can define Akka Streams source that reads Parquet files:
+
+```scala
+import com.github.mjakubowski84.parquet4s.ParquetStreams
+import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
+import akka.actor.ActorSystem
+import akka.stream.{ActorMaterializer, Materializer}
+
+case class User(userId: String, name: String, created: java.sql.Timestamp)
+
+implicit val system: AcrtorSystem =  ActorSystem()
+implicit val materializer: Materializer =  ActorMaterializer()
+
+ParquetStreams.fromParquet[User]("file:///data/users").runForeach(println)
+
+system.terminate()
 
 ```

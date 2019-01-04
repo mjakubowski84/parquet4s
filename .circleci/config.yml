@@ -62,7 +62,7 @@ jobs:
 workflows:
   version: 2
   
-  trying-stage:
+  build-and-release:
     jobs:
       - build
       - release:
