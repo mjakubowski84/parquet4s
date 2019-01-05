@@ -86,6 +86,6 @@ lazy val root = (project in file("."))
   .settings(publishSettings)
   .settings(
     skip in publish := true,
-    skip in publishLocal := true,
+    skip in publishLocal := true
   )
   .aggregate(core, akka)
