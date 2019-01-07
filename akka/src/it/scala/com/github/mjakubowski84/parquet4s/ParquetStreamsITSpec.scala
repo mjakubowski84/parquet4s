@@ -25,6 +25,8 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
   val count = 10000
 
+  val dict: Seq[String] = Vector("a", "b", "c", "d")
+
   override def beforeAll(): Unit = {
     super.beforeAll()
     clearTemp()
@@ -35,7 +37,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     import sparkSession.implicits._
 
     val data = Stream
-      .continually(Data(Random.nextLong(), Random.nextString(12)))
+      .continually(Data(Random.nextLong(), dict(Random.nextInt(4))))
       .take(count)
 
     data

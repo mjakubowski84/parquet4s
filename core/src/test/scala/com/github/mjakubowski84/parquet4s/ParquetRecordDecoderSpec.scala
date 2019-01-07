@@ -1,6 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.scalatest.{FlatSpec, Matchers}
+import ValueImplicits._
 
 class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
@@ -214,7 +215,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     case class NestedRow(int: Int)
     case class Row(nestedMap: Map[String, NestedRow])
 
-    val record = RowParquetRecord("nestedMap" -> ListParquetRecord("key" -> RowParquetRecord("int" -> 1)))
+    val record = RowParquetRecord("nestedMap" -> ListParquetRecord(RowParquetRecord("int" -> 1)))
 
     a[DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
   }

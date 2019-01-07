@@ -32,6 +32,8 @@ object ParquetReader {
 
   private[mjakubowski84] def apply[T : ParquetRecordDecoder](builder: Builder): ParquetReader[T] =
     new ParquetReaderImpl(builder)
+
+  // TODO introduce type class for reader with a single implicit implementation so that there won't be need for users to write import ParquetRecordEncoder._
 }
 
 trait ParquetReader[T] extends Iterable[T] with Closeable
