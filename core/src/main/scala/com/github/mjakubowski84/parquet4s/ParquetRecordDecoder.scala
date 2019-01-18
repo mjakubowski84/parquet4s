@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import shapeless.labelled.{FieldType, field}
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
-import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
@@ -36,9 +35,9 @@ trait CanBeEmpties {
 }
 
 object ParquetRecordDecoder
-  extends CanBuildFromList
+  extends CollectionTransformers
     with CanBeEmpties
-    with AllValueDecoders {
+    with AllValueCodecs {
 
   object DecodingException {
     def apply(msg: String, cause: Throwable): DecodingException = {
@@ -59,7 +58,7 @@ object ParquetRecordDecoder
 
   implicit def headValueDecoder[FieldName <: Symbol, Head, Tail <: HList](implicit
                                                                           witness: Witness.Aux[FieldName],
-                                                                          headDecoder: ValueDecoder[Head],
+                                                                          headDecoder: ValueCodec[Head],
                                                                           tailDecoder: ParquetRecordDecoder[Tail],
                                                                           canBeEmpty: CanBeEmpty[Head]
                                                                          ): ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] =
@@ -104,7 +103,7 @@ object ParquetRecordDecoder
                                                                                                  witness: Witness.Aux[FieldName],
                                                                                                  headDecoder: Lazy[ParquetRecordDecoder[Head]],
                                                                                                  tailDecoder: ParquetRecordDecoder[Tail],
-                                                                                                 cbf: CanBuildFrom[List[Head], Head, Col[Head]]
+                                                                                                 collectionTransformer: CollectionTransformer[Head, Col]
                                                                                                 ): ParquetRecordDecoder[FieldType[FieldName, Col[Head]] :: Tail] =
     new ParquetRecordDecoder[FieldType[FieldName, Col[Head]] :: Tail] {
       override def decode(record: RowParquetRecord): FieldType[FieldName, Col[Head]] :: Tail = {
@@ -112,15 +111,15 @@ object ParquetRecordDecoder
         val values = record.getMap.get(fieldName) match {
           case Some(rowRecord: RowParquetRecord) =>
             val listOfValues: List[Head] = List(headDecoder.value.decode(rowRecord))
-            listOfValues.to[Col]
+            collectionTransformer.to(listOfValues)
           case Some(listRecord: ListParquetRecord) =>
-            val listOfNestedRecords: List[RowParquetRecord] = listRecord.getList.map(_.asInstanceOf[RowParquetRecord])
+            val listOfNestedRecords: List[RowParquetRecord] = listRecord.elements.map(_.asInstanceOf[RowParquetRecord])
             val listOfValues: List[Head] = listOfNestedRecords.map(headDecoder.value.decode)
-            listOfValues.to[Col]
+            collectionTransformer.to(listOfValues)
           case Some(other) =>
             throw DecodingException(s"$other is unexpected input for field $fieldName in record: $record")
           case None =>
-            cbf().result()
+            collectionTransformer.to(List.empty[Head])
         }
         field[FieldName](values) :: tailDecoder.decode(record)
       }
@@ -128,7 +127,7 @@ object ParquetRecordDecoder
 
   implicit def headMapOfProductsDecoder[FieldName <: Symbol, Key, Value, Tail <: HList](implicit
                                                                                         witness: Witness.Aux[FieldName],
-                                                                                        mapKeyDecoder: ValueDecoder[Key],
+                                                                                        mapKeyDecoder: ValueCodec[Key],
                                                                                         mapValueDecoder: Lazy[ParquetRecordDecoder[Value]],
                                                                                         tailDecoder: ParquetRecordDecoder[Tail]
                                                                                       ): ParquetRecordDecoder[FieldType[FieldName, Map[Key, Value]] :: Tail] =

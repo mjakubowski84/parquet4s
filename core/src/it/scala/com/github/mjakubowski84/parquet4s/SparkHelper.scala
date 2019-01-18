@@ -12,8 +12,12 @@ trait SparkHelper extends BeforeAndAfterAll  {
 
   this: Suite =>
 
-  lazy val sparkSession: SparkSession =
+  private var sparkStarted = false
+
+  lazy val sparkSession: SparkSession = {
+    sparkStarted = true
     SparkSession.builder.master("local[2]").appName(getClass.getSimpleName).getOrCreate
+  }
 
   private val tempPath: Path = Paths.get(Files.createTempDir().getAbsolutePath, "sparkOutputPath")
 
@@ -21,7 +25,7 @@ trait SparkHelper extends BeforeAndAfterAll  {
 
   override def afterAll() {
     super.afterAll()
-    sparkSession.stop()
+    if (sparkStarted) sparkSession.stop()
   }
 
   def writeToTemp[T <: Product : TypeTag](data: Seq[T]): Unit = {

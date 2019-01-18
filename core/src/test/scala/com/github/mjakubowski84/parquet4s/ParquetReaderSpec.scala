@@ -7,6 +7,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FlatSpec, Matchers}
+import ValueImplicits._
 
 object ParquetReaderSpec {
 
