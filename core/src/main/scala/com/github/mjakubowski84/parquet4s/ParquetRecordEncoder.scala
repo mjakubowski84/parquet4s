@@ -9,7 +9,9 @@ trait ParquetRecordEncoder[T] {
 
 }
 
-object ParquetRecordEncoder {
+object ParquetRecordEncoder
+  extends CollectionTransformers
+    with AllValueCodecs {
 
   def apply[T](implicit ev: ParquetRecordEncoder[T]): ParquetRecordEncoder[T] = ev
 

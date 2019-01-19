@@ -13,7 +13,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     ParquetRecordDecoder.decode[Empty](RowParquetRecord()) should be(Empty())
   }
 
-  "Primitive value decoder" should "decode record containing primitive values" in {
+  "Value decoder" should "decode record containing primitive values" in {
     case class Primitives(int: Int, string: String)
 
     val data = Primitives(1, "text")

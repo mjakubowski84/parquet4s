@@ -139,6 +139,8 @@ trait CollectionValueCodecs {
       value match {
         case primitiveValue: PrimitiveValue[T] =>
           Option(primitiveValue.value)
+        case NullValue =>
+          None
       }
 
     override def encode(data: Option[T]): Value = {
