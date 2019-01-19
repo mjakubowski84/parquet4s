@@ -23,6 +23,8 @@ object ParquetReaderITSpec {
   case class RowWithSequenceOfNestedClass(nested: Seq[NestedClass])
   case class RowWithVectorOfNestedClass(nested: Vector[NestedClass])
   case class RowWithMapOfNestedClassAsValue(nested: Map[String, NestedClass])
+  case class RowWithListOfOptions(list: List[Option[Int]])
+  case class RowWithMapOfOptions(map: Map[String, Option[Int]])
 
 }
 
@@ -134,6 +136,14 @@ class ParquetReaderITSpec
   it should "be able to read data with map that contains nested class as a value" in new Fixture(Seq(
     RowWithMapOfNestedClassAsValue(Map("1" -> NestedClass(1), "2" -> NestedClass(2), "3" -> NestedClass(3))),
     RowWithMapOfNestedClassAsValue(Map.empty)
+  ))
+
+  it should "be able to read collection of options" in new Fixture(Seq(
+    RowWithListOfOptions(List(None, Some(1), None))
+  ))
+
+  it should "be able to read map of options" in new Fixture(Seq(
+    RowWithMapOfOptions(Map("1" -> None, "2" -> Some(1), "3" -> None))
   ))
 
 }

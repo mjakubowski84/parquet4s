@@ -5,12 +5,11 @@ import org.apache.parquet.schema._
 import shapeless._
 import shapeless.labelled._
 
-import scala.collection.JavaConverters._
 import scala.language.higherKinds
 
 
 object ParquetSchemaResolver
-  extends Schemas {
+  extends SchemaDefs {
 
   sealed trait SchemaResolver[T] {
 
@@ -18,7 +17,7 @@ object ParquetSchemaResolver
 
   }
 
-  def resolveSchema[T](implicit g: SchemaResolver[T]): MessageType = new MessageType("parquet4s-schema", g.resolveSchema.asJava)
+  def resolveSchema[T](implicit g: SchemaResolver[T]): MessageType = Message(g.resolveSchema:_*)
 
   implicit val hnil: SchemaResolver[HNil] = new SchemaResolver[HNil] {
     def resolveSchema: List[Type] = List.empty
@@ -26,10 +25,10 @@ object ParquetSchemaResolver
 
   implicit def hcons[K <: Symbol, V, T <: HList](implicit
                                                  witness: Witness.Aux[K],
-                                                 schemaForName: SchemaForName[V],
+                                                 schemaDef: TypedSchemaDef[V],
                                                  rest: SchemaResolver[T]
                                                 ): SchemaResolver[FieldType[K, V] :: T] = new SchemaResolver[FieldType[K, V] :: T] {
-    def resolveSchema: List[Type] = schemaForName(witness.value.name) +: rest.resolveSchema
+    def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
   }
 
   implicit def caseClass[T, G](implicit
@@ -40,79 +39,107 @@ object ParquetSchemaResolver
   }
 }
 
-trait Schemas {
+object Message {
 
-  trait SchemaTag[V]
-  type Schema[V] = Type with SchemaTag[V]
-  type SchemaForName[V] = String => Schema[V]
+  val name = "parquet4s-schema"
 
-  def schema[V](`type`: Type): Schema[V] = `type`.asInstanceOf[Schema[V]]
+  def apply(fields: Type*): MessageType = Types.buildMessage().addFields(fields:_*).named(name)
 
-  implicit def stringSchema: SchemaForName[String] = name =>
-    schema[String](
-      Types.primitive(PrimitiveType.PrimitiveTypeName.BINARY, Repetition.OPTIONAL).as(OriginalType.UTF8).named(name)
+}
+
+trait SchemaDef {
+
+  def apply(name: String): Type
+
+}
+
+case class PrimitiveSchemaDef(
+                             primitiveType: PrimitiveType.PrimitiveTypeName,
+                             required: Boolean = true,
+                             originalType: Option[OriginalType] = None
+                             ) extends SchemaDef {
+
+  override def apply(name: String): Type = {
+    val builder = Types.primitive(
+      primitiveType,
+      if (required) Repetition.REQUIRED else Repetition.OPTIONAL
     )
-
-  implicit def intSchema: SchemaForName[Int] = name =>
-    schema[Int](
-      Types.primitive(PrimitiveType.PrimitiveTypeName.INT32, Repetition.REQUIRED).as(OriginalType.INT_32).named(name)
-    )
-
-  implicit def longSchema: SchemaForName[Long] = name =>
-    schema[Long](
-      Types.primitive(PrimitiveType.PrimitiveTypeName.INT64, Repetition.REQUIRED).as(OriginalType.INT_64).named(name)
-    )
-
-  implicit def floatSchema: SchemaForName[Float] = name =>
-    schema[Float](
-      Types.primitive(PrimitiveType.PrimitiveTypeName.FLOAT, Repetition.REQUIRED).named(name)
-    )
-
-  implicit def doubleSchema: SchemaForName[Double] = name =>
-    schema[Double](
-      Types.primitive(PrimitiveType.PrimitiveTypeName.DOUBLE, Repetition.REQUIRED).named(name)
-    )
-
-  implicit def booleanSchema: SchemaForName[Boolean] = name =>
-    schema[Boolean](
-      Types.primitive(PrimitiveType.PrimitiveTypeName.BOOLEAN, Repetition.REQUIRED).named(name)
-    )
-
-  implicit def optionSchema[T](implicit schemaForT: SchemaForName[T]): SchemaForName[Option[T]] = name => {
-    schemaForT(name) match {
-      case tSchema if tSchema.isPrimitive =>
-        val s = tSchema.asPrimitiveType()
-        schema[Option[T]](
-          Types.optional(s.getPrimitiveTypeName)
-            .as(s.getOriginalType)
-            .precision(Option(s.getDecimalMetadata).map(_.getPrecision).getOrElse(0))
-            .scale(Option(s.getDecimalMetadata).map(_.getScale).getOrElse(0))
-            .columnOrder(s.columnOrder())
-            .named(name)
-        )
-      case tSchema =>
-        val s = tSchema.asGroupType()
-        schema[Option[T]](
-          Types.optionalGroup()
-            .as(s.getOriginalType)
-            .addFields(s.getFields.asScala:_*)
-            .named(name)
-        )
-    }
+    originalType.foldLeft(builder)(_.as(_)).named(name)
   }
 
-  implicit def traversableSchema[E, X[_] <: Traversable[_]](implicit
-                                       elementSchema: SchemaForName[E]
-                                      ): SchemaForName[X[E]] = name =>
-    schema[X[E]](
-      Types.optionalList().element(elementSchema("element")).named(name)
+}
+
+case class GroupSchemaDef(fields: Type*) extends SchemaDef {
+  override def apply(name: String): Type =
+    Types.optionalGroup().addFields(fields:_*).named(name)
+}
+
+case class ListGroupSchemaDef(element: Type) extends SchemaDef {
+
+  override def apply(name: String): Type =
+    Types.optionalList().element(element).named(name)
+
+}
+
+
+
+// TODO compare schemas here with those from Spark (for example are really primitives required by default, but strings not? maybe it is about empty string? test it)
+// TODO check how Spark saves null and empty primitive values
+trait SchemaDefs {
+
+  trait Tag[V]
+  type TypedSchemaDef[V] = SchemaDef with Tag[V]
+
+  def typedSchemaDef[V](schemaDef: SchemaDef): TypedSchemaDef[V] = schemaDef.asInstanceOf[TypedSchemaDef[V]]
+
+  implicit def stringSchema: TypedSchemaDef[String] =
+    typedSchemaDef[String](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8))
     )
 
-  implicit def arraySchema[E](implicit
-                              elementSchema: SchemaForName[E]
-                             ): SchemaForName[Array[E]] = name =>
-    schema[Array[E]](
-      Types.optionalList().element(elementSchema("element")).named(name)
+  implicit def intSchema: TypedSchemaDef[Int] =
+    typedSchemaDef[Int](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
+    )
+
+  implicit def longSchema: TypedSchemaDef[Long] =
+    typedSchemaDef[Long](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT64, originalType = Some(OriginalType.INT_64))
+    )
+
+  implicit def floatSchema: TypedSchemaDef[Float] =
+    typedSchemaDef[Float](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.FLOAT)
+    )
+
+  implicit def doubleSchema: TypedSchemaDef[Double] =
+    typedSchemaDef[Double](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.DOUBLE)
+    )
+
+  implicit def booleanSchema: TypedSchemaDef[Boolean] =
+    typedSchemaDef[Boolean](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BOOLEAN)
+    )
+
+  implicit def optionSchema[T](implicit tSchemaDef: TypedSchemaDef[T]): TypedSchemaDef[Option[T]] =
+    typedSchemaDef[Option[T]](
+      tSchemaDef match {
+        case primitiveSchemaDef: PrimitiveSchemaDef =>
+          primitiveSchemaDef.copy(required = false)
+        case other =>
+          other // other types are optional by default, aren't they?
+      }
+    )
+
+  implicit def traversableSchema[E, X[_] <: Traversable[_]](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[X[E]] =
+    typedSchemaDef[X[E]](
+      ListGroupSchemaDef(elementSchema("element"))
+    )
+
+  implicit def arraySchema[E](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[Array[E]] =
+    typedSchemaDef[Array[E]](
+      ListGroupSchemaDef(elementSchema("element"))
     )
 
 }
