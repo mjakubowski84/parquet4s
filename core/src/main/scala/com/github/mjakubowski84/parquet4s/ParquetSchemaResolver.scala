@@ -31,9 +31,38 @@ object ParquetSchemaResolver
     def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
   }
 
-  implicit def caseClass[T, G](implicit
-                               lg: LabelledGeneric.Aux[T, G],
-                               rest: SchemaResolver[G]
+  implicit def hconsProduct[K <: Symbol, V, T <: HList](implicit
+                                                        witness: Witness.Aux[K],
+                                                        nestedSchemaResolver: Lazy[SchemaResolver[V]],
+                                                        rest: SchemaResolver[T]
+                                                       ): SchemaResolver[FieldType[K, V] :: T] = new SchemaResolver[FieldType[K, V] :: T] {
+    def resolveSchema: List[Type] =
+      GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)(witness.value.name) +: rest.resolveSchema
+  }
+
+  implicit def hconsOptionalProduct[K <: Symbol, V, T <: HList](implicit
+                                                                witness: Witness.Aux[K],
+                                                                nestedSchemaResolver: Lazy[SchemaResolver[V]],
+                                                                rest: SchemaResolver[T]
+                                                               ): SchemaResolver[FieldType[K, Option[V]] :: T] = new SchemaResolver[FieldType[K, Option[V]] :: T] {
+    def resolveSchema: List[Type] =
+      GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)(witness.value.name) +: rest.resolveSchema
+  }
+
+  implicit def hconsCollectionOfProducts[K <: Symbol, V, Col[_], T <: HList](implicit
+                                                                witness: Witness.Aux[K],
+                                                                nestedSchemaResolver: Lazy[SchemaResolver[V]],
+                                                                rest: SchemaResolver[T]
+                                                               ): SchemaResolver[FieldType[K, Col[V]] :: T] = new SchemaResolver[FieldType[K, Col[V]] :: T] {
+    def resolveSchema: List[Type] =
+      ListGroupSchemaDef(
+        GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)
+      )(witness.value.name) +: rest.resolveSchema
+  }
+
+  implicit def generic[T, G](implicit
+                             lg: LabelledGeneric.Aux[T, G],
+                             rest: SchemaResolver[G]
                               ): SchemaResolver[T] = new SchemaResolver[T] {
     def resolveSchema: List[Type] = rest.resolveSchema
   }
@@ -70,18 +99,20 @@ case class PrimitiveSchemaDef(
 }
 
 case class GroupSchemaDef(fields: Type*) extends SchemaDef {
-  override def apply(name: String): Type =
-    Types.optionalGroup().addFields(fields:_*).named(name)
+  override def apply(name: String): Type = Types.optionalGroup().addFields(fields:_*).named(name)
+}
+
+object ListGroupSchemaDef {
+
+  val ElementName = "element"
+
+  def apply(elementSchemaDef: SchemaDef): ListGroupSchemaDef = ListGroupSchemaDef(elementSchemaDef(ElementName))
+
 }
 
 case class ListGroupSchemaDef(element: Type) extends SchemaDef {
-
-  override def apply(name: String): Type =
-    Types.optionalList().element(element).named(name)
-
+  override def apply(name: String): Type = Types.optionalList().element(element).named(name)
 }
-
-
 
 // TODO compare schemas here with those from Spark (for example are really primitives required by default, but strings not? maybe it is about empty string? test it)
 // TODO check how Spark saves null and empty primitive values
@@ -132,14 +163,9 @@ trait SchemaDefs {
       }
     )
 
-  implicit def traversableSchema[E, X[_] <: Traversable[_]](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[X[E]] =
-    typedSchemaDef[X[E]](
-      ListGroupSchemaDef(elementSchema("element"))
-    )
-
-  implicit def arraySchema[E](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[Array[E]] =
-    typedSchemaDef[Array[E]](
-      ListGroupSchemaDef(elementSchema("element"))
+  implicit def collectionSchema[E, Col[_]](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[Col[E]] =
+    typedSchemaDef[Col[E]](
+      ListGroupSchemaDef(elementSchema)
     )
 
 }
