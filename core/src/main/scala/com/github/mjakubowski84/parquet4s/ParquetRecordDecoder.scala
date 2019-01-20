@@ -109,9 +109,6 @@ object ParquetRecordDecoder
       override def decode(record: RowParquetRecord): FieldType[FieldName, Col[Head]] :: Tail = {
         val fieldName = witness.value.name
         val values = record.getMap.get(fieldName) match {
-          case Some(rowRecord: RowParquetRecord) =>
-            val listOfValues: List[Head] = List(headDecoder.value.decode(rowRecord))
-            collectionTransformer.to(listOfValues)
           case Some(listRecord: ListParquetRecord) =>
             val listOfNestedRecords: List[RowParquetRecord] = listRecord.elements.map(_.asInstanceOf[RowParquetRecord])
             val listOfValues: List[Head] = listOfNestedRecords.map(headDecoder.value.decode)
@@ -120,6 +117,26 @@ object ParquetRecordDecoder
             throw DecodingException(s"$other is unexpected input for field $fieldName in record: $record")
           case None =>
             collectionTransformer.to(List.empty[Head])
+        }
+        field[FieldName](values) :: tailDecoder.decode(record)
+      }
+    }
+
+  implicit def headOptionalProductDecoder[FieldName <: Symbol, Head, Tail <: HList](implicit
+                                                                                    witness: Witness.Aux[FieldName],
+                                                                                    headDecoder: Lazy[ParquetRecordDecoder[Head]],
+                                                                                    tailDecoder: ParquetRecordDecoder[Tail]
+                                                                                   ): ParquetRecordDecoder[FieldType[FieldName, Option[Head]] :: Tail] =
+    new ParquetRecordDecoder[FieldType[FieldName, Option[Head]] :: Tail] {
+      override def decode(record: RowParquetRecord): FieldType[FieldName, Option[Head]] :: Tail = {
+        val fieldName = witness.value.name
+        val values = record.getMap.get(fieldName) match {
+          case Some(rowRecord: RowParquetRecord) =>
+            Option(headDecoder.value.decode(rowRecord))
+          case Some(other) =>
+            throw DecodingException(s"$other is unexpected input for optional field $fieldName in record: $record")
+          case None =>
+            None
         }
         field[FieldName](values) :: tailDecoder.decode(record)
       }

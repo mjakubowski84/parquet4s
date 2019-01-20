@@ -39,8 +39,47 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
   it should "encode record containing collection of optional primitives" in {
     case class Row(list: List[Option[Int]])
 
-    ParquetRecordEncoder.encode(Row(List.empty)) should be(RowParquetRecord("list" -> ListParquetRecord()))
-    ParquetRecordEncoder.encode(Row(List(None, Some(2), None))) should be(RowParquetRecord("list" -> ListParquetRecord(NullValue, 2, NullValue)))
+    ParquetRecordEncoder.encode(Row(List.empty)) should be(
+      RowParquetRecord("list" -> ListParquetRecord())
+    )
+    ParquetRecordEncoder.encode(Row(List(None, Some(2), None))) should be(
+      RowParquetRecord("list" -> ListParquetRecord(NullValue, 2, NullValue))
+    )
+  }
+
+  it should "encode record containing nested record" in {
+    case class Nested(int: Int)
+    case class Row(nested: Nested)
+
+    ParquetRecordEncoder.encode(Row(Nested(1))) should be(RowParquetRecord("nested" -> RowParquetRecord("int" -> 1)))
+  }
+
+  it should "encode record containing optional nested record" in {
+    case class Nested(int: Int)
+    case class Row(nestedOptional: Option[Nested])
+
+    ParquetRecordEncoder.encode(Row(Some(Nested(1)))) should be(
+      RowParquetRecord("nestedOptional" -> RowParquetRecord("int" -> 1))
+    )
+    ParquetRecordEncoder.encode(Row(None)) should be(
+      RowParquetRecord("nestedOptional" -> NullValue)
+    )
+  }
+
+  it should "encode record containing collection of nested records" in {
+    case class Nested(int: Int)
+    case class Row(nestedList: List[Nested])
+
+    ParquetRecordEncoder.encode(Row(List(Nested(1), Nested(2), Nested(3)))) should be(
+      RowParquetRecord("nestedList" -> ListParquetRecord(
+        RowParquetRecord("int" -> 1),
+        RowParquetRecord("int" -> 2),
+        RowParquetRecord("int" -> 3)
+      ))
+    )
+    ParquetRecordEncoder.encode(Row(List.empty)) should be(
+      RowParquetRecord("nestedList" -> ListParquetRecord())
+    )
   }
 
 }

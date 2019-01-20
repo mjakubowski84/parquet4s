@@ -80,7 +80,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     a[ParquetRecordDecoder.DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](record)
   }
 
-  "Collection of products decoder" should "decode record containing optional nested record" in {
+  "Optional product decoder" should "decode record containing optional nested record" in {
     case class NestedRow(int: Int)
     case class Row(nestedOptional: Option[NestedRow])
 
@@ -94,7 +94,18 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     ParquetRecordDecoder.decode[Row](record) should be(dataWithSome)
   }
 
-  it should "decode record containing sequence of nested records" in {
+  it should "throw exception if input does not match expected type" in {
+    case class NestedRow(int: Int)
+    case class Row(nestedOptional: Option[NestedRow])
+
+    val invalidRecordWithMap = RowParquetRecord("nestedOptional" -> MapParquetRecord("a" -> 1))
+    val invalidRecordWithList = RowParquetRecord("nestedOptional" -> ListParquetRecord(1))
+
+    a[DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](invalidRecordWithMap)
+    a[DecodingException] should be thrownBy ParquetRecordDecoder.decode[Row](invalidRecordWithList)
+  }
+
+  "Collection of products decoder" should "decode record containing sequence of nested records" in {
     case class NestedRow(int: Int)
     case class Row(sequence: Seq[NestedRow])
 

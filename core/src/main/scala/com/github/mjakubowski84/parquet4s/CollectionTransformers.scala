@@ -36,9 +36,4 @@ trait CollectionTransformers {
     override def to(list: List[E]): Array[E] = list.toArray
   }
 
-  implicit def optionTransformer[E]: CollectionTransformer[E, Option] = new CollectionTransformer[E, Option] {
-    override def from(col: Option[E]): List[E] = col.toList
-    override def to(list: List[E]): Option[E] = list.headOption
-  }
-
 }
