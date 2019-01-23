@@ -2,84 +2,140 @@ package com.github.mjakubowski84.parquet4s
 
 import org.scalatest.{FlatSpec, Matchers}
 import ValueImplicits._
+import TestCases._
+import ParquetRecordEncoder.encode
 
 class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
 
   import ParquetRecordEncoder._ // TODO this import is needed only because of CollectionTransformers, maybe we need to change smth?
 
   "HNil encoder" should "be used to encode empty record" in {
-    case class Empty()
-
-    ParquetRecordEncoder.encode(Empty()) should be(RowParquetRecord())
+    encode(Empty()) should be(RowParquetRecord())
   }
 
   "Value encoder" should "encode record containing primitive values" in {
-    case class Primitives(int: Int, string: String)
-
-    val data = Primitives(1, "text")
-    val record = RowParquetRecord("int" -> 1, "string" -> "text")
-
-    ParquetRecordEncoder.encode(data) should be(record)
+    val data = Primitives(
+      boolean = true,
+      int = 1,
+      long = 1234567890l,
+      float = 1.1f,
+      double = 1.00000000000001d,
+      string = "text"
+    )
+    val record = RowParquetRecord(
+      "boolean" -> true,
+      "int" -> 1,
+      "long" -> 1234567890l,
+      "float" -> 1.1f,
+      "double" -> 1.00000000000001d,
+      "string" -> "text"
+    )
+    encode(data) should be(record)
   }
 
   it should "encode record containing optional values" in {
-    case class Row(optionalField: Option[Int])
-
-    ParquetRecordEncoder.encode(Row(None)) should be(RowParquetRecord("optionalField" -> NullValue))
-    ParquetRecordEncoder.encode(Row(Some(1))) should be(RowParquetRecord("optionalField" -> 1))
+    encode(ContainsOption(None)) should be(RowParquetRecord("optional" -> NullValue))
+    encode(ContainsOption(Some(1))) should be(RowParquetRecord("optional" -> 1))
   }
 
   it should "encode record containing collection of primitives" in {
-    case class Row(list: List[Int])
-
-    ParquetRecordEncoder.encode(Row(List.empty)) should be(RowParquetRecord("list" -> ListParquetRecord()))
-    ParquetRecordEncoder.encode(Row(List(1, 2, 3))) should be(RowParquetRecord("list" -> ListParquetRecord(1, 2, 3)))
+    encode(Collections(
+      list = List.empty,
+      seq = Seq.empty,
+      vector = Vector.empty,
+      set = Set.empty,
+      array = Array.empty
+    )) should be(RowParquetRecord(
+      "list" -> ListParquetRecord.empty,
+      "seq" -> ListParquetRecord.empty,
+      "vector" -> ListParquetRecord.empty,
+      "set" -> ListParquetRecord.empty,
+      "array" -> ListParquetRecord.empty
+    ))
+    val listRecordWithValues = ListParquetRecord(1, 2, 3)
+    encode(Collections(
+      list = List(1, 2, 3),
+      seq = Seq(1, 2, 3),
+      vector = Vector(1, 2, 3),
+      set = Set(1, 2, 3),
+      array = Array(1, 2, 3)
+    )) should be(RowParquetRecord(
+      "list" -> listRecordWithValues,
+      "seq" -> listRecordWithValues,
+      "vector" -> listRecordWithValues,
+      "set" -> listRecordWithValues,
+      "array" -> listRecordWithValues
+    ))
   }
 
   it should "encode record containing collection of optional primitives" in {
-    case class Row(list: List[Option[Int]])
-
-    ParquetRecordEncoder.encode(Row(List.empty)) should be(
-      RowParquetRecord("list" -> ListParquetRecord())
+    encode(ContainsCollectionOfOptionalPrimitives(List.empty)) should be(
+      RowParquetRecord("list" -> ListParquetRecord.empty)
     )
-    ParquetRecordEncoder.encode(Row(List(None, Some(2), None))) should be(
+    encode(ContainsCollectionOfOptionalPrimitives(List(None, Some(2), None))) should be(
       RowParquetRecord("list" -> ListParquetRecord(NullValue, 2, NullValue))
     )
   }
 
-  it should "encode record containing nested record" in {
-    case class Nested(int: Int)
-    case class Row(nested: Nested)
+  it should "encode record containing collection of collections" in {
+    encode(ContainsCollectionOfCollections(List.empty)) should be(
+      RowParquetRecord("listOfSets" -> ListParquetRecord.empty)
+    )
+    encode(ContainsCollectionOfCollections(List(Set.empty, Set(1, 2, 3), Set.empty))) should be(
+      RowParquetRecord("listOfSets" -> ListParquetRecord(
+        ListParquetRecord.empty,
+        ListParquetRecord(1, 2, 3),
+        ListParquetRecord.empty
+      ))
+    )
+  }
 
-    ParquetRecordEncoder.encode(Row(Nested(1))) should be(RowParquetRecord("nested" -> RowParquetRecord("int" -> 1)))
+  "Product encoder" should "encode record containing nested record" in {
+    encode(ContainsNestedClass(Nested(1))) should be(
+      RowParquetRecord("nested" -> RowParquetRecord("int" -> 1))
+    )
   }
 
   it should "encode record containing optional nested record" in {
-    case class Nested(int: Int)
-    case class Row(nestedOptional: Option[Nested])
-
-    ParquetRecordEncoder.encode(Row(Some(Nested(1)))) should be(
+    encode(ContainsOptionalNestedClass(Some(Nested(1)))) should be(
       RowParquetRecord("nestedOptional" -> RowParquetRecord("int" -> 1))
     )
-    ParquetRecordEncoder.encode(Row(None)) should be(
+    encode(ContainsOptionalNestedClass(None)) should be(
       RowParquetRecord("nestedOptional" -> NullValue)
     )
   }
 
   it should "encode record containing collection of nested records" in {
-    case class Nested(int: Int)
-    case class Row(nestedList: List[Nested])
+    encode(CollectionsOfNestedClass(
+      list = List.empty,
+      seq = Seq.empty,
+      vector = Vector.empty,
+      set = Set.empty,
+      array = Array.empty
+    )) should be(RowParquetRecord(
+      "list" -> ListParquetRecord.empty,
+      "seq" -> ListParquetRecord.empty,
+      "vector" -> ListParquetRecord.empty,
+      "set" -> ListParquetRecord.empty,
+      "array" -> ListParquetRecord.empty
+    ))
 
-    ParquetRecordEncoder.encode(Row(List(Nested(1), Nested(2), Nested(3)))) should be(
-      RowParquetRecord("nestedList" -> ListParquetRecord(
-        RowParquetRecord("int" -> 1),
-        RowParquetRecord("int" -> 2),
-        RowParquetRecord("int" -> 3)
-      ))
+    val listOfNestedRecords = ListParquetRecord(
+      RowParquetRecord("int" -> 1), RowParquetRecord("int" -> 2), RowParquetRecord("int" -> 3)
     )
-    ParquetRecordEncoder.encode(Row(List.empty)) should be(
-      RowParquetRecord("nestedList" -> ListParquetRecord())
-    )
+    encode(CollectionsOfNestedClass(
+      list = List(Nested(1), Nested(2), Nested(3)),
+      seq = Seq(Nested(1), Nested(2), Nested(3)),
+      vector = Vector(Nested(1), Nested(2), Nested(3)),
+      set = Set(Nested(1), Nested(2), Nested(3)),
+      array = Array(Nested(1), Nested(2), Nested(3))
+    )) should be(RowParquetRecord(
+      "list" -> listOfNestedRecords,
+      "seq" -> listOfNestedRecords,
+      "vector" -> listOfNestedRecords,
+      "set" -> listOfNestedRecords,
+      "array" -> listOfNestedRecords
+    ))
   }
 
 }

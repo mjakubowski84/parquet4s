@@ -22,6 +22,8 @@ object RowParquetRecord {
       case (record, (key, value)) => record.add(key, value)
     }
 
+  def empty: RowParquetRecord = new RowParquetRecord()
+
 }
 
 class RowParquetRecord private extends ParquetRecord {
@@ -86,6 +88,8 @@ object ListParquetRecord {
     elements.foldLeft(new ListParquetRecord()) {
       case (record, element) => record.add(ListFieldName, RowParquetRecord(ElementFieldName -> element))
     }
+
+  def empty: ListParquetRecord = new ListParquetRecord()
 
 }
 
@@ -159,6 +163,8 @@ object MapParquetRecord {
       case (record, (key, value)) => record.add("key_value", RowParquetRecord("key" -> key, "value" -> value)) // TODO
     }
   }
+
+  def empty: MapParquetRecord = new MapParquetRecord()
 
 }
 

@@ -123,32 +123,32 @@ trait SchemaDefs {
 
   def typedSchemaDef[V](schemaDef: SchemaDef): TypedSchemaDef[V] = schemaDef.asInstanceOf[TypedSchemaDef[V]]
 
-  implicit def stringSchema: TypedSchemaDef[String] =
+  implicit val stringSchema: TypedSchemaDef[String] =
     typedSchemaDef[String](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8))
     )
 
-  implicit def intSchema: TypedSchemaDef[Int] =
+  implicit val intSchema: TypedSchemaDef[Int] =
     typedSchemaDef[Int](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
     )
 
-  implicit def longSchema: TypedSchemaDef[Long] =
+  implicit val longSchema: TypedSchemaDef[Long] =
     typedSchemaDef[Long](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT64, originalType = Some(OriginalType.INT_64))
     )
 
-  implicit def floatSchema: TypedSchemaDef[Float] =
+  implicit val floatSchema: TypedSchemaDef[Float] =
     typedSchemaDef[Float](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.FLOAT)
     )
 
-  implicit def doubleSchema: TypedSchemaDef[Double] =
+  implicit val doubleSchema: TypedSchemaDef[Double] =
     typedSchemaDef[Double](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.DOUBLE)
     )
 
-  implicit def booleanSchema: TypedSchemaDef[Boolean] =
+  implicit val booleanSchema: TypedSchemaDef[Boolean] =
     typedSchemaDef[Boolean](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BOOLEAN)
     )
