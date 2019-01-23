@@ -13,9 +13,7 @@ trait ParquetRecordDecoder[T] {
 
 }
 
-object ParquetRecordDecoder
-  extends CollectionTransformers
-    with AllValueCodecs {
+object ParquetRecordDecoder {
 
   object DecodingException {
     def apply(msg: String, cause: Throwable): DecodingException = {

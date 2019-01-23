@@ -5,20 +5,33 @@ import java.io.Closeable
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 
-/**
-  * Holds factory that builds iterable instance of Parquet data source.
-  */
+
+trait ParquetReader[T] {
+
+  def read(path: String): ParquetIterable[T]
+
+}
+
 object ParquetReader {
 
   type Builder = HadoopParquetReader.Builder[RowParquetRecord]
 
+  @deprecated(message = "Please use read function or ParquetReader type class", since = "0.3.0")
+  def apply[T : ParquetRecordDecoder](path: String): ParquetIterable[T] = newParquetIterable(path)
+
+  private def newParquetIterable[T : ParquetRecordDecoder](path: String): ParquetIterable[T] =
+    newParquetIterable(HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)))
+
+  private[parquet4s] def newParquetIterable[T : ParquetRecordDecoder](builder: Builder): ParquetIterable[T] =
+    new ParquetIterableImpl(builder)
+
   /**
-    * Creates new iterable instance of reader.
+    * Creates new object that iterates over Parquet data.
     * <br/>
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     * <br/>
-    * <b>Note:</b> Remember to call {{{ close() }}} to clean resources!
+    * <b>Note:</b> Remember to call {{{ close() }}} on iterable in order to free resources!
     *
     * @param path URI to Parquet files, e.g.:
     *             {{{ "file:///data/users" }}}
@@ -27,18 +40,17 @@ object ParquetReader {
     *              case class MyData(id: Long, name: String, created: java.sql.Timestamp)
     *           }}}
     */
-  def apply[T : ParquetRecordDecoder](path: String): ParquetReader[T] =
-    apply(HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)))
+  def read[T](path: String)(implicit reader: ParquetReader[T]): ParquetIterable[T] = reader.read(path)
 
-  private[mjakubowski84] def apply[T : ParquetRecordDecoder](builder: Builder): ParquetReader[T] =
-    new ParquetReaderImpl(builder)
+  implicit def reader[T : ParquetRecordDecoder]: ParquetReader[T] = new ParquetReader[T] {
+    override def read(path: String): ParquetIterable[T] = newParquetIterable(path)
+  }
 
-  // TODO introduce type class for reader with a single implicit implementation so that there won't be need for users to write import ParquetRecordEncoder._
 }
 
-trait ParquetReader[T] extends Iterable[T] with Closeable
+trait ParquetIterable[T] extends Iterable[T] with Closeable
 
-private class ParquetReaderImpl[T : ParquetRecordDecoder](builder: ParquetReader.Builder) extends ParquetReader[T] {
+private class ParquetIterableImpl[T : ParquetRecordDecoder](builder: ParquetReader.Builder) extends ParquetIterable[T] {
 
   private val openCloseables = new scala.collection.mutable.ArrayBuffer[Closeable]()
 

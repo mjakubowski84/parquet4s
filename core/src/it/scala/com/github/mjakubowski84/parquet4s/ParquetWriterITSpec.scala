@@ -20,7 +20,6 @@ class ParquetWriterITSpec extends FlatSpec
   with SparkHelper
   with Inspectors {
 
-  import ParquetRecordDecoder._
   import ParquetWriterITSpec._
 
   before {
@@ -33,7 +32,7 @@ class ParquetWriterITSpec extends FlatSpec
                                                           ): Assertion = {
     ParquetWriter.write(tempPathString, data)
 
-    val dataIterable: ParquetReader[Data] = ParquetReader[Data](tempPathString)
+    val dataIterable = ParquetReader.read[Data](tempPathString)
     try test(dataIterable.toSeq, data) finally {
       dataIterable.close()
     }

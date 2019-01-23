@@ -9,7 +9,7 @@ trait CollectionTransformer[Element, Col[_]] {
   def to(list: List[Element]): Col[Element]
 }
 
-trait CollectionTransformers {
+object CollectionTransformer {
 
   implicit def seqTransformer[E]: CollectionTransformer[E, Seq] = new CollectionTransformer[E, Seq] {
     override def from(col: Seq[E]): List[E] = col.toList

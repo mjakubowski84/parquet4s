@@ -8,62 +8,67 @@ import shapeless.labelled._
 import scala.language.higherKinds
 
 
+trait ParquetSchemaResolver[T] {
+
+  def resolveSchema: List[Type]
+
+}
+
 object ParquetSchemaResolver
   extends SchemaDefs {
 
-  sealed trait SchemaResolver[T] {
+  def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType = Message(g.resolveSchema:_*)
 
-    def resolveSchema: List[Type]
-
-  }
-
-  def resolveSchema[T](implicit g: SchemaResolver[T]): MessageType = Message(g.resolveSchema:_*)
-
-  implicit val hnil: SchemaResolver[HNil] = new SchemaResolver[HNil] {
+  implicit val hnil: ParquetSchemaResolver[HNil] = new ParquetSchemaResolver[HNil] {
     def resolveSchema: List[Type] = List.empty
   }
 
   implicit def hcons[K <: Symbol, V, T <: HList](implicit
                                                  witness: Witness.Aux[K],
                                                  schemaDef: TypedSchemaDef[V],
-                                                 rest: SchemaResolver[T]
-                                                ): SchemaResolver[FieldType[K, V] :: T] = new SchemaResolver[FieldType[K, V] :: T] {
-    def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
-  }
+                                                 rest: ParquetSchemaResolver[T]
+                                                ): ParquetSchemaResolver[FieldType[K, V] :: T] =
+    new ParquetSchemaResolver[FieldType[K, V] :: T] {
+      def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
+    }
 
   implicit def hconsProduct[K <: Symbol, V, T <: HList](implicit
                                                         witness: Witness.Aux[K],
-                                                        nestedSchemaResolver: Lazy[SchemaResolver[V]],
-                                                        rest: SchemaResolver[T]
-                                                       ): SchemaResolver[FieldType[K, V] :: T] = new SchemaResolver[FieldType[K, V] :: T] {
-    def resolveSchema: List[Type] =
-      GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)(witness.value.name) +: rest.resolveSchema
-  }
+                                                        nestedSchemaResolver: Lazy[ParquetSchemaResolver[V]],
+                                                        rest: ParquetSchemaResolver[T]
+                                                       ): ParquetSchemaResolver[FieldType[K, V] :: T] =
+    new ParquetSchemaResolver[FieldType[K, V] :: T] {
+      def resolveSchema: List[Type] =
+        GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)(witness.value.name) +: rest.resolveSchema
+    }
 
   implicit def hconsOptionalProduct[K <: Symbol, V, T <: HList](implicit
                                                                 witness: Witness.Aux[K],
-                                                                nestedSchemaResolver: Lazy[SchemaResolver[V]],
-                                                                rest: SchemaResolver[T]
-                                                               ): SchemaResolver[FieldType[K, Option[V]] :: T] = new SchemaResolver[FieldType[K, Option[V]] :: T] {
-    def resolveSchema: List[Type] =
-      GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)(witness.value.name) +: rest.resolveSchema
-  }
+                                                                nestedSchemaResolver: Lazy[ParquetSchemaResolver[V]],
+                                                                rest: ParquetSchemaResolver[T]
+                                                               ): ParquetSchemaResolver[FieldType[K, Option[V]] :: T] =
+    new ParquetSchemaResolver[FieldType[K, Option[V]] :: T] {
+      def resolveSchema: List[Type] =
+        GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)(witness.value.name) +: rest.resolveSchema
+    }
 
   implicit def hconsCollectionOfProducts[K <: Symbol, V, Col[_], T <: HList](implicit
-                                                                witness: Witness.Aux[K],
-                                                                nestedSchemaResolver: Lazy[SchemaResolver[V]],
-                                                                rest: SchemaResolver[T]
-                                                               ): SchemaResolver[FieldType[K, Col[V]] :: T] = new SchemaResolver[FieldType[K, Col[V]] :: T] {
-    def resolveSchema: List[Type] =
-      ListGroupSchemaDef(
-        GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)
-      )(witness.value.name) +: rest.resolveSchema
-  }
+                                                                             witness: Witness.Aux[K],
+                                                                             nestedSchemaResolver: Lazy[ParquetSchemaResolver[V]],
+                                                                             rest: ParquetSchemaResolver[T]
+                                                                            ): ParquetSchemaResolver[FieldType[K, Col[V]] :: T] =
+
+    new ParquetSchemaResolver[FieldType[K, Col[V]] :: T] {
+      def resolveSchema: List[Type] =
+        ListGroupSchemaDef(
+          GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)
+        )(witness.value.name) +: rest.resolveSchema
+    }
 
   implicit def generic[T, G](implicit
                              lg: LabelledGeneric.Aux[T, G],
-                             rest: SchemaResolver[G]
-                              ): SchemaResolver[T] = new SchemaResolver[T] {
+                             rest: ParquetSchemaResolver[G]
+                              ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
     def resolveSchema: List[Type] = rest.resolveSchema
   }
 }

@@ -17,7 +17,7 @@ Based on official Parquet library, Hadoop Client and Shapeless.
 Add the library to your dependencies:
 
 ```
-"com.github.mjakubowski84" %% "parquet4s-core" % "0.2.0"
+"com.github.mjakubowski84" %% "parquet4s-core" % "0.3.0"
 
 ```
 
@@ -33,11 +33,10 @@ Following you can see examples how to read Parquet from local files or AWS S3.
 
 ```scala
 import com.github.mjakubowski84.parquet4s.ParquetReader
-import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
-val parquetIterable = ParquetReader[User]("file:///data/users")
+val parquetIterable = ParquetReader.read[User]("file:///data/users")
 parquetIterable.foreach(println)
 parquetIterable.close()
 
@@ -64,11 +63,10 @@ And then just use the iterable:
 
 ```scala
 import com.github.mjakubowski84.parquet4s.ParquetReader
-import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
 case class Data(id: Int, name: String, description: String)
 
-val parquetIterable = ParquetReader[Data]("s3a:/my-bucket/data")
+val parquetIterable = ParquetReader.read[Data]("s3a:/my-bucket/data")
 parquetIterable.foreach(println)
 parquetIterable.close()
 
@@ -80,7 +78,7 @@ Parquet4S has a simple integration module that allows you to read Parquet file u
 Just import it:
 
 ```
-"com.github.mjakubowski84" %% "parquet4s-akka" % "0.2.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "0.3.0"
 
 ```
 
@@ -88,7 +86,6 @@ And now you can define Akka Streams source that reads Parquet files:
 
 ```scala
 import com.github.mjakubowski84.parquet4s.ParquetStreams
-import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
 
