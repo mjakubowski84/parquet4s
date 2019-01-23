@@ -1,7 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
-object ValueImplicits extends AllValueCodecs {
+import scala.language.implicitConversions
 
+object ValueImplicits extends AllValueCodecs {
 
   implicit def valueConversion[T](value: T)(implicit valueCodec: ValueCodec[T]): Value = valueCodec.encode(value)
 
@@ -16,4 +17,5 @@ object ValueImplicits extends AllValueCodecs {
                                                     valueACodec: ValueCodec[A],
                                                     valueBCodec: ValueCodec[B]
                                                     ): (Value, Value) = (valueACodec.encode(tuple._1), valueBCodec.encode(tuple._2))
+
 }
