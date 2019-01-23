@@ -7,6 +7,8 @@ import java.util.TimeZone
 import scala.language.higherKinds
 
 
+object ValueCodec extends AllValueCodecs
+
 trait ValueCodec[T] {
 
   def decode(value: Value): T

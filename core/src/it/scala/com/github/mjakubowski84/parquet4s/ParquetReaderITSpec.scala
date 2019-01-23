@@ -34,15 +34,14 @@ class ParquetReaderITSpec
     with BeforeAndAfter
     with SparkHelper {
 
-  import ParquetRecordDecoder._
   import ParquetReaderITSpec._
 
   before {
     clearTemp()
   }
 
-  class Fixture[Row <: Product : TypeTag : ParquetRecordDecoder](rows: Seq[Row]) {
-    private val reader = ParquetReader[Row](tempPathString)
+  class Fixture[Row <: Product : TypeTag : ParquetReader](rows: Seq[Row]) {
+    private val reader = ParquetReader.read[Row](tempPathString)
     writeToTemp(rows)
     try {
       reader should contain theSameElementsAs rows

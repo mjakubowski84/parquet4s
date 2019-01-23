@@ -30,7 +30,7 @@ object ParquetWriter  {
 
   def write[T](path: String, data: Iterable[T])(implicit writer: ParquetWriter[T]): Unit = writer.write(path, data)
 
-  implicit def writer[T: ParquetRecordEncoder : ParquetSchemaResolver.SchemaResolver]: ParquetWriter[T] = new ParquetWriter[T] {
+  implicit def writer[T: ParquetRecordEncoder : ParquetSchemaResolver]: ParquetWriter[T] = new ParquetWriter[T] {
     override def write(path: String, data: Iterable[T]): Unit = {
 
       val records = data.map(ParquetRecordEncoder.encode[T])
