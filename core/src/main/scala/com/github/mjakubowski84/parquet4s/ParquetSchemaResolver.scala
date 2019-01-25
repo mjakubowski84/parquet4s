@@ -32,39 +32,6 @@ object ParquetSchemaResolver
       def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
     }
 
-  implicit def hconsProduct[K <: Symbol, V, T <: HList](implicit
-                                                        witness: Witness.Aux[K],
-                                                        nestedSchemaResolver: Lazy[ParquetSchemaResolver[V]],
-                                                        rest: ParquetSchemaResolver[T]
-                                                       ): ParquetSchemaResolver[FieldType[K, V] :: T] =
-    new ParquetSchemaResolver[FieldType[K, V] :: T] {
-      def resolveSchema: List[Type] =
-        GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)(witness.value.name) +: rest.resolveSchema
-    }
-
-  implicit def hconsOptionalProduct[K <: Symbol, V, T <: HList](implicit
-                                                                witness: Witness.Aux[K],
-                                                                nestedSchemaResolver: Lazy[ParquetSchemaResolver[V]],
-                                                                rest: ParquetSchemaResolver[T]
-                                                               ): ParquetSchemaResolver[FieldType[K, Option[V]] :: T] =
-    new ParquetSchemaResolver[FieldType[K, Option[V]] :: T] {
-      def resolveSchema: List[Type] =
-        GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)(witness.value.name) +: rest.resolveSchema
-    }
-
-  implicit def hconsCollectionOfProducts[K <: Symbol, V, Col[_], T <: HList](implicit
-                                                                             witness: Witness.Aux[K],
-                                                                             nestedSchemaResolver: Lazy[ParquetSchemaResolver[V]],
-                                                                             rest: ParquetSchemaResolver[T]
-                                                                            ): ParquetSchemaResolver[FieldType[K, Col[V]] :: T] =
-
-    new ParquetSchemaResolver[FieldType[K, Col[V]] :: T] {
-      def resolveSchema: List[Type] =
-        ListGroupSchemaDef(
-          GroupSchemaDef(nestedSchemaResolver.value.resolveSchema:_*)
-        )(witness.value.name) +: rest.resolveSchema
-    }
-
   implicit def generic[T, G](implicit
                              lg: LabelledGeneric.Aux[T, G],
                              rest: ParquetSchemaResolver[G]
@@ -119,6 +86,21 @@ case class ListGroupSchemaDef(element: Type) extends SchemaDef {
   override def apply(name: String): Type = Types.optionalList().element(element).named(name)
 }
 
+object MapSchemaDef {
+
+  val KeyName = "key"
+  val ValueName = "value"
+
+  def apply(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = new MapSchemaDef(
+    keySchemaDef(KeyName), valueSchemaDef(ValueName)
+  )
+
+}
+
+case class MapSchemaDef(key: Type, value: Type) extends SchemaDef {
+  override def apply(name: String): Type = Types.optionalMap().key(key).value(value).named(name)
+}
+
 // TODO compare schemas here with those from Spark (for example are really primitives required by default, but strings not? maybe it is about empty string? test it)
 // TODO check how Spark saves null and empty primitive values
 trait SchemaDefs {
@@ -158,6 +140,11 @@ trait SchemaDefs {
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BOOLEAN)
     )
 
+  implicit def productSchema[T](implicit parquetSchemaResolver: ParquetSchemaResolver[T]): TypedSchemaDef[T] =
+    typedSchemaDef[T](
+      GroupSchemaDef(parquetSchemaResolver.resolveSchema:_*)
+    )
+
   implicit def optionSchema[T](implicit tSchemaDef: TypedSchemaDef[T]): TypedSchemaDef[Option[T]] =
     typedSchemaDef[Option[T]](
       tSchemaDef match {
@@ -171,6 +158,14 @@ trait SchemaDefs {
   implicit def collectionSchema[E, Col[_]](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[Col[E]] =
     typedSchemaDef[Col[E]](
       ListGroupSchemaDef(elementSchema)
+    )
+
+  implicit def mapSchema[MapKey, MapValue](implicit
+                                           keySchema: TypedSchemaDef[MapKey],
+                                           valueSchema: TypedSchemaDef[MapValue]
+                                          ): TypedSchemaDef[Map[MapKey, MapValue]] =
+    typedSchemaDef[Map[MapKey, MapValue]](
+      MapSchemaDef(keySchema, valueSchema)
     )
 
 }

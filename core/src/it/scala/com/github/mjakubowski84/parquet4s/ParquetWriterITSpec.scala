@@ -7,10 +7,12 @@ object ParquetWriterITSpec {
   case class BasicPrimitives(string: String, int: Int, long: Long, float: Float, double: Double, boolean: Boolean)
   case class Collections(seq: Seq[Int], list: List[Int], vector: Vector[Int], set: Set[Int], array: Array[Int])
   case class Options(nameOpt: Option[String], longOpt: Option[Long])
+  case class ContainsMap(map: Map[String, Int])
   case class Nested(int: Int)
   case class ContainsNested(nested: Nested)
   case class ContainsNestedOption(nestedOption: Option[Nested])
   case class ContainsNestedCollection(nestedList: List[Nested])
+  case class ContainsNestedMap(nestedMap: Map[String, Nested])
 
 }
 
@@ -61,6 +63,10 @@ class ParquetWriterITSpec extends FlatSpec
     Seq(Options(Some("Hello"), Some(1)), Options(None, None))
   )
 
+  it should "write data with maps" in fixture(
+    Seq(ContainsMap(Map.empty), ContainsMap(Map("key_1" -> 1, "key_2" -> 2, "key_3" -> 3)))
+  )
+
   it should "write data with nested class" in fixture(
     Seq(ContainsNested(Nested(1)))
   )
@@ -69,11 +75,15 @@ class ParquetWriterITSpec extends FlatSpec
     Seq(ContainsNestedOption(Some(Nested(1))), ContainsNestedOption(None))
   )
 
-  it should "write data with nested collection" in fixture(
+  it should "write data with collection of nested classes" in fixture(
     Seq(
       ContainsNestedCollection(List(Nested(1), Nested(2), Nested(3))),
       ContainsNestedCollection(List.empty)
     )
+  )
+
+  it should "write data with maps with nested classes" in fixture(
+    Seq(ContainsNestedMap(Map.empty), ContainsNestedMap(Map("key_1" -> Nested(1), "key_2" -> Nested(2), "key_3" -> Nested(3))))
   )
 
 }

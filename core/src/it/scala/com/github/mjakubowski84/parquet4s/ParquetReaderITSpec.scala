@@ -51,7 +51,7 @@ class ParquetReaderITSpec
   }
 
   class FixtureWithMapping[Row <: Product : TypeTag : ParquetRecordDecoder, Mapped](rows: Seq[Row], mapping: Row => Mapped) {
-    private val reader = ParquetReader[Row](tempPathString)
+    private val reader = ParquetReader.read[Row](tempPathString)
     writeToTemp(rows)
     try {
       reader.map(mapping) should contain theSameElementsAs rows.map(mapping)

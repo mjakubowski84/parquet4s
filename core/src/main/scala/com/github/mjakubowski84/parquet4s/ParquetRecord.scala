@@ -18,7 +18,7 @@ sealed trait ParquetRecord extends Value {
 object RowParquetRecord {
 
   def apply(entries : (String, Value)*): RowParquetRecord =
-    entries.foldLeft(new RowParquetRecord()) {
+    entries.foldLeft(RowParquetRecord.empty) {
       case (record, (key, value)) => record.add(key, value)
     }
 
@@ -33,6 +33,7 @@ class RowParquetRecord private extends ParquetRecord {
   private val values = ArrayBuffer.empty[(String, Value)]
 
   override def add(name: String, value: Value): Self = {
+    // TODO handle case when this field is already there!
     values.append((name, value))
     this
   }
@@ -85,7 +86,7 @@ object ListParquetRecord {
   private val ElementFieldName = "element"
 
   def apply(elements: Value*): ListParquetRecord =
-    elements.foldLeft(new ListParquetRecord()) {
+    elements.foldLeft(ListParquetRecord.empty) {
       case (record, element) => record.add(ListFieldName, RowParquetRecord(ElementFieldName -> element))
     }
 
@@ -102,8 +103,11 @@ class ListParquetRecord private extends ParquetRecord {
 
   override def add(name: String, value: Value): Self = {
     // name should always be equal to ListFieldName
-    val element = value.asInstanceOf[RowParquetRecord].getMap.getOrElse(ElementFieldName, NullValue)
-    values.append(element)
+    add(value.asInstanceOf[RowParquetRecord].getMap.getOrElse(ElementFieldName, NullValue))
+  }
+
+  def add(value: Value): Self = {
+    values.append(value)
     this
   }
 
@@ -112,14 +116,14 @@ class ListParquetRecord private extends ParquetRecord {
   override def toString: String = values.mkString(getClass.getSimpleName + " (", ",", ")")
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
-    val groupSchema = schema.asGroupType()
-    val listSchema = groupSchema.getType(ListFieldName).asGroupType()
-    val listIndex = groupSchema.getFieldIndex(ListFieldName)
-    val elementIndex = listSchema.getFieldIndex(ElementFieldName)
-
     recordConsumer.startGroup()
 
     if (!isEmpty) {
+      val groupSchema = schema.asGroupType()
+      val listSchema = groupSchema.getType(ListFieldName).asGroupType()
+      val listIndex = groupSchema.getFieldIndex(ListFieldName)
+      val elementIndex = listSchema.getFieldIndex(ElementFieldName)
+
       recordConsumer.startField(ListFieldName, listIndex)
       recordConsumer.startGroup()
       recordConsumer.startField(ElementFieldName, elementIndex)
@@ -158,9 +162,13 @@ class ListParquetRecord private extends ParquetRecord {
 
 object MapParquetRecord {
 
+  private val MapKeyValueFieldName = "map"
+  private val KeyFieldName = "key"
+  private val ValueFieldName = "value"
+
   def apply(entries : (Value, Value)*): MapParquetRecord = {
-    entries.foldLeft(new MapParquetRecord()) {
-      case (record, (key, value)) => record.add("key_value", RowParquetRecord("key" -> key, "value" -> value)) // TODO
+    entries.foldLeft(MapParquetRecord.empty) {
+      case (record, (key, value)) => record.add(MapKeyValueFieldName, RowParquetRecord(KeyFieldName -> key, ValueFieldName -> value))
     }
   }
 
@@ -169,6 +177,7 @@ object MapParquetRecord {
 }
 
 class MapParquetRecord private extends ParquetRecord {
+  import MapParquetRecord._
 
   override type Self = this.type
 
@@ -178,7 +187,11 @@ class MapParquetRecord private extends ParquetRecord {
     val keyValueRecord = value.asInstanceOf[RowParquetRecord]
     val mapKey = keyValueRecord.getMap("key")
     val mapValue = keyValueRecord.getMap.getOrElse("value", NullValue)
-    values.put(mapKey, mapValue)
+    add(mapKey, mapValue)
+  }
+
+  def add(key: Value, value: Value): Self = {
+    values.put(key, value)
     this
   }
 
@@ -189,7 +202,42 @@ class MapParquetRecord private extends ParquetRecord {
       .map { case (key, value) => s"$key=$value"}
       .mkString(getClass.getSimpleName + " (", ",", ")")
 
-  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = ??? // TODO
+  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
+    recordConsumer.startGroup()
+
+    if (values.nonEmpty) {
+      val groupSchema = schema.asGroupType()
+      val mapKeyValueSchema = groupSchema.getType(MapKeyValueFieldName).asGroupType()
+      val keySchema = mapKeyValueSchema.getType(KeyFieldName)
+      val valueSchema = mapKeyValueSchema.getType(ValueFieldName)
+
+      val mapKeyValueIndex = groupSchema.getFieldIndex(MapKeyValueFieldName)
+      val keyIndex = mapKeyValueSchema.getFieldIndex(KeyFieldName)
+      val valueIndex = mapKeyValueSchema.getFieldIndex(ValueFieldName)
+
+      recordConsumer.startField(MapKeyValueFieldName, mapKeyValueIndex)
+      recordConsumer.startGroup()
+
+      val valueSeq = values.toSeq
+
+      recordConsumer.startField(KeyFieldName, keyIndex)
+      valueSeq.foreach { case (key, _) =>
+        key.write(keySchema, recordConsumer)
+      }
+      recordConsumer.endField(KeyFieldName, keyIndex)
+
+      recordConsumer.startField(ValueFieldName, valueIndex)
+      valueSeq.foreach { case (_, value) =>
+        value.write(valueSchema, recordConsumer)
+      }
+      recordConsumer.endField(ValueFieldName, valueIndex)
+
+      recordConsumer.endGroup()
+      recordConsumer.endField(MapKeyValueFieldName, mapKeyValueIndex)
+    }
+
+    recordConsumer.endGroup()
+  }
 
   def canEqual(other: Any): Boolean = other.isInstanceOf[MapParquetRecord]
 

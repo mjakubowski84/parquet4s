@@ -58,6 +58,35 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
     ))
   }
 
+  it should "resolve schema for type containing map of primitives" in {
+    resolveSchema[ContainsMapOfPrimitives] should be(Message(
+      MapSchemaDef(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
+      )("map")
+    ))
+  }
+
+  it should "resolve schema for type containing map of optional primitives" in {
+    resolveSchema[ContainsMapOfOptionalPrimitives] should be(Message(
+      MapSchemaDef(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.INT_32))
+      )("map")
+    ))
+  }
+
+  it should "resolve schema for type containing map of collections of primitives" in {
+    resolveSchema[ContainsMapOfCollectionsOfPrimitives] should be(Message(
+      MapSchemaDef(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
+        ListGroupSchemaDef(
+          PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
+        )
+      )("map")
+    ))
+  }
+
   it should "resolve schema for type containing nested class" in {
     resolveSchema[ContainsNestedClass] should be(Message(
       GroupSchemaDef(
@@ -84,6 +113,41 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
       ListGroupSchemaDef(nestedClassSchemaDef)("vector"),
       ListGroupSchemaDef(nestedClassSchemaDef)("set"),
       ListGroupSchemaDef(nestedClassSchemaDef)("array")
+    ))
+  }
+
+  it should "resolve schema for type containing map of nested classes" in {
+    resolveSchema[ContainsMapOfNestedClass] should be(Message(
+      MapSchemaDef(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
+        GroupSchemaDef(
+          PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
+        )
+      )("nested")
+    ))
+  }
+
+  it should "resolve schema for type containing map of optional nested classes" in {
+    resolveSchema[ContainsMapOfOptionalNestedClass] should be(Message(
+      MapSchemaDef(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
+        GroupSchemaDef(
+          PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
+        )
+      )("nested")
+    ))
+  }
+
+  it should "resolve schema for type containing map of collections of nested classes" in {
+    resolveSchema[ContainsMapOfCollectionsOfNestedClass] should be(Message(
+      MapSchemaDef(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
+        ListGroupSchemaDef(
+          GroupSchemaDef(
+            PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
+          )
+        )
+      )("nested")
     ))
   }
 

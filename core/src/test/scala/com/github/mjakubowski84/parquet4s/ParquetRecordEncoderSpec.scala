@@ -7,8 +7,6 @@ import ParquetRecordEncoder.encode
 
 class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
 
-  import ParquetRecordEncoder._ // TODO this import is needed only because of CollectionTransformers, maybe we need to change smth?
-
   "HNil encoder" should "be used to encode empty record" in {
     encode(Empty()) should be(RowParquetRecord())
   }
@@ -90,6 +88,28 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     )
   }
 
+  it should "decode record containing map of primitives" in {
+    encode(ContainsMapOfPrimitives(Map("key" -> 1))) should be(
+      RowParquetRecord("map" -> MapParquetRecord("key" -> 1))
+    )
+  }
+
+  it should "decode record containing map of optional primitives" in {
+    encode(ContainsMapOfOptionalPrimitives(
+      Map("1" -> None, "2" -> Some(2))
+    )) should be(RowParquetRecord(
+      "map" -> MapParquetRecord("1" -> NullValue, "2" -> IntValue(2))
+    ))
+  }
+
+  it should "decode record containing map of collections of primitives" in {
+    encode(ContainsMapOfCollectionsOfPrimitives(
+      Map("1" -> List.empty, "2" -> List(1, 2, 3))
+    )) should be(RowParquetRecord(
+      "map" -> MapParquetRecord("1" -> ListParquetRecord.empty, "2" -> ListParquetRecord(1, 2, 3))
+    ))
+  }
+
   "Product encoder" should "encode record containing nested record" in {
     encode(ContainsNestedClass(Nested(1))) should be(
       RowParquetRecord("nested" -> RowParquetRecord("int" -> 1))
@@ -136,6 +156,51 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
       "set" -> listOfNestedRecords,
       "array" -> listOfNestedRecords
     ))
+  }
+
+  "Map of products encoder" should "encode record containing map of records" in {
+    val dataWithEmptyMap = ContainsMapOfNestedClass(Map.empty)
+    val dataWithMap = ContainsMapOfNestedClass(Map("1" -> Nested(1), "2" -> Nested(2)))
+
+    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
+
+    val record = RowParquetRecord("nested" -> MapParquetRecord(
+      "1" -> RowParquetRecord("int" -> 1),
+      "2" -> RowParquetRecord("int" -> 2)
+    ))
+    encode(dataWithMap) should be(record)
+  }
+
+  it should "decode record containing map of optional records" in {
+    val dataWithEmptyMap = ContainsMapOfOptionalNestedClass(Map.empty)
+    val dataWithMap = ContainsMapOfOptionalNestedClass(Map(
+      "none" -> None,
+      "some" -> Some(Nested(2))
+    ))
+
+    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
+
+    val record = RowParquetRecord("nested" -> MapParquetRecord(
+      "none" -> NullValue,
+      "some" -> RowParquetRecord("int" -> 2)
+    ))
+    encode(dataWithMap) should be(record)
+  }
+
+  it should "decode record containing map of collection of records" in {
+    val dataWithEmptyMap = ContainsMapOfCollectionsOfNestedClass(Map.empty)
+    val dataWithMap = ContainsMapOfCollectionsOfNestedClass(Map(
+      "empty" -> List.empty,
+      "nonEmpty" -> List(Nested(1), Nested(2), Nested(3))
+    ))
+
+    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
+
+    val record = RowParquetRecord("nested" -> MapParquetRecord(
+      "empty" -> ListParquetRecord.empty,
+      "nonEmpty" -> ListParquetRecord(RowParquetRecord("int" -> 1), RowParquetRecord("int" -> 2), RowParquetRecord("int" -> 3))
+    ))
+    encode(dataWithMap) should be(record)
   }
 
 }
