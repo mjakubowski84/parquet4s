@@ -5,13 +5,11 @@ import java.time.Period
 
 import org.scalatest.{FlatSpec, Matchers}
 import ValueImplicits._
-import ParquetRecordDecoder.decode
+import ParquetRecordDecoder.{DecodingException, decode}
 import TestCases._
 
 
 class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
-
-  import ParquetRecordDecoder._
 
   "HNil decoder" should "be used to decode empty record" in {
     decode[Empty](RowParquetRecord.empty) should be(Empty())
@@ -156,11 +154,13 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     val dataWithSome = ContainsOptionalNestedClass(Some(Nested(1)))
     val dataWithNone = ContainsOptionalNestedClass(None)
 
-    val record = RowParquetRecord.empty
-    decode[ContainsOptionalNestedClass](record) should be(dataWithNone)
+    decode[ContainsOptionalNestedClass](
+      RowParquetRecord("nestedOptional" -> NullValue)
+    ) should be(dataWithNone)
 
-    record.add("nestedOptional", RowParquetRecord("int" -> 1))
-    decode[ContainsOptionalNestedClass](record) should be(dataWithSome)
+    decode[ContainsOptionalNestedClass](
+      RowParquetRecord("nestedOptional" -> RowParquetRecord("int" -> 1))
+    ) should be(dataWithSome)
   }
 
   it should "throw exception if input does not match expected type" in {
@@ -214,10 +214,11 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     val dataWithEmptyMap = ContainsMapOfNestedClass(Map.empty)
     val dataWithMap = ContainsMapOfNestedClass(Map("1" -> Nested(1), "2" -> Nested(2)))
 
-    val record = RowParquetRecord.empty
-    decode[ContainsMapOfNestedClass](record) should be(dataWithEmptyMap)
+    decode[ContainsMapOfNestedClass](
+      RowParquetRecord("nested" -> MapParquetRecord.empty)
+    ) should be(dataWithEmptyMap)
 
-    record.add("nested", MapParquetRecord(
+    val record = RowParquetRecord("nested" -> MapParquetRecord(
       "1" -> RowParquetRecord("int" -> 1),
       "2" -> RowParquetRecord("int" -> 2)
     ))
@@ -241,10 +242,11 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "some" -> Some(Nested(2))
     ))
 
-    val record = RowParquetRecord.empty
-    decode[ContainsMapOfOptionalNestedClass](record) should be(dataWithEmptyMap)
+    decode[ContainsMapOfOptionalNestedClass](
+      RowParquetRecord("nested" -> MapParquetRecord.empty)
+    ) should be(dataWithEmptyMap)
 
-    record.add("nested", MapParquetRecord(
+    val record = RowParquetRecord("nested" -> MapParquetRecord(
       "none" -> NullValue,
       "some" -> RowParquetRecord("int" -> 2)
     ))
@@ -258,10 +260,11 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "nonEmpty" -> List(Nested(1), Nested(2), Nested(3))
     ))
 
-    val record = RowParquetRecord.empty
-    decode[ContainsMapOfCollectionsOfNestedClass](record) should be(dataWithEmptyMap)
+    decode[ContainsMapOfCollectionsOfNestedClass](
+      RowParquetRecord("nested" -> MapParquetRecord.empty)
+    ) should be(dataWithEmptyMap)
 
-    record.add("nested", MapParquetRecord(
+    val record = RowParquetRecord("nested" -> MapParquetRecord(
       "empty" -> ListParquetRecord.empty,
       "nonEmpty" -> ListParquetRecord(RowParquetRecord("int" -> 1), RowParquetRecord("int" -> 2), RowParquetRecord("int" -> 3))
     ))

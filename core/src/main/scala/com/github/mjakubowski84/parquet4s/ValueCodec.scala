@@ -118,11 +118,11 @@ trait TimeValueCodecs {
 
 }
 
-trait CollectionValueCodecs {
+trait ComplexValueCodecs {
 
-  implicit def traversableCodec[T, Col[_]](implicit
-                                           elementCodec: ValueCodec[T],
-                                           collectionTransformer: CollectionTransformer[T, Col]
+  implicit def collectionCodec[T, Col[_]](implicit
+                                          elementCodec: ValueCodec[T],
+                                          collectionTransformer: CollectionTransformer[T, Col]
                                          ): ValueCodec[Col[T]] = new ValueCodec[Col[T]] {
     override def decode(value: Value): Col[T] =
       value match {
@@ -130,39 +130,52 @@ trait CollectionValueCodecs {
           collectionTransformer.to(listRecord.elements.map(elementCodec.decode))
       }
 
-    override def encode(data: Col[T]): Value = {
-      val listElements = collectionTransformer.from(data).map(elementCodec.encode)
-      ListParquetRecord(listElements:_*)
-    }
+    override def encode(data: Col[T]): Value =
+      collectionTransformer.from(data).map(elementCodec.encode).foldLeft(ListParquetRecord.empty) {
+        case (record, element) =>
+          record.add(element)
+      }
   }
 
   implicit def optionCodec[T](implicit elementCodec: ValueCodec[T]): ValueCodec[Option[T]] = new ValueCodec[Option[T]] {
     override def decode(value: Value): Option[T] =
       value match {
-        case primitiveValue: PrimitiveValue[T] =>
-          Option(primitiveValue.value)
-        case NullValue =>
-          None
+        case NullValue => None
+        case _ => Option(elementCodec.decode(value))
       }
 
-    override def encode(data: Option[T]): Value = {
+    override def encode(data: Option[T]): Value =
       data match {
-        case Some(t) => elementCodec.encode(t)
         case None => NullValue // TODO write tests for reading and writing null fields!
+        case Some(t) => elementCodec.encode(t)
       }
-    }
   }
 
-  implicit def mapCodec[K, V](implicit kt: ValueCodec[K], vt: ValueCodec[V]): ValueCodec[Map[K, V]] = new ValueCodec[Map[K, V]] {
+  implicit def mapCodec[K, V](implicit
+                              kCodec: ValueCodec[K],
+                              vCodec: ValueCodec[V]
+                             ): ValueCodec[Map[K, V]] = new ValueCodec[Map[K, V]] {
     override def decode(value: Value): Map[K, V] =
       value match {
         case mapParquetRecord: MapParquetRecord =>
           mapParquetRecord.getMap.map { case (mapKey, mapValue) =>
-            kt.decode(mapKey) -> vt.decode(mapValue)
+            kCodec.decode(mapKey) -> vCodec.decode(mapValue)
           }
       }
 
-    override def encode(data: Map[K, V]): Value = ???
+    override def encode(data: Map[K, V]): Value =
+      data.foldLeft(MapParquetRecord.empty) { case (record, (key, value)) =>
+        record.add(kCodec.encode(key), vCodec.encode(value))
+      }
+  }
+
+  implicit def productCodec[T](implicit
+                               encoder: ParquetRecordEncoder[T],
+                               decoder: ParquetRecordDecoder[T]
+                              ): ValueCodec[T] = new ValueCodec[T] {
+
+    override def decode(value: Value): T = decoder.decode(value)
+    override def encode(data: T): Value = encoder.encode(data)
   }
 
 }
@@ -170,4 +183,4 @@ trait CollectionValueCodecs {
 trait AllValueCodecs
   extends PrimitiveValueCodecs
     with TimeValueCodecs
-    with CollectionValueCodecs
+    with ComplexValueCodecs
