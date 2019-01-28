@@ -122,21 +122,13 @@ class ListParquetRecord private extends ParquetRecord {
       val groupSchema = schema.asGroupType()
       val listSchema = groupSchema.getType(ListFieldName).asGroupType()
       val listIndex = groupSchema.getFieldIndex(ListFieldName)
-      val elementIndex = listSchema.getFieldIndex(ElementFieldName)
 
       recordConsumer.startField(ListFieldName, listIndex)
-      recordConsumer.startGroup()
-      recordConsumer.startField(ElementFieldName, elementIndex)
 
-      values.foreach {
-        case NullValue =>
-        // TODO write a test for writing collection with null element and optional element, and collection with only null elements!
-        case value =>
-          value.write(listSchema.getType(ElementFieldName), recordConsumer)
+      values.foreach { value =>
+        RowParquetRecord(ElementFieldName -> value).write(listSchema, recordConsumer)
       }
 
-      recordConsumer.endField(ElementFieldName, elementIndex)
-      recordConsumer.endGroup()
       recordConsumer.endField(ListFieldName, listIndex)
     }
 
@@ -208,31 +200,14 @@ class MapParquetRecord private extends ParquetRecord {
     if (values.nonEmpty) {
       val groupSchema = schema.asGroupType()
       val mapKeyValueSchema = groupSchema.getType(MapKeyValueFieldName).asGroupType()
-      val keySchema = mapKeyValueSchema.getType(KeyFieldName)
-      val valueSchema = mapKeyValueSchema.getType(ValueFieldName)
-
       val mapKeyValueIndex = groupSchema.getFieldIndex(MapKeyValueFieldName)
-      val keyIndex = mapKeyValueSchema.getFieldIndex(KeyFieldName)
-      val valueIndex = mapKeyValueSchema.getFieldIndex(ValueFieldName)
 
       recordConsumer.startField(MapKeyValueFieldName, mapKeyValueIndex)
-      recordConsumer.startGroup()
 
-      val valueSeq = values.toSeq
-
-      recordConsumer.startField(KeyFieldName, keyIndex)
-      valueSeq.foreach { case (key, _) =>
-        key.write(keySchema, recordConsumer)
+      values.foreach { case (key, value) =>
+        RowParquetRecord(KeyFieldName -> key, ValueFieldName -> value).write(mapKeyValueSchema, recordConsumer)
       }
-      recordConsumer.endField(KeyFieldName, keyIndex)
 
-      recordConsumer.startField(ValueFieldName, valueIndex)
-      valueSeq.foreach { case (_, value) =>
-        value.write(valueSchema, recordConsumer)
-      }
-      recordConsumer.endField(ValueFieldName, valueIndex)
-
-      recordConsumer.endGroup()
       recordConsumer.endField(MapKeyValueFieldName, mapKeyValueIndex)
     }
 

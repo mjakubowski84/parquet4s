@@ -33,6 +33,11 @@ trait SparkHelper extends BeforeAndAfterAll  {
     data.toDS().write.parquet(tempPathString)
   }
 
+  def readFromTemp[T <: Product : TypeTag]: Seq[T] = {
+    import sparkSession.implicits._
+    sparkSession.read.parquet(tempPathString).as[T].collect().toSeq
+  }
+
   def clearTemp(): Unit = {
     val tempDir = tempPath.toFile
     Option(tempDir.listFiles()).foreach(_.foreach(_.delete()))
