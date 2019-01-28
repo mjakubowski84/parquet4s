@@ -36,9 +36,11 @@ object ParquetWriter  {
       val records = data.map(ParquetRecordEncoder.encode[T])
 
       val writer = new Builder(path, ParquetSchemaResolver.resolveSchema).build()
-      records.foreach(writer.write)
-
-      writer.close()
+      try {
+        records.foreach(writer.write)
+      } finally {
+        writer.close()
+      }
     }
   }
 
