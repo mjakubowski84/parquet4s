@@ -1,5 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
+import java.nio.{ByteBuffer, ByteOrder}
+import java.util.TimeZone
+
 import org.scalatest.{FlatSpec, Matchers}
 import ValueImplicits._
 import TestCases._
@@ -7,11 +10,11 @@ import ParquetRecordEncoder.encode
 
 class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
 
-  "HNil encoder" should "be used to encode empty record" in {
+  "Parquet record encoder" should "be used to encode empty record" in {
     encode(Empty()) should be(RowParquetRecord())
   }
 
-  "Value encoder" should "encode record containing primitive values" in {
+  it should "encode record containing primitive values" in {
     val data = Primitives(
       boolean = true,
       int = 1,
@@ -28,6 +31,31 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
       "double" -> 1.00000000000001d,
       "string" -> "text"
     )
+    encode(data) should be(record)
+  }
+
+  it should "encode record containing time values" in {
+    val date = java.time.LocalDate.of(2019, 1, 1)
+    val time = java.time.LocalTime.of(0, 0, 0)
+    val dateTime = java.time.LocalDateTime.of(date, time)
+
+    val data = TimePrimitives(
+      timestamp = java.sql.Timestamp.valueOf(dateTime),
+      date = java.sql.Date.valueOf(date)
+    )
+
+    val epochDays = date.toEpochDay.toInt
+
+    val record = RowParquetRecord(
+      "timestamp" -> BinaryValue {
+        val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+        buf.putLong(-TimeZone.getDefault.getRawOffset * TimeValueCodecs.NanosPerMilli) // time in nanos with milli offset due to time zone
+        buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
+        buf.array()
+      },
+      "date" -> epochDays
+    )
+
     encode(data) should be(record)
   }
 
@@ -110,7 +138,7 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     ))
   }
 
-  "Product encoder" should "encode record containing nested record" in {
+  it should "encode record containing nested record" in {
     encode(ContainsNestedClass(Nested(1))) should be(
       RowParquetRecord("nested" -> RowParquetRecord("int" -> 1))
     )
@@ -158,7 +186,7 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     ))
   }
 
-  "Map of products encoder" should "encode record containing map of records" in {
+  it should "encode record containing map of records" in {
     val dataWithEmptyMap = ContainsMapOfNestedClass(Map.empty)
     val dataWithMap = ContainsMapOfNestedClass(Map("1" -> Nested(1), "2" -> Nested(2)))
 

@@ -1,21 +1,21 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.nio.ByteBuffer
-import java.time.Period
+import java.nio.{ByteBuffer, ByteOrder}
+import java.util.TimeZone
 
+import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder.{DecodingException, decode}
+import com.github.mjakubowski84.parquet4s.TestCases._
+import com.github.mjakubowski84.parquet4s.ValueImplicits._
 import org.scalatest.{FlatSpec, Matchers}
-import ValueImplicits._
-import ParquetRecordDecoder.{DecodingException, decode}
-import TestCases._
 
 
 class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
-  "HNil decoder" should "be used to decode empty record" in {
+  "Parquet record decoder" should "be used to decode empty record" in {
     decode[Empty](RowParquetRecord.empty) should be(Empty())
   }
 
-  "Value decoder" should "decode record containing primitive values" in {
+  it should "decode record containing primitive values" in {
     val data = Primitives(
       boolean = true,
       int = 1,
@@ -35,18 +35,28 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     decode[Primitives](record) should be(data)
   }
 
-  ignore should "decode record containing time primitive values" in {
+  it should "decode record containing time primitive values" in {
+    val date = java.time.LocalDate.of(2019, 1, 1)
+    val time = java.time.LocalTime.of(0, 0, 0)
+    val dateTime = java.time.LocalDateTime.of(date, time)
+
     val data = TimePrimitives(
-      timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2019, 1, 1, 12, 0, 1)),
-      date = java.sql.Date.valueOf(java.time.LocalDate.of(2019, 1, 1))
+      timestamp = java.sql.Timestamp.valueOf(dateTime),
+      date = java.sql.Date.valueOf(date)
     )
+
+    val epochDays = date.toEpochDay.toInt
+
     val record = RowParquetRecord(
-      "timestamp" -> BinaryValue(ByteBuffer.allocate(12).array()), // TODO fix when we will have encoder and we know better how to encode
-      "date" -> Period.between(
-        java.time.LocalDate.of(1970, 1, 1),
-        java.time.LocalDate.of(2019, 1, 1)
-      ).getDays
+      "timestamp" -> BinaryValue {
+        val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+        buf.putLong(-TimeZone.getDefault.getRawOffset * TimeValueCodecs.NanosPerMilli) // time in nanos with milli offset due to time zone
+        buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
+        buf.array()
+      },
+      "date" -> epochDays
     )
+
     decode[TimePrimitives](record) should be(data)
   }
 
@@ -60,7 +70,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     decode[ContainsOption](RowParquetRecord.empty) should be(ContainsOption(None))
   }
 
-  it should "throw exception if type of input filed does not match expected type" in {
+  it should "throw exception if type of input field does not match expected type" in {
     case class ContainsInt(int: Int)
 
     val record = RowParquetRecord("int" -> "I am string but I should be int")
@@ -133,7 +143,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     ))
   }
 
-  "Product decoder" should "decode record containing nested records" in {
+  it should "decode record containing nested records" in {
     val data = ContainsNestedClass(Nested(1))
     val record = RowParquetRecord(
       "nested" -> RowParquetRecord("int" -> 1)
@@ -141,16 +151,16 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     decode[ContainsNestedClass](record) should be(data)
   }
 
-  it should "throw exception if record is missing data for field" in {
+  it should "throw exception if record is missing data for a nested record" in {
     a[ParquetRecordDecoder.DecodingException] should be thrownBy decode[ContainsNestedClass](RowParquetRecord.empty)
   }
 
-  it should "throw exception if input record does not match expected type" in {
+  it should "throw exception if nested record does not match expected type" in {
     val record = RowParquetRecord("nested" -> ListParquetRecord(1))
     a[ParquetRecordDecoder.DecodingException] should be thrownBy decode[ContainsNestedClass](record)
   }
 
-  "Optional product decoder" should "decode record containing optional nested record" in {
+  it should "decode record containing optional nested record" in {
     val dataWithSome = ContainsOptionalNestedClass(Some(Nested(1)))
     val dataWithNone = ContainsOptionalNestedClass(None)
 
@@ -163,7 +173,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     ) should be(dataWithSome)
   }
 
-  it should "throw exception if input does not match expected type" in {
+  it should "throw exception if optional nested record does not match expected type" in {
     val invalidRecordWithMap = RowParquetRecord("nestedOptional" -> MapParquetRecord("a" -> 1))
     val invalidRecordWithList = RowParquetRecord("nestedOptional" -> ListParquetRecord(1))
 
@@ -171,7 +181,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     a[DecodingException] should be thrownBy decode[ContainsOptionalNestedClass](invalidRecordWithList)
   }
 
-  "Collection of products decoder" should "decode record containing sequence of nested records" in {
+  it should "decode record containing collection of nested records" in {
     decode[CollectionsOfNestedClass](RowParquetRecord(
       "list" -> ListParquetRecord.empty,
       "seq" -> ListParquetRecord.empty,
@@ -205,12 +215,12 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     ))
   }
 
-  it should "throw exception if input does not match expected type" in {
+  it should "throw exception if collection of nested records does not match expected type" in {
     val record = RowParquetRecord("set" -> MapParquetRecord("a" -> 1))
     a[DecodingException] should be thrownBy decode[CollectionsOfNestedClass](record)
   }
 
-  "Map of products decoder" should "decode record containing map of records" in {
+  it should "decode record containing map of records" in {
     val dataWithEmptyMap = ContainsMapOfNestedClass(Map.empty)
     val dataWithMap = ContainsMapOfNestedClass(Map("1" -> Nested(1), "2" -> Nested(2)))
 
@@ -225,12 +235,12 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     decode[ContainsMapOfNestedClass](record) should be(dataWithMap)
   }
 
-  it should "throw exception when failed to decode a key of a map" in {
+  it should "throw exception when failed to decode a key of nested map record" in {
     val record = RowParquetRecord("nested" -> MapParquetRecord(123 -> RowParquetRecord("int" -> 1)))
     a[DecodingException] should be thrownBy decode[ContainsMapOfNestedClass](record)
   }
 
-  it should "throw exception when encountered implementation of ParquetRecord unsuitable for map" in {
+  it should "throw exception when encountered implementation of ParquetRecord unsuitable for a map" in {
     val record = RowParquetRecord("nested" -> ListParquetRecord(RowParquetRecord("int" -> 1)))
     a[DecodingException] should be thrownBy decode[ContainsMapOfNestedClass](record)
   }
