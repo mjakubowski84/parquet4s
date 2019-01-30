@@ -1,5 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
+import java.util.NoSuchElementException
+
 import com.github.mjakubowski84.parquet4s.CompatibilityParty.CompatibilityParty
 
 import scala.reflect.runtime.universe.TypeTag
@@ -59,9 +61,11 @@ trait TestCaseSupport {
 
   def cases(compatibilityParty: CompatibilityParty*): Seq[Case.CaseDef] = cases(compatibilityParty.toSet)
 
-  def singleCase[T: TypeTag]: Option[Case.CaseDef] = {
-    val targetTag = implicitly[TypeTag[T]]
-    caseDefinitions.find(_.typeTag.toString() == targetTag.toString())
+  def only[T: TypeTag]: Case.CaseDef = {
+    val targetTpe = implicitly[TypeTag[T]].tpe
+    caseDefinitions
+      .find(_.typeTag.tpe =:= targetTpe)
+      .getOrElse(throw new NoSuchElementException(s"Case $targetTpe is not defined"))
   }
 
 }

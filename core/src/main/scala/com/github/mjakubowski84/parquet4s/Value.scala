@@ -48,6 +48,12 @@ case class BinaryValue(value: Array[Byte]) extends PrimitiveValue[Array[Byte]] {
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addBinary(Binary.fromReusedByteArray(value))
 
+  override def equals(obj: Any): Boolean =
+    obj match {
+      case other @ BinaryValue(otherValue) =>
+        (other canEqual this) && value.sameElements(otherValue)
+      case _ => false
+    }
 }
 
 case class BooleanValue(value: Boolean) extends PrimitiveValue[Boolean] {

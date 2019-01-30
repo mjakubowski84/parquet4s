@@ -75,12 +75,20 @@ object CompatibilityTestCases extends TestCaseSupport {
     Case("primitives", Seq(
       Primitives(b = true, 1, 1234567890l, 1.1f, 1.00000000001d, "text")
     )),
-//    Case("time primitives", Seq(
-//      TimePrimitives(
-//        timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2019, 1, 1, 12, 0, 1)),
-//        date = java.sql.Date.valueOf(java.time.LocalDate.of(2019, 1, 1))
-//      )
-//    ), Set(CompatibilityParty.Spark, CompatibilityParty.Reader)),
+    Case("time primitives", Seq(
+      TimePrimitives(
+        timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2019, 1, 1, 0, 0, 0)),
+        date = java.sql.Date.valueOf(java.time.LocalDate.of(2019, 1, 1))
+      ),
+      TimePrimitives(
+        timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2019, 1, 1, 0, 30, 0, 2000)),
+        date = java.sql.Date.valueOf(java.time.LocalDate.of(2019, 1, 1))
+      ),
+      TimePrimitives(
+        timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2018, 12, 31, 23, 30, 0, 999000)),
+        date = java.sql.Date.valueOf(java.time.LocalDate.of(2018, 12, 31))
+      )
+    )),
     Case("options", Seq(ContainsOption(None), ContainsOption(Some(1)))),
     Case("collections of primitives", Seq(
       Collections(

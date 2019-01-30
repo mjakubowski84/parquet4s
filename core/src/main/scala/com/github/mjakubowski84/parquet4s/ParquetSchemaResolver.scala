@@ -140,6 +140,16 @@ trait SchemaDefs {
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BOOLEAN)
     )
 
+  implicit val dateSchema: TypedSchemaDef[java.sql.Date] =
+    typedSchemaDef[java.sql.Date](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.DATE))
+    )
+
+  implicit val timestampSchema: TypedSchemaDef[java.sql.Timestamp] =
+    typedSchemaDef[java.sql.Timestamp](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT96, required = false)
+    )
+
   implicit def productSchema[T](implicit parquetSchemaResolver: ParquetSchemaResolver[T]): TypedSchemaDef[T] =
     typedSchemaDef[T](
       GroupSchemaDef(parquetSchemaResolver.resolveSchema:_*)

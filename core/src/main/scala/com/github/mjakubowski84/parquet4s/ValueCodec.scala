@@ -2,6 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.sql.{Date, Timestamp}
+import java.time._
 import java.util.TimeZone
 
 import scala.language.higherKinds
@@ -72,6 +73,14 @@ trait PrimitiveValueCodecs {
   }
 }
 
+object TimeValueCodecs {
+  val JulianDayOfEpoch = 2440588
+  val MicrosPerMilli = 1000l
+  val NanosPerMicro = 1000l
+  val NanosPerMilli: Long = NanosPerMicro * MicrosPerMilli
+  val NanosPerDay = 86400000000000l
+}
+
 trait TimeValueCodecs {
 
   /**
@@ -79,22 +88,53 @@ trait TimeValueCodecs {
     */
   implicit val timestampCodec: ValueCodec[java.sql.Timestamp] = new ValueCodec[java.sql.Timestamp] {
 
-    override def decode(value: Value): java.sql.Timestamp = {
+    // TODO there are parquet time formats over there to be checked, too
+
+    import TimeValueCodecs._
+
+    private val timeZone = TimeZone.getDefault // TODO should be configurable
+
+    override def decode(value: Value): java.sql.Timestamp =
       value match {
-//        case t: java.sql.Timestamp => // TODO there are parquet time formats over there to be checked, too
-//          t
-//        case d: java.sql.Date =>
-//          java.sql.Timestamp.from(d.toInstant)
         case BinaryValue(bs: Array[Byte]) =>
           val buf = ByteBuffer.wrap(bs).order(ByteOrder.LITTLE_ENDIAN)
-          val timeOfDayNanos = buf.getLong
+          val fixedTimeInNanos = buf.getLong
           val julianDay = buf.getInt
-          val rawTime = DateTimeUtils.fromJulianDay(julianDay, timeOfDayNanos)
-          new java.sql.Timestamp(DateTimeUtils.toMillis(rawTime))
-      }
-    }
 
-    override def encode(data: Timestamp): Value = ???
+          val date = LocalDate.ofEpochDay(julianDay - JulianDayOfEpoch)
+
+          val fixedTimeInMillis = Math.floorDiv(fixedTimeInNanos, NanosPerMilli)
+          val nanosLeft = Math.floorMod(fixedTimeInNanos, NanosPerMilli)
+          val timeInMillis = fixedTimeInMillis + timeZone.getRawOffset
+          val timeInNanos = (timeInMillis * NanosPerMilli) + nanosLeft
+
+          if (timeInNanos >= NanosPerDay) { // fixes issue with Spark
+            val time = LocalTime.ofNanoOfDay(timeInNanos - NanosPerDay)
+            Timestamp.valueOf(LocalDateTime.of(date.plusDays(1), time))
+          } else {
+            val time = LocalTime.ofNanoOfDay(timeInNanos)
+            Timestamp.valueOf(LocalDateTime.of(date, time))
+          }
+      }
+
+    override def encode(data: Timestamp): Value = BinaryValue {
+      val dateTime = data.toLocalDateTime
+      val date = dateTime.toLocalDate
+      val time = dateTime.toLocalTime
+
+      val julianDay = JulianDayOfEpoch + date.toEpochDay.toInt
+
+      val timeInNanos = time.toNanoOfDay
+      val timeInMillis = Math.floorDiv(timeInNanos, NanosPerMilli)
+      val nanosLeft = Math.floorMod(timeInNanos, NanosPerMilli)
+      val fixedTimeInMillis = timeInMillis - timeZone.getRawOffset
+      val fixedTimeInNanos = fixedTimeInMillis * NanosPerMilli + nanosLeft
+
+      val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+      buf.putLong(fixedTimeInNanos)
+      buf.putInt(julianDay)
+      buf.array()
+    }
   }
 
   /**
@@ -102,18 +142,17 @@ trait TimeValueCodecs {
     */
   implicit val dateCodec: ValueCodec[java.sql.Date] = new ValueCodec[java.sql.Date] {
 
-    override def decode(value: Value): java.sql.Date = {
-      value match {
-//        case t: java.sql.Timestamp => // TODO there are parquet time formats over there to be checked, too
-//          java.sql.Date.valueOf(t.toLocalDateTime.toLocalDate)
-//        case d: java.sql.Date =>
-//          d
-        case IntValue(daysSinceEpoch) =>
-          new java.sql.Date(DateTimeUtils.daysToMillis(daysSinceEpoch, TimeZone.getDefault))
-      }
-    }
+    // TODO there are parquet time formats over there to be checked, too
 
-    override def encode(data: Date): Value = ???
+    override def decode(value: Value): java.sql.Date =
+      value match {
+        case IntValue(epochDay) =>
+          Date.valueOf(LocalDate.ofEpochDay(epochDay))
+      }
+
+    override def encode(data: Date): Value = IntValue(
+      data.toLocalDate.toEpochDay.toInt
+    )
   }
 
 }
