@@ -68,7 +68,7 @@ import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder._
 
 case class Data(id: Int, name: String, description: String)
 
-val parquetIterable = ParquetReader[Data]("s3a:/my-bucket/data")
+val parquetIterable = ParquetReader[Data]("s3a://my-bucket/data")
 parquetIterable.foreach(println)
 parquetIterable.close()
 
@@ -76,7 +76,7 @@ parquetIterable.close()
 
 # How to use Parquet4S with Akka Streams?
 
-Parquet4S has a simple integration module that allows you to read Parquet file using Akka Streams!
+Parquet4S has a simple integration module that allows you to read Parquet files using Akka Streams!
 Just import it:
 
 ```
