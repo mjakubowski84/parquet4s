@@ -13,6 +13,7 @@ libraryDependencies ++= {
     "org.apache.spark" %% "spark-core" % sparkVersion % "it"
       exclude(org = "org.apache.hadoop", name = "hadoop-client"),
     "org.apache.spark" %% "spark-sql" % sparkVersion % "it"
-      exclude(org = "org.apache.hadoop", name = "hadoop-client")
+      exclude(org = "org.apache.hadoop", name = "hadoop-client"),
+    "ch.qos.logback" % "logback-classic" % "1.2.3" % "test,it"
   )
 }

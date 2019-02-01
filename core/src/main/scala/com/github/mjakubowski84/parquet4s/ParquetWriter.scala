@@ -7,6 +7,7 @@ import org.apache.parquet.hadoop.api.WriteSupport.WriteContext
 import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.MessageType
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 
@@ -30,7 +31,11 @@ trait ParquetWriter[T] {
 object ParquetWriter  {
 
   private class Builder(path: String, schema: MessageType) extends HadoopParquetWriter.Builder[RowParquetRecord, Builder](new Path(path)) {
-    println("Using schema:\n" + schema)
+    private val logger = LoggerFactory.getLogger(ParquetWriter.this.getClass)
+
+    if (logger.isDebugEnabled) {
+      logger.debug(s"""Resolved following schema to write Parquet to "$path":\n$schema""")
+    }
 
     override def self(): Builder = this
 
