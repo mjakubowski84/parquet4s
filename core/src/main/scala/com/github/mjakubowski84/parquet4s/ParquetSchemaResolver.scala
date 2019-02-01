@@ -7,9 +7,15 @@ import shapeless.labelled._
 
 import scala.language.higherKinds
 
-
+/**
+  * Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
+  * @tparam T scala type that represents schema of Parquet data.
+  */
 trait ParquetSchemaResolver[T] {
 
+  /**
+    * @return list of [[Type]] for each product element that <i>T</t> contains.
+    */
   def resolveSchema: List[Type]
 
 }
@@ -17,6 +23,9 @@ trait ParquetSchemaResolver[T] {
 object ParquetSchemaResolver
   extends SchemaDefs {
 
+  /**
+    * Builds full Parquet file schema ([[MessageType]]) from <i>T</>.
+    */
   def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType = Message(g.resolveSchema:_*)
 
   implicit val hnil: ParquetSchemaResolver[HNil] = new ParquetSchemaResolver[HNil] {

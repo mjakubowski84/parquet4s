@@ -3,9 +3,20 @@ package com.github.mjakubowski84.parquet4s
 import scala.language.{higherKinds, implicitConversions}
 import scala.reflect.ClassTag
 
+/**
+  * Type class that transforms collection of elements to list and the other way around.
+  * @tparam Element type of element of collection
+  * @tparam Col type of collection
+  */
 // TODO use more performant Vector as a basis collection
 trait CollectionTransformer[Element, Col[_]] {
+  /**
+    * Creates list from collection
+    */
   def from(col: Col[Element]): List[Element]
+  /**
+    * Creates collection from a list
+    */
   def to(list: List[Element]): Col[Element]
 }
 

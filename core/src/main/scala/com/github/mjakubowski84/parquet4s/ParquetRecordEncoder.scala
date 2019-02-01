@@ -6,8 +6,17 @@ import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
+
+/**
+  * Type class that allows to encode given data entity as [[RowParquetRecord]]
+  * @tparam T type of source data
+  */
 trait ParquetRecordEncoder[T] {
 
+  /**
+    * @param entity data to be encoded
+    * @return [[RowParquetRecord]] containing product elements from the data
+    */
   def encode(entity: T): RowParquetRecord
 
 }

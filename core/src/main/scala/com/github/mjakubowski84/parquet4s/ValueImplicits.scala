@@ -2,6 +2,9 @@ package com.github.mjakubowski84.parquet4s
 
 import scala.language.implicitConversions
 
+/**
+  * Auxiliary conversions to write more concise code, e.g. when initializing [[RowParquetRecord]].
+  */
 object ValueImplicits extends AllValueCodecs {
 
   implicit def valueConversion[T](value: T)(implicit valueCodec: ValueCodec[T]): Value = valueCodec.encode(value)

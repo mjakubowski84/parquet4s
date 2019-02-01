@@ -5,9 +5,17 @@ import java.io.Closeable
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 
-
+/**
+  * Type class that reads Parquet files from given path.
+  * @tparam T Type that represents schema of Parquet file
+  */
 trait ParquetReader[T] {
 
+  /**
+    * Reads data from give path.
+    * @param path URI to location of files
+    * @return iterable collection of data read from path
+    */
   def read(path: String): ParquetIterable[T]
 
 }
@@ -26,28 +34,33 @@ object ParquetReader {
     new ParquetIterableImpl(builder)
 
   /**
-    * Creates new object that iterates over Parquet data.
+    * Creates new [[ParquetIterable]] over data from given path.
     * <br/>
-    * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
+    * Path can represent local file or directory, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     * <br/>
     * <b>Note:</b> Remember to call {{{ close() }}} on iterable in order to free resources!
     *
     * @param path URI to Parquet files, e.g.:
     *             {{{ "file:///data/users" }}}
-    * @tparam T type of data that represent the schema of the Parquet data, e.g.:
-    *           {{{
-    *              case class MyData(id: Long, name: String, created: java.sql.Timestamp)
-    *           }}}
+    * @tparam T type of data that represents the schema of the Parquet file, e.g.:
+    *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     */
   def read[T](path: String)(implicit reader: ParquetReader[T]): ParquetIterable[T] = reader.read(path)
 
+  /**
+    * Default implementation of [[ParquetReader]].
+    */
   implicit def reader[T : ParquetRecordDecoder]: ParquetReader[T] = new ParquetReader[T] {
     override def read(path: String): ParquetIterable[T] = newParquetIterable(path)
   }
 
 }
 
+/**
+  * Allows to iterate over Parquet file(s). Remember to call {{{close()}}} when you are done.
+  * @tparam T type that represents schema of Parquet file
+  */
 trait ParquetIterable[T] extends Iterable[T] with Closeable
 
 private class ParquetIterableImpl[T : ParquetRecordDecoder](builder: ParquetReader.Builder) extends ParquetIterable[T] {

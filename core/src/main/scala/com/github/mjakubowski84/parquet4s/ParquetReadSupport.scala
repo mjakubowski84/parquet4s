@@ -10,7 +10,7 @@ import org.apache.parquet.schema._
 import scala.collection.JavaConverters._
 
 
-class ParquetReadSupport extends ReadSupport[RowParquetRecord] {
+private[parquet4s] class ParquetReadSupport extends ReadSupport[RowParquetRecord] {
 
   override def prepareForRead(
                                configuration: Configuration,
@@ -24,7 +24,7 @@ class ParquetReadSupport extends ReadSupport[RowParquetRecord] {
 
 }
 
-class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[RowParquetRecord] {
+private class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[RowParquetRecord] {
 
   private val root = new RowParquetRecordConverter(schema)
 
@@ -34,7 +34,7 @@ class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[
 
 }
 
-abstract class ParquetRecordConverter[R <: ParquetRecord](
+private abstract class ParquetRecordConverter[R <: ParquetRecord](
                                                            schema: GroupType,
                                                            name: Option[String],
                                                            parent: Option[ParquetRecordConverter[_ <: ParquetRecord]]
@@ -115,7 +115,7 @@ abstract class ParquetRecordConverter[R <: ParquetRecord](
 
 }
 
-class RowParquetRecordConverter(schema: GroupType, name: Option[String], parent: Option[ParquetRecordConverter[_ <: ParquetRecord]])
+private class RowParquetRecordConverter(schema: GroupType, name: Option[String], parent: Option[ParquetRecordConverter[_ <: ParquetRecord]])
   extends ParquetRecordConverter[RowParquetRecord](schema, name, parent) {
 
   def this(schema: GroupType) {
@@ -128,7 +128,7 @@ class RowParquetRecordConverter(schema: GroupType, name: Option[String], parent:
   
 }
 
-class ListParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter[_ <: ParquetRecord])
+private class ListParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter[_ <: ParquetRecord])
   extends ParquetRecordConverter[ListParquetRecord](schema, Option(name), Option(parent)){
 
   override def start(): Unit = {
@@ -137,7 +137,7 @@ class ListParquetRecordConverter(schema: GroupType, name: String, parent: Parque
 
 }
 
-class MapParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter[_ <: ParquetRecord])
+private class MapParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter[_ <: ParquetRecord])
   extends ParquetRecordConverter[MapParquetRecord](schema, Option(name), Option(parent)) {
 
   override def start(): Unit = {
