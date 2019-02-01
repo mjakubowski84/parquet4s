@@ -50,7 +50,11 @@ object Message {
 
 trait SchemaDef {
 
+  type Self <: SchemaDef
+
   def apply(name: String): Type
+
+  def withRequired(required: Boolean): Self
 
 }
 
@@ -60,6 +64,8 @@ case class PrimitiveSchemaDef(
                              originalType: Option[OriginalType] = None
                              ) extends SchemaDef {
 
+  override type Self = PrimitiveSchemaDef
+
   override def apply(name: String): Type = {
     val builder = Types.primitive(
       primitiveType,
@@ -68,22 +74,46 @@ case class PrimitiveSchemaDef(
     originalType.foldLeft(builder)(_.as(_)).named(name)
   }
 
+  override def withRequired(required: Boolean): PrimitiveSchemaDef = this.copy(required = required)
 }
 
-case class GroupSchemaDef(fields: Type*) extends SchemaDef {
-  override def apply(name: String): Type = Types.optionalGroup().addFields(fields:_*).named(name)
+object GroupSchemaDef {
+
+  def required(fields: Type*): GroupSchemaDef = GroupSchemaDef(fields, required = true)
+  def optional(fields: Type*): GroupSchemaDef = GroupSchemaDef(fields, required = false)
+
+}
+
+case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends SchemaDef {
+
+  override type Self = GroupSchemaDef
+
+  override def apply(name: String): Type = {
+    val builder = if (required) Types.requiredGroup() else Types.optionalGroup()
+    builder.addFields(fields:_*).named(name)
+  }
+
+  override def withRequired(required: Boolean): GroupSchemaDef = this.copy(required = required)
 }
 
 object ListGroupSchemaDef {
 
   val ElementName = "element"
 
-  def apply(elementSchemaDef: SchemaDef): ListGroupSchemaDef = ListGroupSchemaDef(elementSchemaDef(ElementName))
+  def required(elementSchemaDef: SchemaDef): ListGroupSchemaDef = ListGroupSchemaDef(elementSchemaDef(ElementName), required = true)
+  def optional(elementSchemaDef: SchemaDef): ListGroupSchemaDef = ListGroupSchemaDef(elementSchemaDef(ElementName), required = false)
 
 }
 
-case class ListGroupSchemaDef(element: Type) extends SchemaDef {
-  override def apply(name: String): Type = Types.optionalList().element(element).named(name)
+case class ListGroupSchemaDef(element: Type, required: Boolean) extends SchemaDef {
+  override def apply(name: String): Type = {
+    val builder = if (required) Types.requiredList() else Types.optionalList()
+    builder.element(element).named(name)
+  }
+
+  override type Self = ListGroupSchemaDef
+
+  override def withRequired(required: Boolean): ListGroupSchemaDef = this.copy(required = required)
 }
 
 object MapSchemaDef {
@@ -91,14 +121,25 @@ object MapSchemaDef {
   val KeyName = "key"
   val ValueName = "value"
 
-  def apply(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = new MapSchemaDef(
-    keySchemaDef(KeyName), valueSchemaDef(ValueName)
+  def required(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = new MapSchemaDef(
+    keySchemaDef(KeyName), valueSchemaDef(ValueName), required = true
+  )
+
+  def optional(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = new MapSchemaDef(
+    keySchemaDef(KeyName), valueSchemaDef(ValueName), required = false
   )
 
 }
 
-case class MapSchemaDef(key: Type, value: Type) extends SchemaDef {
-  override def apply(name: String): Type = Types.optionalMap().key(key).value(value).named(name)
+case class MapSchemaDef(key: Type, value: Type, required: Boolean) extends SchemaDef {
+  override def apply(name: String): Type = {
+    val builder = if (required) Types.requiredMap() else Types.optionalMap()
+    builder.key(key).value(value).named(name)
+  }
+
+  override type Self = MapSchemaDef
+
+  override def withRequired(required: Boolean): MapSchemaDef = this.copy(required = required)
 }
 
 // TODO compare schemas here with those from Spark (for example are really primitives required by default, but strings not? maybe it is about empty string? test it)
@@ -152,30 +193,26 @@ trait SchemaDefs {
 
   implicit def productSchema[T](implicit parquetSchemaResolver: ParquetSchemaResolver[T]): TypedSchemaDef[T] =
     typedSchemaDef[T](
-      GroupSchemaDef(parquetSchemaResolver.resolveSchema:_*)
+      GroupSchemaDef.optional(parquetSchemaResolver.resolveSchema:_*)
     )
 
   implicit def optionSchema[T](implicit tSchemaDef: TypedSchemaDef[T]): TypedSchemaDef[Option[T]] =
     typedSchemaDef[Option[T]](
-      tSchemaDef match {
-        case primitiveSchemaDef: PrimitiveSchemaDef =>
-          primitiveSchemaDef.copy(required = false)
-        case other =>
-          other // other types are optional by default, aren't they?
-      }
+      tSchemaDef.withRequired(false)
     )
 
   implicit def collectionSchema[E, Col[_]](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[Col[E]] =
     typedSchemaDef[Col[E]](
-      ListGroupSchemaDef(elementSchema)
+      ListGroupSchemaDef.optional(elementSchema)
     )
 
   implicit def mapSchema[MapKey, MapValue](implicit
                                            keySchema: TypedSchemaDef[MapKey],
                                            valueSchema: TypedSchemaDef[MapValue]
                                           ): TypedSchemaDef[Map[MapKey, MapValue]] =
-    typedSchemaDef[Map[MapKey, MapValue]](
-      MapSchemaDef(keySchema, valueSchema)
-    )
+    typedSchemaDef[Map[MapKey, MapValue]] {
+      // type of the map key must be required
+      MapSchemaDef.optional(keySchema.withRequired(true), valueSchema)
+    }
 
 }

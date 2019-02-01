@@ -127,6 +127,12 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     ) should be(ContainsMapOfPrimitives(Map("key" -> 1)))
   }
 
+  it should "throw exception when encountered null-value as a key" in {
+    a[DecodingException] should be thrownBy {
+      decode[ContainsMapOfPrimitives](RowParquetRecord("map" -> MapParquetRecord(NullValue -> 1)))
+    }
+  }
+
   it should "decode record containing map of optional primitives" in {
     decode[ContainsMapOfOptionalPrimitives](RowParquetRecord(
       "map" -> MapParquetRecord("1" -> NullValue, "2" -> IntValue(2))
@@ -151,8 +157,8 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     decode[ContainsNestedClass](record) should be(data)
   }
 
-  it should "throw exception if record is missing data for a nested record" in {
-    a[ParquetRecordDecoder.DecodingException] should be thrownBy decode[ContainsNestedClass](RowParquetRecord.empty)
+  it should "decode record that misses data for a nested record" in {
+    decode[ContainsNestedClass](RowParquetRecord.empty) should be(ContainsNestedClass(null))
   }
 
   it should "throw exception if nested record does not match expected type" in {
@@ -220,11 +226,11 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     a[DecodingException] should be thrownBy decode[CollectionsOfNestedClass](record)
   }
 
-  it should "decode record containing map of records" in {
-    val dataWithEmptyMap = ContainsMapOfNestedClass(Map.empty)
-    val dataWithMap = ContainsMapOfNestedClass(Map("1" -> Nested(1), "2" -> Nested(2)))
+  it should "decode record containing map with record as value" in {
+    val dataWithEmptyMap = ContainsMapOfNestedClassAsValue(Map.empty)
+    val dataWithMap = ContainsMapOfNestedClassAsValue(Map("1" -> Nested(1), "2" -> Nested(2)))
 
-    decode[ContainsMapOfNestedClass](
+    decode[ContainsMapOfNestedClassAsValue](
       RowParquetRecord("nested" -> MapParquetRecord.empty)
     ) should be(dataWithEmptyMap)
 
@@ -232,27 +238,42 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "1" -> RowParquetRecord("int" -> 1),
       "2" -> RowParquetRecord("int" -> 2)
     ))
-    decode[ContainsMapOfNestedClass](record) should be(dataWithMap)
+    decode[ContainsMapOfNestedClassAsValue](record) should be(dataWithMap)
+  }
+
+  it should "decode record containing map with record as key" in {
+    val dataWithEmptyMap = ContainsMapOfNestedClassAsKey(Map.empty)
+    val dataWithMap = ContainsMapOfNestedClassAsKey(Map(Nested(1) -> "1", Nested(2) -> "2"))
+
+    decode[ContainsMapOfNestedClassAsKey](
+      RowParquetRecord("nested" -> MapParquetRecord.empty)
+    ) should be(dataWithEmptyMap)
+
+    val record = RowParquetRecord("nested" -> MapParquetRecord(
+      RowParquetRecord("int" -> 1) -> "1",
+      RowParquetRecord("int" -> 2) -> "2"
+    ))
+    decode[ContainsMapOfNestedClassAsKey](record) should be(dataWithMap)
   }
 
   it should "throw exception when failed to decode a key of nested map record" in {
     val record = RowParquetRecord("nested" -> MapParquetRecord(123 -> RowParquetRecord("int" -> 1)))
-    a[DecodingException] should be thrownBy decode[ContainsMapOfNestedClass](record)
+    a[DecodingException] should be thrownBy decode[ContainsMapOfNestedClassAsValue](record)
   }
 
   it should "throw exception when encountered implementation of ParquetRecord unsuitable for a map" in {
     val record = RowParquetRecord("nested" -> ListParquetRecord(RowParquetRecord("int" -> 1)))
-    a[DecodingException] should be thrownBy decode[ContainsMapOfNestedClass](record)
+    a[DecodingException] should be thrownBy decode[ContainsMapOfNestedClassAsValue](record)
   }
 
-  it should "decode record containing map of optional records" in {
-    val dataWithEmptyMap = ContainsMapOfOptionalNestedClass(Map.empty)
-    val dataWithMap = ContainsMapOfOptionalNestedClass(Map(
+  it should "decode record containing map with optional records as value" in {
+    val dataWithEmptyMap = ContainsMapOfOptionalNestedClassAsValue(Map.empty)
+    val dataWithMap = ContainsMapOfOptionalNestedClassAsValue(Map(
       "none" -> None,
       "some" -> Some(Nested(2))
     ))
 
-    decode[ContainsMapOfOptionalNestedClass](
+    decode[ContainsMapOfOptionalNestedClassAsValue](
       RowParquetRecord("nested" -> MapParquetRecord.empty)
     ) should be(dataWithEmptyMap)
 
@@ -260,17 +281,17 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "none" -> NullValue,
       "some" -> RowParquetRecord("int" -> 2)
     ))
-    decode[ContainsMapOfOptionalNestedClass](record) should be(dataWithMap)
+    decode[ContainsMapOfOptionalNestedClassAsValue](record) should be(dataWithMap)
   }
 
-  it should "decode record containing map of collection of records" in {
-    val dataWithEmptyMap = ContainsMapOfCollectionsOfNestedClass(Map.empty)
-    val dataWithMap = ContainsMapOfCollectionsOfNestedClass(Map(
+  it should "decode record containing map with collection of records as value" in {
+    val dataWithEmptyMap = ContainsMapOfCollectionsOfNestedClassAsValue(Map.empty)
+    val dataWithMap = ContainsMapOfCollectionsOfNestedClassAsValue(Map(
       "empty" -> List.empty,
       "nonEmpty" -> List(Nested(1), Nested(2), Nested(3))
     ))
 
-    decode[ContainsMapOfCollectionsOfNestedClass](
+    decode[ContainsMapOfCollectionsOfNestedClassAsValue](
       RowParquetRecord("nested" -> MapParquetRecord.empty)
     ) should be(dataWithEmptyMap)
 
@@ -278,7 +299,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "empty" -> ListParquetRecord.empty,
       "nonEmpty" -> ListParquetRecord(RowParquetRecord("int" -> 1), RowParquetRecord("int" -> 2), RowParquetRecord("int" -> 3))
     ))
-    decode[ContainsMapOfCollectionsOfNestedClass](record) should be(dataWithMap)
+    decode[ContainsMapOfCollectionsOfNestedClassAsValue](record) should be(dataWithMap)
   }
 
 }

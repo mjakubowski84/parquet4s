@@ -67,8 +67,9 @@ object TestCases {
         case _ => false
       }
   }
-  case class ContainsMapOfNestedClass(nested: Map[String, Nested])
-  case class ContainsMapOfOptionalNestedClass(nested: Map[String, Option[Nested]])
-  case class ContainsMapOfCollectionsOfNestedClass(nested: Map[String, List[Nested]])
+  case class ContainsMapOfNestedClassAsValue(nested: Map[String, Nested])
+  case class ContainsMapOfNestedClassAsKey(nested: Map[Nested, String])
+  case class ContainsMapOfOptionalNestedClassAsValue(nested: Map[String, Option[Nested]])
+  case class ContainsMapOfCollectionsOfNestedClassAsValue(nested: Map[String, List[Nested]])
 
 }

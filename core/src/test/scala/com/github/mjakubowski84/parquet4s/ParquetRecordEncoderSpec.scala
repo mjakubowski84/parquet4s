@@ -6,7 +6,7 @@ import java.util.TimeZone
 import org.scalatest.{FlatSpec, Matchers}
 import ValueImplicits._
 import TestCases._
-import ParquetRecordEncoder.encode
+import ParquetRecordEncoder.{EncodingException, encode}
 
 class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
 
@@ -116,13 +116,17 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     )
   }
 
-  it should "decode record containing map of primitives" in {
+  it should "encode record containing map of primitives" in {
     encode(ContainsMapOfPrimitives(Map("key" -> 1))) should be(
       RowParquetRecord("map" -> MapParquetRecord("key" -> 1))
     )
   }
 
-  it should "decode record containing map of optional primitives" in {
+  it should "throw exception when decoding map with null key" in {
+    an[EncodingException] should be thrownBy encode(ContainsMapOfPrimitives(Map(null.asInstanceOf[String] -> 1)))
+  }
+
+  it should "encode record containing map of optional primitives" in {
     encode(ContainsMapOfOptionalPrimitives(
       Map("1" -> None, "2" -> Some(2))
     )) should be(RowParquetRecord(
@@ -130,7 +134,7 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     ))
   }
 
-  it should "decode record containing map of collections of primitives" in {
+  it should "encode record containing map of collections of primitives" in {
     encode(ContainsMapOfCollectionsOfPrimitives(
       Map("1" -> List.empty, "2" -> List(1, 2, 3))
     )) should be(RowParquetRecord(
@@ -141,6 +145,12 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
   it should "encode record containing nested record" in {
     encode(ContainsNestedClass(Nested(1))) should be(
       RowParquetRecord("nested" -> RowParquetRecord("int" -> 1))
+    )
+  }
+
+  it should "encode record containing null value" in {
+    encode(ContainsNestedClass(null)) should be(
+      RowParquetRecord("nested" -> NullValue)
     )
   }
 
@@ -186,9 +196,9 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     ))
   }
 
-  it should "encode record containing map of records" in {
-    val dataWithEmptyMap = ContainsMapOfNestedClass(Map.empty)
-    val dataWithMap = ContainsMapOfNestedClass(Map("1" -> Nested(1), "2" -> Nested(2)))
+  it should "encode record containing map with records as value" in {
+    val dataWithEmptyMap = ContainsMapOfNestedClassAsValue(Map.empty)
+    val dataWithMap = ContainsMapOfNestedClassAsValue(Map("1" -> Nested(1), "2" -> Nested(2)))
 
     encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
 
@@ -199,9 +209,22 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     encode(dataWithMap) should be(record)
   }
 
-  it should "decode record containing map of optional records" in {
-    val dataWithEmptyMap = ContainsMapOfOptionalNestedClass(Map.empty)
-    val dataWithMap = ContainsMapOfOptionalNestedClass(Map(
+  it should "encode record containing map with records as key" in {
+    val dataWithEmptyMap = ContainsMapOfNestedClassAsKey(Map.empty)
+    val dataWithMap = ContainsMapOfNestedClassAsKey(Map(Nested(1) -> "1", Nested(2) -> "2"))
+
+    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
+
+    val record = RowParquetRecord("nested" -> MapParquetRecord(
+      RowParquetRecord("int" -> 1) -> "1",
+      RowParquetRecord("int" -> 2) -> "2"
+    ))
+    encode(dataWithMap) should be(record)
+  }
+
+  it should "encode record containing map with optional records as value" in {
+    val dataWithEmptyMap = ContainsMapOfOptionalNestedClassAsValue(Map.empty)
+    val dataWithMap = ContainsMapOfOptionalNestedClassAsValue(Map(
       "none" -> None,
       "some" -> Some(Nested(2))
     ))
@@ -215,9 +238,9 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     encode(dataWithMap) should be(record)
   }
 
-  it should "decode record containing map of collection of records" in {
-    val dataWithEmptyMap = ContainsMapOfCollectionsOfNestedClass(Map.empty)
-    val dataWithMap = ContainsMapOfCollectionsOfNestedClass(Map(
+  it should "encode record containing map with collection of records as value" in {
+    val dataWithEmptyMap = ContainsMapOfCollectionsOfNestedClassAsValue(Map.empty)
+    val dataWithMap = ContainsMapOfCollectionsOfNestedClassAsValue(Map(
       "empty" -> List.empty,
       "nonEmpty" -> List(Nested(1), Nested(2), Nested(3))
     ))

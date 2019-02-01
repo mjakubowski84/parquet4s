@@ -32,17 +32,17 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
   it should "resolve schema for type containing collections of primitives" in {
     val intSchemaDef = PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
     resolveSchema[Collections] should be(Message(
-      ListGroupSchemaDef(intSchemaDef)("list"),
-      ListGroupSchemaDef(intSchemaDef)("seq"),
-      ListGroupSchemaDef(intSchemaDef)("vector"),
-      ListGroupSchemaDef(intSchemaDef)("set"),
-      ListGroupSchemaDef(intSchemaDef)("array")
+      ListGroupSchemaDef.optional(intSchemaDef)("list"),
+      ListGroupSchemaDef.optional(intSchemaDef)("seq"),
+      ListGroupSchemaDef.optional(intSchemaDef)("vector"),
+      ListGroupSchemaDef.optional(intSchemaDef)("set"),
+      ListGroupSchemaDef.optional(intSchemaDef)("array")
     ))
   }
 
   it should "resolve schema for type containing collection of optional primitives" in {
     resolveSchema[ContainsCollectionOfOptionalPrimitives] should be(Message(
-      ListGroupSchemaDef(
+      ListGroupSchemaDef.optional(
         PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.INT_32))
       )("list")
     ))
@@ -50,8 +50,8 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
 
   it should "resolve schema for type containing collection of collections of primitives" in {
     resolveSchema[ContainsCollectionOfCollections] should be(Message(
-      ListGroupSchemaDef(
-        ListGroupSchemaDef(
+      ListGroupSchemaDef.optional(
+        ListGroupSchemaDef.optional(
           PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
         )
       )("listOfSets")
@@ -60,8 +60,8 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
 
   it should "resolve schema for type containing map of primitives" in {
     resolveSchema[ContainsMapOfPrimitives] should be(Message(
-      MapSchemaDef(
-        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
+      MapSchemaDef.optional(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, originalType = Some(OriginalType.UTF8)),
         PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
       )("map")
     ))
@@ -69,8 +69,8 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
 
   it should "resolve schema for type containing map of optional primitives" in {
     resolveSchema[ContainsMapOfOptionalPrimitives] should be(Message(
-      MapSchemaDef(
-        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
+      MapSchemaDef.optional(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, originalType = Some(OriginalType.UTF8)),
         PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.INT_32))
       )("map")
     ))
@@ -78,9 +78,9 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
 
   it should "resolve schema for type containing map of collections of primitives" in {
     resolveSchema[ContainsMapOfCollectionsOfPrimitives] should be(Message(
-      MapSchemaDef(
-        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
-        ListGroupSchemaDef(
+      MapSchemaDef.optional(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, originalType = Some(OriginalType.UTF8)),
+        ListGroupSchemaDef.optional(
           PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
         )
       )("map")
@@ -89,7 +89,7 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
 
   it should "resolve schema for type containing nested class" in {
     resolveSchema[ContainsNestedClass] should be(Message(
-      GroupSchemaDef(
+      GroupSchemaDef.optional(
         PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
       )("nested")
     ))
@@ -97,30 +97,30 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
 
   it should "resolve schema for type containing optional nested class" in {
     resolveSchema[ContainsOptionalNestedClass] should be(Message(
-      GroupSchemaDef(
+      GroupSchemaDef.optional(
         PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
       )("nestedOptional")
     ))
   }
 
   it should "resolve schema for type containing collection of nested class" in {
-    val nestedClassSchemaDef = GroupSchemaDef(
+    val nestedClassSchemaDef = GroupSchemaDef.optional(
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
     )
     resolveSchema[CollectionsOfNestedClass] should be(Message(
-      ListGroupSchemaDef(nestedClassSchemaDef)("list"),
-      ListGroupSchemaDef(nestedClassSchemaDef)("seq"),
-      ListGroupSchemaDef(nestedClassSchemaDef)("vector"),
-      ListGroupSchemaDef(nestedClassSchemaDef)("set"),
-      ListGroupSchemaDef(nestedClassSchemaDef)("array")
+      ListGroupSchemaDef.optional(nestedClassSchemaDef)("list"),
+      ListGroupSchemaDef.optional(nestedClassSchemaDef)("seq"),
+      ListGroupSchemaDef.optional(nestedClassSchemaDef)("vector"),
+      ListGroupSchemaDef.optional(nestedClassSchemaDef)("set"),
+      ListGroupSchemaDef.optional(nestedClassSchemaDef)("array")
     ))
   }
 
   it should "resolve schema for type containing map of nested classes" in {
-    resolveSchema[ContainsMapOfNestedClass] should be(Message(
-      MapSchemaDef(
-        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
-        GroupSchemaDef(
+    resolveSchema[ContainsMapOfNestedClassAsValue] should be(Message(
+      MapSchemaDef.optional(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, originalType = Some(OriginalType.UTF8)),
+        GroupSchemaDef.optional(
           PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
         )
       )("nested")
@@ -128,10 +128,10 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
   }
 
   it should "resolve schema for type containing map of optional nested classes" in {
-    resolveSchema[ContainsMapOfOptionalNestedClass] should be(Message(
-      MapSchemaDef(
-        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
-        GroupSchemaDef(
+    resolveSchema[ContainsMapOfOptionalNestedClassAsValue] should be(Message(
+      MapSchemaDef.optional(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, originalType = Some(OriginalType.UTF8)),
+        GroupSchemaDef.optional(
           PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
         )
       )("nested")
@@ -139,11 +139,11 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
   }
 
   it should "resolve schema for type containing map of collections of nested classes" in {
-    resolveSchema[ContainsMapOfCollectionsOfNestedClass] should be(Message(
-      MapSchemaDef(
-        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8)),
-        ListGroupSchemaDef(
-          GroupSchemaDef(
+    resolveSchema[ContainsMapOfCollectionsOfNestedClassAsValue] should be(Message(
+      MapSchemaDef.optional(
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, originalType = Some(OriginalType.UTF8)),
+        ListGroupSchemaDef.optional(
+          GroupSchemaDef.optional(
             PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("int")
           )
         )

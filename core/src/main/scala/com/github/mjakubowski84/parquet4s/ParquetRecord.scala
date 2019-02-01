@@ -118,7 +118,7 @@ class ListParquetRecord private extends ParquetRecord {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
     recordConsumer.startGroup()
 
-    if (!isEmpty) {
+    if (values.nonEmpty) {
       val groupSchema = schema.asGroupType()
       val listSchema = groupSchema.getType(ListFieldName).asGroupType()
       val listIndex = groupSchema.getFieldIndex(ListFieldName)
@@ -134,8 +134,6 @@ class ListParquetRecord private extends ParquetRecord {
 
     recordConsumer.endGroup()
   }
-
-  private def isEmpty: Boolean = values.isEmpty || values.forall(_ == NullValue)
 
   def canEqual(other: Any): Boolean = other.isInstanceOf[ListParquetRecord]
 
