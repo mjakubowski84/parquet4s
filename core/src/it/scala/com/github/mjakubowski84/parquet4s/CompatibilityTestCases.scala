@@ -31,13 +31,33 @@ object CompatibilityTestCases extends TestCaseSupport {
             seq == otherSeq &&
             vector == otherVector &&
             set == otherSet &&
-            array.sameElements(otherArray)
+            ((array == null && otherArray == null) || array.sameElements(otherArray))
+        case _ => false
+      }
+  }
+  case class CollectionsOfStrings(
+                          list: List[String],
+                          seq: Seq[String],
+                          vector: Vector[String],
+                          set: Set[String],
+                          array: Array[String]
+                        ) {
+    override def equals(obj: Any): Boolean =
+      obj match {
+        case other @ CollectionsOfStrings(otherList, otherSeq, otherVector, otherSet, otherArray) =>
+          (other canEqual this) &&
+            list == otherList &&
+            seq == otherSeq &&
+            vector == otherVector &&
+            set == otherSet &&
+            ((array == null && otherArray == null) || array.sameElements(otherArray))
         case _ => false
       }
   }
   case class ContainsCollectionOfOptionalPrimitives(list: List[Option[Int]])
   case class ContainsCollectionOfCollections(listOfSets: List[Set[Int]])
   case class ContainsMapOfPrimitives(map: Map[String, Int])
+  case class ContainsReversedMapOfPrimitives(map: Map[Int, String])
   case class ContainsMapOfOptionalPrimitives(map: Map[String, Option[Int]])
   case class ContainsMapOfCollectionsOfPrimitives(map: Map[String, List[Int]])
 
@@ -66,14 +86,18 @@ object CompatibilityTestCases extends TestCaseSupport {
         case _ => false
       }
   }
-  case class ContainsMapOfNestedClass(nested: Map[String, Nested])
-  case class ContainsMapOfOptionalNestedClass(nested: Map[String, Option[Nested]])
-  case class ContainsMapOfCollectionsOfNestedClass(nested: Map[String, List[Nested]])
+  case class ContainsMapOfNestedClassAsValue(nested: Map[String, Nested])
+  case class ContainsMapOfNestedClassAsKey(nested: Map[Nested, String])
+  case class ContainsMapOfOptionalNestedClassAsValue(nested: Map[String, Option[Nested]])
+  case class ContainsMapOfCollectionsOfNestedClassAsValue(nested: Map[String, List[Nested]])
 
 
   override val caseDefinitions: Seq[Case.CaseDef] = Seq(
     Case("primitives", Seq(
-      Primitives(b = true, 1, 1234567890l, 1.1f, 1.00000000001d, "text")
+      Primitives(b = true, 1, 1234567890l, 1.1f, 1.00000000001d, "text"),
+      Primitives(b = false, 0, 0l, 0f, 0d, ""),
+      Primitives(b = false, Int.MaxValue, Long.MaxValue, Float.MaxValue, Double.MaxValue, "Żołądź z dębu"),
+      Primitives(b = false, Int.MinValue, Long.MinValue, Float.MinValue, Double.MinValue, null)
     )),
     Case("time primitives", Seq(
       TimePrimitives(
@@ -87,12 +111,16 @@ object CompatibilityTestCases extends TestCaseSupport {
       TimePrimitives(
         timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2018, 12, 31, 23, 30, 0, 999000)),
         date = java.sql.Date.valueOf(java.time.LocalDate.of(2018, 12, 31))
-      )
+      ),
+      TimePrimitives(timestamp = null, date = null)
     )),
     Case("options", Seq(ContainsOption(None), ContainsOption(Some(1)))),
     Case("collections of primitives", Seq(
       Collections(
         list = List.empty, seq = Seq.empty, vector = Vector.empty, set = Set.empty, array = Array.empty
+      ),
+      Collections(
+        list = null, seq = null, vector = null, set = null, array = null
       ),
       Collections(
         list = List(1, 2, 3),
@@ -102,13 +130,42 @@ object CompatibilityTestCases extends TestCaseSupport {
         array = Array(1, 2, 3)
       )
     )),
+    Case("collections of strings", Seq(
+      CollectionsOfStrings(
+        list = List.empty, seq = Seq.empty, vector = Vector.empty, set = Set.empty, array = Array.empty
+      ),
+      CollectionsOfStrings(
+        list = null, seq = null, vector = null, set = null, array = null
+      ),
+      CollectionsOfStrings(
+        list = List("a", "b", "c"),
+        seq = Seq("a", "b", "c"),
+        vector = Vector("a", "b", "c"),
+        set = Set("a", "b", "c"),
+        array = Array("a", "b", "c")
+      ),
+      CollectionsOfStrings(
+        list = List("a", null, "c"),
+        seq = Seq(null, "b", null),
+        vector = Vector(null, null, null),
+        set = Set("a", "b", "c"),
+        array = Array("a", "b", "c")
+      )
+    )),
     Case("collection with optional primitives", Seq(
       ContainsCollectionOfOptionalPrimitives(List.empty),
       ContainsCollectionOfOptionalPrimitives(List(None, Some(2), None))
     )),
     Case("map of primitives", Seq(
       ContainsMapOfPrimitives(Map.empty),
+      ContainsMapOfPrimitives(null),
       ContainsMapOfPrimitives(Map("key_1" -> 1, "key_2" -> 2, "key_3" -> 3))
+    )),
+    Case("reversed map of primitives", Seq(
+      ContainsReversedMapOfPrimitives(Map.empty),
+      ContainsReversedMapOfPrimitives(null),
+      ContainsReversedMapOfPrimitives(Map(1 -> "a", 2 -> "b", 3 -> "c")),
+      ContainsReversedMapOfPrimitives(Map(1 -> "a", 2 -> null, 3 -> "c"))
     )),
     Case("map of optional primitives", Seq(
       ContainsMapOfOptionalPrimitives(Map.empty),
@@ -119,7 +176,8 @@ object CompatibilityTestCases extends TestCaseSupport {
       ContainsMapOfCollectionsOfPrimitives(Map("1" -> List.empty, "2" -> List(1, 2, 3)))
     )),
     Case("nested class", Seq(
-      ContainsNestedClass(Nested(1))
+      ContainsNestedClass(Nested(1)),
+      ContainsNestedClass(null)
     )),
     Case("nested optional class", Seq(
       ContainsOptionalNestedClass(None),
@@ -135,24 +193,39 @@ object CompatibilityTestCases extends TestCaseSupport {
         vector = Vector(Nested(1), Nested(2), Nested(3)),
         set = Set(Nested(1), Nested(2), Nested(3)),
         array = Array(Nested(1), Nested(2), Nested(3))
+      ),
+      CollectionsOfNestedClass(
+        list = List(null, Nested(2), Nested(3)),
+        seq = Seq(Nested(1), null, Nested(3)),
+        vector = Vector(Nested(1), Nested(2), null),
+        set = Set(Nested(1), null, Nested(3)),
+        array = Array(null, null, null)
       )
     )),
-    Case("map of nested class", Seq(
-      ContainsMapOfNestedClass(Map.empty),
-      ContainsMapOfNestedClass(Map("1" -> Nested(1), "2" -> Nested(2)))
+    Case("map of nested class as value", Seq(
+      ContainsMapOfNestedClassAsValue(Map.empty),
+      ContainsMapOfNestedClassAsValue(Map("1" -> Nested(1), "2" -> Nested(2))),
+      ContainsMapOfNestedClassAsValue(Map("1" -> null, "2" -> Nested(2)))
     )),
-    Case("map of optional nested class", Seq(
-      ContainsMapOfOptionalNestedClass(Map.empty),
-      ContainsMapOfOptionalNestedClass(Map(
+    Case("map of nested class as key", Seq(
+      ContainsMapOfNestedClassAsKey(Map.empty),
+      ContainsMapOfNestedClassAsKey(Map(Nested(1) -> "1", Nested(2) -> "2")),
+      ContainsMapOfNestedClassAsKey(Map(Nested(1) -> null))
+    ), compatibilityParties = Set(CompatibilityParty.Reader, CompatibilityParty.Reader)),
+    Case("map of optional nested class as value", Seq(
+      ContainsMapOfOptionalNestedClassAsValue(Map.empty),
+      ContainsMapOfOptionalNestedClassAsValue(Map(
         "none" -> None,
         "some" -> Some(Nested(2))
       ))
     )),
-    Case("map of collections of nested class", Seq(
-      ContainsMapOfCollectionsOfNestedClass(Map.empty),
-      ContainsMapOfCollectionsOfNestedClass(Map(
+    Case("map of collections of nested class as value", Seq(
+      ContainsMapOfCollectionsOfNestedClassAsValue(Map.empty),
+      ContainsMapOfCollectionsOfNestedClassAsValue(Map(
         "empty" -> List.empty,
-        "nonEmpty" -> List(Nested(1), Nested(2), Nested(3))
+        "nonEmpty" -> List(Nested(1), Nested(2), Nested(3)),
+        "contains single null" -> List(Nested(1), null, Nested(3)),
+        "contains only nulls" -> List(null, null, null)
       ))
     ))
   )

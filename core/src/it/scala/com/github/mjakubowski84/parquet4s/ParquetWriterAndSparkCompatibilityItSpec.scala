@@ -21,9 +21,7 @@ class ParquetWriterAndSparkCompatibilityItSpec extends
     }
 
   "Spark should be able to read file saved by ParquetWriter if the file contains" - {
-    CompatibilityTestCases.cases(Writer, Spark).foreach { testCase =>
-      runTestCase(testCase)
-    }
+    CompatibilityTestCases.cases(Writer, Spark).foreach(runTestCase)
   }
 
 }

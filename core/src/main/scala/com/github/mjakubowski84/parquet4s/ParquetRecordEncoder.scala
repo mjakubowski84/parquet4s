@@ -4,6 +4,7 @@ import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 trait ParquetRecordEncoder[T] {
 
@@ -12,6 +13,16 @@ trait ParquetRecordEncoder[T] {
 }
 
 object ParquetRecordEncoder {
+
+  object EncodingException {
+    def apply(msg: String, cause: Throwable): EncodingException = {
+      val encodingException = EncodingException(msg)
+      encodingException.initCause(cause)
+      encodingException
+    }
+  }
+
+  case class EncodingException(msg: String) extends RuntimeException(msg)
 
   def apply[T](implicit ev: ParquetRecordEncoder[T]): ParquetRecordEncoder[T] = ev
 
@@ -29,7 +40,12 @@ object ParquetRecordEncoder {
     new ParquetRecordEncoder[FieldType[FieldName, Head] :: Tail] {
       override def encode(entity: FieldType[FieldName, Head] :: Tail): RowParquetRecord = {
         val fieldName = witness.value.name
-        val fieldValue = headEncoder.encode(entity.head)
+        val fieldValue = try {
+          headEncoder.encode(entity.head)
+        } catch {
+          case NonFatal(cause) =>
+            throw EncodingException(s"Failed to encode field $fieldName: ${entity.head}, due to ${cause.getMessage}", cause)
+        }
         tailEncoder.encode(entity.tail).prepend(fieldName, fieldValue)
       }
     }
