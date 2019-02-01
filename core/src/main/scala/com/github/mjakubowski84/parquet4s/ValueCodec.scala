@@ -6,17 +6,35 @@ import java.util.TimeZone
 
 import scala.language.higherKinds
 
-
+/**
+  * Contains implicit instances of all [[ValueCodec]]
+  */
 object ValueCodec extends AllValueCodecs
 
+/**
+  * Type class that allows to decode data from Parquet [[Value]] or encode it as [[Value]]
+  * @tparam T data type to decode to or encode from
+  */
 trait ValueCodec[T] {
 
+  /**
+    * @param value source Parquet [[Value]]
+    * @return data decoded from [[Value]]
+    */
   def decode(value: Value): T
 
+  /**
+    * @param data source data
+    * @return encoded Parquet [[Value]]
+    */
   def encode(data: T): Value
 
 }
 
+/**
+  * Codec for non-null type of [[Value]]
+  * @tparam T data type to decode to or encode from
+  */
 trait RequiredValueCodec[T] extends ValueCodec[T] {
 
   final override def decode(value: Value): T =
@@ -41,6 +59,10 @@ trait RequiredValueCodec[T] extends ValueCodec[T] {
 
 }
 
+/**
+  * Codec for [[Value]] that can be null.
+  * @tparam T data type to decode to or encode from
+  */
 trait OptionalValueCodec[T] extends ValueCodec[T] {
 
   final override def decode(value: Value): T =
@@ -226,7 +248,7 @@ trait ComplexValueCodecs {
 
     override def encode(data: Option[T]): Value =
       data match {
-        case None => NullValue // TODO write tests for reading and writing null fields!
+        case None => NullValue
         case Some(t) => elementCodec.encode(t)
       }
   }
@@ -256,7 +278,12 @@ trait ComplexValueCodecs {
                                decoder: ParquetRecordDecoder[T]
                               ): ValueCodec[T] = new OptionalValueCodec[T] {
 
-    override def decodeNonNull(value: Value): T = decoder.decode(value)
+    override def decodeNonNull(value: Value): T =
+      value match {
+        case record: RowParquetRecord =>
+          decoder.decode(record)
+      }
+
     override def encodeNonNull(data: T): Value = encoder.encode(data)
   }
 

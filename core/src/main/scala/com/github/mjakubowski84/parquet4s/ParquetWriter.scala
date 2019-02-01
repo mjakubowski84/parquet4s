@@ -11,8 +11,17 @@ import org.apache.parquet.schema.MessageType
 import scala.collection.JavaConverters._
 
 
+/**
+  * Type class that allows to write data which scehma is represented by type <i>T</i> to given path.
+  * @tparam T schema of data to write
+  */
 trait ParquetWriter[T] {
 
+  /**
+    * Writes data to given path.
+    * @param path location where files are meant to be written
+    * @param data data to write
+    */
   def write(path: String, data: Iterable[T])
 
 }
@@ -28,8 +37,21 @@ object ParquetWriter  {
     override def getWriteSupport(conf: Configuration): WriteSupport[RowParquetRecord] = new ParquetWriteSupport(schema, Map.empty)
   }
 
+  /**
+    * Writes iterable collection of data as a Parquet files at given path.
+    * Path can represent local file or directory, HDFS, AWS S3, Google Storage, Azure, etc.
+    * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
+    *
+    * @param path URI where the data will be written to
+    * @param data Collection of <i>T</> that will be written in Parquet file format
+    * @param writer [[ParquetWriter]] that will be used to write data
+    * @tparam T type of data, will be used also to resolve the schema of Parquet files
+    */
   def write[T](path: String, data: Iterable[T])(implicit writer: ParquetWriter[T]): Unit = writer.write(path, data)
 
+  /**
+    * Default instance of [[ParquetWriter]]
+    */
   implicit def writer[T: ParquetRecordEncoder : ParquetSchemaResolver]: ParquetWriter[T] = new ParquetWriter[T] {
     override def write(path: String, data: Iterable[T]): Unit = {
 
@@ -54,7 +76,7 @@ private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, Str
 
   override def write(record: RowParquetRecord): Unit = {
     consumer.startMessage()
-    record.getMap.foreach {
+    record.fields.foreach {
       case (_, NullValue) =>
         // ignoring nulls
       case (name, value) =>

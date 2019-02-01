@@ -5,10 +5,20 @@ import org.apache.parquet.schema.Type
 
 import scala.collection.mutable.ArrayBuffer
 
+/**
+  * Special type of [[Value]] that represents a record in Parquet file.
+  * A record is a complex type of data that contains series of other value entries inside.
+  */
 sealed trait ParquetRecord extends Value {
 
   type Self
 
+  /**
+    * Creates a new entry in record.
+    * @param name name of the entry
+    * @param value value of the entry
+    * @return a record with an entry added
+    */
   def add(name: String, value: Value): Self
 
   override def toString: String
@@ -17,15 +27,27 @@ sealed trait ParquetRecord extends Value {
 
 object RowParquetRecord {
 
-  def apply(entries : (String, Value)*): RowParquetRecord =
-    entries.foldLeft(RowParquetRecord.empty) {
+  /**
+    * @param fields fields to init the record with
+    * @return A new instance of [[RowParquetRecord]] initialized with given list of fields.
+    */
+  def apply(fields : (String, Value)*): RowParquetRecord =
+    fields.foldLeft(RowParquetRecord.empty) {
       case (record, (key, value)) => record.add(key, value)
     }
 
+  /**
+    * @return A new empty instance of [[RowParquetRecord]]
+    */
   def empty: RowParquetRecord = new RowParquetRecord()
 
 }
 
+/**
+  * Represents a basic type of [[ParquetRecord]] an object that contains
+  * a non-empty list of fields with other values associated with each of them.
+  * Cannot be empty while being saved.
+  */
 class RowParquetRecord private extends ParquetRecord {
 
   override type Self = this.type
@@ -38,7 +60,10 @@ class RowParquetRecord private extends ParquetRecord {
     this
   }
 
-  def getMap: Map[String, Value] = values.toMap
+  /**
+    * @return fields held in record
+    */
+  def fields: Map[String, Value] = values.toMap
 
   override def toString: String =
     values
@@ -55,7 +80,7 @@ class RowParquetRecord private extends ParquetRecord {
     recordConsumer.startGroup()
     values.foreach {
       case (_, NullValue) =>
-      // TODO write a test for writing case class with null and option field
+        // we do not write nulls
       case (name, value) =>
         val index = groupSchema.getFieldIndex(name)
         recordConsumer.startField(name, index)
@@ -85,15 +110,26 @@ object ListParquetRecord {
   private val ListFieldName = "list"
   private val ElementFieldName = "element"
 
+  /**
+    * @param elements to init the record with
+    * @return An instance of [[ListParquetRecord]] pre-filled with given elements
+    */
   def apply(elements: Value*): ListParquetRecord =
     elements.foldLeft(ListParquetRecord.empty) {
       case (record, element) => record.add(ListFieldName, RowParquetRecord(ElementFieldName -> element))
     }
 
+  /**
+    * @return An empty instance of [[ListParquetRecord]]
+    */
   def empty: ListParquetRecord = new ListParquetRecord()
 
 }
 
+/**
+  * A type of [[ParquetRecord]] that represents a record holding a repeated amount of entries
+  * of the same type. Can be empty.
+  */
 class ListParquetRecord private extends ParquetRecord {
   import ListParquetRecord._
 
@@ -103,7 +139,7 @@ class ListParquetRecord private extends ParquetRecord {
 
   override def add(name: String, value: Value): Self = {
     // name should always be equal to ListFieldName
-    add(value.asInstanceOf[RowParquetRecord].getMap.getOrElse(ElementFieldName, NullValue))
+    add(value.asInstanceOf[RowParquetRecord].fields.getOrElse(ElementFieldName, NullValue))
   }
 
   def add(value: Value): Self = {
@@ -111,6 +147,9 @@ class ListParquetRecord private extends ParquetRecord {
     this
   }
 
+  /**
+    * @return collection of elements held in record
+    */
   def elements: List[Value] = values.toList // TODO let's use vector, check if ArrayBuffer is a good choice
 
   override def toString: String = values.mkString(getClass.getSimpleName + " (", ",", ")")
@@ -166,6 +205,10 @@ object MapParquetRecord {
 
 }
 
+/**
+  * A type of [[ParquetRecord]] that represents a map from one entry type to another. Can be empty.
+  * A key entry cannot be null, a value entry can.
+  */
 class MapParquetRecord private extends ParquetRecord {
   import MapParquetRecord._
 
@@ -175,8 +218,8 @@ class MapParquetRecord private extends ParquetRecord {
 
   override def add(name: String, value: Value): Self = {
     val keyValueRecord = value.asInstanceOf[RowParquetRecord]
-    val mapKey = keyValueRecord.getMap("key")
-    val mapValue = keyValueRecord.getMap.getOrElse("value", NullValue)
+    val mapKey = keyValueRecord.fields("key")
+    val mapValue = keyValueRecord.fields.getOrElse("value", NullValue)
     add(mapKey, mapValue)
   }
 
@@ -185,6 +228,9 @@ class MapParquetRecord private extends ParquetRecord {
     this
   }
 
+  /**
+    * @return map of values held by record
+    */
   def getMap: Map[Value, Value] = values.toMap
 
   override def toString: String =
