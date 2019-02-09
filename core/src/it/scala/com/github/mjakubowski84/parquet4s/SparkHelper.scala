@@ -19,7 +19,7 @@ trait SparkHelper extends BeforeAndAfterAll  {
     SparkSession.builder.master("local[2]").appName(getClass.getSimpleName).getOrCreate
   }
 
-  private val tempPath: Path = Paths.get(Files.createTempDir().getAbsolutePath, "sparkOutputPath")
+  private val tempPath: Path = Paths.get(Files.createTempDir().getAbsolutePath, "testOutputPath")
 
   val tempPathString: String = tempPath.toString
 

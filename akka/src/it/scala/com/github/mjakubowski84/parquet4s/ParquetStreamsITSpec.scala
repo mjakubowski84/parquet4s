@@ -1,11 +1,14 @@
 package com.github.mjakubowski84.parquet4s
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.{ActorMaterializer, Materializer}
+import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.scalatest.{AsyncFlatSpec, Matchers}
+import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.Await
+import scala.collection.immutable
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration.Duration
 import scala.util.Random
 
@@ -15,38 +18,93 @@ object ParquetStreamsITSpec {
 
 class ParquetStreamsITSpec extends AsyncFlatSpec
   with Matchers
-  with SparkHelper {
+  with SparkHelper
+  with IOOps {
 
   import ParquetRecordDecoder._
   import ParquetStreamsITSpec._
 
+  override val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
   implicit val mat: Materializer = ActorMaterializer()
 
-  val count = 10000
+  val writeOptions: ParquetWriter.Options = ParquetWriter.Options().copy(
+    compressionCodecName = CompressionCodecName.SNAPPY,
+    pageSize = 512,
+    rowGroupSize = 4 * 512
+  )
 
+  val count: Int = 4 * writeOptions.rowGroupSize
   val dict: Seq[String] = Vector("a", "b", "c", "d")
+  val data: Stream[Data] = Stream
+    .continually(Data(Random.nextLong(), dict(Random.nextInt(4))))
+    .take(count)
+
+  def read(path: String): Future[immutable.Seq[Data]] = ParquetStreams.fromParquet[Data](path).runWith(Sink.seq)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     clearTemp()
   }
 
-  "ParquetStreams" should "read Parquet file correctly" in {
+  "ParquetStreams" should "write single file and read it correctly" in {
+    val outputPath = s"$tempPathString/writeSingleFile"
+    val outputFileName = "data.parquet"
 
-    import sparkSession.implicits._
+    val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$outputPath/$outputFileName",
+      options = writeOptions
+    ))
 
-    val data = Stream
-      .continually(Data(Random.nextLong(), dict(Random.nextInt(4))))
-      .take(count)
+    for {
+      _ <- write()
+      files <- filesAtPath(outputPath)
+      readData <- read(outputPath)
+    } yield {
+      files should be(List(outputFileName))
+      readData should have size count
+      readData should contain theSameElementsInOrderAs data
+    }
+  }
 
-    data
-      .toDS()
-      .write.parquet(tempPathString)
+  it should "split data into sequential chunks and read it correctly" in {
+    val outputPath = s"$tempPathString/writeSequentiallySplitFiles"
+    val outputFileNames = List("part-00000.parquet", "part-00001.parquet")
 
-    ParquetStreams.fromParquet[Data](tempPathString).runWith(Sink.seq).map { result =>
-      result should have size count
-      result should contain theSameElementsAs data
+    val write = () => Source(data).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
+      path = outputPath,
+      maxRecordsPerFile = 2 * writeOptions.rowGroupSize,
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write()
+      files <- filesAtPath(outputPath)
+      readData <- read(outputPath)
+    } yield {
+      files should contain theSameElementsAs outputFileNames
+      readData should have size count
+      readData should contain theSameElementsInOrderAs data
+    }
+  }
+
+  it should "write data in parallel as chunks and read it correctly" in {
+    val outputPath = s"$tempPathString/writeParallelUnordered"
+
+    val write = () => Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
+      path = outputPath,
+      parallelism = 2,
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write()
+      files <- filesAtPath(outputPath)
+      readData <- read(outputPath)
+    } yield {
+      files should have size 2
+      readData should have size count
+      readData should contain theSameElementsAs data
     }
   }
 

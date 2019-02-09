@@ -73,7 +73,7 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord](
 
   private class ParquetPrimitiveConverter(name: String) extends PrimitiveConverter {
     override def addBinary(value: Binary): Unit = {
-      record.add(name, new BinaryValue(value))
+      record.add(name, BinaryValue(value))
     }
 
     override def addBoolean(value: Boolean): Unit = {
@@ -99,7 +99,7 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord](
 
   private class StringConverter(name: String) extends ParquetPrimitiveConverter(name) {
     override def addBinary(value: Binary): Unit = {
-      record.add(name, new StringValue(value))
+      record.add(name, StringValue(value))
     }
   }
 
