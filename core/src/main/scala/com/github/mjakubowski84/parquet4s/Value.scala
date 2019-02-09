@@ -9,7 +9,7 @@ import org.apache.parquet.schema.Type
   * Basic structure element which Parquet data is built from. Represents any data element that can be read from or
   * can be written to Parquet files.
   */
-trait Value {
+trait Value extends Any {
 
   /**
     * Writes the value content to Parquet
@@ -24,7 +24,7 @@ trait Value {
   * Primitive value like integer or long.
   * @tparam T type of the value
   */
-trait PrimitiveValue[T] extends Value {
+trait PrimitiveValue[T] extends Any with Value {
 
   /**
     * Content of the value
@@ -33,34 +33,36 @@ trait PrimitiveValue[T] extends Value {
 
 }
 
-case class StringValue(value: String) extends PrimitiveValue[String] {
-
-  def this(binary: Binary) = this(binary.toStringUsingUTF8)
-
-  override def write(schema: Type, recordConsumer: RecordConsumer): Unit =
-    recordConsumer.addBinary(Binary.fromReusedByteArray(value.getBytes(StandardCharsets.UTF_8)))
-
+object StringValue {
+  def apply(binary: Binary): StringValue = StringValue(binary.toStringUsingUTF8)
 }
 
-case class LongValue(value: Long) extends PrimitiveValue[Long] {
+case class StringValue(value: String) extends AnyVal with PrimitiveValue[String] {
+  override def write(schema: Type, recordConsumer: RecordConsumer): Unit =
+    recordConsumer.addBinary(Binary.fromReusedByteArray(value.getBytes(StandardCharsets.UTF_8)))
+}
+
+case class LongValue(value: Long) extends AnyVal with PrimitiveValue[Long] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addLong(value)
 }
 
-case class IntValue(value: Int) extends PrimitiveValue[Int] {
+case class IntValue(value: Int) extends AnyVal with PrimitiveValue[Int] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addInteger(value)
 }
 
-case class FloatValue(value: Float) extends PrimitiveValue[Float] {
+case class FloatValue(value: Float) extends AnyVal with PrimitiveValue[Float] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addFloat(value)
 }
 
-case class DoubleValue(value: Double) extends PrimitiveValue[Double] {
+case class DoubleValue(value: Double) extends AnyVal with PrimitiveValue[Double] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addDouble(value)
 }
 
-case class BinaryValue(value: Array[Byte]) extends PrimitiveValue[Array[Byte]] {
+object BinaryValue {
+  def apply(binary: Binary): BinaryValue = BinaryValue(binary.getBytes)
+}
 
-  def this(binary: Binary) = this(binary.getBytes)
+case class BinaryValue(value: Array[Byte]) extends PrimitiveValue[Array[Byte]] {
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addBinary(Binary.fromReusedByteArray(value))
 
@@ -72,7 +74,7 @@ case class BinaryValue(value: Array[Byte]) extends PrimitiveValue[Array[Byte]] {
     }
 }
 
-case class BooleanValue(value: Boolean) extends PrimitiveValue[Boolean] {
+case class BooleanValue(value: Boolean) extends AnyVal with PrimitiveValue[Boolean] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addBoolean(value)
 }
 
