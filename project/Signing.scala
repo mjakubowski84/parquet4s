@@ -25,7 +25,7 @@ object Signing {
 
     sys.process.Process(command, args) ! match {
       case 0 => ()
-      case n => sys.error(s"Failure running '${command + " " + args.mkString(" ")}'.  Exit code: " + n)
+      case n => sys.error(s"""Failure running '${args.mkString(command + " ", " ", "")}'. Exit code: $n""")
     }
 
     signatureFile

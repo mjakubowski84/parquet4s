@@ -13,7 +13,9 @@ import scala.concurrent.Future
 object ParquetStreams {
 
   /**
-    * Creates a [[Source]] that reads Parquet data from the specified path.
+    * Creates a [[akka.stream.scaladsl.Source]] that reads Parquet data from the specified path.
+    * If there are multiple files at path then the order in which files are loaded is determined by underlying
+    * filesystem.
     * <br/>
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
@@ -31,7 +33,8 @@ object ParquetStreams {
     ).map(ParquetRecordDecoder.decode[T])
 
   /**
-    * Creates a [[Sink]] that writes Parquet data to single file at the specified path (including file name).
+    * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to single file at the specified path (including
+    * file name).
     * <br/>
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
@@ -48,9 +51,10 @@ object ParquetStreams {
     SingleFileParquetSink(new Path(path), options)
 
   /**
-    * Creates a [[Sink]] that writes Parquet data to files at the specified path. Sink splits files sequentially into
-    * pieces. Each file contains maximal number of records according to <i>maxRecordsPerFile</i>. It is recommended to
-    * define <i>maxRecordsPerFile</i> as a multiple of [[com.github.mjakubowski84.parquet4s.ParquetWriter.Options.rowGroupSize]].
+    * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to files at the specified path. Sink splits files
+    * sequentially into pieces. Each file contains maximal number of records according to <i>maxRecordsPerFile</i>.
+    * It is recommended to define <i>maxRecordsPerFile</i> as a multiple of
+    * [[com.github.mjakubowski84.parquet4s.ParquetWriter.Options.rowGroupSize]].
     *
     * <br/>
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
@@ -70,8 +74,8 @@ object ParquetStreams {
     SequentialFileSplittingParquetSink(new Path(path), maxRecordsPerFile, options)
 
   /**
-    * Creates a [[Sink]] that writes Parquet data to files at the specified path. Sink splits files into number of pieces
-    * equal to <i>parallelism</i>. Files are written in parallel. Data is written in unordered way.
+    * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to files at the specified path. Sink splits files
+    * into number of pieces equal to <i>parallelism</i>. Files are written in parallel. Data is written in unordered way.
     *
     * <br/>
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
