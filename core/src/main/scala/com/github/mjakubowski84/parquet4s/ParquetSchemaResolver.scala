@@ -14,7 +14,7 @@ import scala.language.higherKinds
 trait ParquetSchemaResolver[T] {
 
   /**
-    * @return list of [[Type]] for each product element that <i>T</t> contains.
+    * @return list of [[org.apache.parquet.schema.Type]] for each product element that <i>T</i> contains.
     */
   def resolveSchema: List[Type]
 
@@ -24,7 +24,7 @@ object ParquetSchemaResolver
   extends SchemaDefs {
 
   /**
-    * Builds full Parquet file schema ([[MessageType]]) from <i>T</>.
+    * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
     */
   def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType = Message(g.resolveSchema:_*)
 

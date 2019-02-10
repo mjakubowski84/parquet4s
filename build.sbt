@@ -3,12 +3,13 @@ lazy val resolvers =  Seq(
   Resolver.jcenterRepo
 )
 
+lazy val supportedScalaVersions = Seq("2.11.12", "2.12.8")
+
 lazy val commonSettings = Seq(
   Keys.organization := "com.github.mjakubowski84",
   Keys.version := "0.3.0-SNAPSHOT",
   Keys.isSnapshot := true,
   Keys.scalaVersion := "2.11.12",
-  Keys.crossScalaVersions := Seq("2.11.12", "2.12.8"),
   Keys.scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8"),
   Keys.javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature"),
   Keys.resolvers := resolvers
@@ -21,8 +22,20 @@ lazy val publishSettings = {
       Credentials(
         realm = "Sonatype Nexus Repository Manager",
         host = "oss.sonatype.org",
-        userName = sys.env("SONATYPE_USER_NAME"),
-        passwd = sys.env("SONATYPE_PASSWORD")
+        userName = sys.env.getOrElse(
+          "SONATYPE_USER_NAME",
+          {
+            streams.value.log.warn("Undefined environment variable: SONATYPE_USER_NAME")
+            "UNDEFINED"
+          }
+        ),
+        passwd = sys.env.getOrElse(
+          "SONATYPE_PASSWORD",
+          {
+            streams.value.log.warn("Undefined environment variable: SONATYPE_PASSWORD")
+            "UNDEFINED"
+          }
+        )
       )
     ),
     Keys.licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT")),
@@ -65,7 +78,8 @@ lazy val itSettings = Defaults.itSettings ++ Project.inConfig(IntegrationTest)(S
 lazy val core = (project in file("core"))
   .configs(IntegrationTest)
   .settings(
-    Keys.name := "parquet4s-core"
+    Keys.name := "parquet4s-core",
+    Keys.crossScalaVersions := supportedScalaVersions
   )
   .settings(commonSettings)
   .settings(itSettings)
@@ -74,7 +88,8 @@ lazy val core = (project in file("core"))
 lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
   .settings(
-    Keys.name := "parquet4s-akka"
+    Keys.name := "parquet4s-akka",
+    Keys.crossScalaVersions := supportedScalaVersions
   )
   .settings(commonSettings)
   .settings(itSettings)
@@ -85,7 +100,8 @@ lazy val root = (project in file("."))
   .settings(commonSettings)
   .settings(publishSettings)
   .settings(
-    skip in publish := true,
-    skip in publishLocal := true
+    crossScalaVersions := Nil,
+    publish / skip := true,
+    publishLocal / skip := true
   )
   .aggregate(core, akka)
