@@ -28,7 +28,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
   implicit val system: ActorSystem = ActorSystem()
   implicit val mat: Materializer = ActorMaterializer()
 
-  val writeOptions: ParquetWriter.Options = ParquetWriter.Options().copy(
+  val writeOptions: ParquetWriter.Options = ParquetWriter.Options(
     compressionCodecName = CompressionCodecName.SNAPPY,
     pageSize = 512,
     rowGroupSize = 4 * 512
