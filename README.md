@@ -137,8 +137,8 @@ implicit val customTypeCodec: OptionalValueCodec[CustomType] =
   new OptionalValueCodec[CustomType] {
     override protected def decodeNonNull(value: Value): CustomType = value match {
       case StringValue(string) => CustomType(string)
- 	}
-  	override protected def encodeNonNull(data: CustomType): Value =
+    }
+    override protected def encodeNonNull(data: CustomType): Value =
       StringValue(data.string)
 }
 ```
