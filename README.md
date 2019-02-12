@@ -160,3 +160,7 @@ implicit val customTypeSchema: TypedSchemaDef[CustomType] =
     )
   )
 ```
+
+## Contributing
+
+Do you want to contribute? Please read the [contrubution guidelines](CONTRIBUTING.md).
