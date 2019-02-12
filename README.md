@@ -133,6 +133,8 @@ case class CustomType(string: String)
 You want to save it as regular optional `String`. In order to achieve you have to define your own codec:
 
 ```scala
+import com.github.mjakubowski84.parquet4s.{OptionalValueCodec, StringValue, Value}
+
 implicit val customTypeCodec: OptionalValueCodec[CustomType] = 
   new OptionalValueCodec[CustomType] {
     override protected def decodeNonNull(value: Value): CustomType = value match {
@@ -146,6 +148,9 @@ implicit val customTypeCodec: OptionalValueCodec[CustomType] =
 Additionaly, if you want to write your custom type, you have to define the schema for it:
 
 ```scala
+import org.apache.parquet.schema.{OriginalType, PrimitiveType}
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver._
+ 
 implicit val customTypeSchema: TypedSchemaDef[CustomType] =
   typedSchemaDef[CustomType](
     PrimitiveSchemaDef(
