@@ -94,7 +94,7 @@ val writeOptions = ParquetWriter.Options(
 Source(users).runWith(ParquetStreams.toParquetSingleFile(
   path = "file:///data/users/user-303.parquet",
   options = writeOptions
-)
+))
 
 // Sequentially splits data into files of 'maxRecordsPerFile'.
 // Recommended to use in environments with limitted available resources.
@@ -103,7 +103,7 @@ Source(data).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
   // will create files consisting of max 2 row groups
   maxRecordsPerFile = 2 * writeOptions.rowGroupSize,
   options = writeOptions
-)
+))
 
 // Writes files in parallel in number equal to 'parallelism'.
 // Recommended to use in order to achieve better performance under condition that
@@ -112,12 +112,10 @@ Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
   path = "file:///data/users",
   parallelism = 4,
   options = writeOptions
-)
+))
   
 // Reads file or files from the path.
 ParquetStreams.fromParquet[User]("file:///data/users").runForeach(println)
-
-system.terminate()
 ```
 
 ## Customisation and extensibility
