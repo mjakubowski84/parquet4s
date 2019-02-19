@@ -13,7 +13,12 @@ object TestCases {
                          double: Double,
                          string: String
                        )
-  case class TimePrimitives(timestamp: java.sql.Timestamp, date: java.sql.Date)
+  case class TimePrimitives(
+                             localDateTime: java.time.LocalDateTime,
+                             sqlTimestamp: java.sql.Timestamp,
+                             localDate: java.time.LocalDate,
+                             sqlDate: java.sql.Date
+                           )
   case class ContainsOption(optional: Option[Int])
 
   // Collections of primitives

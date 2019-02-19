@@ -40,20 +40,26 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     val dateTime = java.time.LocalDateTime.of(date, time)
 
     val data = TimePrimitives(
-      timestamp = java.sql.Timestamp.valueOf(dateTime),
-      date = java.sql.Date.valueOf(date)
+      localDateTime = dateTime,
+      sqlTimestamp = java.sql.Timestamp.valueOf(dateTime),
+      localDate = date,
+      sqlDate = java.sql.Date.valueOf(date)
     )
 
     val epochDays = date.toEpochDay.toInt
 
+    val binaryDateTime = BinaryValue {
+      val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+      buf.putLong(-TimeZone.getDefault.getRawOffset * TimeValueCodecs.NanosPerMilli) // time in nanos with milli offset due to time zone
+      buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
+      buf.array()
+    }
+
     val record = RowParquetRecord(
-      "timestamp" -> BinaryValue {
-        val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-        buf.putLong(-TimeZone.getDefault.getRawOffset * TimeValueCodecs.NanosPerMilli) // time in nanos with milli offset due to time zone
-        buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
-        buf.array()
-      },
-      "date" -> epochDays
+      "localDateTime" -> binaryDateTime,
+      "sqlTimestamp" -> binaryDateTime,
+      "localDate" -> epochDays,
+      "sqlDate" -> epochDays
     )
 
     encode(data) should be(record)
