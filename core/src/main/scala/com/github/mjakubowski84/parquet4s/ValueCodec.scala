@@ -142,80 +142,115 @@ object TimeValueCodecs {
   val NanosPerMicro = 1000l
   val NanosPerMilli: Long = NanosPerMicro * MicrosPerMilli
   val NanosPerDay = 86400000000000l
-}
 
-trait TimeValueCodecs {
+  private val timeZone = TimeZone.getDefault
+
+  // TODO there are parquet time formats over there to be checked, too
 
   /**
     * Uses decoding that is implemented in Apache Spark.
     */
-  implicit val timestampCodec: ValueCodec[java.sql.Timestamp] = new OptionalValueCodec[java.sql.Timestamp] {
+  private def decodeLocalDateTime(value: Value): java.time.LocalDateTime =
+    value match {
+      case BinaryValue(bs: Array[Byte]) =>
+        val buf = ByteBuffer.wrap(bs).order(ByteOrder.LITTLE_ENDIAN)
+        val fixedTimeInNanos = buf.getLong
+        val julianDay = buf.getInt
 
-    // TODO there are parquet time formats over there to be checked, too
+        val date = LocalDate.ofEpochDay(julianDay - JulianDayOfEpoch)
 
-    import TimeValueCodecs._
+        val fixedTimeInMillis = Math.floorDiv(fixedTimeInNanos, NanosPerMilli)
+        val nanosLeft = Math.floorMod(fixedTimeInNanos, NanosPerMilli)
+        val timeInMillis = fixedTimeInMillis + timeZone.getRawOffset
+        val timeInNanos = (timeInMillis * NanosPerMilli) + nanosLeft
 
-    private val timeZone = TimeZone.getDefault // TODO should be configurable
-
-    override def decodeNonNull(value: Value): java.sql.Timestamp =
-      value match {
-        case BinaryValue(bs: Array[Byte]) =>
-          val buf = ByteBuffer.wrap(bs).order(ByteOrder.LITTLE_ENDIAN)
-          val fixedTimeInNanos = buf.getLong
-          val julianDay = buf.getInt
-
-          val date = LocalDate.ofEpochDay(julianDay - JulianDayOfEpoch)
-
-          val fixedTimeInMillis = Math.floorDiv(fixedTimeInNanos, NanosPerMilli)
-          val nanosLeft = Math.floorMod(fixedTimeInNanos, NanosPerMilli)
-          val timeInMillis = fixedTimeInMillis + timeZone.getRawOffset
-          val timeInNanos = (timeInMillis * NanosPerMilli) + nanosLeft
-
-          if (timeInNanos >= NanosPerDay) { // fixes issue with Spark when in number of nanos >= 1 day
-            val time = LocalTime.ofNanoOfDay(timeInNanos - NanosPerDay)
-            java.sql.Timestamp.valueOf(LocalDateTime.of(date.plusDays(1), time))
-          } else {
-            val time = LocalTime.ofNanoOfDay(timeInNanos)
-            java.sql.Timestamp.valueOf(LocalDateTime.of(date, time))
-          }
-      }
-
-    override def encodeNonNull(data: java.sql.Timestamp): Value = BinaryValue {
-      val dateTime = data.toLocalDateTime
-      val date = dateTime.toLocalDate
-      val time = dateTime.toLocalTime
-
-      val julianDay = JulianDayOfEpoch + date.toEpochDay.toInt
-
-      val timeInNanos = time.toNanoOfDay
-      val timeInMillis = Math.floorDiv(timeInNanos, NanosPerMilli)
-      val nanosLeft = Math.floorMod(timeInNanos, NanosPerMilli)
-      val fixedTimeInMillis = timeInMillis - timeZone.getRawOffset
-      val fixedTimeInNanos = fixedTimeInMillis * NanosPerMilli + nanosLeft
-
-      val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-      buf.putLong(fixedTimeInNanos)
-      buf.putInt(julianDay)
-      buf.array()
+        if (timeInNanos >= NanosPerDay) { // fixes issue with Spark when in number of nanos >= 1 day
+          val time = LocalTime.ofNanoOfDay(timeInNanos - NanosPerDay)
+          LocalDateTime.of(date.plusDays(1), time)
+        } else {
+          val time = LocalTime.ofNanoOfDay(timeInNanos)
+          LocalDateTime.of(date, time)
+        }
     }
+
+  /**
+    * Uses decoding that is implemented in Apache Spark.
+    */
+  private def encodeLocalDateTime(data: java.time.LocalDateTime): Value = BinaryValue {
+    val date = data.toLocalDate
+    val time = data.toLocalTime
+
+    val julianDay = JulianDayOfEpoch + date.toEpochDay.toInt
+
+    val timeInNanos = time.toNanoOfDay
+    val timeInMillis = Math.floorDiv(timeInNanos, NanosPerMilli)
+    val nanosLeft = Math.floorMod(timeInNanos, NanosPerMilli)
+    val fixedTimeInMillis = timeInMillis - timeZone.getRawOffset
+    val fixedTimeInNanos = fixedTimeInMillis * NanosPerMilli + nanosLeft
+
+    val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+    buf.putLong(fixedTimeInNanos)
+    buf.putInt(julianDay)
+    buf.array()
   }
 
   /**
     * Uses decoding that is implemented in Apache Spark.
     */
-  implicit val dateCodec: ValueCodec[java.sql.Date] = new OptionalValueCodec[java.sql.Date] {
+  private def decodeLocalDate(value: Value): java.time.LocalDate =
+    value match {
+      case IntValue(epochDay) => LocalDate.ofEpochDay(epochDay)
+    }
 
-    // TODO there are parquet time formats over there to be checked, too
+  /**
+    * Uses decoding that is implemented in Apache Spark.
+    */
+  private def encodeLocalDate(data: java.time.LocalDate): Value =
+    IntValue(data.toEpochDay.toInt)
+}
 
-    override def decodeNonNull(value: Value): java.sql.Date =
-      value match {
-        case IntValue(epochDay) =>
-          java.sql.Date.valueOf(LocalDate.ofEpochDay(epochDay))
-      }
+trait TimeValueCodecs {
 
-    override def encodeNonNull(data: java.sql.Date): Value = IntValue(
-      data.toLocalDate.toEpochDay.toInt
-    )
+  implicit val localDateTimeCodec: ValueCodec[java.time.LocalDateTime] =
+    new OptionalValueCodec[java.time.LocalDateTime] {
+
+    override def decodeNonNull(value: Value): java.time.LocalDateTime =
+      TimeValueCodecs.decodeLocalDateTime(value)
+
+    override def encodeNonNull(data: java.time.LocalDateTime): Value =
+      TimeValueCodecs.encodeLocalDateTime(data)
+  }
+
+  implicit val sqlTimestampCodec: ValueCodec[java.sql.Timestamp] = new OptionalValueCodec[java.sql.Timestamp] {
+
+    override def decodeNonNull(value: Value): java.sql.Timestamp = {
+      val dateTime = TimeValueCodecs.decodeLocalDateTime(value)
+      java.sql.Timestamp.valueOf(dateTime)
+    }
+
+    override def encodeNonNull(data: java.sql.Timestamp): Value =
+      TimeValueCodecs.encodeLocalDateTime(data.toLocalDateTime)
+  }
+
+
+  implicit val localDateCodec: ValueCodec[java.time.LocalDate] = new OptionalValueCodec[java.time.LocalDate] {
+
+    override def decodeNonNull(value: Value): java.time.LocalDate =
+      TimeValueCodecs.decodeLocalDate(value)
+
+    override def encodeNonNull(data: java.time.LocalDate): Value =
+      TimeValueCodecs.encodeLocalDate(data)
+  }
+
+  implicit val sqlDateCodec: ValueCodec[java.sql.Date] = new OptionalValueCodec[java.sql.Date] {
+
+    override def decodeNonNull(value: Value): java.sql.Date = {
+      val date = TimeValueCodecs.decodeLocalDate(value)
+      java.sql.Date.valueOf(date)
+    }
+
+    override def encodeNonNull(data: java.sql.Date): Value =
+      TimeValueCodecs.encodeLocalDate(data.toLocalDate)
   }
 
 }

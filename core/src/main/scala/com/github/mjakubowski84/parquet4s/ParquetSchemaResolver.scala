@@ -190,12 +190,22 @@ trait SchemaDefs {
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BOOLEAN)
     )
 
-  implicit val dateSchema: TypedSchemaDef[java.sql.Date] =
+  implicit val localDateSchema: TypedSchemaDef[java.time.LocalDate] =
+    typedSchemaDef[java.time.LocalDate](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.DATE))
+    )
+
+  implicit val sqlDateSchema: TypedSchemaDef[java.sql.Date] =
     typedSchemaDef[java.sql.Date](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.DATE))
     )
 
-  implicit val timestampSchema: TypedSchemaDef[java.sql.Timestamp] =
+  implicit val localDateTimeSchema: TypedSchemaDef[java.time.LocalDateTime] =
+    typedSchemaDef[java.time.LocalDateTime](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT96, required = false)
+    )
+
+  implicit val sqlTimestampSchema: TypedSchemaDef[java.sql.Timestamp] =
     typedSchemaDef[java.sql.Timestamp](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT96, required = false)
     )
