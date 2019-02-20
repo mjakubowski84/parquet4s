@@ -1,6 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import java.io.Closeable
+import java.util.TimeZone
 
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
@@ -14,9 +15,10 @@ trait ParquetReader[T] {
   /**
     * Reads data from give path.
     * @param path URI to location of files
+    * @param options configuration of how Parquet files should be read
     * @return iterable collection of data read from path
     */
-  def read(path: String): ParquetIterable[T]
+  def read(path: String, options: ParquetReader.Options): ParquetIterable[T]
 
 }
 
@@ -24,14 +26,24 @@ object ParquetReader {
 
   type Builder = HadoopParquetReader.Builder[RowParquetRecord]
 
+  /**
+    * Configuration settings that are used during decoding or reading Parquet files
+    * @param timeZone set it to TimeZone which was used to encode time-based data that you want to read, machine's
+    *                 time zone is used by default
+    */
+  case class Options(timeZone: TimeZone = TimeZone.getDefault) {
+    private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
+  }
+
   @deprecated(message = "Please use read function or ParquetReader type class", since = "0.3.0")
-  def apply[T : ParquetRecordDecoder](path: String): ParquetIterable[T] = newParquetIterable(path)
+  def apply[T : ParquetRecordDecoder](path: String, options: Options = Options()): ParquetIterable[T] =
+    newParquetIterable(path, options)
 
-  private def newParquetIterable[T : ParquetRecordDecoder](path: String): ParquetIterable[T] =
-    newParquetIterable(HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)))
+  private def newParquetIterable[T : ParquetRecordDecoder](path: String, options: Options): ParquetIterable[T] =
+    newParquetIterable(HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)), options)
 
-  private[parquet4s] def newParquetIterable[T : ParquetRecordDecoder](builder: Builder): ParquetIterable[T] =
-    new ParquetIterableImpl(builder)
+  private[parquet4s] def newParquetIterable[T : ParquetRecordDecoder](builder: Builder, options: Options): ParquetIterable[T] =
+    new ParquetIterableImpl(builder, options)
 
   /**
     * Creates new [[ParquetIterable]] over data from given path.
@@ -46,13 +58,14 @@ object ParquetReader {
     * @tparam T type of data that represents the schema of the Parquet file, e.g.:
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     */
-  def read[T](path: String)(implicit reader: ParquetReader[T]): ParquetIterable[T] = reader.read(path)
+  def read[T](path: String, options: Options = Options())(implicit reader: ParquetReader[T]): ParquetIterable[T] =
+    reader.read(path, options)
 
   /**
     * Default implementation of [[ParquetReader]].
     */
   implicit def reader[T : ParquetRecordDecoder]: ParquetReader[T] = new ParquetReader[T] {
-    override def read(path: String): ParquetIterable[T] = newParquetIterable(path)
+    override def read(path: String, options: Options = Options()): ParquetIterable[T] = newParquetIterable(path, options)
   }
 
 }
@@ -63,7 +76,10 @@ object ParquetReader {
   */
 trait ParquetIterable[T] extends Iterable[T] with Closeable
 
-private class ParquetIterableImpl[T : ParquetRecordDecoder](builder: ParquetReader.Builder) extends ParquetIterable[T] {
+private class ParquetIterableImpl[T : ParquetRecordDecoder](builder: ParquetReader.Builder, options: ParquetReader.Options)
+  extends ParquetIterable[T] {
+
+  private val valueCodecConfiguration = options.toValueCodecConfiguration
 
   private val openCloseables = new scala.collection.mutable.ArrayBuffer[Closeable]()
 
@@ -76,7 +92,7 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](builder: ParquetRead
 
     override def hasNext: Boolean = {
       if (!recordPreRead) {
-        nextRecord = Option(reader.read()).map(ParquetRecordDecoder.decode[T])
+        nextRecord = Option(reader.read()).map((ParquetRecordDecoder.decode[T] _).curried(_)(valueCodecConfiguration))
         recordPreRead = true
       }
       nextRecord.nonEmpty
@@ -84,7 +100,7 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](builder: ParquetRead
 
     override def next(): T = {
       if (!recordPreRead) {
-        nextRecord = Option(reader.read()).map(ParquetRecordDecoder.decode[T])
+        nextRecord = Option(reader.read()).map((ParquetRecordDecoder.decode[T] _).curried(_)(valueCodecConfiguration))
         recordPreRead = true
       }
 

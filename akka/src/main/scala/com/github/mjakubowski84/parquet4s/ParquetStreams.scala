@@ -25,12 +25,15 @@ object ParquetStreams {
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     * @return The source of Parquet data
     */
-  def fromParquet[T : ParquetRecordDecoder](path: String): Source[T, NotUsed] =
+  def fromParquet[T : ParquetRecordDecoder](path: String, options: ParquetReader.Options = ParquetReader.Options()): Source[T, NotUsed] = {
+    val valueCodecConfiguration = options.toValueCodecConfiguration
+    def decode(record: RowParquetRecord): T =  ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
     Source.unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
       create = HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)).build,
       read = reader => Option(reader.read()),
       close = _.close()
-    ).map(ParquetRecordDecoder.decode[T])
+    ).map(decode)
+  }
 
   /**
     * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to single file at the specified path (including

@@ -19,17 +19,30 @@ trait ValueCodec[T] {
 
   /**
     * @param value source Parquet [[Value]]
+    * @param configuration [ValueCodecConfiguration] used by some codecs
     * @return data decoded from [[Value]]
     */
-  def decode(value: Value): T
+  def decode(value: Value, configuration: ValueCodecConfiguration): T
 
   /**
     * @param data source data
+    * @param configuration [ValueCodecConfiguration] used by some codecs
     * @return encoded Parquet [[Value]]
     */
-  def encode(data: T): Value
+  def encode(data: T, configuration: ValueCodecConfiguration): Value
 
 }
+
+
+object ValueCodecConfiguration {
+  val default: ValueCodecConfiguration = ValueCodecConfiguration(TimeZone.getDefault)
+}
+
+/**
+  * Configuration necessary for some of codecs
+  * @param timeZone used when encoding and decoding time-based values
+  */
+case class ValueCodecConfiguration(timeZone: TimeZone)
 
 /**
   * Codec for non-null type of [[Value]]
@@ -37,25 +50,25 @@ trait ValueCodec[T] {
   */
 trait RequiredValueCodec[T] extends ValueCodec[T] {
 
-  final override def decode(value: Value): T =
+  final override def decode(value: Value, configuration: ValueCodecConfiguration): T =
     value match {
       case NullValue =>
         throw new IllegalArgumentException("NullValue cannot be decoded to required type")
       case other =>
-        decodeNonNull(other)
+        decodeNonNull(other, configuration)
     }
 
-  final override def encode(data: T): Value =
+  final override def encode(data: T, configuration: ValueCodecConfiguration): Value =
     Option(data) match {
       case None =>
         throw new IllegalArgumentException("Cannot encode null instance of required type")
       case Some(other) =>
-        encodeNonNull(other)
+        encodeNonNull(other, configuration)
     }
 
-  protected def decodeNonNull(value: Value): T
+  protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): T
 
-  protected def encodeNonNull(data: T): Value
+  protected def encodeNonNull(data: T, configuration: ValueCodecConfiguration): Value
 
 }
 
@@ -65,18 +78,18 @@ trait RequiredValueCodec[T] extends ValueCodec[T] {
   */
 trait OptionalValueCodec[T] extends ValueCodec[T] {
 
-  final override def decode(value: Value): T =
+  final override def decode(value: Value, configuration: ValueCodecConfiguration): T =
     value match {
       case NullValue => null.asInstanceOf[T]
-      case other => decodeNonNull(other)
+      case other => decodeNonNull(other, configuration)
     }
 
-  final override def encode(data: T): Value =
-    Option(data).fold[Value](NullValue)(encodeNonNull)
+  final override def encode(data: T, configuration: ValueCodecConfiguration): Value =
+    Option(data).fold[Value](NullValue)(nonNullData => encodeNonNull(nonNullData, configuration))
 
-  protected def decodeNonNull(value: Value): T
+  protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): T
 
-  protected def encodeNonNull(data: T): Value
+  protected def encodeNonNull(data: T, configuration: ValueCodecConfiguration): Value
 
 }
 
@@ -84,56 +97,57 @@ trait OptionalValueCodec[T] extends ValueCodec[T] {
 trait PrimitiveValueCodecs {
 
   implicit val stringCodec: ValueCodec[String] = new OptionalValueCodec[String] {
-    override def decodeNonNull(value: Value): String =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): String =
       value match {
         case StringValue(str) => str
       }
-    override def encodeNonNull(data: String): Value = StringValue(data)
+    override def encodeNonNull(data: String, configuration: ValueCodecConfiguration): Value = StringValue(data)
   }
 
   implicit val booleanCodec: ValueCodec[Boolean] = new RequiredValueCodec[Boolean] {
-    override def decodeNonNull(value: Value): Boolean =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Boolean =
       value match {
         case BooleanValue(b) => b
       }
-    override def encodeNonNull(data: Boolean): Value = BooleanValue(data)
+    override def encodeNonNull(data: Boolean, configuration: ValueCodecConfiguration): Value = BooleanValue(data)
   }
 
   implicit val intCodec: ValueCodec[Int] = new RequiredValueCodec[Int] {
-    override def decodeNonNull(value: Value): Int =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Int =
       value match {
         case IntValue(int) => int
         case LongValue(long) => long.toInt
       }
-    override def encodeNonNull(data: Int): Value = IntValue(data)
+    override def encodeNonNull(data: Int, configuration: ValueCodecConfiguration): Value = IntValue(data)
   }
 
   implicit val longCodec: ValueCodec[Long] = new RequiredValueCodec[Long] {
-    override def decodeNonNull(value: Value): Long =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Long =
       value match {
         case IntValue(int) => int.toLong
         case LongValue(long) => long
       }
-    override def encodeNonNull(data: Long): Value = LongValue(data)
+    override def encodeNonNull(data: Long, configuration: ValueCodecConfiguration): Value = LongValue(data)
   }
 
   implicit val doubleCodec: ValueCodec[Double] = new RequiredValueCodec[Double] {
-    override def decodeNonNull(value: Value): Double =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Double =
       value match {
         case DoubleValue(double) => double
         case FloatValue(float) => float.toDouble
       }
-    override def encodeNonNull(data: Double): Value = DoubleValue(data)
+    override def encodeNonNull(data: Double, configuration: ValueCodecConfiguration): Value = DoubleValue(data)
   }
 
   implicit val floatCodec: ValueCodec[Float] = new RequiredValueCodec[Float] {
-    override def decodeNonNull(value: Value): Float =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Float =
       value match {
         case DoubleValue(double) => double.toFloat
         case FloatValue(float) => float
       }
-    override def encodeNonNull(data: Float): Value = FloatValue(data)
+    override def encodeNonNull(data: Float, configuration: ValueCodecConfiguration): Value = FloatValue(data)
   }
+
 }
 
 object TimeValueCodecs {
@@ -143,14 +157,9 @@ object TimeValueCodecs {
   val NanosPerMilli: Long = NanosPerMicro * MicrosPerMilli
   val NanosPerDay = 86400000000000l
 
-  private val timeZone = TimeZone.getDefault
-
   // TODO there are parquet time formats over there to be checked, too
 
-  /**
-    * Uses decoding that is implemented in Apache Spark.
-    */
-  private def decodeLocalDateTime(value: Value): java.time.LocalDateTime =
+  private def decodeLocalDateTime(value: Value, configuration: ValueCodecConfiguration): LocalDateTime =
     value match {
       case BinaryValue(bs: Array[Byte]) =>
         val buf = ByteBuffer.wrap(bs).order(ByteOrder.LITTLE_ENDIAN)
@@ -161,7 +170,7 @@ object TimeValueCodecs {
 
         val fixedTimeInMillis = Math.floorDiv(fixedTimeInNanos, NanosPerMilli)
         val nanosLeft = Math.floorMod(fixedTimeInNanos, NanosPerMilli)
-        val timeInMillis = fixedTimeInMillis + timeZone.getRawOffset
+        val timeInMillis = fixedTimeInMillis + configuration.timeZone.getRawOffset
         val timeInNanos = (timeInMillis * NanosPerMilli) + nanosLeft
 
         if (timeInNanos >= NanosPerDay) { // fixes issue with Spark when in number of nanos >= 1 day
@@ -173,10 +182,7 @@ object TimeValueCodecs {
         }
     }
 
-  /**
-    * Uses decoding that is implemented in Apache Spark.
-    */
-  private def encodeLocalDateTime(data: java.time.LocalDateTime): Value = BinaryValue {
+  private def encodeLocalDateTime(data:LocalDateTime, configuration: ValueCodecConfiguration): Value = BinaryValue {
     val date = data.toLocalDate
     val time = data.toLocalTime
 
@@ -185,7 +191,7 @@ object TimeValueCodecs {
     val timeInNanos = time.toNanoOfDay
     val timeInMillis = Math.floorDiv(timeInNanos, NanosPerMilli)
     val nanosLeft = Math.floorMod(timeInNanos, NanosPerMilli)
-    val fixedTimeInMillis = timeInMillis - timeZone.getRawOffset
+    val fixedTimeInMillis = timeInMillis - configuration.timeZone.getRawOffset
     val fixedTimeInNanos = fixedTimeInMillis * NanosPerMilli + nanosLeft
 
     val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
@@ -197,7 +203,7 @@ object TimeValueCodecs {
   /**
     * Uses decoding that is implemented in Apache Spark.
     */
-  private def decodeLocalDate(value: Value): java.time.LocalDate =
+  private def decodeLocalDate(value: Value): LocalDate =
     value match {
       case IntValue(epochDay) => LocalDate.ofEpochDay(epochDay)
     }
@@ -205,51 +211,51 @@ object TimeValueCodecs {
   /**
     * Uses decoding that is implemented in Apache Spark.
     */
-  private def encodeLocalDate(data: java.time.LocalDate): Value =
-    IntValue(data.toEpochDay.toInt)
+  private def encodeLocalDate(data:LocalDate): Value = IntValue(data.toEpochDay.toInt)
+
 }
 
 trait TimeValueCodecs {
 
-  implicit val localDateTimeCodec: ValueCodec[java.time.LocalDateTime] =
-    new OptionalValueCodec[java.time.LocalDateTime] {
+  implicit val localDateTimeCodec: ValueCodec[LocalDateTime] =
+    new OptionalValueCodec[LocalDateTime] {
 
-    override def decodeNonNull(value: Value): java.time.LocalDateTime =
-      TimeValueCodecs.decodeLocalDateTime(value)
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): LocalDateTime =
+      TimeValueCodecs.decodeLocalDateTime(value, configuration)
 
-    override def encodeNonNull(data: java.time.LocalDateTime): Value =
-      TimeValueCodecs.encodeLocalDateTime(data)
+    override def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeLocalDateTime(data, configuration)
   }
 
   implicit val sqlTimestampCodec: ValueCodec[java.sql.Timestamp] = new OptionalValueCodec[java.sql.Timestamp] {
 
-    override def decodeNonNull(value: Value): java.sql.Timestamp = {
-      val dateTime = TimeValueCodecs.decodeLocalDateTime(value)
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): java.sql.Timestamp = {
+      val dateTime = TimeValueCodecs.decodeLocalDateTime(value, configuration)
       java.sql.Timestamp.valueOf(dateTime)
     }
 
-    override def encodeNonNull(data: java.sql.Timestamp): Value =
-      TimeValueCodecs.encodeLocalDateTime(data.toLocalDateTime)
+    override def encodeNonNull(data: java.sql.Timestamp, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeLocalDateTime(data.toLocalDateTime, configuration)
   }
 
 
-  implicit val localDateCodec: ValueCodec[java.time.LocalDate] = new OptionalValueCodec[java.time.LocalDate] {
+  implicit val localDateCodec: ValueCodec[LocalDate] = new OptionalValueCodec[LocalDate] {
 
-    override def decodeNonNull(value: Value): java.time.LocalDate =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): LocalDate =
       TimeValueCodecs.decodeLocalDate(value)
 
-    override def encodeNonNull(data: java.time.LocalDate): Value =
+    override def encodeNonNull(data: LocalDate, configuration: ValueCodecConfiguration): Value =
       TimeValueCodecs.encodeLocalDate(data)
   }
 
   implicit val sqlDateCodec: ValueCodec[java.sql.Date] = new OptionalValueCodec[java.sql.Date] {
 
-    override def decodeNonNull(value: Value): java.sql.Date = {
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): java.sql.Date = {
       val date = TimeValueCodecs.decodeLocalDate(value)
       java.sql.Date.valueOf(date)
     }
 
-    override def encodeNonNull(data: java.sql.Date): Value =
+    override def encodeNonNull(data: java.sql.Date, configuration: ValueCodecConfiguration): Value =
       TimeValueCodecs.encodeLocalDate(data.toLocalDate)
   }
 
@@ -261,30 +267,33 @@ trait ComplexValueCodecs {
                                           elementCodec: ValueCodec[T],
                                           collectionTransformer: CollectionTransformer[T, Col]
                                          ): ValueCodec[Col[T]] = new OptionalValueCodec[Col[T]] {
-    override def decodeNonNull(value: Value): Col[T] =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Col[T] =
       value match {
         case listRecord: ListParquetRecord =>
-          collectionTransformer.to(listRecord.elements.map(elementCodec.decode))
+          collectionTransformer.to(listRecord.elements.map((elementCodec.decode _).curried(_)(configuration)))
       }
 
-    override def encodeNonNull(data: Col[T]): Value =
-      collectionTransformer.from(data).map(elementCodec.encode).foldLeft(ListParquetRecord.empty) {
-        case (record, element) =>
-          record.add(element)
-      }
+    override def encodeNonNull(data: Col[T], configuration: ValueCodecConfiguration): Value =
+      collectionTransformer
+        .from(data)
+        .map((elementCodec.encode _).curried(_)(configuration))
+        .foldLeft(ListParquetRecord.empty) {
+          case (record, element) =>
+            record.add(element)
+        }
   }
 
   implicit def optionCodec[T](implicit elementCodec: ValueCodec[T]): ValueCodec[Option[T]] = new ValueCodec[Option[T]] {
-    override def decode(value: Value): Option[T] =
+    override def decode(value: Value, configuration: ValueCodecConfiguration): Option[T] =
       value match {
         case NullValue => None
-        case _ => Option(elementCodec.decode(value))
+        case _ => Option(elementCodec.decode(value, configuration))
       }
 
-    override def encode(data: Option[T]): Value =
+    override def encode(data: Option[T], configuration: ValueCodecConfiguration): Value =
       data match {
         case None => NullValue
-        case Some(t) => elementCodec.encode(t)
+        case Some(t) => elementCodec.encode(t, configuration)
       }
   }
 
@@ -292,19 +301,19 @@ trait ComplexValueCodecs {
                               kCodec: ValueCodec[K],
                               vCodec: ValueCodec[V]
                              ): ValueCodec[Map[K, V]] = new OptionalValueCodec[Map[K, V]] {
-    override def decodeNonNull(value: Value): Map[K, V] =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Map[K, V] =
       value match {
         case mapParquetRecord: MapParquetRecord =>
           mapParquetRecord.getMap.map { case (mapKey, mapValue) =>
             require(mapKey != NullValue, "Map cannot have null keys")
-            kCodec.decode(mapKey) -> vCodec.decode(mapValue)
+            kCodec.decode(mapKey, configuration) -> vCodec.decode(mapValue, configuration)
           }
       }
 
-    override def encodeNonNull(data: Map[K, V]): Value =
+    override def encodeNonNull(data: Map[K, V], configuration: ValueCodecConfiguration): Value =
       data.foldLeft(MapParquetRecord.empty) { case (record, (key, value)) =>
         require(key != null, "Map cannot have null keys")
-        record.add(kCodec.encode(key), vCodec.encode(value))
+        record.add(kCodec.encode(key, configuration), vCodec.encode(value, configuration))
       }
   }
 
@@ -313,13 +322,14 @@ trait ComplexValueCodecs {
                                decoder: ParquetRecordDecoder[T]
                               ): ValueCodec[T] = new OptionalValueCodec[T] {
 
-    override def decodeNonNull(value: Value): T =
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): T =
       value match {
         case record: RowParquetRecord =>
-          decoder.decode(record)
+          decoder.decode(record, configuration)
       }
 
-    override def encodeNonNull(data: T): Value = encoder.encode(data)
+    override def encodeNonNull(data: T, configuration: ValueCodecConfiguration): Value =
+      encoder.encode(data, configuration)
   }
 
 }

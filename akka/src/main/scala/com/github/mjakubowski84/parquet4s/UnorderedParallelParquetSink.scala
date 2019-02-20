@@ -19,13 +19,16 @@ object UnorderedParallelParquetSink extends IOOps {
                                                              options: ParquetWriter.Options = ParquetWriter.Options()
                                                             ): Sink[T, Future[Done]] = {
     val schema = ParquetSchemaResolver.resolveSchema[T]
+    val valueCodecConfiguration = options.toValueCodecConfiguration
 
     validateWritePath(path, options)
+
+    def encode(data: T): RowParquetRecord = ParquetRecordEncoder.encode[T](data, valueCodecConfiguration)
 
     Flow[T]
       .zipWithIndex
       .groupBy(parallelism, elemAndIndex => Math.floorMod(elemAndIndex._2, parallelism))
-      .map(elemAndIndex => ParquetRecordEncoder.encode(elemAndIndex._1))
+      .map(elemAndIndex => encode(elemAndIndex._1))
       .fold(UnorderedChunk(path, schema, options))(_.write(_))
       .map(_.close())
       .async
