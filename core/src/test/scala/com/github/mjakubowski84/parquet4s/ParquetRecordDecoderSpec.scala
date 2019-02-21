@@ -11,6 +11,15 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
+  def dateTimeAsBinary(epochDays: Int, timeInNanos: Long, timeZone: TimeZone) =
+    BinaryValue {
+      val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+      // tz offset is expressed in millis while time in Parquet is expressed in nanos
+      buf.putLong(-timeZone.getRawOffset * TimeValueCodecs.NanosPerMilli + timeInNanos)
+      buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
+      buf.array()
+    }
+
   "Parquet record decoder" should "be used to decode empty record" in {
     decode[Empty](RowParquetRecord.empty) should be(Empty())
   }
@@ -41,7 +50,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     val time = java.time.LocalTime.of(0, 0, 0)
     val dateTime = java.time.LocalDateTime.of(date, time)
 
-    val data = TimePrimitives(
+    val expectedData = TimePrimitives(
       localDateTime = dateTime,
       sqlTimestamp = java.sql.Timestamp.valueOf(dateTime),
       localDate = date,
@@ -49,14 +58,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     )
 
     val epochDays = date.toEpochDay.toInt
-
-    val binaryDateTime = BinaryValue {
-      val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-      buf.putLong(-timeZone.getRawOffset * TimeValueCodecs.NanosPerMilli) // time in nanos with milli offset due to time zone
-      buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
-      buf.array()
-    }
-
+    val binaryDateTime = dateTimeAsBinary(epochDays, time.toNanoOfDay, timeZone)
     val record = RowParquetRecord(
       "localDateTime" -> binaryDateTime,
       "sqlTimestamp" -> binaryDateTime,
@@ -64,17 +66,16 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "sqlDate" -> epochDays
     )
 
-    decode[TimePrimitives](record, ValueCodecConfiguration(timeZone)) should be(data)
+    decode[TimePrimitives](record, ValueCodecConfiguration(timeZone)) should be(expectedData)
   }
 
   it should "decode record containing time primitive values using UTC time zone" in {
     val timeZone: TimeZone = TimeZone.getTimeZone("UTC")
-
     val date = java.time.LocalDate.of(2019, 1, 1)
     val time = java.time.LocalTime.of(0, 0, 0)
     val dateTime = java.time.LocalDateTime.of(date, time)
 
-    val data = TimePrimitives(
+    val expectedData = TimePrimitives(
       localDateTime = dateTime,
       sqlTimestamp = java.sql.Timestamp.valueOf(dateTime),
       localDate = date,
@@ -82,14 +83,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     )
 
     val epochDays = date.toEpochDay.toInt
-
-    val binaryDateTime = BinaryValue {
-      val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-      buf.putLong(0) // zero as there's no offset for UTC time zone
-      buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
-      buf.array()
-    }
-
+    val binaryDateTime = dateTimeAsBinary(epochDays, time.toNanoOfDay, timeZone)
     val record = RowParquetRecord(
       "localDateTime" -> binaryDateTime,
       "sqlTimestamp" -> binaryDateTime,
@@ -97,7 +91,60 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "sqlDate" -> epochDays
     )
 
-    decode[TimePrimitives](record, ValueCodecConfiguration(timeZone)) should be(data)
+    decode[TimePrimitives](record, ValueCodecConfiguration(timeZone)) should be(expectedData)
+  }
+
+  it should "decode record containing time primitive values using UTC time zone while input data was saved with time zone 1h east" in {
+    val date = java.time.LocalDate.of(2019, 1, 1)
+    val time = java.time.LocalTime.of(0, 0, 0)
+    // 2018-12-31 23:00:00 local/no-tz
+    val dateTime = java.time.LocalDateTime.of(date, time).minusHours(1)
+
+    val expectedData = TimePrimitives(
+      localDateTime = dateTime,
+      sqlTimestamp = java.sql.Timestamp.valueOf(dateTime),
+      localDate = date,
+      sqlDate = java.sql.Date.valueOf(date)
+    )
+
+    val epochDays = date.toEpochDay.toInt
+    // 2019-01-01 00:00:00 GMT+1
+    val binaryDateTime = dateTimeAsBinary(epochDays, time.toNanoOfDay, TimeZone.getTimeZone("GMT+1"))
+    val record = RowParquetRecord(
+      "localDateTime" -> binaryDateTime,
+      "sqlTimestamp" -> binaryDateTime,
+      "localDate" -> epochDays,
+      "sqlDate" -> epochDays
+    )
+
+    decode[TimePrimitives](record, ValueCodecConfiguration(TimeZone.getTimeZone("UTC"))) should be(expectedData)
+  }
+
+
+  it should "decode record containing time primitive values using UTC time zone while input data was saved with time zone 1h west" in {
+    val date = java.time.LocalDate.of(2018, 12, 31)
+    val time = java.time.LocalTime.of(23, 0, 0)
+    // 2019-01-01 00:00:00 local/no-tz
+    val dateTime = java.time.LocalDateTime.of(date, time).plusHours(1)
+
+    val expectedData = TimePrimitives(
+      localDateTime = dateTime,
+      sqlTimestamp = java.sql.Timestamp.valueOf(dateTime),
+      localDate = date,
+      sqlDate = java.sql.Date.valueOf(date)
+    )
+
+    val epochDays = date.toEpochDay.toInt
+    // 2018-12-31 23:00:00 GMT-1
+    val binaryDateTime = dateTimeAsBinary(epochDays, time.toNanoOfDay, TimeZone.getTimeZone("GMT-1"))
+    val record = RowParquetRecord(
+      "localDateTime" -> binaryDateTime,
+      "sqlTimestamp" -> binaryDateTime,
+      "localDate" -> epochDays,
+      "sqlDate" -> epochDays
+    )
+
+    decode[TimePrimitives](record, ValueCodecConfiguration(TimeZone.getTimeZone("UTC"))) should be(expectedData)
   }
 
   it should "throw exception if record is missing data for non-optional field" in {

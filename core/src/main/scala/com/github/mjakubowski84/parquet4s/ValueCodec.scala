@@ -173,9 +173,20 @@ object TimeValueCodecs {
         val timeInMillis = fixedTimeInMillis + configuration.timeZone.getRawOffset
         val timeInNanos = (timeInMillis * NanosPerMilli) + nanosLeft
 
-        if (timeInNanos >= NanosPerDay) { // fixes issue with Spark when in number of nanos >= 1 day
+        if (timeInNanos >= NanosPerDay) {
+          /*
+           * original value was encoded with time zone WEST to one that we read it with
+           * and we experience a day flip due to difference in time zone offset
+           */
           val time = LocalTime.ofNanoOfDay(timeInNanos - NanosPerDay)
           LocalDateTime.of(date.plusDays(1), time)
+        } else if (timeInNanos < 0) {
+          /*
+           * original value was encoded with time zone EAST to one that we read it with
+           * and we experience a day flip due to difference in time zone offset
+           */
+          val time = LocalTime.ofNanoOfDay(timeInNanos + NanosPerDay)
+          LocalDateTime.of(date.minusDays(1), time)
         } else {
           val time = LocalTime.ofNanoOfDay(timeInNanos)
           LocalDateTime.of(date, time)
