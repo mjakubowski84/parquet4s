@@ -36,7 +36,7 @@ export AWS_SECRET_ACCESS_KEY=my.secret.key
 Add the library to your dependencies:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-core" % "0.3.0"
+"com.github.mjakubowski84" %% "parquet4s-core" % "0.4.0"
 ```
 
 The library contains simple implementation of Scala's Iterable that allows reading Parquet from a single file or a directory. You may also use `org.apache.parquet.hadoop.ParquetReader` directly and use our `RowParquetRecord` and `ParquetRecordDecoder` to decode your data.
@@ -64,7 +64,7 @@ try {
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "0.3.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "0.4.0"
 ```
 
 Parquet4S has so far single `Source` for reading single file or directory and **three** `Sink`s for writing. Choose one that suits you most.
@@ -114,7 +114,7 @@ Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
   options = writeOptions
 ))
   
-// Reads file or files from the path.
+// Reads file or files from the path. Please also have a look at optional parameters.
 ParquetStreams.fromParquet[User]("file:///data/users").runForeach(println)
 ```
 
