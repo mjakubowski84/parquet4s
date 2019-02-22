@@ -1,5 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
+import java.util.TimeZone
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.api.WriteSupport
@@ -50,6 +52,7 @@ object ParquetWriter  {
     * Configuration of parquet writer. Please have a look at
     * <a href="https://parquet.apache.org/documentation/latest/">documentation of Parquet</a>
     * to understand what every configuration entry is responsible for.
+    * @param timeZone used when encoding time-based data, local machine's time zone is used by default
     */
   case class Options(
                     writeMode: ParquetFileWriter.Mode = ParquetFileWriter.Mode.CREATE,
@@ -59,8 +62,11 @@ object ParquetWriter  {
                     maxPaddingSize: Int = HadoopParquetWriter.MAX_PADDING_SIZE_DEFAULT,
                     pageSize: Int = HadoopParquetWriter.DEFAULT_PAGE_SIZE,
                     rowGroupSize: Int = HadoopParquetWriter.DEFAULT_BLOCK_SIZE,
-                    validationEnabled: Boolean = HadoopParquetWriter.DEFAULT_IS_VALIDATING_ENABLED
-                    )
+                    validationEnabled: Boolean = HadoopParquetWriter.DEFAULT_IS_VALIDATING_ENABLED,
+                    timeZone: TimeZone = TimeZone.getDefault
+                    ) {
+    private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
+  }
 
   private[parquet4s] def internalWriter(path: Path, schema: MessageType, options: Options): InternalWriter =
     new Builder(path, schema)
@@ -93,9 +99,10 @@ object ParquetWriter  {
   implicit def writer[T: ParquetRecordEncoder : ParquetSchemaResolver]: ParquetWriter[T] = new ParquetWriter[T] {
     override def write(path: String, data: Iterable[T], options: Options = Options()): Unit = {
       val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
+      val valueCodecConfiguration = options.toValueCodecConfiguration
       try {
         data.foreach { elem =>
-          writer.write(ParquetRecordEncoder.encode[T](elem))
+          writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
         }
       } finally {
         writer.close()

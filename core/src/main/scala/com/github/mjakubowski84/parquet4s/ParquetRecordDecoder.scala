@@ -14,9 +14,10 @@ trait ParquetRecordDecoder[T] {
 
   /**
     * @param record to be decoded to instance of given type
+    * @param configuration [ValueCodecConfiguration] used by some codecs
     * @return instance of product type decoded from record
     */
-  def decode(record: RowParquetRecord): T
+  def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): T
 
 }
 
@@ -34,10 +35,11 @@ object ParquetRecordDecoder {
 
   def apply[T](implicit ev: ParquetRecordDecoder[T]): ParquetRecordDecoder[T] = ev
 
-  def decode[T](record: RowParquetRecord)(implicit ev: ParquetRecordDecoder[T]): T = ev.decode(record)
+  def decode[T](record: RowParquetRecord, configuration: ValueCodecConfiguration = ValueCodecConfiguration.default)
+               (implicit ev: ParquetRecordDecoder[T]): T = ev.decode(record, configuration)
 
   implicit val nilDecoder: ParquetRecordDecoder[HNil] = new ParquetRecordDecoder[HNil] {
-    override def decode(record: RowParquetRecord): HNil.type = HNil
+    override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): HNil.type = HNil
   }
 
   implicit def headValueDecoder[FieldName <: Symbol, Head, Tail <: HList](implicit
@@ -46,16 +48,16 @@ object ParquetRecordDecoder {
                                                                           tailDecoder: ParquetRecordDecoder[Tail]
                                                                          ): ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] =
     new ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] {
-      override def decode(record: RowParquetRecord): FieldType[FieldName, Head] :: Tail = {
+      override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): FieldType[FieldName, Head] :: Tail = {
         val fieldName = witness.value.name
         val fieldValue = record.fields.getOrElse(fieldName, NullValue)
         val decodedFieldValue = try {
-          headDecoder.decode(fieldValue)
+          headDecoder.decode(fieldValue, configuration)
         } catch {
           case NonFatal(cause) =>
             throw DecodingException(s"Failed to decode field $fieldName of record: $record", cause)
         }
-        field[FieldName](decodedFieldValue) :: tailDecoder.decode(record)
+        field[FieldName](decodedFieldValue) :: tailDecoder.decode(record, configuration)
       }
     }
 
@@ -64,7 +66,8 @@ object ParquetRecordDecoder {
                                     decoder: Lazy[ParquetRecordDecoder[R]]
                                    ): ParquetRecordDecoder[A] =
     new ParquetRecordDecoder[A] {
-      override def decode(record: RowParquetRecord): A = gen.from(decoder.value.decode(record))
+      override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): A =
+        gen.from(decoder.value.decode(record, configuration))
     }
 
 }

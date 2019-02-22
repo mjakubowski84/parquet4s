@@ -7,18 +7,29 @@ import scala.language.implicitConversions
   */
 object ValueImplicits extends AllValueCodecs {
 
-  implicit def valueConversion[T](value: T)(implicit valueCodec: ValueCodec[T]): Value = valueCodec.encode(value)
+  implicit val valueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration.default
+
+  implicit def valueConversion[T](value: T)(implicit
+                                            valueCodec: ValueCodec[T],
+                                            configuration: ValueCodecConfiguration
+                                            ): Value = valueCodec.encode(value, configuration)
 
   implicit def leftTupleConversion[A](tuple: (A, Value))(implicit
-                                                         valueACodec: ValueCodec[A]
-                                                        ): (Value, Value) = (valueACodec.encode(tuple._1), tuple._2)
+                                                         valueACodec: ValueCodec[A],
+                                                         configuration: ValueCodecConfiguration
+                                                        ): (Value, Value) =
+    (valueACodec.encode(tuple._1, configuration), tuple._2)
   implicit def rightTupleConversion[B](tuple: (Value, B))(implicit
-                                                          valueBCodec: ValueCodec[B]
-                                                         ): (Value, Value) = (tuple._1, valueBCodec.encode(tuple._2))
+                                                          valueBCodec: ValueCodec[B],
+                                                          configuration: ValueCodecConfiguration
+                                                         ): (Value, Value) =
+    (tuple._1, valueBCodec.encode(tuple._2, configuration))
 
   implicit def tupleConversion[A, B](tuple: (A, B))(implicit
                                                     valueACodec: ValueCodec[A],
-                                                    valueBCodec: ValueCodec[B]
-                                                    ): (Value, Value) = (valueACodec.encode(tuple._1), valueBCodec.encode(tuple._2))
+                                                    valueBCodec: ValueCodec[B],
+                                                    configuration: ValueCodecConfiguration
+                                                    ): (Value, Value) =
+    (valueACodec.encode(tuple._1, configuration), valueBCodec.encode(tuple._2, configuration))
 
 }

@@ -34,7 +34,9 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     encode(data) should be(record)
   }
 
-  it should "encode record containing time values" in {
+  it should "encode record containing time values using local time zone" in {
+    val timeZone: TimeZone = TimeZone.getDefault
+
     val date = java.time.LocalDate.of(2019, 1, 1)
     val time = java.time.LocalTime.of(0, 0, 0)
     val dateTime = java.time.LocalDateTime.of(date, time)
@@ -50,7 +52,7 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
 
     val binaryDateTime = BinaryValue {
       val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-      buf.putLong(-TimeZone.getDefault.getRawOffset * TimeValueCodecs.NanosPerMilli) // time in nanos with milli offset due to time zone
+      buf.putLong(-timeZone.getRawOffset * TimeValueCodecs.NanosPerMilli) // time in nanos with milli offset due to time zone
       buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
       buf.array()
     }
@@ -62,7 +64,41 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
       "sqlDate" -> epochDays
     )
 
-    encode(data) should be(record)
+    encode(data, ValueCodecConfiguration(timeZone)) should be(record)
+  }
+
+
+  it should "encode record containing time values using UTC time zone" in {
+    val timeZone: TimeZone = TimeZone.getTimeZone("UTC")
+
+    val date = java.time.LocalDate.of(2019, 1, 1)
+    val time = java.time.LocalTime.of(0, 0, 0)
+    val dateTime = java.time.LocalDateTime.of(date, time)
+
+    val data = TimePrimitives(
+      localDateTime = dateTime,
+      sqlTimestamp = java.sql.Timestamp.valueOf(dateTime),
+      localDate = date,
+      sqlDate = java.sql.Date.valueOf(date)
+    )
+
+    val epochDays = date.toEpochDay.toInt
+
+    val binaryDateTime = BinaryValue {
+      val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+      buf.putLong(0) // zero as there's no offset for UTC time zone
+      buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
+      buf.array()
+    }
+
+    val record = RowParquetRecord(
+      "localDateTime" -> binaryDateTime,
+      "sqlTimestamp" -> binaryDateTime,
+      "localDate" -> epochDays,
+      "sqlDate" -> epochDays
+    )
+
+    encode(data, ValueCodecConfiguration(timeZone)) should be(record)
   }
 
   it should "encode record containing optional values" in {

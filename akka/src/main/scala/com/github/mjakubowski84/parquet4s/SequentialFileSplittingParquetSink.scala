@@ -17,12 +17,15 @@ object SequentialFileSplittingParquetSink extends IOOps {
                                                              options: ParquetWriter.Options = ParquetWriter.Options()
                                                             ): Sink[T, Future[Done]] = {
     val schema = ParquetSchemaResolver.resolveSchema[T]
+    val valueCodecConfiguration = options.toValueCodecConfiguration
 
     validateWritePath(path, options)
 
+    def encode(data: T): RowParquetRecord = ParquetRecordEncoder.encode[T](data, valueCodecConfiguration)
+
     Flow[T]
       .zipWithIndex
-      .map { case (elem, index) => OrderedChunkElem(ParquetRecordEncoder.encode(elem), index) }
+      .map { case (elem, index) => OrderedChunkElem(encode(elem), index) }
       .fold(OrderedChunk(path, schema, maxRecordsPerFile, options))(_.write(_))
       .map(_.close())
       .toMat(Sink.ignore)(Keep.right)
