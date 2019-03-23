@@ -12,7 +12,8 @@ object TestCases {
                          float: Float,
                          double: Double,
                          string: String,
-                         short: Short
+                         short: Short,
+                         byte: Byte
                        )
   case class TimePrimitives(
                              localDateTime: java.time.LocalDateTime,

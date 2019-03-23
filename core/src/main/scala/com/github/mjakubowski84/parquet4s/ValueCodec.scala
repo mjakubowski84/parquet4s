@@ -151,10 +151,19 @@ trait PrimitiveValueCodecs {
   implicit val shortCodec: ValueCodec[Short] = new RequiredValueCodec[Short] {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Short =
       value match {
-        case ShortValue(int) => int
+        case ShortValue(short) => short
         case IntValue(int) => int.toShort
       }
     override def encodeNonNull(data: Short, configuration: ValueCodecConfiguration): Value = ShortValue(data)
+  }
+
+  implicit val byteCodec: ValueCodec[Byte] = new RequiredValueCodec[Byte] {
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Byte =
+      value match {
+        case ByteValue(byte) => byte
+        case IntValue(int) => int.toByte
+      }
+    override def encodeNonNull(data: Byte, configuration: ValueCodecConfiguration): Value = ByteValue(data)
   }
 
 }
