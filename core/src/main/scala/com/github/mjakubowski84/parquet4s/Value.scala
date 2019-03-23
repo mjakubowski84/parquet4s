@@ -58,6 +58,14 @@ case class DoubleValue(value: Double) extends AnyVal with PrimitiveValue[Double]
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addDouble(value)
 }
 
+object ShortValue {
+  def apply(value: Int): ShortValue = ShortValue(value.toShort)
+}
+
+case class ShortValue(value: Short) extends AnyVal with PrimitiveValue[Short] {
+  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addInteger(value)
+}
+
 object BinaryValue {
   def apply(binary: Binary): BinaryValue = BinaryValue(binary.getBytes)
 }

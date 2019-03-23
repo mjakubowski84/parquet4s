@@ -148,6 +148,15 @@ trait PrimitiveValueCodecs {
     override def encodeNonNull(data: Float, configuration: ValueCodecConfiguration): Value = FloatValue(data)
   }
 
+  implicit val shortCodec: ValueCodec[Short] = new RequiredValueCodec[Short] {
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Short =
+      value match {
+        case ShortValue(int) => int
+        case IntValue(int) => int.toShort
+      }
+    override def encodeNonNull(data: Short, configuration: ValueCodecConfiguration): Value = ShortValue(data)
+  }
+
 }
 
 object TimeValueCodecs {

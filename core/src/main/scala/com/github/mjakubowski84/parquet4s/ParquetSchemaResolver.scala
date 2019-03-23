@@ -190,6 +190,11 @@ trait SchemaDefs {
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BOOLEAN)
     )
 
+  implicit val shortSchema: TypedSchemaDef[Short] =
+    typedSchemaDef[Short](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_16))
+    )
+
   implicit val localDateSchema: TypedSchemaDef[java.time.LocalDate] =
     typedSchemaDef[java.time.LocalDate](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.DATE))
