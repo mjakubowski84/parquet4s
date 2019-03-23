@@ -51,6 +51,8 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord](
       case Some(OriginalType.DECIMAL) if field.isPrimitive =>
         val scale = field.asPrimitiveType.getDecimalMetadata.getScale
         new DecimalConverter(field.getName, scale)
+      case Some(OriginalType.INT_16) if field.isPrimitive =>
+        new ShortConverter(field.getName)
       case _ if field.isPrimitive =>
         new ParquetPrimitiveConverter(field.getName)
       case Some(OriginalType.MAP) =>
@@ -100,6 +102,12 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord](
   private class StringConverter(name: String) extends ParquetPrimitiveConverter(name) {
     override def addBinary(value: Binary): Unit = {
       record.add(name, StringValue(value))
+    }
+  }
+
+  private class ShortConverter(name: String) extends ParquetPrimitiveConverter(name) {
+    override def addInt(value: Int): Unit = {
+      record.add(name, ShortValue(value))
     }
   }
 

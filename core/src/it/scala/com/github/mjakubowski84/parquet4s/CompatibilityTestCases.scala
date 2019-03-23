@@ -10,7 +10,8 @@ object CompatibilityTestCases extends TestCaseSupport {
                          l: Long,
                          f: Float,
                          d: Double,
-                         s: String
+                         s: String,
+                         sh: Short
                        )
   case class TimePrimitives(timestamp: java.sql.Timestamp, date: java.sql.Date)
   case class ContainsOption(optional: Option[Int])
@@ -94,10 +95,10 @@ object CompatibilityTestCases extends TestCaseSupport {
 
   override val caseDefinitions: Seq[Case.CaseDef] = Seq(
     Case("primitives", Seq(
-      Primitives(b = true, 1, 1234567890l, 1.1f, 1.00000000001d, "text"),
-      Primitives(b = false, 0, 0l, 0f, 0d, ""),
-      Primitives(b = false, Int.MaxValue, Long.MaxValue, Float.MaxValue, Double.MaxValue, "Żołądź z dębu"),
-      Primitives(b = false, Int.MinValue, Long.MinValue, Float.MinValue, Double.MinValue, null)
+      Primitives(b = true, 1, 1234567890l, 1.1f, 1.00000000001d, "text", 1),
+      Primitives(b = false, 0, 0l, 0f, 0d, "", 0),
+      Primitives(b = false, Int.MaxValue, Long.MaxValue, Float.MaxValue, Double.MaxValue, "Żołądź z dębu", Short.MaxValue),
+      Primitives(b = false, Int.MinValue, Long.MinValue, Float.MinValue, Double.MinValue, null, Short.MinValue)
     )),
     Case("time primitives", Seq(
       TimePrimitives(
