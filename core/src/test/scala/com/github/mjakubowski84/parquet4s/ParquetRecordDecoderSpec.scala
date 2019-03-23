@@ -32,7 +32,8 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       float = 1.1f,
       double = 1.00000000000001d,
       string = "text",
-      short = 1
+      short = 1,
+      byte = 1
     )
     val record = RowParquetRecord(
       "boolean" -> true,
@@ -41,7 +42,8 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "float" -> 1.1f,
       "double" -> 1.00000000000001d,
       "string" -> "text",
-      "short" -> (1: Short)
+      "short" -> (1: Short),
+      "byte" -> (1: Byte)
     )
     decode[Primitives](record) should be(data)
   }
