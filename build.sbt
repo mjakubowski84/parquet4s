@@ -1,3 +1,5 @@
+import bloop.integrations.sbt.BloopDefaults
+
 lazy val resolvers =  Seq(
   Opts.resolver.sonatypeReleases,
   Resolver.jcenterRepo
@@ -73,7 +75,7 @@ lazy val publishSettings = {
 lazy val itSettings = Defaults.itSettings ++ Project.inConfig(IntegrationTest)(Seq(
   Keys.fork := true,
   Keys.parallelExecution := true
-))
+)) ++ Project.inConfig(IntegrationTest)(BloopDefaults.configSettings)
 
 lazy val core = (project in file("core"))
   .configs(IntegrationTest)

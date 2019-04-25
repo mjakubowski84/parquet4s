@@ -2,6 +2,10 @@
 *.log
 *.iml
 
+.vscode
+.metals
+.bloop
 .idea
 target
 spark-warehouse
+project/.plugins.sbt.swp
