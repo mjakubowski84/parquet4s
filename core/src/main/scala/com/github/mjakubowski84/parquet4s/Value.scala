@@ -42,6 +42,11 @@ case class StringValue(value: String) extends AnyVal with PrimitiveValue[String]
     recordConsumer.addBinary(Binary.fromReusedByteArray(value.getBytes(StandardCharsets.UTF_8)))
 }
 
+case class CharValue(value: Char) extends AnyVal with PrimitiveValue[Char] {
+  override def write(schema: Type, recordConsumer: RecordConsumer): Unit =
+    recordConsumer.addInteger(value)
+}
+
 case class LongValue(value: Long) extends AnyVal with PrimitiveValue[Long] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addLong(value)
 }

@@ -15,6 +15,7 @@ object CompatibilityTestCases extends TestCaseSupport {
                          by: Byte
                        )
   case class TimePrimitives(timestamp: java.sql.Timestamp, date: java.sql.Date)
+  case class OtherPrimitives(ch: Char, date: java.time.LocalDate, dateTime: java.time.LocalDateTime)
   case class ContainsOption(optional: Option[Int])
 
   // Collections of primitives
@@ -116,6 +117,23 @@ object CompatibilityTestCases extends TestCaseSupport {
       ),
       TimePrimitives(timestamp = null, date = null)
     )),
+    Case("other primitives", Seq(
+      OtherPrimitives(
+        ch = 0,
+        date = java.time.LocalDate.of(2019, 1, 1),
+        dateTime = java.time.LocalDateTime.of(2019, 1, 1, 0, 0, 0)
+      ),
+      OtherPrimitives(
+        ch = 'a',
+        date = java.time.LocalDate.of(2019, 1, 1),
+        dateTime = java.time.LocalDateTime.of(2018, 12, 31, 23, 30, 0, 999000)
+      ),
+      OtherPrimitives(
+        ch = '\r',
+        date = null,
+        dateTime = null
+      )
+    ), Set(CompatibilityParty.Reader, CompatibilityParty.Writer)),
     Case("options", Seq(ContainsOption(None), ContainsOption(Some(1)))),
     Case("collections of primitives", Seq(
       Collections(
