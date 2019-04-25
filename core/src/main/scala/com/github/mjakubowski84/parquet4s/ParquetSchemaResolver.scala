@@ -165,6 +165,11 @@ trait SchemaDefs {
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8))
     )
 
+  implicit val charSchema: TypedSchemaDef[Char] =
+    typedSchemaDef[Char](
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
+    )
+
   implicit val intSchema: TypedSchemaDef[Int] =
     typedSchemaDef[Int](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))

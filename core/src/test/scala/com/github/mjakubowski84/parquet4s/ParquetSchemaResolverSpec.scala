@@ -21,7 +21,8 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.DOUBLE)("double"),
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8))("string"),
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_16))("short"),
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_8))("byte")
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_8))("byte"),
+      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))("char")
     ))
   }
 

@@ -23,7 +23,8 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
       double = 1.00000000000001d,
       string = "text",
       short = 1,
-      byte = 1
+      byte = 1,
+      char = '\n'
     )
     val record = RowParquetRecord(
       "boolean" -> true,
@@ -33,7 +34,8 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
       "double" -> 1.00000000000001d,
       "string" -> "text",
       "short" -> (1: Short),
-      "byte" -> (1: Byte)
+      "byte" -> (1: Byte),
+      "char" -> '\n'
     )
     encode(data) should be(record)
   }
