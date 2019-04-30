@@ -39,7 +39,7 @@ object StringValue {
   def apply(binary: Binary): StringValue = StringValue(binary.toStringUsingUTF8)
 }
 
-// TODO redundant structure.... we should use BinarrValue for storing strings and use codec for conversions
+// TODO redundant structure.... we should use BinarrValue for storing strings and do conversions in codec
 case class StringValue(value: String) extends AnyVal with PrimitiveValue[String] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit =
     recordConsumer.addBinary(Binary.fromReusedByteArray(value.getBytes(StandardCharsets.UTF_8)))
@@ -70,7 +70,9 @@ object DecimalValue {
   val Scale = 18
   val Precision = 38
   val ByteArrayLength = 16
-  lazy val RescaleMathContext = new MathContext(DecimalValue.Precision)
+  private lazy val RescaleMathContext = new MathContext(Precision)
+
+  private def rescale(original: BigDecimal) = BigDecimal.decimal(original.bigDecimal, RescaleMathContext).setScale(Scale)
 
   def apply(binary: Binary, scale: Int, mathContext: MathContext): DecimalValue =
     DecimalValue(BigDecimal(BigInt(binary.getBytes), scale, mathContext))
@@ -80,12 +82,16 @@ case class DecimalValue(value: BigDecimal) extends AnyVal with PrimitiveValue[Bi
   import DecimalValue._
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
+    /*
+      Decimal is stored as byte array of unscaled BigInteger.
+      Scale and precision is stored seperately in metadata.
+      Value needs to be rescaled with default scale and precision for BigDecimal before saving. 
+    */
     val buf = ByteBuffer.allocate(ByteArrayLength)
-    val rescaled = BigDecimal.decimal(value.bigDecimal, RescaleMathContext).setScale(Scale)
-    val unscaled = rescaled.bigDecimal.unscaledValue().toByteArray()
-    val zeros = DecimalValue.ByteArrayLength - unscaled.length
-    val signum = if (unscaled.head < 0) -1: Byte else 0: Byte
-    (0 until zeros).foreach(_ => buf.put(signum))
+    val unscaled = rescale(value).bigDecimal.unscaledValue().toByteArray()
+    // BigInteger is stored in tail of byte array, sign is stored in unoccupied cells
+    val sign: Byte = if (unscaled.head < 0) -1 else 0
+    (0 until ByteArrayLength - unscaled.length).foreach(_ => buf.put(sign))
     buf.put(unscaled)
     recordConsumer.addBinary(Binary.fromReusedByteArray(buf.array()))
   }
