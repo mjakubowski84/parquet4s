@@ -175,6 +175,15 @@ trait PrimitiveValueCodecs {
     override def encodeNonNull(data: Byte, configuration: ValueCodecConfiguration): Value = ByteValue(data)
   }
 
+  implicit val decimalCodec: ValueCodec[BigDecimal] = new OptionalValueCodec[BigDecimal] {
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): BigDecimal =
+      value match {
+        case DoubleValue(double) => BigDecimal(double)
+        case FloatValue(float) => BigDecimal.decimal(float)
+        case DecimalValue(bigDecimal) => bigDecimal
+      }
+    override def encodeNonNull(data: BigDecimal, configuration: ValueCodecConfiguration): Value = DecimalValue(data)
+  }
 }
 
 object TimeValueCodecs {

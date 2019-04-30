@@ -14,7 +14,8 @@ object TestCases {
                          string: String,
                          short: Short,
                          byte: Byte,
-                         char: Char
+                         char: Char,
+                         bigDecimal: BigDecimal
                        )
   case class TimePrimitives(
                              localDateTime: java.time.LocalDateTime,

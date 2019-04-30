@@ -52,6 +52,7 @@ object ParquetWriter  {
     * Configuration of parquet writer. Please have a look at
     * <a href="https://parquet.apache.org/documentation/latest/">documentation of Parquet</a>
     * to understand what every configuration entry is responsible for.
+    * Apart from options specific for Parquet file format there are some other - what follows:
     * @param timeZone used when encoding time-based data, local machine's time zone is used by default
     */
   case class Options(
@@ -87,6 +88,7 @@ object ParquetWriter  {
     *
     * @param path URI where the data will be written to
     * @param data Collection of <i>T</> that will be written in Parquet file format
+    * @param options configuration of writer, see [[ParquetWriter.Options]]
     * @param writer [[ParquetWriter]] that will be used to write data
     * @tparam T type of data, will be used also to resolve the schema of Parquet files
     */

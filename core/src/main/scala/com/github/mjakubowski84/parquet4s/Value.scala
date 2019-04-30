@@ -1,9 +1,11 @@
 package com.github.mjakubowski84.parquet4s
 
 import java.nio.charset.StandardCharsets
+import java.math.MathContext
 
 import org.apache.parquet.io.api.{Binary, RecordConsumer}
 import org.apache.parquet.schema.Type
+import java.nio.ByteBuffer
 
 /**
   * Basic structure element which Parquet data is built from. Represents any data element that can be read from or
@@ -37,6 +39,7 @@ object StringValue {
   def apply(binary: Binary): StringValue = StringValue(binary.toStringUsingUTF8)
 }
 
+// TODO redundant structure.... we should use BinarrValue for storing strings and use codec for conversions
 case class StringValue(value: String) extends AnyVal with PrimitiveValue[String] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit =
     recordConsumer.addBinary(Binary.fromReusedByteArray(value.getBytes(StandardCharsets.UTF_8)))
@@ -61,6 +64,31 @@ case class FloatValue(value: Float) extends AnyVal with PrimitiveValue[Float] {
 
 case class DoubleValue(value: Double) extends AnyVal with PrimitiveValue[Double] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addDouble(value)
+}
+
+object DecimalValue {
+  val Scale = 18
+  val Precision = 38
+  val ByteArrayLength = 16
+  lazy val RescaleMathContext = new MathContext(DecimalValue.Precision)
+
+  def apply(binary: Binary, scale: Int, mathContext: MathContext): DecimalValue =
+    DecimalValue(BigDecimal(BigInt(binary.getBytes), scale, mathContext))
+}
+
+case class DecimalValue(value: BigDecimal) extends AnyVal with PrimitiveValue[BigDecimal] {
+  import DecimalValue._
+
+  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
+    val buf = ByteBuffer.allocate(ByteArrayLength)
+    val rescaled = BigDecimal.decimal(value.bigDecimal, RescaleMathContext).setScale(Scale)
+    val unscaled = rescaled.bigDecimal.unscaledValue().toByteArray()
+    val zeros = DecimalValue.ByteArrayLength - unscaled.length
+    val signum = if (unscaled.head < 0) -1: Byte else 0: Byte
+    (0 until zeros).foreach(_ => buf.put(signum))
+    buf.put(unscaled)
+    recordConsumer.addBinary(Binary.fromReusedByteArray(buf.array()))
+  }
 }
 
 object ShortValue {

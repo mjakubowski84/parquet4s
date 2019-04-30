@@ -34,7 +34,8 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       string = "text",
       short = 1,
       byte = 1,
-      char = '\n'
+      char = '\n',
+      bigDecimal = BigDecimal.valueOf(1.00000000000001d)
     )
     val record = RowParquetRecord(
       "boolean" -> true,
@@ -45,7 +46,8 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "string" -> "text",
       "short" -> (1: Short),
       "byte" -> (1: Byte),
-      "char" -> '\n'
+      "char" -> '\n',
+      "bigDecimal" -> BigDecimal.valueOf(1.00000000000001d)
     )
     decode[Primitives](record) should be(data)
   }
