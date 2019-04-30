@@ -6,6 +6,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
 import org.apache.parquet.io.api._
 import org.apache.parquet.schema._
+import java.math.MathContext
 
 import scala.collection.JavaConverters._
 
@@ -49,8 +50,12 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord](
       case Some(OriginalType.UTF8) if field.isPrimitive =>
         new StringConverter(field.getName)
       case Some(OriginalType.DECIMAL) if field.isPrimitive =>
-        val scale = field.asPrimitiveType.getDecimalMetadata.getScale
-        new DecimalConverter(field.getName, scale)
+        val decimalMetadata = field.asPrimitiveType().getDecimalMetadata()
+        new DecimalConverter(
+          name = field.getName, 
+          scale = field.asPrimitiveType.getDecimalMetadata.getScale, 
+          mathContext = new MathContext(decimalMetadata.getPrecision())
+        )
       case Some(OriginalType.INT_16) if field.isPrimitive =>
         new ShortConverter(field.getName)
       case Some(OriginalType.INT_8) if field.isPrimitive =>
@@ -119,14 +124,9 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord](
     }
   }
 
-  private class DecimalConverter(name: String, scale: Int) extends ParquetPrimitiveConverter(name) {
-    override def addBinary(value: Binary): Unit = ???
-    /*
-      TODO probably record should have pointer to schema, and real conversion should take place in codec
-
-      record.add(name, new GenericValue(BigDecimal(new BigInteger(value.getBytes), scale))) // TODO hey, we do not have codecs for big decimal!!!
-     */
-
+  private class DecimalConverter(name: String, scale: Int, mathContext: MathContext) extends ParquetPrimitiveConverter(name) {
+    override def addBinary(value: Binary): Unit =
+      record.add(name, DecimalValue(value, scale, mathContext))
   }
 
 }

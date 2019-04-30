@@ -44,7 +44,7 @@ object ParquetSchemaResolver
   implicit def generic[T, G](implicit
                              lg: LabelledGeneric.Aux[T, G],
                              rest: ParquetSchemaResolver[G]
-                              ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
+                            ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
     def resolveSchema: List[Type] = rest.resolveSchema
   }
 }
@@ -68,9 +68,12 @@ trait SchemaDef {
 }
 
 case class PrimitiveSchemaDef(
-                             primitiveType: PrimitiveType.PrimitiveTypeName,
-                             required: Boolean = true,
-                             originalType: Option[OriginalType] = None
+                              primitiveType: PrimitiveType.PrimitiveTypeName,
+                              required: Boolean = true,
+                              originalType: Option[OriginalType] = None,
+                              precision: Option[Int] = None,
+                              scale: Option[Int] = None,
+                              length: Option[Int] = None
                              ) extends SchemaDef {
 
   override type Self = PrimitiveSchemaDef
@@ -80,10 +83,16 @@ case class PrimitiveSchemaDef(
       primitiveType,
       if (required) Repetition.REQUIRED else Repetition.OPTIONAL
     )
-    originalType.foldLeft(builder)(_.as(_)).named(name)
+    val withOriginalType = originalType.foldLeft(builder)(_.as(_))
+    val withPrecision = precision.foldLeft(withOriginalType)(_.precision(_))
+    val withScale = scale.foldLeft(withPrecision)(_.scale(_))
+    val withLength = length.foldLeft(withScale)(_.length(_))
+    
+    withLength.named(name)
   }
 
   override def withRequired(required: Boolean): PrimitiveSchemaDef = this.copy(required = required)
+
 }
 
 object GroupSchemaDef {
@@ -103,26 +112,29 @@ case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends SchemaDe
   }
 
   override def withRequired(required: Boolean): GroupSchemaDef = this.copy(required = required)
+
 }
 
-object ListGroupSchemaDef {
+object ListSchemaDef {
 
   val ElementName = "element"
 
-  def required(elementSchemaDef: SchemaDef): ListGroupSchemaDef = ListGroupSchemaDef(elementSchemaDef(ElementName), required = true)
-  def optional(elementSchemaDef: SchemaDef): ListGroupSchemaDef = ListGroupSchemaDef(elementSchemaDef(ElementName), required = false)
+  def required(elementSchemaDef: SchemaDef): ListSchemaDef = ListSchemaDef(elementSchemaDef(ElementName), required = true)
+  def optional(elementSchemaDef: SchemaDef): ListSchemaDef = ListSchemaDef(elementSchemaDef(ElementName), required = false)
 
 }
 
-case class ListGroupSchemaDef(element: Type, required: Boolean) extends SchemaDef {
+case class ListSchemaDef(element: Type, required: Boolean) extends SchemaDef {
+  
+  override type Self = ListSchemaDef
+  
   override def apply(name: String): Type = {
     val builder = if (required) Types.requiredList() else Types.optionalList()
     builder.element(element).named(name)
   }
 
-  override type Self = ListGroupSchemaDef
+  override def withRequired(required: Boolean): ListSchemaDef = this.copy(required = required)
 
-  override def withRequired(required: Boolean): ListGroupSchemaDef = this.copy(required = required)
 }
 
 object MapSchemaDef {
@@ -141,18 +153,18 @@ object MapSchemaDef {
 }
 
 case class MapSchemaDef(key: Type, value: Type, required: Boolean) extends SchemaDef {
+  
+  override type Self = MapSchemaDef
+  
   override def apply(name: String): Type = {
     val builder = if (required) Types.requiredMap() else Types.optionalMap()
     builder.key(key).value(value).named(name)
   }
 
-  override type Self = MapSchemaDef
-
   override def withRequired(required: Boolean): MapSchemaDef = this.copy(required = required)
+
 }
 
-// TODO compare schemas here with those from Spark (for example are really primitives required by default, but strings not? maybe it is about empty string? test it)
-// TODO check how Spark saves null and empty primitive values
 trait SchemaDefs {
 
   trait Tag[V]
@@ -204,6 +216,18 @@ trait SchemaDefs {
     typedSchemaDef[Byte](
       PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_8))
     )
+    
+  implicit val decimalSchema: TypedSchemaDef[BigDecimal] =
+    typedSchemaDef[BigDecimal](
+      PrimitiveSchemaDef(
+        PrimitiveType.PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY, 
+        required = false, 
+        originalType = Some(OriginalType.DECIMAL),
+        precision = Some(DecimalValue.Precision),
+        scale = Some(DecimalValue.Scale),
+        length = Some(DecimalValue.ByteArrayLength)
+      )
+    )
 
   implicit val localDateSchema: TypedSchemaDef[java.time.LocalDate] =
     typedSchemaDef[java.time.LocalDate](
@@ -237,7 +261,7 @@ trait SchemaDefs {
 
   implicit def collectionSchema[E, Col[_]](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[Col[E]] =
     typedSchemaDef[Col[E]](
-      ListGroupSchemaDef.optional(elementSchema)
+      ListSchemaDef.optional(elementSchema)
     )
 
   implicit def mapSchema[MapKey, MapValue](implicit

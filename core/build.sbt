@@ -1,5 +1,5 @@
 libraryDependencies ++= {
-  val parquetVersion = "1.10.0"
+  val parquetVersion = "1.10.1"
   val sparkVersion = "2.4.0"
   val hadoopVersion = "2.9.2"
   Seq(

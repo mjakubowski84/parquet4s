@@ -12,7 +12,8 @@ object CompatibilityTestCases extends TestCaseSupport {
                          d: Double,
                          s: String,
                          sh: Short,
-                         by: Byte
+                         by: Byte,
+                         bd: BigDecimal
                        )
   case class TimePrimitives(timestamp: java.sql.Timestamp, date: java.sql.Date)
   case class OtherPrimitives(ch: Char, date: java.time.LocalDate, dateTime: java.time.LocalDateTime)
@@ -97,10 +98,12 @@ object CompatibilityTestCases extends TestCaseSupport {
 
   override val caseDefinitions: Seq[Case.CaseDef] = Seq(
     Case("primitives", Seq(
-      Primitives(b = true, 1, 1234567890l, 1.1f, 1.00000000001d, "text", 1, 1),
-      Primitives(b = false, 0, 0l, 0f, 0d, "", 0, 0),
-      Primitives(b = false, Int.MaxValue, Long.MaxValue, Float.MaxValue, Double.MaxValue, "Żołądź z dębu", Short.MaxValue, Byte.MaxValue),
-      Primitives(b = false, Int.MinValue, Long.MinValue, Float.MinValue, Double.MinValue, null, Short.MinValue, Byte.MinValue)
+      Primitives(b = true, 1, 1234567890l, 1.1f, 1.00000000001d, "text", 1, 1, BigDecimal("1.0000000000000000")),
+      Primitives(b = false, 0, 0l, 0f, 0d, "", 0, 0, BigDecimal("0.0000000000000000")),
+      Primitives(b = false, Int.MaxValue, Long.MaxValue, Float.MaxValue, Double.MaxValue, "Żołądź z dębu", Short.MaxValue, 
+        Byte.MaxValue, BigDecimal("0.0000000000000001")),
+      Primitives(b = false, Int.MinValue, Long.MinValue, Float.MinValue, Double.MinValue, null, Short.MinValue, 
+        Byte.MinValue, BigDecimal("-0.0000000000000001"))
     )),
     Case("time primitives", Seq(
       TimePrimitives(
