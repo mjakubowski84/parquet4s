@@ -14,7 +14,8 @@ lazy val commonSettings = Seq(
   Keys.scalaVersion := "2.11.12",
   Keys.scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8"),
   Keys.javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature"),
-  Keys.resolvers := resolvers
+  Keys.resolvers := resolvers,
+  Keys.makePomConfiguration := makePomConfiguration.value.withConfigurations(Configurations.defaultMavenConfigurations)
 )
 
 lazy val publishSettings = {
@@ -74,7 +75,7 @@ lazy val publishSettings = {
 
 lazy val itSettings = Defaults.itSettings ++ Project.inConfig(IntegrationTest)(Seq(
   Keys.fork := true,
-  Keys.parallelExecution := true
+  Keys.parallelExecution := true  
 )) ++ Project.inConfig(IntegrationTest)(BloopDefaults.configSettings)
 
 lazy val core = (project in file("core"))
