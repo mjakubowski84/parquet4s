@@ -43,9 +43,9 @@ object ParquetSchemaResolver
 
   implicit def generic[T, G](implicit
                              lg: LabelledGeneric.Aux[T, G],
-                             rest: ParquetSchemaResolver[G]
+                             rest: Lazy[ParquetSchemaResolver[G]]
                             ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
-    def resolveSchema: List[Type] = rest.resolveSchema
+    def resolveSchema: List[Type] = rest.value.resolveSchema
   }
 }
 
