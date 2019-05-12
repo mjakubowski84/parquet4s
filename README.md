@@ -19,7 +19,7 @@ As it is based on Hadoop Client Parquet4S can do read and write from variety of 
 In order to connect to **S3** at **AWS** you need to import dependency:
 
 ```scala
-"org.apache.hadoop" % "hadoop-aws" % "2.9.2"
+"org.apache.hadoop" % "hadoop-aws" % yourHadoopVersion
 ```
 
 Next, the most common way is to define following environmental variables:
@@ -36,7 +36,11 @@ export AWS_SECRET_ACCESS_KEY=my.secret.key
 Add the library to your dependencies:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-core" % "0.4.0"
+"com.github.mjakubowski84" %% "parquet4s-core" % "0.5.0"
+```
+**Note** Since version `0.5.0` you need to define your own version of `hadoop-client`:
+```scala
+"org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
 The library contains simple implementation of Scala's Iterable that allows reading Parquet from a single file or a directory. You may also use `org.apache.parquet.hadoop.ParquetReader` directly and use our `RowParquetRecord` and `ParquetRecordDecoder` to decode your data.
@@ -64,7 +68,11 @@ try {
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "0.4.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "0.5.0"
+```
+**Note** Since version `0.5.0` you need to define your own version of `hadoop-client`:
+```scala
+"org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
 Parquet4S has so far single `Source` for reading single file or directory and **three** `Sink`s for writing. Choose one that suits you most.
