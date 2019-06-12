@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import java.io.Closeable
 import java.util.TimeZone
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 
@@ -31,7 +32,7 @@ object ParquetReader {
     * @param timeZone set it to TimeZone which was used to encode time-based data that you want to read, machine's
     *                 time zone is used by default
     */
-  case class Options(timeZone: TimeZone = TimeZone.getDefault) {
+  case class Options(timeZone: TimeZone = TimeZone.getDefault, fsConf: Configuration = new Configuration()) {
     private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
   }
 
