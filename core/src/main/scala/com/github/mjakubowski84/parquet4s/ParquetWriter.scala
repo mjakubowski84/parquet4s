@@ -64,7 +64,8 @@ object ParquetWriter  {
                     pageSize: Int = HadoopParquetWriter.DEFAULT_PAGE_SIZE,
                     rowGroupSize: Int = HadoopParquetWriter.DEFAULT_BLOCK_SIZE,
                     validationEnabled: Boolean = HadoopParquetWriter.DEFAULT_IS_VALIDATING_ENABLED,
-                    timeZone: TimeZone = TimeZone.getDefault
+                    timeZone: TimeZone = TimeZone.getDefault,
+                    hadoopConfig: Configuration = new Configuration()
                     ) {
     private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
   }
@@ -79,6 +80,7 @@ object ParquetWriter  {
       .withPageSize(options.pageSize)
       .withRowGroupSize(options.rowGroupSize)
       .withValidation(options.validationEnabled)
+      .withConf(options.hadoopConfig)
       .build()
 
   /**
