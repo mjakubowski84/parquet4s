@@ -106,7 +106,7 @@ val conf = ??? // Set FS Confs programmatically
 val writeOptions = ParquetWriter.Options(
   writeMode = ParquetFileWriter.Mode.OVERWRITE,
   compressionCodecName = CompressionCodecName.SNAPPY,
-  fsConf = conf // optional fsConf
+  hadoopConf = conf // optional hadoopConf
 )
 
 // Writes a single file.
@@ -134,7 +134,7 @@ Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
 ))
   
 // Reads file or files from the path. Please also have a look at optional parameters.
-ParquetStreams.fromParquet[User]("file:///data/users", ParquetReader.Options(fsConf=conf)).runForeach(println)
+ParquetStreams.fromParquet[User]("file:///data/users", ParquetReader.Options(hadoopConf=conf)).runForeach(println)
 ```
 
 ## Customisation and extensibility
