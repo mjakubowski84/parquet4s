@@ -32,7 +32,7 @@ object ParquetReader {
     * @param timeZone set it to TimeZone which was used to encode time-based data that you want to read, machine's
     *                 time zone is used by default
     */
-  case class Options(timeZone: TimeZone = TimeZone.getDefault, fsConf: Configuration = new Configuration()) {
+  case class Options(timeZone: TimeZone = TimeZone.getDefault, hadoopConf: Configuration = new Configuration()) {
     private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
   }
 

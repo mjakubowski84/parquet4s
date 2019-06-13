@@ -29,7 +29,7 @@ object ParquetStreams {
     val valueCodecConfiguration = options.toValueCodecConfiguration
     def decode(record: RowParquetRecord): T =  ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
     Source.unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
-      create = HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)).withConf(options.fsConf).build,
+      create = HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)).withConf(options.hadoopConf).build,
       read = reader => Option(reader.read()),
       close = _.close()
     ).map(decode)
