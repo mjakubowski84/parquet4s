@@ -29,6 +29,12 @@ export AWS_ACCESS_KEY_ID=my.aws.key
 export AWS_SECRET_ACCESS_KEY=my.secret.key
 ```
 
+#### Passing FS Configs Programmatically 
+File system configs for S3, GCS or Hadoop can also be set programmatically to the 
+`ParquetReader` and `ParquetWriter` by passing the `Configuration` object to the 
+`ParqetReader.Options` and `ParquetWriter.Options` case classes.  
+
+
 ## How to use Parquet4S to read and write parquet files?
 
 ### Core library
@@ -61,6 +67,7 @@ val parquetIterable = ParquetReader.read[User](path)
 try {
   parquetIterable.foreach(println)
 } finally parquetIterable.close()
+
 ```
 
 ### Akka Streams
@@ -84,6 +91,7 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.Source
+import org.apache.hadoop.conf.Configuration
 
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
@@ -92,10 +100,13 @@ implicit val materializer: Materializer =  ActorMaterializer()
 
 val users: Stream[User] = ???
 
+val conf = ??? // Set FS Confs programmatically
+
 // Please check all the available configuration options!
 val writeOptions = ParquetWriter.Options(
   writeMode = ParquetFileWriter.Mode.OVERWRITE,
-  compressionCodecName = CompressionCodecName.SNAPPY
+  compressionCodecName = CompressionCodecName.SNAPPY,
+  fsConf = conf // optional fsConf
 )
 
 // Writes a single file.
@@ -123,7 +134,7 @@ Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
 ))
   
 // Reads file or files from the path. Please also have a look at optional parameters.
-ParquetStreams.fromParquet[User]("file:///data/users").runForeach(println)
+ParquetStreams.fromParquet[User]("file:///data/users", ParquetReader.Options(fsConf=conf)).runForeach(println)
 ```
 
 ## Customisation and extensibility
