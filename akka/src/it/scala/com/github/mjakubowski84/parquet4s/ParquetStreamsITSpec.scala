@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.{ActorMaterializer, Materializer}
-import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.scalatest.{AsyncFlatSpec, Matchers}
 import org.slf4j.{Logger, LoggerFactory}
