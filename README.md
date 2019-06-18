@@ -42,7 +42,7 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 Add the library to your dependencies:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-core" % "0.5.0"
+"com.github.mjakubowski84" %% "parquet4s-core" % "0.6.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -75,7 +75,7 @@ try {
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "0.5.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "0.6.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
