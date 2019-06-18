@@ -2,7 +2,7 @@ import DependecyVersions._
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
-  "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
+  "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided
 )
 
 excludeDependencies ++= Seq(
