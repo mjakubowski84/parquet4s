@@ -99,6 +99,14 @@ lazy val akka = (project in file("akka"))
   .settings(publishSettings)
   .dependsOn(core % "compile->compile;it->it")
 
+lazy val examples = (project in file("examples"))
+  .settings(commonSettings)
+  .settings(
+    publish / skip := true,
+    publishLocal / skip := true
+  )
+  .dependsOn(akka)
+
 lazy val root = (project in file("."))
   .settings(commonSettings)
   .settings(publishSettings)
@@ -107,4 +115,4 @@ lazy val root = (project in file("."))
     publish / skip := true,
     publishLocal / skip := true
   )
-  .aggregate(core, akka)
+  .aggregate(core, akka, examples)
