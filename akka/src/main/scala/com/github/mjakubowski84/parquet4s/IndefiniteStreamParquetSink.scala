@@ -12,10 +12,15 @@ object IndefiniteStreamParquetSink extends IOOps {
 
   protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
+  type ChunkPathBuilder[In] = (Path, Seq[In]) => Path
+
+  private def defaultChunkPathBuilder[In]: ChunkPathBuilder[In] =
+    (basePath, _) => basePath.suffix(s"/part-${UUID.randomUUID()}.parquet")
+
   def apply[In, ToWrite: ParquetWriter, Mat](path: Path,
                               maxChunkSize: Int,
                               chunkWriteTimeWindow: FiniteDuration,
-                              buildChunkPath: Path => Path = _.suffix(s"/part-${UUID.randomUUID()}.parquet"),
+                              buildChunkPath: ChunkPathBuilder[In] = defaultChunkPathBuilder,
                               preWriteTransformation: In => ToWrite = identity _,
                               postWriteSink: Sink[Seq[In], Mat] = Sink.ignore,
                               options: ParquetWriter.Options = ParquetWriter.Options()
@@ -29,7 +34,7 @@ object IndefiniteStreamParquetSink extends IOOps {
       val broadcastChunks = b.add(Broadcast[Seq[In]](outputPorts = 2))
       val writeFlow = Flow[Seq[In]].map { chunk =>
         val toWrite = chunk.map(preWriteTransformation)
-        val chunkPath = buildChunkPath(path)
+        val chunkPath = buildChunkPath(path, chunk)
         if (logger.isDebugEnabled()) logger.debug(s"Writing ${toWrite.size} records to $chunkPath")
         ParquetWriter.write(chunkPath.toString, toWrite)
       }
