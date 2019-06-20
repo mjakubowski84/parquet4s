@@ -1,41 +1,34 @@
 package com.github.mjakubowski84.parquet4s
-import net.manub.embeddedkafka.EmbeddedKafka
-import akka.actor.ActorSystem
-import akka.stream.Materializer
-import akka.stream.ActorMaterializer
-import scala.concurrent.duration._
-import net.manub.embeddedkafka.Consumers
-import net.manub.embeddedkafka.EmbeddedKafkaConfig
-import org.apache.kafka.clients.consumer.KafkaConsumer
-import net.manub.embeddedkafka.ConsumerExtensions._
-import scala.collection.JavaConverters._
-import akka.kafka.scaladsl.Consumer
-import akka.kafka.ConsumerSettings
-import org.apache.kafka.common.serialization.StringDeserializer
-import akka.kafka.Subscriptions
-import org.apache.parquet.hadoop.metadata.CompressionCodecName
-import scala.concurrent.Future
-import akka.Done
-import akka.stream.KillSwitches
-import akka.stream.scaladsl.Keep
-import scala.concurrent.Await
 import java.nio.file.Paths
+
+import akka.Done
+import akka.actor.ActorSystem
+import akka.kafka.ConsumerMessage.{CommittableMessage, CommittableOffsetBatch}
+import akka.kafka.scaladsl.{Committer, Consumer}
+import akka.kafka.{CommitterSettings, ConsumerSettings, Subscriptions}
+import akka.stream.scaladsl.{Flow, Keep}
+import akka.stream.{ActorMaterializer, Materializer}
 import com.google.common.io.Files
-import org.slf4j.LoggerFactory
+import net.manub.embeddedkafka.{Consumers, EmbeddedKafka}
 import org.apache.hadoop.fs.Path
-import akka.kafka.scaladsl.Committer
-import akka.kafka.ConsumerMessage.{CommittableOffset, CommittableMessage, Committable, CommittableOffsetBatch}
-import akka.stream.scaladsl.Flow
-import akka.kafka.CommitterSettings
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.parquet.hadoop.metadata.CompressionCodecName
+import org.slf4j.LoggerFactory
+import java.sql.Timestamp
 
-object Example extends App with Consumers {
+import scala.concurrent.Await
+import scala.concurrent.duration._
+import scala.util.Random
 
-  case class Message(timestamp: java.sql.Timestamp)
+object ExampleApp extends App with Consumers {
 
-  val logger = LoggerFactory.getLogger(this.getClass())
+  case class Message(timestamp: Timestamp, word: String)
+  val words = Seq("Example", "how", "to", "setup", "indefinite", "stream", "with", "Parquet", "writer")
+
+  val logger = LoggerFactory.getLogger(this.getClass)
 
   val topic = "myTopic"
-  val path = Paths.get(Files.createTempDir().getAbsolutePath, "messages").toString()
+  val path = Paths.get(Files.createTempDir().getAbsolutePath, "messages").toString
   val writerOptions = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
 
   logger.info("Starting Kafka...")
@@ -47,49 +40,49 @@ object Example extends App with Consumers {
 
   logger.info("Starting scheduler that sends messages to Kafka...")
   val scheduler = system.scheduler.schedule(1.second, 50.millis) {
-    EmbeddedKafka.publishStringMessageToKafka(topic, "Message")
+    EmbeddedKafka.publishStringMessageToKafka(topic, words(Random.nextInt(words.size - 1)))
   }
   
   val consumerSettings = ConsumerSettings(system, new StringDeserializer(), new StringDeserializer())
     .withBootstrapServers(s"localhost:${broker.config.kafkaPort}")
     .withGroupId("myGroup")
+    .withStopTimeout(Duration.Zero)
   val subscription = Subscriptions.topics(topic)
+  val messageSource = Consumer.committableSource(consumerSettings, subscription)
 
-  val (control, messageSource) = Consumer.committableSource(consumerSettings, subscription).preMaterialize()
+  val committerSink = Flow.apply[Seq[CommittableMessage[String, String]]].map { messages =>
+    CommittableOffsetBatch(messages.map(_.committableOffset))
+  }.toMat(Committer.sink(CommitterSettings(system)))(Keep.right)
 
-
-  
-  val parquetSink = IndefiniteStreamParquetSink[Message](
-    path = new Path(path), 
-    maxChunkSize = 128, 
+  val parquetSink = IndefiniteStreamParquetSink(
+    path = new Path(path),
+    maxChunkSize = 128,
     chunkWriteTimeWindow = 10.seconds,
+    preWriteTransformation = { cm: CommittableMessage[String, String] => 
+      Message(
+        timestamp = new Timestamp(cm.record.timestamp()),
+        word = cm.record.value()
+      ) 
+    },
+    postWriteSink = committerSink,
     options = writerOptions
   )
 
-
   logger.info(s"Starting consumer that reads messages from Kafka and writes them to $path...")
-  val (killSwitch, process) = messageSource
-    .map { commitableRecord =>
-      Message(new java.sql.Timestamp(commitableRecord.record.timestamp()))
-    }
+  val control: Consumer.DrainingControl[Done] = messageSource
     .toMat(parquetSink)(Keep.both)
+    .mapMaterializedValue(Consumer.DrainingControl.apply)
     .run()
-
-  /*
-  TODO:
-  1. add to sink with .groupedWithin(128, 10.seconds) v
-  2. add to sink callback when message is successfully writted
-  1. add to sink function that is a file name factory
-  */  
    
   sys.addShutdownHook {
-    logger.info("Stopping scheduler")
+    logger.info("Stopping scheduler...")
     scheduler.cancel()
     logger.info("Stopping consumer...")
-    Await.ready(process, 1.second)
-    Await.ready(system.terminate(), 1.second)
+    Await.ready(control.drainAndShutdown(), 1.second)
     logger.info("Stopping Kafka")
     EmbeddedKafka.stop()
+    logger.info("Stopping Akka...")
+    Await.ready(system.terminate(), 1.second)
     logger.info("Exiting...")
   } 
 }
