@@ -12,6 +12,10 @@ object SequentialFileSplittingParquetSink extends IOOps {
 
   protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
+  @deprecated(
+    message = "Please use ParquetStreams.toParquetSequentialWithFileSplit. This function will be inaccessible in future versions.",
+    since = "0.7.0"
+  )
   def apply[T: ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
                                                              maxRecordsPerFile: Long,
                                                              options: ParquetWriter.Options = ParquetWriter.Options()

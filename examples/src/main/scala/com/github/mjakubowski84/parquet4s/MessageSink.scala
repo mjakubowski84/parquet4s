@@ -1,23 +1,27 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.nio.file.Paths
 import java.sql.Timestamp
 import java.util.UUID
 
+import akka.Done
 import akka.kafka.CommitterSettings
 import akka.kafka.ConsumerMessage.CommittableOffsetBatch
 import akka.kafka.scaladsl.Committer
-import akka.stream.scaladsl.{Flow, Keep}
-import com.github.mjakubowski84.parquet4s.IndefiniteStreamParquetSink.ChunkPathBuilder
+import akka.stream.scaladsl.{Flow, Keep, Sink}
 import com.google.common.io.Files
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 object MessageSink {
 
   case class Data(timestamp: Timestamp, word: String)
+
+  val MaxChunkSize: Int = 128
+  val ChunkWriteTimeWindow: FiniteDuration = 10.seconds
+  val WriteDirectoryName: String = "messages"
 
 }
 
@@ -28,7 +32,7 @@ trait MessageSink {
   import MessageSink._
   import MessageSource._
 
-  val baseWritePath: String = Paths.get(Files.createTempDir().getAbsolutePath, "messages").toString
+  protected val baseWritePath: String = new Path(Files.createTempDir().getAbsolutePath, WriteDirectoryName).toString
 
   private val writerOptions = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
 
@@ -47,10 +51,10 @@ trait MessageSink {
       basePath.suffix(s"/$year/$month/$day/part-$uuid.parquet")
   }
 
-  lazy val messageSink = IndefiniteStreamParquetSink(
-    path = new Path(baseWritePath),
-    maxChunkSize = 128,
-    chunkWriteTimeWindow = 10.seconds,
+  lazy val messageSink: Sink[Message, Future[Done]] = ParquetStreams.toParquetIndefinite(
+    path = baseWritePath,
+    maxChunkSize = MaxChunkSize,
+    chunkWriteTimeWindow = ChunkWriteTimeWindow,
     buildChunkPath = chunkPath,
     preWriteTransformation = { message: Message =>
       Data(

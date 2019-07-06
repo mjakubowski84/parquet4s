@@ -11,6 +11,10 @@ object SingleFileParquetSink {
 
   protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
+  @deprecated(
+    message = "Please use ParquetStreams.toParquetSingleFile. This function will be inaccessible in future versions.",
+    since = "0.7.0"
+  )
   def apply[T: ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
                                                              options: ParquetWriter.Options = ParquetWriter.Options()
                                                             ): Sink[T, Future[Done]] = {

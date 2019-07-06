@@ -14,6 +14,10 @@ object UnorderedParallelParquetSink extends IOOps {
 
   protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
+  @deprecated(
+    message = "Please use ParquetStreams.toParquetParallelUnordered. This function will be inaccessible in future versions.",
+    since = "0.7.0"
+  )
   def apply[T: ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
                                                              parallelism: Int,
                                                              options: ParquetWriter.Options = ParquetWriter.Options()
