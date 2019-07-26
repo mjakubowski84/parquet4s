@@ -1,5 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
+import akka.{Done, NotUsed}
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.{ActorMaterializer, Materializer}
@@ -9,7 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.immutable
 import scala.concurrent.{Await, Future}
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.util.Random
 
 object ParquetStreamsITSpec {
@@ -103,6 +104,27 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
       readData <- read(outputPath)
     } yield {
       files should have size 2
+      readData should have size count
+      readData should contain theSameElementsAs data
+    }
+  }
+
+  it should "split data into sequential chunks using indefinite stream support with default options" in {
+    val outputPath = s"$tempPathString/writeIndefiniteDefault"
+
+    val write = () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
+      path = outputPath,
+      maxChunkSize = writeOptions.rowGroupSize,
+      chunkWriteTimeWindow = 10.seconds,
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write()
+      files <- filesAtPath(outputPath)
+      readData <- read(outputPath)
+    } yield {
+      files should have size 4
       readData should have size count
       readData should contain theSameElementsAs data
     }
