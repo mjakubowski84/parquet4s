@@ -98,7 +98,6 @@ object ParquetStreams {
                                                                                  ): Sink[T, Future[Done]] =
     UnorderedParallelParquetSink(new Path(path), parallelism, options)
 
-
   /**
     * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to files at the specified path. Sink splits files
     * when <i>maxChunkSize</i> is reached or time equal to <i>chunkWriteTimeWindow</i> elapses. 
@@ -128,7 +127,7 @@ object ParquetStreams {
                                                            maxChunkSize: Int,
                                                            chunkWriteTimeWindow: FiniteDuration,
                                                            buildChunkPath: ChunkPathBuilder[In] = ChunkPathBuilder.default,
-                                                           preWriteTransformation: In => ToWrite = identity _,
+                                                           preWriteTransformation: In => ToWrite = identity[In] _,
                                                            postWriteSink: Sink[Seq[In], Mat] = Sink.ignore,
                                                            options: ParquetWriter.Options = ParquetWriter.Options()
                                                           ): Sink[In, Mat] =
