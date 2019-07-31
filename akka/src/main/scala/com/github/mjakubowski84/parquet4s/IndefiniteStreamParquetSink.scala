@@ -15,7 +15,7 @@ private[parquet4s] object IndefiniteStreamParquetSink extends IOOps {
                                              maxChunkSize: Int,
                                              chunkWriteTimeWindow: FiniteDuration,
                                              buildChunkPath: ChunkPathBuilder[In] = ChunkPathBuilder.default,
-                                             preWriteTransformation: In => ToWrite = identity _,
+                                             preWriteTransformation: In => ToWrite = identity[In] _,
                                              postWriteSink: Sink[Seq[In], Mat] = Sink.ignore,
                                              options: ParquetWriter.Options = ParquetWriter.Options()
                                             ): Sink[In, Mat] = {
