@@ -102,6 +102,7 @@ lazy val akka = (project in file("akka"))
 lazy val examples = (project in file("examples"))
   .settings(commonSettings)
   .settings(
+    Keys.name := "parquet4s-examples",
     publish / skip := true,
     publishLocal / skip := true
   )
