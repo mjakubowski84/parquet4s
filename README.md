@@ -10,7 +10,7 @@ Based on official Parquet library, Hadoop Client and Shapeless.
 
 Integration for Akka Streams.
 
-## Supported storages
+## Supported storage types
 
 As it is based on Hadoop Client Parquet4S can do read and write from variety of file systems starting from local files, HDFS to Amazon S3, Google Storage, Azure or OpenStack. Following you can find description how to read from local files and S3. Please refer to Hadoop Client documentation or your storage provider to check how to connect to your storage.
 
@@ -29,7 +29,7 @@ export AWS_ACCESS_KEY_ID=my.aws.key
 export AWS_SECRET_ACCESS_KEY=my.secret.key
 ```
 
-#### Passing FS Configs Programmatically 
+#### Passing Hadoop Configs Programmatically 
 File system configs for S3, GCS or Hadoop can also be set programmatically to the 
 `ParquetReader` and `ParquetWriter` by passing the `Configuration` object to the 
 `ParqetReader.Options` and `ParquetWriter.Options` case classes.  
@@ -92,6 +92,7 @@ import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.Source
 import org.apache.hadoop.conf.Configuration
+import scala.concurrent.duration._
 
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
@@ -100,7 +101,7 @@ implicit val materializer: Materializer =  ActorMaterializer()
 
 val users: Stream[User] = ???
 
-val conf = ??? // Set FS Confs programmatically
+val conf: Configuration = ??? // Set Hadoop configuration programmatically
 
 // Please check all the available configuration options!
 val writeOptions = ParquetWriter.Options(
@@ -130,6 +131,16 @@ Source(data).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
 Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
   path = "file:///data/users",
   parallelism = 4,
+  options = writeOptions
+))
+
+// Tailored for writing indefinite streams.
+// Writes file when chunk reaches size limit or defined time period elapses.
+// Check also all other parameters and example usage in project sources.
+Source(data).runWith(ParyquetStreams.toParquetIndefinite(
+  path = "file:///data/users",
+  maxChunkSize = writeOptions.rowGroupSize,
+  chunkWriteTimeWindow = 30.seconds,
   options = writeOptions
 ))
   
@@ -162,7 +173,7 @@ implicit val customTypeCodec: OptionalValueCodec[CustomType] =
 }
 ```
 
-Additionaly, if you want to write your custom type, you have to define the schema for it:
+Additionally, if you want to write your custom type, you have to define the schema for it:
 
 ```scala
 import org.apache.parquet.schema.{OriginalType, PrimitiveType}
@@ -177,6 +188,11 @@ implicit val customTypeSchema: TypedSchemaDef[CustomType] =
     )
   )
 ```
+
+## Examples
+
+Please check simple example application of lib comprising Akka Streams and Kafka. It shows how you can write
+Parquet files with data coming from indefinite stream. Source code can be found in [examples](examples).
 
 ## Contributing
 
