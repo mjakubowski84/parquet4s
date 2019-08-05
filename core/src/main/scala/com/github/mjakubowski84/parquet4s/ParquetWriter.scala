@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import java.util.TimeZone
 
-import com.github.mjakubowski84.parquet4s.ParquetWriter.{Options, internalWriter}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.api.WriteSupport
@@ -17,7 +16,7 @@ import scala.collection.JavaConverters._
 
 
 /**
-  * Type class that allows to write data which scehma is represented by type <i>T</i> to given path.
+  * Type class that allows to write data which schema is represented by type <i>T</i> to given path.
   * @tparam T schema of data to write
   */
 trait ParquetWriter[T] {
@@ -30,15 +29,13 @@ trait ParquetWriter[T] {
     */
   def write(path: String, data: Iterable[T], options: ParquetWriter.Options)
 
+  def newIncrementalWriter(path: String, options: ParquetWriter.Options): IncrementalParquetWriter[T]
+
 }
 
-class IncrementalWriter[T : ParquetRecordEncoder : ParquetSchemaResolver](path: String, options: Options = Options()) {
-  private val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
-  private val valueCodecConfiguration = options.toValueCodecConfiguration
-  def write(data: Iterable[T]): Unit = data.foreach { elem =>
-    writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
-  }
-  def close(): Unit = writer.close()
+trait IncrementalParquetWriter[T] {
+  def write(data: Iterable[T])
+  def close()
 }
 
 object ParquetWriter  {
@@ -106,24 +103,28 @@ object ParquetWriter  {
   def write[T](path: String, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options())
               (implicit writer: ParquetWriter[T]): Unit = writer.write(path, data, options)
 
+  def incremental[T](path: String, options: ParquetWriter.Options = Options())
+                    (implicit writer: ParquetWriter[T]): IncrementalParquetWriter[T] = writer.newIncrementalWriter(path, options)
+
   /**
     * Default instance of [[ParquetWriter]]
     */
   implicit def writer[T: ParquetRecordEncoder : ParquetSchemaResolver]: ParquetWriter[T] = new ParquetWriter[T] {
-    override def write(path: String, data: Iterable[T], options: Options = Options()): Unit = {
-      val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
-      val valueCodecConfiguration = options.toValueCodecConfiguration
-      try {
-        data.foreach { elem =>
-          writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
-        }
-      } finally {
-        writer.close()
+
+    override def newIncrementalWriter(path: String, options: Options): IncrementalParquetWriter[T] = new IncrementalParquetWriter[T] {
+      private val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
+      private val valueCodecConfiguration = options.toValueCodecConfiguration
+      def write(data: Iterable[T]): Unit = data.foreach { elem =>
+        writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
       }
+      def close(): Unit = writer.close()
+    }
+
+    override def write(path: String, data: Iterable[T], options: Options = Options()): Unit = {
+      val w = newIncrementalWriter(path, options)
+      try w.write(data) finally w.close()
     }
   }
-
-  def incremental[T : ParquetRecordEncoder : ParquetSchemaResolver](path: String, options: ParquetWriter.Options = ParquetWriter.Options()): IncrementalWriter[T] = new IncrementalWriter[T](path, options)
 
 }
 
