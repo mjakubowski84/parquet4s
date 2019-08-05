@@ -18,7 +18,8 @@ class ParquetWriterAndParquetReaderCompatibilityItSpec extends
     testCase.description in {
       if (incremental) {
         val w: IncrementalParquetWriter[testCase.DataType] = ParquetWriter.incremental(tempPathString)(testCase.writer)
-        try testCase.data.foreach(d => w.write(Iterable(d)))
+        val q = testCase.data.map(Iterable(_))
+        try testCase.data.map(Iterable(_)).foreach(w.write)
         finally w.close()
       } else ParquetWriter.write(tempPathString, testCase.data)(testCase.writer)
       val parquetIterable = ParquetReader.read(tempPathString)(testCase.reader)
