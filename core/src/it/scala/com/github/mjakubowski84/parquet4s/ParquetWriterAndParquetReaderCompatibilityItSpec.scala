@@ -14,9 +14,13 @@ class ParquetWriterAndParquetReaderCompatibilityItSpec extends
     clearTemp()
   }
 
-  private def runTestCase(testCase: CaseDef): Unit = {
+  private def runTestCase(testCase: CaseDef, incremental: Boolean = false): Unit = {
     testCase.description in {
-      ParquetWriter.write(tempPathString, testCase.data)(testCase.writer)
+      if (incremental) {
+        val w = ParquetWriter.incremental[testCase.DataType](tempPathString)(testCase.writer)
+        try testCase.data.foreach(d => w.write(Iterable(d)))
+        finally w.close()
+      } else ParquetWriter.write(tempPathString, testCase.data)(testCase.writer)
       val parquetIterable = ParquetReader.read(tempPathString)(testCase.reader)
       try {
         parquetIterable should contain theSameElementsAs testCase.data
@@ -27,7 +31,11 @@ class ParquetWriterAndParquetReaderCompatibilityItSpec extends
   }
 
   "Spark should be able to read file saved by ParquetWriter if the file contains" - {
-    CompatibilityTestCases.cases(Writer, Reader).foreach(runTestCase)
+    CompatibilityTestCases.cases(Writer, Reader).foreach(runTestCase(_))
+  }
+
+  "Behaves the same for incremental writes" - {
+    CompatibilityTestCases.cases(Writer, Reader).foreach(tc => runTestCase(tc, incremental = true))
   }
 
 }

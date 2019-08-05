@@ -2,6 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import java.util.TimeZone
 
+import com.github.mjakubowski84.parquet4s.ParquetWriter.{Options, internalWriter}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.api.WriteSupport
@@ -31,6 +32,14 @@ trait ParquetWriter[T] {
 
 }
 
+class IncrementalWriter[T : ParquetRecordEncoder : ParquetSchemaResolver](path: String, options: Options = Options()) {
+  private val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
+  private val valueCodecConfiguration = options.toValueCodecConfiguration
+  def write(data: Iterable[T]): Unit = data.foreach { elem =>
+    writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
+  }
+  def close(): Unit = writer.close()
+}
 
 object ParquetWriter  {
 
@@ -113,6 +122,8 @@ object ParquetWriter  {
       }
     }
   }
+
+  def incremental[T : ParquetRecordEncoder : ParquetSchemaResolver](path: String, options: ParquetWriter.Options = ParquetWriter.Options()): IncrementalWriter[T] = new IncrementalWriter[T](path, options)
 
 }
 
