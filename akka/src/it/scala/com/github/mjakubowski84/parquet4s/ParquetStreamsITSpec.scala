@@ -2,6 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import java.sql.Timestamp
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.{ActorMaterializer, Materializer}
@@ -123,12 +124,13 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
   it should "split data into sequential chunks using indefinite stream support with default settings" in {
     val outputPath = s"$tempPathString/writeIndefiniteDefault"
 
-    val write = () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
-      path = outputPath,
-      maxChunkSize = writeOptions.rowGroupSize,
-      chunkWriteTimeWindow = 10.seconds,
-      options = writeOptions
-    ))
+    val write: () => Future[Done] = ???
+//    () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
+//      path = outputPath,
+//      maxChunkSize = writeOptions.rowGroupSize,
+//      chunkWriteTimeWindow = 10.seconds,
+//      options = writeOptions
+//    ))
 
     for {
       _ <- write()

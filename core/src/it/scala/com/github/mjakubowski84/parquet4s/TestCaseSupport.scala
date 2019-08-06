@@ -19,7 +19,7 @@ object Case {
 
   type CaseDef = Case[_ <: Product]
 
-  def apply[T <: Product : TypeTag : ParquetReader : ParquetWriter](
+  def apply[T <: Product : TypeTag : ParquetReader : ParquetSchemaResolver : ParquetRecordEncoder](
                                                                      description: String,
                                                                      data: Seq[T],
                                                                      compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
@@ -29,7 +29,8 @@ object Case {
       compatibilityParties = compatibilityParties,
       _data = data,
       _reader = implicitly[ParquetReader[T]],
-      _writer = implicitly[ParquetWriter[T]],
+      _encoder = implicitly[ParquetRecordEncoder[T]],
+      _resolver = implicitly[ParquetSchemaResolver[T]],
       _typeTag = implicitly[TypeTag[T]]
     )
 }
@@ -40,13 +41,15 @@ class Case[T <: Product](
                           val compatibilityParties: Set[CompatibilityParty],
                           _data: Seq[T],
                           _reader: ParquetReader[T],
-                          _writer: ParquetWriter[T],
+                          _encoder: ParquetRecordEncoder[T],
+                          _resolver: ParquetSchemaResolver[T],
                           _typeTag: TypeTag[T]
                         ) {
   type DataType = T
   def data: Seq[DataType] = _data
   def reader: ParquetReader[DataType] = _reader
-  def writer: ParquetWriter[DataType] = _writer
+  def encoder: ParquetRecordEncoder[DataType] = _encoder
+  def resolver: ParquetSchemaResolver[DataType] = _resolver
   def typeTag: TypeTag[DataType] = _typeTag
 }
 

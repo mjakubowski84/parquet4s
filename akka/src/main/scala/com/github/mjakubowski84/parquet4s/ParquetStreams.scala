@@ -123,13 +123,14 @@ object ParquetStreams {
     * @tparam Mat type of sink's materalized value
     * @return The sink that writes Parquet files
     */ 
-  def toParquetIndefinite[In, ToWrite: ParquetWriter, Mat](path: String,
-                                                           maxChunkSize: Int,
-                                                           chunkWriteTimeWindow: FiniteDuration,
-                                                           buildChunkPath: ChunkPathBuilder[In] = ChunkPathBuilder.default,
-                                                           preWriteTransformation: In => ToWrite = identity[In] _,
-                                                           postWriteSink: Sink[Seq[In], Mat] = Sink.ignore,
-                                                           options: ParquetWriter.Options = ParquetWriter.Options()
-                                                          ): Sink[In, Mat] =
+  def toParquetIndefinite[In, ToWrite: ParquetSchemaResolver : ParquetRecordEncoder, Mat](
+    path: String,
+    maxChunkSize: Int,
+    chunkWriteTimeWindow: FiniteDuration,
+    buildChunkPath: ChunkPathBuilder[In] = ChunkPathBuilder.default,
+    preWriteTransformation: In => ToWrite = identity[In] _,
+    postWriteSink: Sink[Seq[In], Mat] = Sink.ignore,
+    options: ParquetWriter.Options = ParquetWriter.Options()
+  ): Sink[In, Mat] =
     IndefiniteStreamParquetSink(new Path(path), maxChunkSize, chunkWriteTimeWindow, buildChunkPath, preWriteTransformation, postWriteSink, options)
 }
