@@ -15,26 +15,24 @@ import org.slf4j.LoggerFactory
 import scala.collection.JavaConverters._
 
 
+/**
+  * Interface for a writer which writes records to parquet with schema defined by [[T]]
+  * @tparam T schema being written to parquet file
+  */
 trait ParquetWriter[T] {
+  /**
+    * Write the given data to a parquet file
+    * @param data The data to write
+    */
   def write(data: Iterable[T]): Unit
+
+  /**
+    * Close and clean up any resources used for writing
+    */
   def close(): Unit
 }
 
 object ParquetWriter  {
-
-  def apply[T : ParquetSchemaResolver : ParquetRecordEncoder](path: String, options: Options = Options()): ParquetWriter[T] = new ParquetWriter[T] {
-    private val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
-    private val valueCodecConfiguration = options.toValueCodecConfiguration
-    def write(data: Iterable[T]): Unit = data.foreach { elem =>
-      writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
-    }
-    def close(): Unit = writer.close()
-  }
-
-  def write[T : ParquetSchemaResolver : ParquetRecordEncoder](path: String, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options()): Unit = {
-    val w = ParquetWriter[T](path, options)
-    try w.write(data) finally w.close()
-  }
 
   private[parquet4s] type InternalWriter = HadoopParquetWriter[RowParquetRecord]
 
@@ -85,36 +83,37 @@ object ParquetWriter  {
       .withConf(options.hadoopConf)
       .build()
 
-//  /**
-//    * Writes iterable collection of data as a Parquet files at given path.
-//    * Path can represent local file or directory, HDFS, AWS S3, Google Storage, Azure, etc.
-//    * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
-//    *
-//    * @param path URI where the data will be written to
-//    * @param data Collection of <i>T</> that will be written in Parquet file format
-//    * @param options configuration of writer, see [[ParquetWriter.Options]]
-//    * @param writer [[ParquetWriter]] that will be used to write data
-//    * @tparam T type of data, will be used also to resolve the schema of Parquet files
-//    */
-//  def write[T](path: String, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options())
-//              (implicit writer: ParquetWriter[T]): Unit = writer.write(path, data, options)
-//
-//  /**
-//    * Default instance of [[ParquetWriter]]
-//    */
-//  implicit def writer[T: ParquetRecordEncoder : ParquetSchemaResolver]: ParquetWriter[T] = new ParquetWriter[T] {
-//    override def write(path: String, data: Iterable[T], options: Options = Options()): Unit = {
-//      val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
-//      val valueCodecConfiguration = options.toValueCodecConfiguration
-//      try {
-//        data.foreach { elem =>
-//          writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
-//        }
-//      } finally {
-//        writer.close()
-//      }
-//    }
-//  }
+  /**
+    * Returns an instance of a [[ParquetWriter]] which will write records of type [[T]] to the given path with the given options.
+    * Note that this is not thread-safe by itself and you should remember to call close().
+    * @param path URI where the data will be written to
+    * @param options configuration of writer, see [[ParquetWriter.Options]]
+    * @tparam T type of data, wil be used to resolve the schema of Parquet files
+    */
+  def apply[T : ParquetSchemaResolver : ParquetRecordEncoder](path: String, options: Options = ParquetWriter.Options()): ParquetWriter[T] = new ParquetWriter[T] {
+    private val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
+    private val valueCodecConfiguration = options.toValueCodecConfiguration
+    def write(data: Iterable[T]): Unit = data.foreach { elem =>
+      writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
+    }
+    def close(): Unit = writer.close()
+  }
+
+  /**
+    * Writes iterable collection of data as a Parquet files at given path.
+    * Path can represent local file or directory, HDFS, AWS S3, Google Storage, Azure, etc.
+    * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
+    *
+    * @param path URI where the data will be written to
+    * @param data Collection of <i>T</> that will be written in Parquet file format
+    * @param options configuration of writer, see [[ParquetWriter.Options]]
+    * @tparam T type of data, will be used also to resolve the schema of Parquet files
+    */
+  def write[T : ParquetSchemaResolver : ParquetRecordEncoder](path: String, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options()): Unit = {
+    val w = ParquetWriter[T](path, options)
+    try w.write(data) finally w.close()
+  }
+
 
 }
 

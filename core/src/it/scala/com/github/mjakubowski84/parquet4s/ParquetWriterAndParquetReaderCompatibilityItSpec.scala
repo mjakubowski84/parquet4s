@@ -22,7 +22,6 @@ class ParquetWriterAndParquetReaderCompatibilityItSpec extends
         val w = ParquetWriter[testCase.DataType](tempPathString)
         try testCase.data.foreach(d => w.write(Iterable(d))) finally w.close()
       } else ParquetWriter.write(tempPathString, testCase.data)
-      ParquetWriter.write(tempPathString, testCase.data)(testCase.resolver, testCase.encoder)
       val parquetIterable = ParquetReader.read(tempPathString)(testCase.reader)
       try {
         parquetIterable should contain theSameElementsAs testCase.data
