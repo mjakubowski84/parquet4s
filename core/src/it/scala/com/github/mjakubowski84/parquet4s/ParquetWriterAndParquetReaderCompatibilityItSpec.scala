@@ -36,4 +36,8 @@ class ParquetWriterAndParquetReaderCompatibilityItSpec extends
     CompatibilityTestCases.cases(Writer, Reader).foreach(runTestCase(_))
   }
 
+  "Incremental writes work equivalently to passing the whole Iterable" - {
+    CompatibilityTestCases.cases(Writer, Reader).foreach(runTestCase(_, incremental = true))
+  }
+
 }
