@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import java.util.TimeZone
 
-import com.github.mjakubowski84.parquet4s.ParquetWriter.internalWriter
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.api.WriteSupport
