@@ -33,16 +33,16 @@ trait ParquetWriter[T] {
   /**
     * Instantiate a new [[IncrementalParquetWriter]]
     * @param path The path to which this writer will write
-    * @param options Options for writing
+    * @param options configuration of how Parquet files should be created and written
     */
   def incrementalWriter(path: String, options: ParquetWriter.Options): IncrementalParquetWriter[T]
 
 }
 
 /**
-  * Interface for a writer which can incrementally write records of type [[T]] to the given path with the given options
+  * Interface for a writer which can incrementally write records of type [[T]] to the given path with the given options.
   * @param path The path to which this writer will write
-  * @param options Options for writing
+  * @param options configuration of how Parquet files should be created and written
   * @tparam T schema of data to write.
   */
 abstract class IncrementalParquetWriter[T] private[parquet4s] (path: String, options: ParquetWriter.Options) {
