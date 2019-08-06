@@ -16,10 +16,12 @@ class ParquetWriterAndParquetReaderCompatibilityItSpec extends
 
   private def runTestCase(testCase: CaseDef, incremental: Boolean = false): Unit = {
     testCase.description in {
+      implicit val resolver: ParquetSchemaResolver[testCase.DataType] = testCase.resolver
+      implicit val encoder: ParquetRecordEncoder[testCase.DataType] = testCase.encoder
       if (incremental) {
-        val w: ParquetWriter[testCase.DataType] = ParquetWriter[testCase.DataType](tempPathString)(testCase.resolver, testCase.encoder)
+        val w = ParquetWriter[testCase.DataType](tempPathString)
         try testCase.data.foreach(d => w.write(Iterable(d))) finally w.close()
-      } else ParquetWriter.write(tempPathString, testCase.data)(testCase.resolver, testCase.encoder)
+      } else ParquetWriter.write(tempPathString, testCase.data)
       ParquetWriter.write(tempPathString, testCase.data)(testCase.resolver, testCase.encoder)
       val parquetIterable = ParquetReader.read(tempPathString)(testCase.reader)
       try {
