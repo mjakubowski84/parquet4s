@@ -10,13 +10,23 @@ import org.slf4j.LoggerFactory
   * @tparam T schema of data to write
   */
 trait IncrementalParquetWriter[T] extends Closeable {
+
+  /**
+    * Appends data chunk to file contents
+    * @param data data chunk to be written
+    */
   def write(data: Iterable[T])
+
 }
 
 object IncrementalParquetWriter {
 
   /**
-    * Default instance of an [[IncrementalParquetWriter]]
+    * Default instance of an [[IncrementalParquetWriter]].
+    *
+    * <b>Note</b> While [[IncrementalParquetWriter.close]] is thread-safe [[IncrementalParquetWriter.write]] is not.
+    * For better performance we used no synchronisation for writing. Used your own synchronisation method here if needed.
+    *
     * @param path location where files are meant to be written
     * @param options configuration of how Parquet files should be created and written
     * @tparam T schema of data to write
@@ -53,7 +63,7 @@ object IncrementalParquetWriter {
           writer.close()
         }
       }
-      
+
     }
 
 }
