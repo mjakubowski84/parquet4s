@@ -28,6 +28,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
 
   "iterator" should "build instance of iterator over row class containing record reader" in {
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(mock[TestReader])
 
     ParquetReader.newParquetIterable[TestRow](builder, options).iterator should be(an[Iterator[_]])
@@ -35,6 +36,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
 
   it should "build a new iterator with new reader every time called" in {
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder).repeated(3)
     (builder.build _).expects().returns(mock[TestReader]).repeated(3)
 
     ParquetReader.newParquetIterable[TestRow](builder, options).iterator should be(an[Iterator[_]])
@@ -47,6 +49,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(null).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     ParquetReader.newParquetIterable[TestRow](builder, options).iterator.hasNext should be(false)
@@ -57,6 +60,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(testRecord(1)).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     ParquetReader.newParquetIterable[TestRow](builder, options).iterator.hasNext should be(true)
@@ -67,6 +71,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(null).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterator = ParquetReader.newParquetIterable[TestRow](builder, options).iterator
@@ -80,6 +85,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(testRecord(1)).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterator = ParquetReader.newParquetIterable[TestRow](builder, options).iterator
@@ -93,6 +99,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(testRecord(1)).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     ParquetReader.newParquetIterable[TestRow](builder, options).iterator.next should be(TestRow(1))
@@ -103,6 +110,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(null).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     a[NoSuchElementException] should be thrownBy ParquetReader.newParquetIterable[TestRow](builder, options).iterator.next
@@ -113,6 +121,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(null).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterator = ParquetReader.newParquetIterable[TestRow](builder, options).iterator
@@ -129,6 +138,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(null)
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterator = ParquetReader.newParquetIterable[TestRow](builder, options).iterator
@@ -143,6 +153,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(null).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterator = ParquetReader.newParquetIterable[TestRow](builder, options).iterator
@@ -155,6 +166,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(testRecord(1)).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterator = ParquetReader.newParquetIterable[TestRow](builder, options).iterator
@@ -168,6 +180,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(null).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterator = ParquetReader.newParquetIterable[TestRow](builder, options).iterator
@@ -184,6 +197,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.read _).expects().returns(null).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterator = ParquetReader.newParquetIterable[TestRow](builder, options).iterator
@@ -200,6 +214,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.close _).expects().returns(()).once()
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder)
     (builder.build _).expects().returns(reader)
 
     val iterable = ParquetReader.newParquetIterable[TestRow](builder, options)
@@ -212,6 +227,7 @@ class ParquetIterableSpec extends FlatSpec with Matchers with MockFactory {
     (reader.close _).expects().returns(()).repeated(3)
 
     val builder = mock[TestBuilder]
+    (builder.withConf _).expects(options.hadoopConf).returns(builder).repeated(3)
     (builder.build _).expects().returns(reader).repeated(3)
 
     val iterable = ParquetReader.newParquetIterable[TestRow](builder, options)

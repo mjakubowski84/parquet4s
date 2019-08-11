@@ -85,7 +85,7 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](builder: ParquetRead
   private val openCloseables = new scala.collection.mutable.ArrayBuffer[Closeable]()
 
   override def iterator: Iterator[T] = new Iterator[T] {
-    private val reader = builder.build()
+    private val reader = builder.withConf(options.hadoopConf).build()
     openCloseables.synchronized(openCloseables.append(reader))
 
     private var recordPreRead = false
