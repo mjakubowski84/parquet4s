@@ -22,36 +22,38 @@ object IncrementalParquetWriter {
     * @tparam T schema of data to write
     */
   def apply[T: ParquetRecordEncoder: ParquetSchemaResolver](
-      path: String,
-      options: ParquetWriter.Options = ParquetWriter.Options())
-    : IncrementalParquetWriter[T] = {
+                                                             path: String,
+                                                             options: ParquetWriter.Options = ParquetWriter.Options()
+                                                           ): IncrementalParquetWriter[T] =
     new IncrementalParquetWriter[T] {
       private val writer = ParquetWriter.internalWriter(
-        new Path(path),
-        ParquetSchemaResolver.resolveSchema[T],
-        options)
+        path = new Path(path),
+        schema = ParquetSchemaResolver.resolveSchema[T],
+        options = options
+      )
       private val valueCodecConfiguration = options.toValueCodecConfiguration
       private val logger = LoggerFactory.getLogger(this.getClass)
-      private var isClosed: Boolean = false
+      private var closed = false
 
-      override def write(data: Iterable[T]): Unit =
-        if (isClosed)
-          throw new IllegalStateException(
-            "Attempted to write with a writer which was already closed")
-        else
+      override def write(data: Iterable[T]): Unit = {
+        if (closed) {
+          throw new IllegalStateException("Attempted to write with a writer which was already closed")
+        } else {
           data.foreach { elem =>
-            writer.write(
-              ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
+            writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
           }
+        }
+      }
 
-      override def close(): Unit = this.synchronized {
-        if (isClosed)
+      override def close(): Unit = synchronized {
+        if (closed) {
           logger.warn("Attempted to close a writer which was already closed")
-        else {
-          isClosed = true
+        } else {
+          closed = true
           writer.close()
         }
       }
+      
     }
-  }
+
 }
