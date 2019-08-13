@@ -1,6 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.nio.charset.StandardCharsets
 import java.math.MathContext
 
 import org.apache.parquet.io.api.{Binary, RecordConsumer}
@@ -35,21 +34,6 @@ trait PrimitiveValue[T] extends Any with Value {
 
 }
 
-object StringValue {
-  def apply(binary: Binary): StringValue = StringValue(binary.toStringUsingUTF8)
-}
-
-// TODO redundant structure.... we should use BinarrValue for storing strings and do conversions in codec
-case class StringValue(value: String) extends AnyVal with PrimitiveValue[String] {
-  override def write(schema: Type, recordConsumer: RecordConsumer): Unit =
-    recordConsumer.addBinary(Binary.fromReusedByteArray(value.getBytes(StandardCharsets.UTF_8)))
-}
-
-case class CharValue(value: Char) extends AnyVal with PrimitiveValue[Char] {
-  override def write(schema: Type, recordConsumer: RecordConsumer): Unit =
-    recordConsumer.addInteger(value)
-}
-
 case class LongValue(value: Long) extends AnyVal with PrimitiveValue[Long] {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addLong(value)
 }
@@ -66,67 +50,45 @@ case class DoubleValue(value: Double) extends AnyVal with PrimitiveValue[Double]
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addDouble(value)
 }
 
+// TODO move to proper place
 object DecimalValue {
   val Scale = 18
   val Precision = 38
   val ByteArrayLength = 16
-  private lazy val RescaleMathContext = new MathContext(Precision)
+  private val RescaleMathContext = new MathContext(Precision)
 
   private def rescale(original: BigDecimal) = BigDecimal.decimal(original.bigDecimal, RescaleMathContext).setScale(Scale)
 
-  def apply(binary: Binary, scale: Int, mathContext: MathContext): DecimalValue =
-    DecimalValue(BigDecimal(BigInt(binary.getBytes), scale, mathContext))
-}
+  def rescaleBinary(binary: Binary, originalScale: Int, originalMathContext: MathContext): Binary =
+    binaryFromDecimal(decimalFromBinary(binary, originalScale, originalMathContext))
 
-case class DecimalValue(value: BigDecimal) extends AnyVal with PrimitiveValue[BigDecimal] {
-  import DecimalValue._
+  def decimalFromBinary(binary: Binary, scale: Int = Scale, mathContext: MathContext = RescaleMathContext): BigDecimal =
+    BigDecimal(BigInt(binary.getBytes), scale, mathContext)
 
-  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
+  def binaryFromDecimal(decimal: BigDecimal): Binary = {
     /*
       Decimal is stored as byte array of unscaled BigInteger.
-      Scale and precision is stored seperately in metadata.
-      Value needs to be rescaled with default scale and precision for BigDecimal before saving. 
+      Scale and precision is stored separately in metadata.
+      Value needs to be rescaled with default scale and precision for BigDecimal before saving.
     */
     val buf = ByteBuffer.allocate(ByteArrayLength)
-    val unscaled = rescale(value).bigDecimal.unscaledValue().toByteArray()
+    val unscaled = rescale(decimal).bigDecimal.unscaledValue().toByteArray
     // BigInteger is stored in tail of byte array, sign is stored in unoccupied cells
     val sign: Byte = if (unscaled.head < 0) -1 else 0
     (0 until ByteArrayLength - unscaled.length).foreach(_ => buf.put(sign))
     buf.put(unscaled)
-    recordConsumer.addBinary(Binary.fromReusedByteArray(buf.array()))
+    Binary.fromReusedByteArray(buf.array())
   }
 }
 
-object ShortValue {
-  def apply(value: Int): ShortValue = ShortValue(value.toShort)
-}
-
-case class ShortValue(value: Short) extends AnyVal with PrimitiveValue[Short] {
-  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addInteger(value)
-}
-
-object ByteValue {
-  def apply(value: Int): ByteValue = ByteValue(value.toByte)
-}
-
-case class ByteValue(value: Byte) extends AnyVal with PrimitiveValue[Byte] {
-  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addInteger(value)
-}
-
 object BinaryValue {
-  def apply(binary: Binary): BinaryValue = BinaryValue(binary.getBytes)
+  def apply(bytes: Array[Byte]): BinaryValue = BinaryValue(Binary.fromReusedByteArray(bytes))
 }
 
-case class BinaryValue(value: Array[Byte]) extends PrimitiveValue[Array[Byte]] {
+case class BinaryValue(value: Binary) extends PrimitiveValue[Binary] {
 
-  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addBinary(Binary.fromReusedByteArray(value))
+  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addBinary(value)
 
-  override def equals(obj: Any): Boolean =
-    obj match {
-      case other @ BinaryValue(otherValue) =>
-        (other canEqual this) && value.sameElements(otherValue)
-      case _ => false
-    }
 }
 
 case class BooleanValue(value: Boolean) extends AnyVal with PrimitiveValue[Boolean] {

@@ -155,24 +155,24 @@ ParquetStreams.fromParquet[User]("file:///data/users", ParquetReader.Options(had
 
 Parquet4S is built using Scala's type class system. That allows you to extend Parquet4S by defining your own implementations of its type classes. 
 
-For example, you may define your codecs of your own type so that they can be read fromor written to Parquet. Assume that you have your own type:
+For example, you may define your codecs of your own type so that they can be read from or written to Parquet. Assume that you have your own type:
 
 ```scala
-case class CustomType(string: String)
+case class CustomType(i: Int)
 ```
 
-You want to save it as regular optional `String`. In order to achieve you have to define your own codec:
+You want to save it as optional `Int`. In order to achieve you have to define your own codec:
 
 ```scala
-import com.github.mjakubowski84.parquet4s.{OptionalValueCodec, StringValue, Value}
+import com.github.mjakubowski84.parquet4s.{OptionalValueCodec, IntValue, Value}
 
 implicit val customTypeCodec: OptionalValueCodec[CustomType] = 
   new OptionalValueCodec[CustomType] {
     override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): CustomType = value match {
-      case StringValue(string) => CustomType(string)
+      case IntValue(i) => CustomType(i)
     }
     override protected def encodeNonNull(data: CustomType, configuration: ValueCodecConfiguration): Value =
-      StringValue(data.string)
+      IntValue(data.i)
 }
 ```
 
@@ -185,9 +185,9 @@ import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver._
 implicit val customTypeSchema: TypedSchemaDef[CustomType] =
   typedSchemaDef[CustomType](
     PrimitiveSchemaDef(
-      primitiveType = PrimitiveType.PrimitiveTypeName.BINARY, 
+      primitiveType = PrimitiveType.PrimitiveTypeName.INT32, 
       required = false, 
-      originalType = Some(OriginalType.UTF8)
+      originalType = Some(OriginalType.INT_32)
     )
   )
 ```

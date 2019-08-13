@@ -5,7 +5,7 @@ lazy val resolvers =  Seq(
   Resolver.jcenterRepo
 )
 
-lazy val supportedScalaVersions = Seq("2.11.12", "2.12.8")
+lazy val supportedScalaVersions = Seq("2.11.12", "2.12.9")
 
 lazy val commonSettings = Seq(
   Keys.organization := "com.github.mjakubowski84",
