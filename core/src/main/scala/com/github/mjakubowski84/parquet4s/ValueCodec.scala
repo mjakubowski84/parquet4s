@@ -4,6 +4,8 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.time._
 import java.util.TimeZone
 
+import org.apache.parquet.io.api.Binary
+
 import scala.language.higherKinds
 
 /**
@@ -99,18 +101,17 @@ trait PrimitiveValueCodecs {
   implicit val stringCodec: ValueCodec[String] = new OptionalValueCodec[String] {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): String =
       value match {
-        case StringValue(str) => str
+        case BinaryValue(binary) => binary.toStringUsingUTF8
       }
-    override def encodeNonNull(data: String, configuration: ValueCodecConfiguration): Value = StringValue(data)
+    override def encodeNonNull(data: String, configuration: ValueCodecConfiguration): Value = BinaryValue(Binary.fromString(data))
   }
 
   implicit val charCodec: ValueCodec[Char] = new RequiredValueCodec[Char] {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Char =
       value match {
-        case CharValue(char) => char
         case IntValue(int) => int.toChar
       }
-    override def encodeNonNull(data: Char, configuration: ValueCodecConfiguration): Value = CharValue(data)
+    override def encodeNonNull(data: Char, configuration: ValueCodecConfiguration): Value = IntValue(data)
   }
 
   implicit val booleanCodec: ValueCodec[Boolean] = new RequiredValueCodec[Boolean] {
@@ -160,19 +161,17 @@ trait PrimitiveValueCodecs {
   implicit val shortCodec: ValueCodec[Short] = new RequiredValueCodec[Short] {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Short =
       value match {
-        case ShortValue(char) => char
         case IntValue(int) => int.toShort
       }
-    override def encodeNonNull(data: Short, configuration: ValueCodecConfiguration): Value = ShortValue(data)
+    override def encodeNonNull(data: Short, configuration: ValueCodecConfiguration): Value = IntValue(data)
   }
 
   implicit val byteCodec: ValueCodec[Byte] = new RequiredValueCodec[Byte] {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Byte =
       value match {
-        case ByteValue(byte) => byte
         case IntValue(int) => int.toByte
       }
-    override def encodeNonNull(data: Byte, configuration: ValueCodecConfiguration): Value = ByteValue(data)
+    override def encodeNonNull(data: Byte, configuration: ValueCodecConfiguration): Value = IntValue(data)
   }
 
   implicit val decimalCodec: ValueCodec[BigDecimal] = new OptionalValueCodec[BigDecimal] {
@@ -180,9 +179,11 @@ trait PrimitiveValueCodecs {
       value match {
         case DoubleValue(double) => BigDecimal(double)
         case FloatValue(float) => BigDecimal.decimal(float)
-        case DecimalValue(bigDecimal) => bigDecimal
+        case BinaryValue(binary) => DecimalValue.decimalFromBinary(binary)
       }
-    override def encodeNonNull(data: BigDecimal, configuration: ValueCodecConfiguration): Value = DecimalValue(data)
+    override def encodeNonNull(data: BigDecimal, configuration: ValueCodecConfiguration): Value = BinaryValue(
+      DecimalValue.binaryFromDecimal(data)
+    )
   }
 }
 
@@ -197,8 +198,8 @@ object TimeValueCodecs {
 
   private def decodeLocalDateTime(value: Value, configuration: ValueCodecConfiguration): LocalDateTime =
     value match {
-      case BinaryValue(bs: Array[Byte]) =>
-        val buf = ByteBuffer.wrap(bs).order(ByteOrder.LITTLE_ENDIAN)
+      case BinaryValue(binary) =>
+        val buf = ByteBuffer.wrap(binary.getBytes).order(ByteOrder.LITTLE_ENDIAN)
         val fixedTimeInNanos = buf.getLong
         val julianDay = buf.getInt
 

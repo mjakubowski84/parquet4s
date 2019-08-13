@@ -5,31 +5,31 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class ValueCodecSpec extends FlatSpec with Matchers {
 
-  case class TestType(text: String)
+  case class TestType(i: Int)
 
   val requiredValueCodec: RequiredValueCodec[TestType] = new RequiredValueCodec[TestType] {
     override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): TestType = value match {
-      case StringValue(string) => TestType(string)
+      case IntValue(i) => TestType(i)
     }
-    override protected def encodeNonNull(data: TestType, configuration: ValueCodecConfiguration): Value = StringValue(data.text)
+    override protected def encodeNonNull(data: TestType, configuration: ValueCodecConfiguration): Value = IntValue(data.i)
   }
   val optionalValueCodec: OptionalValueCodec[TestType] = new OptionalValueCodec[TestType] {
     override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): TestType = value match {
-      case StringValue(string) => TestType(string)
+      case IntValue(i) => TestType(i)
     }
-    override protected def encodeNonNull(data: TestType, configuration: ValueCodecConfiguration): Value = StringValue(data.text)
+    override protected def encodeNonNull(data: TestType, configuration: ValueCodecConfiguration): Value = IntValue(data.i)
   }
 
-  val text = TestType("text")
-  val textValue = StringValue(text.text)
+  val testType = TestType(42)
+  val testValue = IntValue(testType.i)
   val configuration: ValueCodecConfiguration = ValueCodecConfiguration.default
 
   "Required value codec" should "encode non-null value" in {
-    requiredValueCodec.encode(text, configuration) should be(textValue)
+    requiredValueCodec.encode(testType, configuration) should be(testValue)
   }
 
   it should "decode non-null value" in {
-    requiredValueCodec.decode(textValue, configuration) should be(text)
+    requiredValueCodec.decode(testValue, configuration) should be(testType)
   }
 
   it should "throw an exception when decoding null-value" in {
@@ -41,11 +41,11 @@ class ValueCodecSpec extends FlatSpec with Matchers {
   }
 
   "Optional value codec" should "encode non-null value" in {
-    optionalValueCodec.encode(text, configuration) should be(textValue)
+    optionalValueCodec.encode(testType, configuration) should be(testValue)
   }
 
   it should "decode non-null value" in {
-    optionalValueCodec.decode(textValue, configuration) should be(text)
+    optionalValueCodec.decode(testValue, configuration) should be(testType)
   }
 
   it should "throw an exception when decoding null-value" in {
