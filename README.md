@@ -140,7 +140,7 @@ Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
 // Tailored for writing indefinite streams.
 // Writes file when chunk reaches size limit or defined time period elapses.
 // Check also all other parameters and example usage in project sources.
-Source(data).runWith(ParyquetStreams.toParquetIndefinite(
+Source(data).runWith(ParquetStreams.toParquetIndefinite(
   path = "file:///data/users",
   maxChunkSize = writeOptions.rowGroupSize,
   chunkWriteTimeWindow = 30.seconds,
