@@ -220,13 +220,13 @@ trait SchemaDefs {
   implicit val decimalSchema: TypedSchemaDef[BigDecimal] =
     typedSchemaDef[BigDecimal](
       PrimitiveSchemaDef(
-        PrimitiveType.PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY, 
-        required = false, 
+        PrimitiveType.PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY,
+        required = false,
         originalType = Some(OriginalType.DECIMAL),
-        precision = Some(DecimalValue.Precision),
-        scale = Some(DecimalValue.Scale),
-        length = Some(DecimalValue.ByteArrayLength)
-      )
+        precision = Some(Decimals.Precision),
+        scale = Some(Decimals.Scale),
+        length = Some(Decimals.ByteArrayLength)
+        )
     )
 
   implicit val localDateSchema: TypedSchemaDef[java.time.LocalDate] =

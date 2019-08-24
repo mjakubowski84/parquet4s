@@ -179,11 +179,11 @@ trait PrimitiveValueCodecs {
       value match {
         case DoubleValue(double) => BigDecimal(double)
         case FloatValue(float) => BigDecimal.decimal(float)
-        case BinaryValue(binary) => DecimalValue.decimalFromBinary(binary)
+        case BinaryValue(binary) => Decimals.decimalFromBinary(binary)
       }
     override def encodeNonNull(data: BigDecimal, configuration: ValueCodecConfiguration): Value = BinaryValue(
-      DecimalValue.binaryFromDecimal(data)
-    )
+        Decimals.binaryFromDecimal(data)
+      )
   }
 }
 

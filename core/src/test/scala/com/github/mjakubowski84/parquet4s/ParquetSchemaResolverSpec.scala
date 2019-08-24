@@ -26,9 +26,9 @@ class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
       Types.primitive(INT32, REQUIRED).as(OriginalType.INT_8).named("byte"),
       Types.primitive(INT32, REQUIRED).as(OriginalType.INT_32).named("char"),
       Types.primitive(FIXED_LEN_BYTE_ARRAY, OPTIONAL).as(OriginalType.DECIMAL)
-        .precision(DecimalValue.Precision)
-        .scale(DecimalValue.Scale)
-        .length(DecimalValue.ByteArrayLength)
+        .precision(Decimals.Precision)
+        .scale(Decimals.Scale)
+        .length(Decimals.ByteArrayLength)
         .named("bigDecimal")
     ))
   }
