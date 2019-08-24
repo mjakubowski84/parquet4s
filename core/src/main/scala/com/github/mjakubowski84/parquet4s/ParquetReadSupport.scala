@@ -126,11 +126,11 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord](
 
   private class DecimalConverter(name: String, scale: Int, precision: Int) extends ParquetPrimitiveConverter(name) {
     private lazy val mathContext = new MathContext(precision)
-    private val shouldRescale = scale != DecimalValue.Scale || precision != DecimalValue.Precision
+    private val shouldRescale = scale != Decimals.Scale || precision != Decimals.Precision
 
     override def addBinary(value: Binary): Unit = {
       val rescaled =
-        if (shouldRescale) DecimalValue.rescaleBinary(value, scale, mathContext)
+        if (shouldRescale) Decimals.rescaleBinary(value, scale, mathContext)
         else value
       record.add(name, BinaryValue(rescaled))
     }
