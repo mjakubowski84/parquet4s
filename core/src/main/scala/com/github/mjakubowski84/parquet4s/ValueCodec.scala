@@ -230,7 +230,7 @@ object TimeValueCodecs {
         }
     }
 
-  private def encodeLocalDateTime(data:LocalDateTime, configuration: ValueCodecConfiguration): Value = BinaryValue {
+  private def encodeLocalDateTime(data: LocalDateTime, configuration: ValueCodecConfiguration): Value = BinaryValue {
     val date = data.toLocalDate
     val time = data.toLocalTime
 

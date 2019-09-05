@@ -95,9 +95,11 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](
   private val openCloseables = new scala.collection.mutable.ArrayBuffer[Closeable]()
 
   override def iterator: Iterator[T] = new Iterator[T] {
-    private val reader = filterOpt.foldLeft(builder) { case (b, f) =>
-      b.withFilter(FilterCompat.get(f.toPredicate(valueCodecConfiguration)))
-    }.withConf(options.hadoopConf).build()
+    private val reader = filterOpt
+      .foldLeft(builder) { case (b, f) =>
+        b.withFilter(FilterCompat.get(f.toPredicate(valueCodecConfiguration)))
+      }.withConf(options.hadoopConf)
+      .build()
 
     openCloseables.synchronized(openCloseables.append(reader))
 
