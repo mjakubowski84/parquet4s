@@ -1,7 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.util.TimeZone
-
 import com.github.mjakubowski84.parquet4s.FilterValue.FilterValueFactory
 import org.apache.parquet.filter2.predicate.Operators._
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate}
@@ -89,52 +87,59 @@ trait FilterValueConverter[In, V <: Comparable[V], C <: Column[V]] {
 
 }
 
+private class SimpleFilterValueConverter[In, V <: Comparable[V], C <: Column[V]](f: In => FilterValue[V, C]
+                                                                                ) extends FilterValueConverter[In, V, C] {
+  override def convert(in: In): FilterValueFactory[V, C] = _ => f(in)
+}
+
+private class BinaryFilterValueConverter[In](codec: ValueCodec[In]) extends FilterValueConverter[In, Binary, BinaryColumn] {
+  override def convert(in: In): FilterValueFactory[Binary, BinaryColumn] =
+    conf => FilterValue.binary(codec.encode(in, conf).asInstanceOf[PrimitiveValue[Binary]].value)
+}
+
+private class IntFilterValueConverter[In](codec: ValueCodec[In]) extends FilterValueConverter[In, Integer, IntColumn] {
+  override def convert(in: In): FilterValueFactory[Integer, IntColumn] =
+    conf => FilterValue.int(codec.encode(in, conf).asInstanceOf[PrimitiveValue[Int]].value)
+}
+
 object FilterValueConverter {
 
-  implicit val stringFilterValueConverter: FilterValueConverter[String, Binary, BinaryColumn] = new FilterValueConverter[String, Binary, BinaryColumn] {
-    override def convert(in: String): FilterValueFactory[Binary, BinaryColumn] =
-      conf => FilterValue.binary(ValueCodec.stringCodec.encode(in, conf).asInstanceOf[PrimitiveValue[Binary]].value)
-  }
+  implicit val stringFilterValueConverter: FilterValueConverter[String, Binary, BinaryColumn] =
+    new BinaryFilterValueConverter(ValueCodec.stringCodec)
 
-  implicit val intFilterValueConverter: FilterValueConverter[Int, Integer, IntColumn] = new FilterValueConverter[Int, Integer, IntColumn] {
-    override def convert(in: Int): FilterValueFactory[Integer, IntColumn] =
-      _ => FilterValue.int(in)
-  }
+  implicit val intFilterValueConverter: FilterValueConverter[Int, Integer, IntColumn] =
+    new SimpleFilterValueConverter(FilterValue.int)
 
-  implicit val shortFilterValueConverter: FilterValueConverter[Short, Integer, IntColumn] = new FilterValueConverter[Short, Integer, IntColumn] {
-    override def convert(in: Short): FilterValueFactory[Integer, IntColumn] =
-      _ => FilterValue.int(in.toInt)
-  }
+  implicit val shortFilterValueConverter: FilterValueConverter[Short, Integer, IntColumn] =
+    new SimpleFilterValueConverter((Short.short2int _).andThen(FilterValue.int).apply)
 
-  implicit val byteFilterValueConverter: FilterValueConverter[Byte, Integer, IntColumn] = new FilterValueConverter[Byte, Integer, IntColumn] {
-    override def convert(in: Byte): FilterValueFactory[Integer, IntColumn] =
-      _ => FilterValue.int(in.toInt)
-  }
+  implicit val byteFilterValueConverter: FilterValueConverter[Byte, Integer, IntColumn] =
+    new SimpleFilterValueConverter((Byte.byte2int _).andThen(FilterValue.int).apply)
 
-  implicit val charFilterValueConverter: FilterValueConverter[Char, Integer, IntColumn] = new FilterValueConverter[Char, Integer, IntColumn] {
-    override def convert(in: Char): FilterValueFactory[Integer, IntColumn] =
-      _ => FilterValue.int(in.toInt)
-  }
+  implicit val charFilterValueConverter: FilterValueConverter[Char, Integer, IntColumn] =
+    new SimpleFilterValueConverter((Char.char2int _).andThen(FilterValue.int).apply)
 
-  implicit val longFilterValueConverter: FilterValueConverter[Long, java.lang.Long, LongColumn] = new FilterValueConverter[Long, java.lang.Long, LongColumn] {
-    override def convert(in: Long): FilterValueFactory[java.lang.Long, LongColumn] =
-      _ => FilterValue.long(in)
-  }
+  implicit val longFilterValueConverter: FilterValueConverter[Long, java.lang.Long, LongColumn] =
+    new SimpleFilterValueConverter(FilterValue.long)
 
-  implicit val floatFilterValueConverter: FilterValueConverter[Float, java.lang.Float, FloatColumn] = new FilterValueConverter[Float, java.lang.Float, FloatColumn] {
-    override def convert(in: Float): FilterValueFactory[java.lang.Float, FloatColumn] =
-      _ => FilterValue.float(in)
-  }
+  implicit val floatFilterValueConverter: FilterValueConverter[Float, java.lang.Float, FloatColumn] =
+    new SimpleFilterValueConverter(FilterValue.float)
 
-  implicit val doubleFilterValueConverter: FilterValueConverter[Double, java.lang.Double, DoubleColumn] = new FilterValueConverter[Double, java.lang.Double, DoubleColumn] {
-    override def convert(in: Double): FilterValueFactory[java.lang.Double, DoubleColumn] =
-      _ => FilterValue.double(in)
-  }
+  implicit val doubleFilterValueConverter: FilterValueConverter[Double, java.lang.Double, DoubleColumn] =
+    new SimpleFilterValueConverter(FilterValue.double)
 
-  implicit val booleanFilterValueConverter: FilterValueConverter[Boolean, java.lang.Boolean, BooleanColumn] = new FilterValueConverter[Boolean, java.lang.Boolean, BooleanColumn] {
-    override def convert(in: Boolean): FilterValueFactory[java.lang.Boolean, BooleanColumn] =
-      _ => FilterValue.boolean(in)
-  }
+  implicit val booleanFilterValueConverter: FilterValueConverter[Boolean, java.lang.Boolean, BooleanColumn] =
+    new SimpleFilterValueConverter(FilterValue.boolean)
+
+  implicit val sqlDateFilterValueConverter: FilterValueConverter[java.sql.Date, Integer, IntColumn] =
+    new IntFilterValueConverter(ValueCodec.sqlDateCodec)
+
+  implicit val localDateFilterValueConverter: FilterValueConverter[java.time.LocalDate, Integer, IntColumn] =
+    new IntFilterValueConverter(ValueCodec.localDateCodec)
+
+  implicit val decimalFilterValueConverter: FilterValueConverter[BigDecimal, Binary, BinaryColumn] =
+    new BinaryFilterValueConverter(ValueCodec.decimalCodec)
+
 }
 
 object FilterValue {
@@ -145,35 +150,17 @@ object FilterValue {
                                                               (implicit filterValueConverter: FilterValueConverter[In, V, C]): FilterValueFactory[V, C] =
     filterValueConverter.convert(in)
 
-  def binary(binary: Binary): FilterValue[Binary, BinaryColumn] = new FilterValue[Binary, BinaryColumn] {
-    override val value: Binary = binary
-    override val columnFactory: String => BinaryColumn = FilterApi.binaryColumn
-  }
+  def binary(binary: Binary): FilterValue[Binary, BinaryColumn] = new FilterValueImpl(binary, FilterApi.binaryColumn)
 
-  def int(int: Integer): FilterValue[Integer, IntColumn] = new FilterValue[Integer, IntColumn] {
-    override val value: Integer = int
-    override val columnFactory: String => IntColumn = FilterApi.intColumn
-  }
+  def int(int: Int): FilterValue[Integer, IntColumn] = new FilterValueImpl(int, FilterApi.intColumn)
 
-  def long(long: Long): FilterValue[java.lang.Long, LongColumn] = new FilterValue[java.lang.Long, LongColumn] {
-    override val value: java.lang.Long = long
-    override val columnFactory: String => LongColumn = FilterApi.longColumn
-  }
+  def long(long: Long): FilterValue[java.lang.Long, LongColumn] = new FilterValueImpl(long, FilterApi.longColumn)
 
-  def float(float: Float): FilterValue[java.lang.Float, FloatColumn] = new FilterValue[java.lang.Float, FloatColumn] {
-    override val value: java.lang.Float = float
-    override val columnFactory: String => FloatColumn = FilterApi.floatColumn
-  }
+  def float(float: Float): FilterValue[java.lang.Float, FloatColumn] = new FilterValueImpl(float, FilterApi.floatColumn)
 
-  def double(double: Double): FilterValue[java.lang.Double, DoubleColumn] = new FilterValue[java.lang.Double, DoubleColumn] {
-    override val value: java.lang.Double = double
-    override val columnFactory: String => DoubleColumn = FilterApi.doubleColumn
-  }
+  def double(double: Double): FilterValue[java.lang.Double, DoubleColumn] = new FilterValueImpl(double, FilterApi.doubleColumn)
 
-  def boolean(bool: Boolean): FilterValue[java.lang.Boolean, BooleanColumn] = new FilterValue[java.lang.Boolean, BooleanColumn] {
-    override val value: java.lang.Boolean = bool
-    override val columnFactory: String => BooleanColumn = FilterApi.booleanColumn
-  }
+  def boolean(bool: Boolean): FilterValue[java.lang.Boolean, BooleanColumn] = new FilterValueImpl(bool, FilterApi.booleanColumn)
 
 }
 
@@ -184,6 +171,10 @@ trait FilterValue[V <: Comparable[V], C <: Column[V]] {
   def columnFactory: String => C
 
 }
+
+private class FilterValueImpl[V <: Comparable[V], C <: Column[V]](override val value: V,
+                                                                  override val columnFactory: String => C
+                                                                 ) extends FilterValue[V, C]
 
 case class Col(columnPath: String) {
 
