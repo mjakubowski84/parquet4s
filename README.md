@@ -99,7 +99,7 @@ import scala.concurrent.duration._
 
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
-implicit val system: AcrtorSystem =  ActorSystem()
+implicit val system: ActorSystem =  ActorSystem()
 implicit val materializer: Materializer =  ActorMaterializer()
 
 val users: Stream[User] = ???
