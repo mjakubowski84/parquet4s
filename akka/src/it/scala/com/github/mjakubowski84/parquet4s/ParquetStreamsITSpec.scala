@@ -70,7 +70,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath)
+      files <- filesAtPath(outputPath, writeOptions)
       readData <- read[Data](outputPath)
     } yield {
       files should be(List(outputFileName))
@@ -91,7 +91,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath)
+      files <- filesAtPath(outputPath, writeOptions)
       readData <- read[Data](outputPath)
     } yield {
       files should contain theSameElementsAs outputFileNames
@@ -111,7 +111,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath)
+      files <- filesAtPath(outputPath, writeOptions)
       readData <- read[Data](outputPath)
     } yield {
       files should have size 2
@@ -132,7 +132,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath)
+      files <- filesAtPath(outputPath, writeOptions)
       readData <- read[Data](outputPath)
     } yield {
       files should have size 4
@@ -158,7 +158,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       postWriteData <- write()
-      files <- filesAtPath(outputPath)
+      files <- filesAtPath(outputPath, writeOptions)
       readData <- read[DataTransformed](outputPath)
     } yield {
       postWriteData should have size count
