@@ -14,7 +14,7 @@ trait IOOps {
   protected val logger: Logger
 
   protected def validateWritePath(path: Path, writeOptions: ParquetWriter.Options): Unit = {
-    val fs = path.getFileSystem(new Configuration())
+    val fs = path.getFileSystem(writeOptions.hadoopConf)
     try {
       if (fs.exists(path)) {
         if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
