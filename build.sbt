@@ -9,8 +9,8 @@ lazy val supportedScalaVersions = Seq("2.11.12", "2.12.9")
 
 lazy val commonSettings = Seq(
   Keys.organization := "com.github.mjakubowski84",
-  Keys.version := "0.9.0",
-  Keys.isSnapshot := false,
+  Keys.version := "0.10.0-SNAPSHOT",
+  Keys.isSnapshot := true,
   Keys.scalaVersion := "2.11.12",
   Keys.scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8"),
   Keys.javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature"),
