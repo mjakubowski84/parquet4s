@@ -25,7 +25,7 @@ class IncrementalParquetWriterItSpec
 
   // Generate records and do a single batch write.
   private val records = Record.random(5000)
-  ParquetWriter.write(batchPath.toString, records, ParquetWriter.Options())
+  ParquetWriter.write(batchPath.toString, records)
 
   private def incrementalRecords: Seq[Record] = {
     val iter = ParquetReader.read[Record](incrementalPath.toString)

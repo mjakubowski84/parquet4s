@@ -94,7 +94,7 @@ object ParquetWriter  {
     * @param writer [[ParquetWriter]] that will be used to write data
     * @tparam T type of data, will be used also to resolve the schema of Parquet files
     */
-  def write[T](path: String, data: Iterable[T], options: ParquetWriter.Options)
+  def write[T](path: String, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options())
               (implicit writer: ParquetWriter[T]): Unit = writer.write(path, data, options)
 
   /**
