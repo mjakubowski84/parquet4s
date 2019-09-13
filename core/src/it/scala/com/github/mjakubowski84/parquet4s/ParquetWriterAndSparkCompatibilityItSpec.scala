@@ -16,7 +16,7 @@ class ParquetWriterAndSparkCompatibilityItSpec extends
 
   private def runTestCase(testCase: CaseDef): Unit =
     testCase.description in {
-      ParquetWriter.write(tempPathString, testCase.data)(testCase.writer)
+      ParquetWriter.write(tempPathString, testCase.data, ParquetWriter.Options())(testCase.writer)
       readFromTemp(testCase.typeTag) should contain theSameElementsAs testCase.data
     }
 
