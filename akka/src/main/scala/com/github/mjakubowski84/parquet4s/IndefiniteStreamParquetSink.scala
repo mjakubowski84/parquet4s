@@ -30,7 +30,7 @@ private[parquet4s] object IndefiniteStreamParquetSink extends IOOps {
         val toWrite = chunk.map(preWriteTransformation)
         val chunkPath = buildChunkPath(path, chunk)
         if (logger.isDebugEnabled()) logger.debug(s"Writing ${toWrite.size} records to $chunkPath")
-        ParquetWriter.write(chunkPath.toString, toWrite)
+        ParquetWriter.write(chunkPath.toString, toWrite, options)
       }
       val zip = b.add(ZipWith[Seq[In], Unit, Seq[In]]((chunk, _) => chunk))
       
