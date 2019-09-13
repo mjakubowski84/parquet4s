@@ -14,7 +14,7 @@ trait IOOps {
   protected val logger: Logger
 
   protected def validateWritePath(path: Path, writeOptions: ParquetWriter.Options): Unit = {
-    val fs = path.getFileSystem(new Configuration())
+    val fs = path.getFileSystem(writeOptions.hadoopConf)
     try {
       if (fs.exists(path)) {
         if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
@@ -27,9 +27,10 @@ trait IOOps {
     } finally fs.close()
   }
 
-  protected def filesAtPath(path: Path)(implicit ec: ExecutionContext): Future[List[String]] = Future {
+  protected def filesAtPath(path: Path, writeOptions: ParquetWriter.Options)
+                           (implicit ec: ExecutionContext): Future[List[String]] = Future {
     scala.concurrent.blocking {
-      val fs = path.getFileSystem(new Configuration())
+      val fs = path.getFileSystem(writeOptions.hadoopConf)
       try {
         val iter = fs.listFiles(path, false)
         Stream
@@ -42,6 +43,7 @@ trait IOOps {
     }
   }
 
-  protected def filesAtPath(path: String)(implicit ec: ExecutionContext): Future[List[String]] = filesAtPath(new Path(path))
+  protected def filesAtPath(path: String, writeOptions: ParquetWriter.Options)
+                           (implicit ec: ExecutionContext): Future[List[String]] = filesAtPath(new Path(path), writeOptions)
 
 }
