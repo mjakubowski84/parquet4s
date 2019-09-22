@@ -1,6 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.FilterValue.FilterValueFactory
+import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators._
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate}
 import org.apache.parquet.io.api.Binary
@@ -10,7 +11,10 @@ import scala.language.{higherKinds, implicitConversions}
 
 trait Filter {
 
-  def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate
+  protected def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate
+
+  def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
+    FilterCompat.get(toPredicate(valueCodecConfiguration))
 
   def &&(other: Filter): Filter = Filter.andFilter(this, other)
 
@@ -22,17 +26,17 @@ trait Filter {
 
 object Filter {
 
-  def eqFilter[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: String, expressionFactory: FilterValueFactory[V, C]): Filter = new Filter {
+  def eqFilter[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: String, filterValueFactory: FilterValueFactory[V, C]): Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
-      val expression = expressionFactory(valueCodecConfiguration)
-      FilterApi.eq(expression.columnFactory(columnPath), expression.value)
+      val filterValue = filterValueFactory(valueCodecConfiguration)
+      FilterApi.eq(filterValue.columnFactory(columnPath), filterValue.value)
     }
   }
 
-  def neqFilter[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: String, expressionFactory: FilterValueFactory[V, C]): Filter = new Filter {
+  def neqFilter[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: String, filterValueFactory: FilterValueFactory[V, C]): Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
-      val expression = expressionFactory(valueCodecConfiguration)
-      FilterApi.notEq(expression.columnFactory(columnPath), expression.value)
+      val filterValue = filterValueFactory(valueCodecConfiguration)
+      FilterApi.notEq(filterValue.columnFactory(columnPath), filterValue.value)
     }
   }
 
@@ -51,32 +55,43 @@ object Filter {
       FilterApi.not(filter.toPredicate(valueCodecConfiguration))
   }
 
-  def gtFilter[V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: String, expressionFactory: FilterValueFactory[V, C]): Filter = new Filter {
+  def gtFilter[V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: String, filterValueFactory: FilterValueFactory[V, C]): Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
-      val expression = expressionFactory(valueCodecConfiguration)
-      FilterApi.gt(expression.columnFactory(columnPath), expression.value)
+      val filterValue = filterValueFactory(valueCodecConfiguration)
+      FilterApi.gt(filterValue.columnFactory(columnPath), filterValue.value)
     }
   }
 
-  def gtEqFilter[V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: String, expressionFactory: FilterValueFactory[V, C]): Filter = new Filter {
+  def gtEqFilter[V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: String, filterValueFactory: FilterValueFactory[V, C]): Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
-      val expression = expressionFactory(valueCodecConfiguration)
-      FilterApi.gtEq(expression.columnFactory(columnPath), expression.value)
+      val filterValue = filterValueFactory(valueCodecConfiguration)
+      FilterApi.gtEq(filterValue.columnFactory(columnPath), filterValue.value)
     }
   }
 
-  def ltFilter[V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: String, expressionFactory: FilterValueFactory[V, C]): Filter = new Filter {
+  def ltFilter[V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: String, filterValueFactory: FilterValueFactory[V, C]): Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
-      val expression = expressionFactory(valueCodecConfiguration)
-      FilterApi.lt(expression.columnFactory(columnPath), expression.value)
+      val filterValue = filterValueFactory(valueCodecConfiguration)
+      FilterApi.lt(filterValue.columnFactory(columnPath), filterValue.value)
     }
   }
 
-  def ltEqFilter[V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: String, expressionFactory: FilterValueFactory[V, C]): Filter = new Filter {
+  def ltEqFilter[V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: String, filterValueFactory: FilterValueFactory[V, C]): Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
-      val expression = expressionFactory(valueCodecConfiguration)
-      FilterApi.ltEq(expression.columnFactory(columnPath), expression.value)
+      val filterValue = filterValueFactory(valueCodecConfiguration)
+      FilterApi.ltEq(filterValue.columnFactory(columnPath), filterValue.value)
     }
+  }
+
+  val noopFilter: Filter  = new Filter {
+    override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = new FilterPredicate {
+      override def accept[R](visitor: FilterPredicate.Visitor[R]): R = {
+        throw new UnsupportedOperationException
+      }
+    }
+
+    override def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
+      FilterCompat.NOOP
   }
 
 }
@@ -178,22 +193,22 @@ private class FilterValueImpl[V <: Comparable[V], C <: Column[V]](override val v
 
 case class Col(columnPath: String) {
 
-  def ===[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](expressionFactory: FilterValueFactory[V, C]): Filter =
-    Filter.eqFilter(columnPath, expressionFactory)
+  def ===[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.eqFilter(columnPath, filterValueFactory)
 
-  def !==[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](expressionFactory: FilterValueFactory[V, C]): Filter =
-    Filter.neqFilter(columnPath, expressionFactory)
+  def !==[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.neqFilter(columnPath, filterValueFactory)
 
-  def >[V <: Comparable[V], C <: Column[V] with SupportsLtGt](expressionFactory: FilterValueFactory[V, C]): Filter =
-    Filter.gtFilter(columnPath, expressionFactory)
+  def >[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.gtFilter(columnPath, filterValueFactory)
 
-  def >=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](expressionFactory: FilterValueFactory[V, C]): Filter =
-    Filter.gtEqFilter(columnPath, expressionFactory)
+  def >=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.gtEqFilter(columnPath, filterValueFactory)
 
-  def <[V <: Comparable[V], C <: Column[V] with SupportsLtGt](expressionFactory: FilterValueFactory[V, C]): Filter =
-    Filter.ltFilter(columnPath, expressionFactory)
+  def <[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.ltFilter(columnPath, filterValueFactory)
 
-  def <=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](expressionFactory: FilterValueFactory[V, C]): Filter =
-    Filter.ltEqFilter(columnPath, expressionFactory)
+  def <=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.ltEqFilter(columnPath, filterValueFactory)
 
 }

@@ -27,6 +27,8 @@ object ParquetStreamsITSpec {
 
 }
 
+
+// TODO add case with filtering
 class ParquetStreamsITSpec extends AsyncFlatSpec
   with Matchers
   with SparkHelper

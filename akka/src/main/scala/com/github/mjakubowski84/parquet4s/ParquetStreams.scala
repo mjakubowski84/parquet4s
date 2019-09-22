@@ -26,11 +26,20 @@ object ParquetStreams {
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     * @return The source of Parquet data
     */
-  def fromParquet[T : ParquetRecordDecoder](path: String, options: ParquetReader.Options = ParquetReader.Options()): Source[T, NotUsed] = {
+  def fromParquet[T : ParquetRecordDecoder](
+                                             path: String,
+                                             options: ParquetReader.Options = ParquetReader.Options(),
+                                             filter: Filter = Filter.noopFilter // TODO update docu
+                                           ): Source[T, NotUsed] = {
     val valueCodecConfiguration = options.toValueCodecConfiguration
+    val builder = HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path))
+      .withConf(options.hadoopConf)
+      .withFilter(filter.toFilterCompat(valueCodecConfiguration))
+
     def decode(record: RowParquetRecord): T =  ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
+
     Source.unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
-      create = HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)).withConf(options.hadoopConf).build,
+      create = builder.build,
       read = reader => Option(reader.read()),
       close = _.close()
     ).map(decode)
