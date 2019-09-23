@@ -28,7 +28,6 @@ object ParquetStreamsITSpec {
 }
 
 
-// TODO add case with filtering
 class ParquetStreamsITSpec extends AsyncFlatSpec
   with Matchers
   with SparkHelper
@@ -54,7 +53,8 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     .range(start = 0L, end = count, step = 1L)
     .map(i => Data(i, dict(Random.nextInt(4))))
 
-  def read[T : ParquetRecordDecoder](path: String): Future[immutable.Seq[T]] = ParquetStreams.fromParquet[T](path).runWith(Sink.seq)
+  def read[T : ParquetRecordDecoder](path: String, filter: Filter = Filter.noopFilter): Future[immutable.Seq[T]] =
+    ParquetStreams.fromParquet[T](path = path, filter = filter).runWith(Sink.seq)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -78,6 +78,24 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
       files should be(List(outputFileName))
       readData should have size count
       readData should contain theSameElementsInOrderAs data
+    }
+  }
+
+  it should "be able to filter files during reading" in {
+    val outputPath = s"$tempPathString/writeSingleFileAndFilterIt"
+    val outputFileName = "data.parquet"
+
+    val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$outputPath/$outputFileName",
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write()
+      readData <- read[Data](outputPath, filter = Col("s") === "a")
+    } yield {
+      readData should not be empty
+      forAll(readData) { _.s should be("a") }
     }
   }
 

@@ -11,14 +11,14 @@ import scala.language.{higherKinds, implicitConversions}
 
 trait Filter {
 
-  protected def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate
+  protected[parquet4s] def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate
 
   def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
     FilterCompat.get(toPredicate(valueCodecConfiguration))
 
   def &&(other: Filter): Filter = Filter.andFilter(this, other)
 
-  def |(other: Filter): Filter = Filter.orFilter(this, other)
+  def ||(other: Filter): Filter = Filter.orFilter(this, other)
 
   def unary_! : Filter = Filter.notFilter(this)
 
