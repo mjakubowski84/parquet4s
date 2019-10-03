@@ -11,6 +11,8 @@ import scala.util.Random
 
 class FilteringSpec extends FlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
 
+
+  case class Embedded(x: Int)
   case class Data(
                    idx: Int,
                    float: Float,
@@ -18,7 +20,8 @@ class FilteringSpec extends FlatSpec with Matchers with BeforeAndAfterAll with I
                    enum: String,
                    flag: Boolean,
                    date: LocalDate,
-                   decimal: BigDecimal
+                   decimal: BigDecimal,
+                   embedded: Embedded
                  )
 
   val enum: Seq[String] = List("a", "b", "c", "d")
@@ -40,7 +43,8 @@ class FilteringSpec extends FlatSpec with Matchers with BeforeAndAfterAll with I
         enum = enum(Random.nextInt(enum.size - 1)),
         flag = Random.nextBoolean(),
         date = zeroDate.plusDays(i),
-        decimal = BigDecimal.valueOf(0.001 * (i - halfSize))
+        decimal = BigDecimal.valueOf(0.001 * (i - halfSize)),
+        embedded = Embedded(i)
       )
     }
 
@@ -116,6 +120,7 @@ class FilteringSpec extends FlatSpec with Matchers with BeforeAndAfterAll with I
 
   it should "filter data by decimal" in ltGtTest("decimal", BigDecimal(0), _.decimal)
 
+  it should "filter data by embedded value" in ltGtTest("embedded.x", halfSize, _.idx)
 
   it should "leave data unfiltered when using noop filter" in {
     val filtered = ParquetReader.read[Data](filePath, filter = Filter.noopFilter)

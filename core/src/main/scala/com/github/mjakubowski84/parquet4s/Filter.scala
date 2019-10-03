@@ -8,12 +8,26 @@ import org.apache.parquet.io.api.Binary
 
 import scala.language.{higherKinds, implicitConversions}
 
-
+/**
+  * Filter provides a way to define filtering predicates with a simple algebra. Use filters to process
+  * your files while it is read from a file system and BEFORE its content is transferred to your application.
+  * 
+  * You can filter by values of leaf fields of your schema. Check here which field types are supported. TODO link
+  * Refer to fields/columns using case class [[Col]]. Define filtering conditions using simple algebraic operators, like
+  * equality or greater then (check [[Col]]'s fields. Combine filter by means of simple algebraic operators `&&`, `||`
+  * and `!`.
+  *
+  * @example
+  *          Given schema:
+  *          {{{ case class User(id: Long, age: Int, gender: String) }}}
+  *          Search for males in age below 40 (exclusive) or above 50 (inclusive)
+  *          {{{ Col("gender") === "male" && (Col("age") < 40 || Col("age") >= 50) }}}
+  */
 trait Filter {
 
   protected[parquet4s] def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate
 
-  def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
+  private[parquet4s] def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
     FilterCompat.get(toPredicate(valueCodecConfiguration))
 
   def &&(other: Filter): Filter = Filter.andFilter(this, other)
@@ -96,7 +110,35 @@ object Filter {
 
 }
 
-trait FilterValueConverter[In, V <: Comparable[V], C <: Column[V]] {
+/**
+  * Represent a column path that you want to apply a filter against. Use a dot-nation to refer to embedded fields.
+  * 
+  * @example
+  *          {{{ Col("user.address.postcode") === "00000" }}}
+  */
+case class Col(columnPath: String) {
+
+  def ===[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.eqFilter(columnPath, filterValueFactory)
+
+  def !==[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.neqFilter(columnPath, filterValueFactory)
+
+  def >[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.gtFilter(columnPath, filterValueFactory)
+
+  def >=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.gtEqFilter(columnPath, filterValueFactory)
+
+  def <[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.ltFilter(columnPath, filterValueFactory)
+
+  def <=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
+    Filter.ltEqFilter(columnPath, filterValueFactory)
+
+}
+
+private trait FilterValueConverter[In, V <: Comparable[V], C <: Column[V]] {
 
   def convert(in: In): FilterValueFactory[V, C]
 
@@ -117,7 +159,7 @@ private class IntFilterValueConverter[In](codec: ValueCodec[In]) extends FilterV
     conf => FilterValue.int(codec.encode(in, conf).asInstanceOf[PrimitiveValue[Int]].value)
 }
 
-object FilterValueConverter {
+private object FilterValueConverter {
 
   implicit val stringFilterValueConverter: FilterValueConverter[String, Binary, BinaryColumn] =
     new BinaryFilterValueConverter(ValueCodec.stringCodec)
@@ -157,7 +199,7 @@ object FilterValueConverter {
 
 }
 
-object FilterValue {
+private object FilterValue {
 
   type FilterValueFactory[V <: Comparable[V], C <: Column[V]] = ValueCodecConfiguration => FilterValue[V, C]
 
@@ -179,7 +221,7 @@ object FilterValue {
 
 }
 
-trait FilterValue[V <: Comparable[V], C <: Column[V]] {
+private trait FilterValue[V <: Comparable[V], C <: Column[V]] {
 
   def value: V
 
@@ -190,25 +232,3 @@ trait FilterValue[V <: Comparable[V], C <: Column[V]] {
 private class FilterValueImpl[V <: Comparable[V], C <: Column[V]](override val value: V,
                                                                   override val columnFactory: String => C
                                                                  ) extends FilterValue[V, C]
-
-case class Col(columnPath: String) {
-
-  def ===[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactory: FilterValueFactory[V, C]): Filter =
-    Filter.eqFilter(columnPath, filterValueFactory)
-
-  def !==[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactory: FilterValueFactory[V, C]): Filter =
-    Filter.neqFilter(columnPath, filterValueFactory)
-
-  def >[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
-    Filter.gtFilter(columnPath, filterValueFactory)
-
-  def >=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
-    Filter.gtEqFilter(columnPath, filterValueFactory)
-
-  def <[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
-    Filter.ltFilter(columnPath, filterValueFactory)
-
-  def <=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
-    Filter.ltEqFilter(columnPath, filterValueFactory)
-
-}
