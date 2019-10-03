@@ -17,6 +17,7 @@ trait ParquetReader[T] {
     * Reads data from give path.
     * @param path URI to location of files
     * @param options configuration of how Parquet files should be read
+    * @param filter optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
     * @return iterable collection of data read from path
     */
   def read(path: String, options: ParquetReader.Options, filter: Filter): ParquetIterable[T]
@@ -29,8 +30,9 @@ object ParquetReader {
 
   /**
     * Configuration settings that are used during decoding or reading Parquet files
-    * @param timeZone set it to [[TimeZone]] which was used to encode time-based data that you want to read, machine's
+    * @param timeZone set it to [[TimeZone]] which was used to encode time-based data that you want to read; machine's
     *                 time zone is used by default
+    * @param hadoopConf use it to programmatically override Hadoop's [[Configuration]]
     */
   case class Options(timeZone: TimeZone = TimeZone.getDefault, hadoopConf: Configuration = new Configuration()) {
     private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
@@ -54,15 +56,17 @@ object ParquetReader {
     * <br/>
     * Path can represent local file or directory, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
-    * <br/>
-    * <b>Note:</b> Remember to call {{{ close() }}} on iterable in order to free resources!
+    *
+    * @note Remember to call `close()` on iterable in order to free resources!
     *
     * @param path URI to Parquet files, e.g.:
     *             {{{ "file:///data/users" }}}
+    * @param options configuration of how Parquet files should be read
+    * @param filter optional before-read filtering; no filtering is applied by default; check [[Filter]] for more details
     * @tparam T type of data that represents the schema of the Parquet file, e.g.:
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     */
-  def read[T](path: String, options: Options = Options(), filter: Filter = Filter.noopFilter) // TODO update docu here and there
+  def read[T](path: String, options: Options = Options(), filter: Filter = Filter.noopFilter)
              (implicit reader: ParquetReader[T]): ParquetIterable[T] =
     reader.read(path, options, filter)
 
@@ -77,7 +81,7 @@ object ParquetReader {
 }
 
 /**
-  * Allows to iterate over Parquet file(s). Remember to call {{{close()}}} when you are done.
+  * Allows to iterate over Parquet file(s). Remember to call `close()` when you are done.
   * @tparam T type that represents schema of Parquet file
   */
 trait ParquetIterable[T] extends Iterable[T] with Closeable

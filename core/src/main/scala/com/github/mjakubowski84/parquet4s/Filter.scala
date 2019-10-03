@@ -30,10 +30,19 @@ trait Filter {
   private[parquet4s] def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
     FilterCompat.get(toPredicate(valueCodecConfiguration))
 
+  /**
+    * @return New filter that passes data that match `this` <b>and<b> `other` filter.
+    */
   def &&(other: Filter): Filter = Filter.andFilter(this, other)
 
+  /**
+    * @return New filter that passes data that match `this` <b>or<b> `other` filter.
+    */
   def ||(other: Filter): Filter = Filter.orFilter(this, other)
 
+  /**
+    * @return Returns new filter that reverts `this`
+    */
   def unary_! : Filter = Filter.notFilter(this)
 
 }
@@ -118,21 +127,39 @@ object Filter {
   */
 case class Col(columnPath: String) {
 
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> provided value
+    */
   def ===[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactory: FilterValueFactory[V, C]): Filter =
     Filter.eqFilter(columnPath, filterValueFactory)
 
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>not equal to</b> provided value
+    */
   def !==[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactory: FilterValueFactory[V, C]): Filter =
     Filter.neqFilter(columnPath, filterValueFactory)
 
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>greater than</b> provided value
+    */
   def >[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
     Filter.gtFilter(columnPath, filterValueFactory)
 
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>greater than or equal to</b> provided value
+    */
   def >=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
     Filter.gtEqFilter(columnPath, filterValueFactory)
 
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>less than</b> provided value
+    */
   def <[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
     Filter.ltFilter(columnPath, filterValueFactory)
 
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>less than or equal to</b> provided value
+    */
   def <=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
     Filter.ltEqFilter(columnPath, filterValueFactory)
 
