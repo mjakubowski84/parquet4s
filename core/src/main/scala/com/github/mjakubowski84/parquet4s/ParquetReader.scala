@@ -29,7 +29,7 @@ object ParquetReader {
 
   /**
     * Configuration settings that are used during decoding or reading Parquet files
-    * @param timeZone set it to TimeZone which was used to encode time-based data that you want to read, machine's
+    * @param timeZone set it to [[TimeZone]] which was used to encode time-based data that you want to read, machine's
     *                 time zone is used by default
     */
   case class Options(timeZone: TimeZone = TimeZone.getDefault, hadoopConf: Configuration = new Configuration()) {
