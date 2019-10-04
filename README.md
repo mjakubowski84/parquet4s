@@ -171,7 +171,7 @@ ParquetStreams.fromParquet[Stats](
 )
 ```
 
-You can filter using simple algebraic predicates using `===`, `!==`, `>`, `>=`, `<`, `<=` operators on column containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
+You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
 
 Check ScalaDoc and code for more!
 
