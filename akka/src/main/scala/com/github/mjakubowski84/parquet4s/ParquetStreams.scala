@@ -22,6 +22,8 @@ object ParquetStreams {
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     *
     * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
+    * @param options configuration of how Parquet files should be read
+    * @param filter optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
     * @tparam T type of data that represent the schema of the Parquet data, e.g.:
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     * @return The source of Parquet data
@@ -29,7 +31,7 @@ object ParquetStreams {
   def fromParquet[T : ParquetRecordDecoder](
                                              path: String,
                                              options: ParquetReader.Options = ParquetReader.Options(),
-                                             filter: Filter = Filter.noopFilter // TODO update docu
+                                             filter: Filter = Filter.noopFilter
                                            ): Source[T, NotUsed] = {
     val valueCodecConfiguration = options.toValueCodecConfiguration
     val builder = HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path))
