@@ -42,7 +42,7 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 Add the library to your dependencies:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-core" % "0.9.1"
+"com.github.mjakubowski84" %% "parquet4s-core" % "0.10.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -70,22 +70,21 @@ try {
 
 ```
 
-Since 0.8.0 a separate [IncrementalParquetWriter](core/src/main/scala/com/github/mjakubowski84/parquet4s/IncrementalParquetWriter.scala) 
-is available. You may use it to write chunks of data to a single file multiple times and close it when you are done.
+Since 0.8.0 a separate [IncrementalParquetWriter](core/src/main/scala/com/github/mjakubowski84/parquet4s/IncrementalParquetWriter.scala) is available. You may use it to write chunks of data to a single file **multiple times and close it** when you are done.
 
 ### Akka Streams
 
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "0.9.1"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "0.10.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
-Parquet4S has so far single `Source` for reading single file or directory and **three** `Sink`s for writing. Choose one that suits you most.
+Parquet4S has so far single `Source` for reading single file or directory and **four** `Sink`s for writing. Choose one that suits you most.
 
 ```scala
 import com.github.mjakubowski84.parquet4s.{ParquetStreams, ParquetWriter}
@@ -151,11 +150,34 @@ Source(data).runWith(ParquetStreams.toParquetIndefinite(
 ParquetStreams.fromParquet[User]("file:///data/users", ParquetReader.Options(hadoopConf=conf)).runForeach(println)
 ```
 
+## Before-read filtering or Filter pushdown
+
+One of the best features of Parquet is efficient way of fitering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Since version 0.10.0 Parquet4S allows do define filter predicates both in core and akka module in order to push filtering out from Scala collections or Akka Stream down to point before file content is even read.
+
+You define you filters using simple algebra as follows.
+
+In core library:
+
+```scala
+ParquetReader.read[User](path = "file://my/path", filter = Col("email") === "user@email.com")
+```
+
+In Akka:
+
+```scala
+ParquetStreams.fromParquet[Stats](
+  path = "file://my/path", 
+  filter = Col("stats.score") > 0.9 && Col("stats.score") <= 1.0
+)
+```
+
+Check ScalaDoc and code for more!
+
 ## Customisation and extensibility
 
 Parquet4S is built using Scala's type class system. That allows you to extend Parquet4S by defining your own implementations of its type classes. 
 
-For example, you may define your codecs of your own type so that they can be read from or written to Parquet. Assume that you have your own type:
+For example, you may define your codecs of your own type so that they can be **read from or written** to Parquet. Assume that you have your own type:
 
 ```scala
 case class CustomType(i: Int)
