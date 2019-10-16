@@ -40,6 +40,11 @@ class FilterSpec extends FlatSpec with Matchers {
     predicate.toString  should be("lteq(i, 1)")
   }
 
+  it should "build in predicate" in {
+    val predicate = (Col("i") in Seq(1, 2, 3)).toPredicate(valueCodecConfiguration)
+    predicate.toString should be("userdefinedbyinstance(i, in(1, 2, 3))")
+  }
+
   it should "build not predicate" in {
     val predicate = (!(Col("i") === 1)).toPredicate(valueCodecConfiguration)
     predicate.toString  should be("not(eq(i, 1))")

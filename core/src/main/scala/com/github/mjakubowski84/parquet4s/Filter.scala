@@ -1,17 +1,19 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.FilterValue.FilterValueFactory
+import com.github.mjakubowski84.parquet4s.FilterValueSet.FilterValueSetFactory
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators._
-import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate}
+import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
 
+import scala.collection.immutable
 import scala.language.{higherKinds, implicitConversions}
 
 /**
   * Filter provides a way to define filtering predicates with a simple algebra. Use filters to process
   * your files while it is read from a file system and BEFORE its content is transferred to your application.
-  * 
+  *
   * You can filter by values of leaf fields of your schema. Check here which field types are supported. TODO link
   * Refer to fields/columns using case class [[Col]]. Define filtering conditions using simple algebraic operators, like
   * equality or greater then (check [[Col]]'s fields. Combine filter by means of simple algebraic operators `&&`, `||`
@@ -45,6 +47,23 @@ trait Filter {
     */
   def unary_! : Filter = Filter.notFilter(this)
 
+}
+
+case class InPredicate[T <: Comparable[T]](values: Set[T]) extends UserDefinedPredicate[T] with Serializable {
+  override def keep(value: T): Boolean = values.contains(value)
+
+  override def canDrop(statistics: Statistics[T]): Boolean = !inverseCanDrop(statistics)
+
+  @inline
+  override def inverseCanDrop(statistics: Statistics[T]): Boolean = {
+    val compare = statistics.getComparator.compare(_, _)
+    val min = statistics.getMin
+    val max = statistics.getMax
+    val isInRange = (value: T) => compare(value, min) >= 0 && compare(value, max) <= 0
+    values.exists(isInRange)
+  }
+
+  override def toString: String = values.mkString("in(", ", ", ")")
 }
 
 object Filter {
@@ -106,7 +125,15 @@ object Filter {
     }
   }
 
-  val noopFilter: Filter  = new Filter {
+  def inFilter[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: String, filterValueSetFactory: FilterValueSetFactory[V, C]): Filter =
+    new Filter {
+      override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
+        val filterValue = filterValueSetFactory(valueCodecConfiguration)
+        FilterApi.userDefined(filterValue.columnFactory(columnPath), InPredicate(filterValue.value))
+      }
+    }
+
+  val noopFilter: Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = new FilterPredicate {
       override def accept[R](visitor: FilterPredicate.Visitor[R]): R = {
         throw new UnsupportedOperationException
@@ -121,7 +148,7 @@ object Filter {
 
 /**
   * Represent a column path that you want to apply a filter against. Use a dot-nation to refer to embedded fields.
-  * 
+  *
   * @example
   *          {{{ Col("user.address.postcode") === "00000" }}}
   */
@@ -163,6 +190,11 @@ case class Col(columnPath: String) {
   def <=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
     Filter.ltEqFilter(columnPath, filterValueFactory)
 
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> one of the provided values
+    */
+  def in[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueSetFactory: FilterValueSetFactory[V, C]): Filter =
+    Filter.inFilter(columnPath, filterValueSetFactory)
 }
 
 private trait FilterValueConverter[In, V <: Comparable[V], C <: Column[V]] {
@@ -259,3 +291,93 @@ private trait FilterValue[V <: Comparable[V], C <: Column[V]] {
 private class FilterValueImpl[V <: Comparable[V], C <: Column[V]](override val value: V,
                                                                   override val columnFactory: String => C
                                                                  ) extends FilterValue[V, C]
+
+private trait FilterValueSetConverter[In, V <: Comparable[V], C <: Column[V]] {
+
+  def convert(in: Iterable[In]): FilterValueSetFactory[V, C]
+}
+
+private class SimpleFilterValueSetConverter[In, V <: Comparable[V], C <: Column[V]](f: Iterable[In] => FilterValueSet[V, C]
+                                                                                   ) extends FilterValueSetConverter[In, V, C] {
+  override def convert(in: Iterable[In]): FilterValueSetFactory[V, C] = _ => f(in)
+}
+
+private class BinaryFilterValueSetConverter[In](codec: ValueCodec[In]) extends FilterValueSetConverter[In, Binary, BinaryColumn] {
+  override def convert(in: Iterable[In]): FilterValueSetFactory[Binary, BinaryColumn] =
+    conf => FilterValueSet.binary(in.map(codec.encode(_, conf).asInstanceOf[BinaryValue].value))
+}
+
+private class IntFilterValueSetConverter[In](codec: ValueCodec[In]) extends FilterValueSetConverter[In, Integer, IntColumn] {
+  override def convert(in: Iterable[In]): FilterValueSetFactory[Integer, IntColumn] =
+    conf => FilterValueSet.int(in.map(codec.encode(_, conf).asInstanceOf[PrimitiveValue[Int]].value))
+}
+
+private object FilterValueSetConverter {
+  implicit val stringFilterValueSetConverter: FilterValueSetConverter[String, Binary, BinaryColumn] =
+    new BinaryFilterValueSetConverter(ValueCodec.stringCodec)
+
+  implicit val intFilterValueSetConverter: FilterValueSetConverter[Int, Integer, IntColumn] =
+    new SimpleFilterValueSetConverter(FilterValueSet.int)
+
+  implicit val shortFilterValueSetConverter: FilterValueSetConverter[Short, Integer, IntColumn] =
+    new SimpleFilterValueSetConverter(shorts => FilterValueSet.int(shorts.map(_.toInt)))
+
+  implicit val byteFilterValueSetConverter: FilterValueSetConverter[Byte, Integer, IntColumn] =
+    new SimpleFilterValueSetConverter(bytes => FilterValueSet.int(bytes.map(_.toInt)))
+
+  implicit val charFilterValueSetConverter: FilterValueSetConverter[Char, Integer, IntColumn] =
+    new SimpleFilterValueSetConverter(chars => FilterValueSet.int(chars.map(_.toInt)))
+
+  implicit val longFilterValueSetConverter: FilterValueSetConverter[Long, java.lang.Long, LongColumn] =
+    new SimpleFilterValueSetConverter(FilterValueSet.long)
+
+  implicit val floatFilterValueSetConverter: FilterValueSetConverter[Float, java.lang.Float, FloatColumn] =
+    new SimpleFilterValueSetConverter(FilterValueSet.float)
+
+  implicit val doubleFilterValueSetConverter: FilterValueSetConverter[Double, java.lang.Double, DoubleColumn] =
+    new SimpleFilterValueSetConverter(FilterValueSet.double)
+
+  implicit val sqlDateFilterValueSetConverter: FilterValueSetConverter[java.sql.Date, Integer, IntColumn] =
+    new IntFilterValueSetConverter(ValueCodec.sqlDateCodec)
+
+  implicit val localDateFilterValueSetConverter: FilterValueSetConverter[java.time.LocalDate, Integer, IntColumn] =
+    new IntFilterValueSetConverter(ValueCodec.localDateCodec)
+
+  implicit val decimalFilterValueSetConverter: FilterValueSetConverter[BigDecimal, Binary, BinaryColumn] =
+    new BinaryFilterValueSetConverter(ValueCodec.decimalCodec)
+
+}
+
+private object FilterValueSet {
+  type FilterValueSetFactory[V <: Comparable[V], C <: Column[V]] = ValueCodecConfiguration => FilterValueSet[V, C]
+
+  implicit def convert[In, V <: Comparable[V], C <: Column[V]](in: Iterable[In])
+                                                              (implicit filterValueSetConverter: FilterValueSetConverter[In, V, C]): FilterValueSetFactory[V, C] =
+    filterValueSetConverter.convert(in)
+
+  def binary(binaries: Iterable[Binary]): FilterValueSet[Binary, BinaryColumn] =
+    new FilterValueSetImpl(binaries.to[immutable.Set], FilterApi.binaryColumn)
+
+  def int(ints: Iterable[Int]): FilterValueSet[Integer, IntColumn] =
+    new FilterValueSetImpl(ints.map(new Integer(_)).to[immutable.Set], FilterApi.intColumn)
+
+  def long(longs: Iterable[Long]): FilterValueSet[java.lang.Long, LongColumn] =
+    new FilterValueSetImpl(longs.map(new java.lang.Long(_)).to[immutable.Set], FilterApi.longColumn)
+
+  def float(floats: Iterable[Float]): FilterValueSet[java.lang.Float, FloatColumn] =
+    new FilterValueSetImpl(floats.map(new java.lang.Float(_)).to[immutable.Set], FilterApi.floatColumn)
+
+  def double(doubles: Iterable[Double]): FilterValueSet[java.lang.Double, DoubleColumn] =
+    new FilterValueSetImpl(doubles.map(new java.lang.Double(_)).to[immutable.Set], FilterApi.doubleColumn)
+}
+
+private trait FilterValueSet[V <: Comparable[V], C <: Column[V]] {
+
+  def value: Set[V]
+
+  def columnFactory: String => C
+}
+
+private class FilterValueSetImpl[V <: Comparable[V], C <: Column[V]](override val value: Set[V],
+                                                                     override val columnFactory: String => C
+                                                                    ) extends FilterValueSet[V, C]
