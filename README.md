@@ -43,6 +43,7 @@ Add the library to your dependencies:
 
 ```scala
 "com.github.mjakubowski84" %% "parquet4s-core" % "0.10.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "0.10.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
