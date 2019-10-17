@@ -125,4 +125,9 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
     filteredRecords.size should equal(3)
     filteredRecords.map(_.idx) should contain allOf(1, 2, 3)
   }
+
+  it should "reject an empty set of keys" in {
+    a[IllegalArgumentException] should be thrownBy (Col("idx") in())
+    a[IllegalArgumentException] should be thrownBy (Col("idx") in Set.empty[Int])
+  }
 }
