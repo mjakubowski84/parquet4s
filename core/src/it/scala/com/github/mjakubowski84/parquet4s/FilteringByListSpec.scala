@@ -76,7 +76,7 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
   }
 
   def genericFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T)
-                                                                                             (implicit filterValueSetConverter: FilterValueSetConverter[T, V, C]): Unit = {
+                                                                                             (implicit filterValueConverter: FilterValueConverter[T, V, C]): Unit = {
     val filterValues = everyOtherDatum.map(field)
     val actual = ParquetReader.read[Data](filePath, filter = Col(columnName) in filterValues)
 
@@ -84,7 +84,7 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
   }
 
   def specificValueFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T, values: Vector[T])
-                                                                                                   (implicit filterValueSetConverter: FilterValueSetConverter[T, V, C]): Unit = {
+                                                                                                   (implicit filterValueConverter: FilterValueConverter[T, V, C]): Unit = {
     val filteredRecords = ParquetReader.read[Data](filePath, filter = Col(columnName) in values)
     filteredRecords.map(field) should contain only (values: _*)
 
@@ -93,7 +93,6 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
       .filter(row => values.contains(field(row)))
 
     filteredRecords.map(_.idx) should equal(manuallyFilteredRecords.map(_.idx))
-
   }
 
   "Filtering" should "filter data by a list of ints" in genericFilterTest("idx", _.idx)
@@ -119,4 +118,11 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
   it should "filter data by a list of decimals" in genericFilterTest("decimal", _.decimal)
 
   it should "filter data by a list of embedded values" in genericFilterTest("embedded.x", _.idx)
+
+  it should "filter data by a hard-coded list of values" in {
+    val filteredRecords = ParquetReader.read[Data](filePath, filter = Col("idx") in(1, 2, 3))
+
+    filteredRecords.size should equal(3)
+    filteredRecords.map(_.idx) should contain allOf(1, 2, 3)
+  }
 }
