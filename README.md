@@ -78,7 +78,7 @@ Since 0.8.0 a separate [IncrementalParquetWriter](core/src/main/scala/com/github
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "0.10.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "0.11.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -172,7 +172,7 @@ ParquetStreams.fromParquet[Stats](
 )
 ```
 
-You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
+You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, and `in` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
 
 Check ScalaDoc and code for more!
 

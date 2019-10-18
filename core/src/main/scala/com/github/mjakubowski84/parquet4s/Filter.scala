@@ -3,7 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import com.github.mjakubowski84.parquet4s.FilterValue.FilterValueFactory
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators._
-import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate}
+import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
 
 import scala.language.{higherKinds, implicitConversions}
@@ -11,7 +11,7 @@ import scala.language.{higherKinds, implicitConversions}
 /**
   * Filter provides a way to define filtering predicates with a simple algebra. Use filters to process
   * your files while it is read from a file system and BEFORE its content is transferred to your application.
-  * 
+  *
   * You can filter by values of leaf fields of your schema. Check here which field types are supported. TODO link
   * Refer to fields/columns using case class [[Col]]. Define filtering conditions using simple algebraic operators, like
   * equality or greater then (check [[Col]]'s fields. Combine filter by means of simple algebraic operators `&&`, `||`
@@ -45,6 +45,23 @@ trait Filter {
     */
   def unary_! : Filter = Filter.notFilter(this)
 
+}
+
+case class InPredicate[T <: Comparable[T]](values: Set[T]) extends UserDefinedPredicate[T] with Serializable {
+  override def keep(value: T): Boolean = values.contains(value)
+
+  override def canDrop(statistics: Statistics[T]): Boolean = !inverseCanDrop(statistics)
+
+  @inline
+  override def inverseCanDrop(statistics: Statistics[T]): Boolean = {
+    val compare = statistics.getComparator.compare(_, _)
+    val min = statistics.getMin
+    val max = statistics.getMax
+    val isInRange = (value: T) => compare(value, min) >= 0 && compare(value, max) <= 0
+    values.exists(isInRange)
+  }
+
+  override def toString: String = values.mkString("in(", ", ", ")")
 }
 
 object Filter {
@@ -106,7 +123,20 @@ object Filter {
     }
   }
 
-  val noopFilter: Filter  = new Filter {
+  def inFilter[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: String, filterValueFactories: Iterable[FilterValueFactory[V, C]]): Filter = {
+    require(filterValueFactories.nonEmpty, "Cannot filter with an empty list of keys.")
+
+    new Filter {
+      override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
+        val filterValues = filterValueFactories.map(_ (valueCodecConfiguration))
+        val column = filterValues.head.columnFactory(columnPath)
+        val valueSet = filterValues.map(_.value).toSet
+        FilterApi.userDefined(column, InPredicate(valueSet))
+      }
+    }
+  }
+
+  val noopFilter: Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = new FilterPredicate {
       override def accept[R](visitor: FilterPredicate.Visitor[R]): R = {
         throw new UnsupportedOperationException
@@ -121,7 +151,7 @@ object Filter {
 
 /**
   * Represent a column path that you want to apply a filter against. Use a dot-nation to refer to embedded fields.
-  * 
+  *
   * @example
   *          {{{ Col("user.address.postcode") === "00000" }}}
   */
@@ -163,6 +193,19 @@ case class Col(columnPath: String) {
   def <=[V <: Comparable[V], C <: Column[V] with SupportsLtGt](filterValueFactory: FilterValueFactory[V, C]): Filter =
     Filter.ltEqFilter(columnPath, filterValueFactory)
 
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> one of the provided values
+    */
+  def in[V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](filterValueFactories: FilterValueFactory[V, C]*): Filter =
+    Filter.inFilter(columnPath, filterValueFactories.toSet)
+
+  /**
+    * @return Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> one of the provided values
+    */
+  def in[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](in: Iterable[In])
+                                                                     (implicit conv: FilterValueConverter[In, V, C]): Filter = {
+    Filter.inFilter(columnPath, in.map(conv.convert))
+  }
 }
 
 private trait FilterValueConverter[In, V <: Comparable[V], C <: Column[V]] {
