@@ -9,10 +9,10 @@ import scala.language.postfixOps
 
 object Signing {
 
-  private val signatureExtension = "asc"
+  private val SignatureExtension = "asc"
 
   private def createSignatureFile(artifactFile: File): File = {
-    val signatureFile = file(artifactFile.getAbsolutePath + "." + signatureExtension)
+    val signatureFile = file(artifactFile.getAbsolutePath + "." + SignatureExtension)
     if (signatureFile.exists()) IO.delete(signatureFile)
 
     val command = "gpg"
@@ -43,8 +43,8 @@ object Signing {
       val sourceArtifact = artifact.in(configuration, packageTask).value
       Artifact(
         name = sourceArtifact.name,
-        `type` = signatureExtension,
-        extension = sourceArtifact.extension + "." + signatureExtension,
+        `type` = SignatureExtension,
+        extension = sourceArtifact.extension + "." + SignatureExtension,
         classifier = sourceArtifact.classifier,
         configurations = Vector.empty,
         url = None
