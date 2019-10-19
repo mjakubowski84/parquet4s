@@ -79,20 +79,25 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
                                                                                              (implicit filterValueConverter: FilterValueConverter[T, V, C]): Unit = {
     val filterValues = everyOtherDatum.map(field)
     val actual = ParquetReader.read[Data](filePath, filter = Col(columnName) in filterValues)
-
-    actual.map(_.idx) should equal(everyOtherDatum.map(_.idx))
+    try {
+      actual.map(_.idx) should equal(everyOtherDatum.map(_.idx))
+    } finally actual.close()
   }
 
   def specificValueFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T, values: Vector[T])
                                                                                                    (implicit filterValueConverter: FilterValueConverter[T, V, C]): Unit = {
     val filteredRecords = ParquetReader.read[Data](filePath, filter = Col(columnName) in values)
-    filteredRecords.map(field) should contain only (values: _*)
+    val unfilteredRecords = ParquetReader.read[Data](filePath)
 
-    val manuallyFilteredRecords = ParquetReader
-      .read[Data](filePath)
-      .filter(row => values.contains(field(row)))
+    try {
+      filteredRecords.map(field) should contain only (values: _*)
+      val manuallyFilteredRecords = unfilteredRecords.filter(row => values.contains(field(row)))
+      filteredRecords.map(_.idx) should equal(manuallyFilteredRecords.map(_.idx))
+    } finally {
+      filteredRecords.close()
+      unfilteredRecords.close()
+    }
 
-    filteredRecords.map(_.idx) should equal(manuallyFilteredRecords.map(_.idx))
   }
 
   "Filtering" should "filter data by a list of ints" in genericFilterTest("idx", _.idx)
@@ -121,9 +126,10 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
 
   it should "filter data by a hard-coded list of values" in {
     val filteredRecords = ParquetReader.read[Data](filePath, filter = Col("idx") in(1, 2, 3))
-
-    filteredRecords.size should equal(3)
-    filteredRecords.map(_.idx) should contain allOf(1, 2, 3)
+    try {
+      filteredRecords.size should equal(3)
+      filteredRecords.map(_.idx) should contain allOf(1, 2, 3)
+    } finally filteredRecords.close()
   }
 
   it should "reject an empty set of keys" in {

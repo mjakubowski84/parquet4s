@@ -57,23 +57,29 @@ class FilteringSpec extends FlatSpec with Matchers with BeforeAndAfterAll with I
     ))
   }
 
+  def read(filter: Filter): Seq[Data] = {
+    val iter = ParquetReader.read[Data](filePath, filter = filter)
+    try iter.toSeq
+    finally iter.close()
+  }
+
   def ltGtTest[T : Ordering, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnName: String, boundaryValue: T, field: Data => T)
                                                                                   (implicit filterValueConverter: FilterValueConverter[T, V, C]): Unit = {
-    forExactly(halfSize, ParquetReader.read[Data](filePath, filter = Col(columnName) < boundaryValue)) { dataRecord =>
+    forExactly(halfSize, read(Col(columnName) < boundaryValue)) { dataRecord =>
       field(dataRecord) should be < boundaryValue
     }
 
-    forExactly(halfSize + 1, ParquetReader.read[Data](filePath, filter = Col(columnName) <= boundaryValue)) { dataRecord =>
+    forExactly(halfSize + 1, read(Col(columnName) <= boundaryValue)) { dataRecord =>
       field(dataRecord) should be <= boundaryValue
     }
 
-    field(ParquetReader.read[Data](filePath, filter = Col(columnName) === boundaryValue).head) should be(boundaryValue)
+    field(read(Col(columnName) === boundaryValue).head) should be(boundaryValue)
 
-    forExactly(halfSize, ParquetReader.read[Data](filePath, filter = Col(columnName) >= boundaryValue)) { dataRecord =>
+    forExactly(halfSize, read(Col(columnName) >= boundaryValue)) { dataRecord =>
       field(dataRecord) should be >= boundaryValue
     }
 
-    forExactly(halfSize - 1, ParquetReader.read[Data](filePath, filter = Col(columnName) > boundaryValue)) { dataRecord =>
+    forExactly(halfSize - 1, read(Col(columnName) > boundaryValue)) { dataRecord =>
       field(dataRecord) should be > boundaryValue
     }
   }
@@ -87,31 +93,31 @@ class FilteringSpec extends FlatSpec with Matchers with BeforeAndAfterAll with I
   it should "filter data by text" in {
     val boundaryValue = "c"
 
-    forAll(ParquetReader.read[Data](filePath, filter = Col("enum") < boundaryValue)) { dataRecord =>
+    forAll(read(Col("enum") < boundaryValue)) { dataRecord =>
       dataRecord.enum should be < boundaryValue
     }
 
-    forAll(ParquetReader.read[Data](filePath, filter = Col("enum") <= boundaryValue)) { dataRecord =>
+    forAll(read(Col("enum") <= boundaryValue)) { dataRecord =>
       dataRecord.enum should be <= boundaryValue
     }
 
-    ParquetReader.read[Data](filePath, filter = Col("enum") === boundaryValue).head.enum should be(boundaryValue)
+    read(Col("enum") === boundaryValue).head.enum should be(boundaryValue)
 
-    forAll(ParquetReader.read[Data](filePath, filter = Col("enum") >= boundaryValue)) { dataRecord =>
+    forAll(read(Col("enum") >= boundaryValue)) { dataRecord =>
       dataRecord.enum should be >= boundaryValue
     }
 
-    forAll(ParquetReader.read[Data](filePath, filter = Col("enum") > boundaryValue)) { dataRecord =>
+    forAll(read(Col("enum") > boundaryValue)) { dataRecord =>
       dataRecord.enum should be > boundaryValue
     }
   }
 
   it should "filter data by boolean" in {
-    val trueData = ParquetReader.read[Data](filePath, filter = Col("flag") === true)
+    val trueData = read(Col("flag") === true)
     trueData.headOption should be (defined)
     forAll(trueData) { _.flag should be(true) }
 
-    val falseData = ParquetReader.read[Data](filePath, filter = Col("flag") === false)
+    val falseData = read(Col("flag") === false)
     falseData.headOption should be (defined)
     forAll(falseData) { _.flag should be(false) }
   }
@@ -123,7 +129,7 @@ class FilteringSpec extends FlatSpec with Matchers with BeforeAndAfterAll with I
   it should "filter data by embedded value" in ltGtTest("embedded.x", halfSize, _.idx)
 
   it should "leave data unfiltered when using noop filter" in {
-    val filtered = ParquetReader.read[Data](filePath, filter = Filter.noopFilter)
+    val filtered = read(Filter.noopFilter)
 
     filtered should have size dataSize
   }
