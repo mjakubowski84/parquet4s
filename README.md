@@ -29,6 +29,8 @@ export AWS_ACCESS_KEY_ID=my.aws.key
 export AWS_SECRET_ACCESS_KEY=my.secret.key
 ```
 
+Please follow [documentation of Hadoop AWS](https://hadoop.apache.org/docs/current/hadoop-aws/tools/hadoop-aws/index.html) for more details and troubleshooting.
+
 #### Passing Hadoop Configs Programmatically 
 File system configs for S3, GCS or Hadoop can also be set programmatically to the 
 `ParquetReader` and `ParquetWriter` by passing the `Configuration` object to the 
