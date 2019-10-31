@@ -3,5 +3,5 @@ object DependecyVersions {
   val sparkVersion = "2.4.4"
   val hadoopVersion = "2.9.2"
   val slf4jVersion = "1.7.25"
-  val akkaVersion = "2.5.23"
+  val akkaVersion = "2.5.25"
 }
