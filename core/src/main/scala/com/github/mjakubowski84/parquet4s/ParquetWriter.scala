@@ -27,7 +27,7 @@ trait ParquetWriter[T] {
     * @param data data to write
     * @param options configuration of how Parquet files should be created and written
     */
-  def write(path: String, data: Iterable[T], options: ParquetWriter.Options)
+  def write(path: String, data: Iterable[T], options: ParquetWriter.Options): Unit
 
 }
 

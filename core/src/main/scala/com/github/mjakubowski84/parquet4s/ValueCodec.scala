@@ -189,10 +189,10 @@ trait PrimitiveValueCodecs {
 
 object TimeValueCodecs {
   val JulianDayOfEpoch = 2440588
-  val MicrosPerMilli = 1000l
-  val NanosPerMicro = 1000l
+  val MicrosPerMilli = 1000L
+  val NanosPerMicro = 1000L
   val NanosPerMilli: Long = NanosPerMicro * MicrosPerMilli
-  val NanosPerDay = 86400000000000l
+  val NanosPerDay = 86400000000000L
 
   // TODO there are parquet time formats over there to be checked, too
 

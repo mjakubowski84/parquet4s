@@ -71,7 +71,7 @@ class FilterSpec extends FlatSpec with Matchers {
   }
 
   it should "build predicate for long column" in {
-    val predicate = (Col("l") === 1l).toPredicate(valueCodecConfiguration)
+    val predicate = (Col("l") === 1L).toPredicate(valueCodecConfiguration)
     predicate.toString  should be("eq(l, 1)")
   }
 

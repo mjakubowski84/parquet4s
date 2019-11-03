@@ -15,7 +15,7 @@ trait IncrementalParquetWriter[T] extends Closeable {
     * Appends data chunk to file contents
     * @param data data chunk to be written
     */
-  def write(data: Iterable[T])
+  def write(data: Iterable[T]): Unit
 
 }
 

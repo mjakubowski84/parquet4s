@@ -3,12 +3,13 @@ package com.github.mjakubowski84.parquet4s
 import java.nio.file.{Path, Paths}
 
 import com.google.common.io.Files
+import com.github.mjakubowski84.parquet4s.TestUtils
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.reflect.runtime.universe.TypeTag
 
-trait SparkHelper extends BeforeAndAfterAll  {
+trait SparkHelper extends BeforeAndAfterAll with TestUtils {
 
   this: Suite =>
 
@@ -18,10 +19,6 @@ trait SparkHelper extends BeforeAndAfterAll  {
     sparkStarted = true
     SparkSession.builder.master("local[2]").appName(getClass.getSimpleName).getOrCreate
   }
-
-  private val tempPath: Path = Paths.get(Files.createTempDir().getAbsolutePath, "testOutputPath")
-
-  val tempPathString: String = tempPath.toString
 
   override def afterAll() {
     super.afterAll()
@@ -36,12 +33,6 @@ trait SparkHelper extends BeforeAndAfterAll  {
   def readFromTemp[T <: Product : TypeTag]: Seq[T] = {
     import sparkSession.implicits._
     sparkSession.read.parquet(tempPathString).as[T].collect().toSeq
-  }
-
-  def clearTemp(): Unit = {
-    val tempDir = tempPath.toFile
-    Option(tempDir.listFiles()).foreach(_.foreach(_.delete()))
-    tempDir.delete()
   }
 
 }
