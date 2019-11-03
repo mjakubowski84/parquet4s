@@ -8,7 +8,7 @@ libraryDependencies ++= Seq(
   "org.slf4j" % "slf4j-api" % slf4jVersion,
 
   // tests
-  "org.scalamock" %% "scalamock" % "4.4.0" % "test",
+  "org.mockito" %% "mockito-scala-scalatest" % "1.7.1" % "test",
   "org.scalatest" %% "scalatest" % "3.0.8" % "test,it",
   "ch.qos.logback" % "logback-classic" % "1.2.3" % "test,it",
   "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
@@ -24,7 +24,6 @@ lazy val sparkDeps = Seq(
 
 libraryDependencies ++= {
   val scala = scalaBinaryVersion.value
-  println(scala)
   scala match {
     case "2.11" | "2.12" => sparkDeps
     case _ => Seq.empty

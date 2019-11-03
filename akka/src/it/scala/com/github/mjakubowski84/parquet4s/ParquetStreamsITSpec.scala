@@ -6,7 +6,7 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import akka.stream.{ActorMaterializer, Materializer}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
-import org.scalatest.{AsyncFlatSpec, Inspectors, Matchers}
+import org.scalatest.{AsyncFlatSpec, BeforeAndAfterAll, Inspectors, Matchers}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.immutable
@@ -30,9 +30,10 @@ object ParquetStreamsITSpec {
 
 class ParquetStreamsITSpec extends AsyncFlatSpec
   with Matchers
-  with SparkHelper
+  with TestUtils
   with IOOps
-  with Inspectors {
+  with Inspectors
+  with BeforeAndAfterAll {
 
   import ParquetRecordDecoder._
   import ParquetStreamsITSpec._

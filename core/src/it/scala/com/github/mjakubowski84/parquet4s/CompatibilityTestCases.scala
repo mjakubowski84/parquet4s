@@ -98,8 +98,8 @@ object CompatibilityTestCases extends TestCaseSupport {
 
   override val caseDefinitions: Seq[Case.CaseDef] = Seq(
     Case("primitives", Seq(
-      Primitives(b = true, 1, 1234567890l, 1.1f, 1.00000000001d, "text", 1, 1, BigDecimal("1.0000000000000000")),
-      Primitives(b = false, 0, 0l, 0f, 0d, "", 0, 0, BigDecimal("0.0000000000000000")),
+      Primitives(b = true, 1, 1234567890L, 1.1f, 1.00000000001d, "text", 1, 1, BigDecimal("1.0000000000000000")),
+      Primitives(b = false, 0, 0L, 0f, 0d, "", 0, 0, BigDecimal("0.0000000000000000")),
       Primitives(b = false, Int.MaxValue, Long.MaxValue, Float.MaxValue, Double.MaxValue, "Żołądź z dębu", Short.MaxValue, 
         Byte.MaxValue, BigDecimal("0.0000000000000001")),
       Primitives(b = false, Int.MinValue, Long.MinValue, Float.MinValue, Double.MinValue, null, Short.MinValue, 

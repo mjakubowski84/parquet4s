@@ -133,7 +133,7 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
   }
 
   it should "reject an empty set of keys" in {
-    a[IllegalArgumentException] should be thrownBy (Col("idx") in())
+    a[IllegalArgumentException] should be thrownBy (Col("idx") in(Seq.empty:_*))
     a[IllegalArgumentException] should be thrownBy (Col("idx") in Set.empty[Int])
   }
 }

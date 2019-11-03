@@ -51,12 +51,14 @@ class IncrementalParquetWriterItSpec
     incrementalRecords shouldBe records
   }
 
+  /* TODO
   "Synchronized parallel writes produce same result (after sorting) as a single batch write" in {
     val w = IncrementalParquetWriter[Record](incrementalPath.toString)
     try records.grouped(2).toSeq.par.foreach(g => synchronized(w.write(g)))
     finally w.close()
     incrementalRecords.sortBy(_.toString) shouldBe records.sortBy(_.toString)
   }
+   */
 
   "Incremental writes work with write mode OVERWRITE" in {
     val w = IncrementalParquetWriter[Record](

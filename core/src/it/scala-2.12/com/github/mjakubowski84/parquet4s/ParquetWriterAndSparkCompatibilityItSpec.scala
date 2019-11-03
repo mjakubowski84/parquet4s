@@ -4,30 +4,24 @@ import com.github.mjakubowski84.parquet4s.Case.CaseDef
 import com.github.mjakubowski84.parquet4s.CompatibilityParty._
 import org.scalatest.{BeforeAndAfter, FreeSpec, Matchers}
 
-class ParquetWriterAndParquetReaderCompatibilityItSpec extends
+class ParquetWriterAndSparkCompatibilityItSpec extends
   FreeSpec
     with Matchers
     with BeforeAndAfter
-    with TestUtils {
+    with SparkHelper {
 
   before {
     clearTemp()
   }
 
-  private def runTestCase(testCase: CaseDef): Unit = {
+  private def runTestCase(testCase: CaseDef): Unit =
     testCase.description in {
       ParquetWriter.write(tempPathString, testCase.data)(testCase.writer)
-      val parquetIterable = ParquetReader.read(tempPathString)(testCase.reader)
-      try {
-        parquetIterable should contain theSameElementsAs testCase.data
-      } finally {
-        parquetIterable.close()
-      }
+      readFromTemp(testCase.typeTag) should contain theSameElementsAs testCase.data
     }
-  }
 
   "Spark should be able to read file saved by ParquetWriter if the file contains" - {
-    CompatibilityTestCases.cases(Writer, Reader).foreach(runTestCase)
+    CompatibilityTestCases.cases(Writer, Spark).foreach(runTestCase)
   }
 
 }
