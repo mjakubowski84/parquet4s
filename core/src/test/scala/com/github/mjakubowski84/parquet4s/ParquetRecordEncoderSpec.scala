@@ -18,7 +18,7 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     val data = Primitives(
       boolean = true,
       int = 1,
-      long = 1234567890l,
+      long = 1234567890L,
       float = 1.1f,
       double = 1.00000000000001d,
       string = "text",
@@ -30,7 +30,7 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     val record = RowParquetRecord(
       "boolean" -> true,
       "int" -> 1,
-      "long" -> 1234567890l,
+      "long" -> 1234567890L,
       "float" -> 1.1f,
       "double" -> 1.00000000000001d,
       "string" -> "text",
