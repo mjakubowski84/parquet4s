@@ -1,9 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.nio.file.{Path, Paths}
-
-import com.google.common.io.Files
-import com.github.mjakubowski84.parquet4s.TestUtils
 import org.apache.spark.sql.SparkSession
 import org.scalatest.{BeforeAndAfterAll, Suite}
 

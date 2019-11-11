@@ -1,5 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
+import java.io.Closeable
 import java.util.TimeZone
 
 import org.apache.hadoop.conf.Configuration
@@ -16,18 +17,17 @@ import scala.collection.JavaConverters._
 
 
 /**
-  * Type class that allows to write data which scehma is represented by type <i>T</i> to given path.
+  * Type class that allows to write data which schema is represented by type <i>T</i>.
+  * Path and options are meant to be set by implementation of the trait.
   * @tparam T schema of data to write
   */
-trait ParquetWriter[T] {
+trait ParquetWriter[T] extends Closeable{
 
   /**
-    * Writes data to given path.
-    * @param path location where files are meant to be written
+    * Appends data chunk to file contents.
     * @param data data to write
-    * @param options configuration of how Parquet files should be created and written
     */
-  def write(path: String, data: Iterable[T], options: ParquetWriter.Options): Unit
+  def write(data: Iterable[T]): Unit
 
 }
 
@@ -35,6 +35,8 @@ trait ParquetWriter[T] {
 object ParquetWriter  {
 
   private[parquet4s] type InternalWriter = HadoopParquetWriter[RowParquetRecord]
+
+  type ParquetWriterFactory[T] = (String, Options) => ParquetWriter[T]
 
   private class Builder(path: Path, schema: MessageType) extends HadoopParquetWriter.Builder[RowParquetRecord, Builder](path) {
     private val logger = LoggerFactory.getLogger(ParquetWriter.this.getClass)
@@ -53,6 +55,7 @@ object ParquetWriter  {
     * <a href="https://parquet.apache.org/documentation/latest/">documentation of Parquet</a>
     * to understand what every configuration entry is responsible for.
     * Apart from options specific for Parquet file format there are some other - what follows:
+    * @param hadoopConf can be used to programmatically set Hadoop's [[Configuration]]
     * @param timeZone used when encoding time-based data, local machine's time zone is used by default
     */
   case class Options(
@@ -91,36 +94,66 @@ object ParquetWriter  {
     * @param path URI where the data will be written to
     * @param data Collection of <i>T</> that will be written in Parquet file format
     * @param options configuration of writer, see [[ParquetWriter.Options]]
-    * @param writer [[ParquetWriter]] that will be used to write data
+    * @param writerFactory [[ParquetWriterFactory]] that will be used to create an instance of writer
     * @tparam T type of data, will be used also to resolve the schema of Parquet files
     */
-  def write[T](path: String, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options())
-              (implicit writer: ParquetWriter[T]): Unit = writer.write(path, data, options)
+  def writeAndClose[T](path: String, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options())
+                      (implicit writerFactory: ParquetWriterFactory[T]): Unit = {
+    val writer = writerFactory(path, options)
+    try writer.write(data)
+    finally writer.close()
+  }
+
+  def writer[T](path: String, options: ParquetWriter.Options = ParquetWriter.Options())
+               (implicit writerFactory: ParquetWriterFactory[T]): ParquetWriter[T] =
+    writerFactory(path, options)
+
 
   /**
-    * Default instance of [[ParquetWriter]]
+    * Default instance of [[ParquetWriterFactory]]
     */
-  implicit def writer[T: ParquetRecordEncoder : ParquetSchemaResolver]: ParquetWriter[T] = new ParquetWriter[T] {
-    override def write(path: String, data: Iterable[T], options: Options = Options()): Unit = {
-      val writer = internalWriter(new Path(path), ParquetSchemaResolver.resolveSchema[T], options)
-      val valueCodecConfiguration = options.toValueCodecConfiguration
-      try {
-        data.foreach { elem =>
-          writer.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
-        }
-      } finally {
-        writer.close()
+  implicit def writerFactory[T: ParquetRecordEncoder : ParquetSchemaResolver]: ParquetWriterFactory[T] = (path, options) =>
+    new DefaultParquetWriter[T](path, options)
+
+}
+
+private class DefaultParquetWriter[T : ParquetRecordEncoder : ParquetSchemaResolver](
+                                                                                      path: String,
+                                                                                      options: ParquetWriter.Options
+                                                                                    ) extends ParquetWriter[T] {
+  private val internalWriter = ParquetWriter.internalWriter(
+    path = new Path(path),
+    schema = ParquetSchemaResolver.resolveSchema[T],
+    options = options
+  )
+  private val valueCodecConfiguration = options.toValueCodecConfiguration
+  private val logger = LoggerFactory.getLogger(this.getClass)
+  private var closed = false
+
+  override def write(data: Iterable[T]): Unit = {
+    if (closed) {
+      throw new IllegalStateException("Attempted to write with a writer which was already closed")
+    } else {
+      data.foreach { elem =>
+        internalWriter.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
       }
     }
   }
 
+  override def close(): Unit = synchronized {
+    if (closed) {
+      logger.warn("Attempted to close a writer which was already closed")
+    } else {
+      closed = true
+      internalWriter.close()
+    }
+  }
 }
 
 private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, String]) extends WriteSupport[RowParquetRecord] {
   private var consumer: RecordConsumer = _
 
   override def init(configuration: Configuration): WriteContext = new WriteContext(schema, metadata.asJava)
-
 
   override def write(record: RowParquetRecord): Unit = {
     consumer.startMessage()
