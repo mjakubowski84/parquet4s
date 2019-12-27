@@ -6,7 +6,7 @@ libraryDependencies ++= Seq(
   "ch.qos.logback" % "logback-classic" % "1.2.3",
   "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
   "com.typesafe.akka" %% "akka-stream-kafka" % "1.1.0",
-  "com.google.guava" % "guava" % "28.0-jre"
+  "com.google.guava" % "guava" % "28.1-jre"
 )
 
 excludeDependencies ++= Seq(
