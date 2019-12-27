@@ -70,7 +70,7 @@ class RowParquetRecord private extends ParquetRecord {
       .map { case (key, value) => s"$key=$value"}
       .mkString(getClass.getSimpleName + " (", ",", ")")
 
-  def prepend(name: String, value: Value): RowParquetRecord = { // TODO add or prepend?
+  def prepend(name: String, value: Value): RowParquetRecord = {
     values.prepend((name, value))
     this
   }

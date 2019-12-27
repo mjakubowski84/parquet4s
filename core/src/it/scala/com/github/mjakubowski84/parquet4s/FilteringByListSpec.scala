@@ -68,7 +68,7 @@ class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll 
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    ParquetWriter.write(filePath, data, ParquetWriter.Options(
+    ParquetWriter.writeAndClose(filePath, data, ParquetWriter.Options(
       rowGroupSize = 512 * 1024,
       pageSize = 128 * 1024,
       dictionaryPageSize = 128 * 1024

@@ -1,10 +1,12 @@
 package com.github.mjakubowski84.parquet4s
 
-import akka.actor.{Actor, ActorRef, Props, Scheduler}
+import akka.actor.{Actor, ActorRef, Cancellable, Props, Scheduler}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.Random
+import akka.pattern.ask
+import akka.util.Timeout
 
 object RandomDataProducer {
 
@@ -22,6 +24,7 @@ trait RandomDataProducer {
   private def action(): Unit = sendKafkaMessage(nextWord)
 
   private lazy val scheduler: ActorRef = system.actorOf(FluctuatingSchedulerActor.props(action))
+  implicit private val stopTimeout: Timeout = new Timeout(FluctuatingSchedulerActor.MaxDelay)
 
   def startDataProducer(): Unit = {
     logger.info("Starting scheduler that sends messages to Kafka...")
@@ -30,7 +33,7 @@ trait RandomDataProducer {
 
   def stopDataProducer(): Unit = {
     logger.info("Stopping scheduler...")
-    system.stop(scheduler)
+    Await.ready(scheduler.ask(FluctuatingSchedulerActor.Stop), Duration.Inf)
   }
 
 }
@@ -39,6 +42,7 @@ private object FluctuatingSchedulerActor {
 
   case object Start
   case object ScheduleNext
+  case object Stop
 
   val MinDelay: FiniteDuration = 1.milli
   val MaxDelay: FiniteDuration = 500.millis
@@ -48,7 +52,7 @@ private object FluctuatingSchedulerActor {
   case object Up extends Direction
   case object Down extends Direction
 
-  def props(action: () => Unit) = Props(new FluctuatingSchedulerActor(action))
+  def props(action: () => Unit): Props = Props(new FluctuatingSchedulerActor(action))
 
 }
 
@@ -58,6 +62,7 @@ private class FluctuatingSchedulerActor(action: () => Unit) extends Actor {
 
   implicit def executionContext: ExecutionContext = context.system.dispatcher
   def scheduler: Scheduler = context.system.scheduler
+  var scheduled: Option[Cancellable] = None
 
   override def receive: Receive = {
     case Start =>
@@ -82,8 +87,12 @@ private class FluctuatingSchedulerActor(action: () => Unit) extends Actor {
           (Up, delay + step)
       }
 
-      scheduler.scheduleOnce(delay, self, ScheduleNext)
+      scheduled = Some(scheduler.scheduleOnce(delay, self, ScheduleNext))
       context.become(scheduling(newDelay, newDirection), discardOld = true)
+
+    case Stop =>
+      scheduled.foreach(_.cancel())
+      context.stop(self)
   }
 
 }
