@@ -21,13 +21,19 @@ import scala.collection.JavaConverters._
   * Path and options are meant to be set by implementation of the trait.
   * @tparam T schema of data to write
   */
-trait ParquetWriter[T] extends Closeable{
+trait ParquetWriter[T] extends Closeable {
 
   /**
     * Appends data chunk to file contents.
     * @param data data to write
     */
   def write(data: Iterable[T]): Unit
+
+  /**
+    * Appends data chunk to file contents.
+    * @param data data to write
+    */
+  def write(data: T*): Unit
 
 }
 
@@ -140,6 +146,8 @@ private class DefaultParquetWriter[T : ParquetRecordEncoder : ParquetSchemaResol
     }
   }
 
+  override def write(data: T*): Unit = this.write(data)
+
   override def close(): Unit = synchronized {
     if (closed) {
       logger.warn("Attempted to close a writer which was already closed")
@@ -148,6 +156,7 @@ private class DefaultParquetWriter[T : ParquetRecordEncoder : ParquetSchemaResol
       internalWriter.close()
     }
   }
+
 }
 
 private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, String]) extends WriteSupport[RowParquetRecord] {

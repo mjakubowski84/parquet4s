@@ -6,7 +6,7 @@ lazy val supportedScalaVersions = Seq("2.11.12", "2.12.10", "2.13.1")
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "0.12.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
-ThisBuild / scalaVersion := "2.11.12"
+ThisBuild / scalaVersion := "2.13.1"
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8")
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature")
 ThisBuild / resolvers := Seq(
@@ -100,7 +100,7 @@ lazy val akka = (project in file("akka"))
 lazy val examples = (project in file("examples"))
   .settings(
     name := "parquet4s-examples",
-    crossScalaVersions := Seq("2.11.12", "2.12.10"),
+    crossScalaVersions := supportedScalaVersions,
     publish / skip := true,
     publishLocal / skip := true
   )
