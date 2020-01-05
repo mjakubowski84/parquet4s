@@ -177,6 +177,10 @@ You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, an
 
 Check ScalaDoc and code for more!
 
+## Supported types
+
+List of types that are supported out of the box for reading, writing and filtering can be found [here](supportedTypes.md).
+
 ## Customisation and extensibility
 
 Parquet4S is built using Scala's type class system. That allows you to extend Parquet4S by defining your own implementations of its type classes. 
