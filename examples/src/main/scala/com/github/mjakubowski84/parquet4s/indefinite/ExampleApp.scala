@@ -1,4 +1,4 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.indefinite
 
 import akka.Done
 import akka.kafka.scaladsl.Consumer.DrainingControl

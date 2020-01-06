@@ -1,4 +1,4 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.indefinite
 
 import java.sql.Timestamp
 import java.util.UUID
@@ -8,6 +8,7 @@ import akka.kafka.CommitterSettings
 import akka.kafka.ConsumerMessage.CommittableOffsetBatch
 import akka.kafka.scaladsl.Committer
 import akka.stream.scaladsl.{Flow, Keep, Sink}
+import com.github.mjakubowski84.parquet4s.{ChunkPathBuilder, ParquetStreams, ParquetWriter}
 import com.google.common.io.Files
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.metadata.CompressionCodecName

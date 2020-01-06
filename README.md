@@ -222,8 +222,10 @@ implicit val customTypeSchema: TypedSchemaDef[CustomType] =
 
 ## Examples
 
-Please check simple example application of lib comprising Akka Streams and Kafka. It shows how you can write
-Parquet files with data coming from indefinite stream. Source code can be found in [examples](examples).
+Please check [examples](examples) where you can find simple code covering basics both for `core` and `akka` modules.
+
+Moreover, examples contain simple application of lib comprising Akka Streams and Kafka. It shows how you can write
+Parquet files with data coming from indefinite stream.
 
 ## Contributing
 
