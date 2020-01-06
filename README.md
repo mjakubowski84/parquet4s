@@ -58,7 +58,7 @@ import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter}
 
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
-val users: Stream[User] = ???
+val users: Iterable[User] = ???
 val path = "file:///data/users"
 
 // writing
