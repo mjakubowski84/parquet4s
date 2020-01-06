@@ -1,12 +1,12 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.indefinite
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props, Scheduler}
-
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration._
-import scala.util.Random
 import akka.pattern.ask
 import akka.util.Timeout
+
+import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext}
+import scala.util.Random
 
 object RandomDataProducer {
 

@@ -1,10 +1,10 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.indefinite
 
 import akka.actor.ActorSystem
 import akka.stream.{ActorMaterializer, Materializer}
 
-import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext}
 
 trait Akka {
 
