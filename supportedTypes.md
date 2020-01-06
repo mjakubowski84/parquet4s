@@ -25,5 +25,5 @@ Complex Types
  * Vector
  * Set
  * Array
- * Map - **Key must be of primitive type***
+ * Map - **Key must be of primitive type**
  * *Any case class*
