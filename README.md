@@ -10,6 +10,8 @@ Based on official Parquet library, Hadoop Client and Shapeless.
 
 Integration for Akka Streams.
 
+Released for Scala 2.11.x, 2.12.x and 2.13.x.
+
 ## Supported storage types
 
 As it is based on Hadoop Client Parquet4S can do read and write from variety of file systems starting from local files, HDFS to Amazon S3, Google Storage, Azure or OpenStack. Following you can find description how to read from local files and S3. Please refer to Hadoop Client documentation or your storage provider to check how to connect to your storage.
@@ -44,7 +46,7 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 Add the library to your dependencies:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-core" % "0.11.0"
+"com.github.mjakubowski84" %% "parquet4s-core" % "1.0.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -62,7 +64,7 @@ val users: Iterable[User] = ???
 val path = "file:///data/users"
 
 // writing
-ParquetWriter.write(path, users)
+ParquetWriter.writeAndClose(path, users)
 
 // reading
 val parquetIterable = ParquetReader.read[User](path)
@@ -72,14 +74,12 @@ try {
 
 ```
 
-Since 0.8.0 a separate [IncrementalParquetWriter](core/src/main/scala/com/github/mjakubowski84/parquet4s/IncrementalParquetWriter.scala) is available. You may use it to write chunks of data to a single file **multiple times and close it** when you are done.
-
 ### Akka Streams
 
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "0.11.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "1.0.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -103,7 +103,7 @@ case class User(userId: String, name: String, created: java.sql.Timestamp)
 implicit val system: ActorSystem =  ActorSystem()
 implicit val materializer: Materializer =  ActorMaterializer()
 
-val users: Stream[User] = ???
+val users: Iterable[User] = ???
 
 val conf: Configuration = ??? // Set Hadoop configuration programmatically
 
