@@ -1,17 +1,18 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.nio.file.{Path, Paths}
+import java.io.File
+import java.net.URI
 
 import com.google.common.io.Files
+import org.apache.hadoop.fs.Path
 
 trait TestUtils {
 
-  private val tempPath: Path = Paths.get(Files.createTempDir().getAbsolutePath, "testOutputPath")
-
-  val tempPathString: String = tempPath.toString
+  protected val tempPath: Path = new Path(Files.createTempDir().getAbsolutePath, "testOutputPath")
+  protected val tempPathString: String = tempPath.toString
 
   def clearTemp(): Unit = {
-    val tempDir = tempPath.toFile
+    val tempDir = new File(tempPath.makeQualified(URI.create("file:/"), new Path("/")).toUri)
     Option(tempDir.listFiles()).foreach(_.foreach(_.delete()))
     tempDir.delete()
   }

@@ -33,20 +33,8 @@ object ParquetStreams {
                                              path: String,
                                              options: ParquetReader.Options = ParquetReader.Options(),
                                              filter: Filter = Filter.noopFilter
-                                           ): Source[T, NotUsed] = {
-    val valueCodecConfiguration = options.toValueCodecConfiguration
-    val builder = HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path))
-      .withConf(options.hadoopConf)
-      .withFilter(filter.toFilterCompat(valueCodecConfiguration))
-
-    def decode(record: RowParquetRecord): T =  ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
-
-    Source.unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
-      create = builder.build,
-      read = reader => Option(reader.read()),
-      close = _.close()
-    ).map(decode)
-  }
+                                           ): Source[T, NotUsed] =
+    ParquetSource[T](new Path(path), options, filter)
 
   /**
     * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to single file at the specified path (including

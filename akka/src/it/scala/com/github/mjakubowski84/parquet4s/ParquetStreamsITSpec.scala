@@ -1,22 +1,25 @@
 package com.github.mjakubowski84.parquet4s
 
 import java.sql.Timestamp
+import java.util.concurrent.TimeUnit
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorMaterializer, Materializer}
+import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.scalatest.{AsyncFlatSpec, BeforeAndAfterAll, Inspectors, Matchers}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.immutable
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
-import scala.util.Random
+import scala.concurrent.{Await, ExecutionException, Future}
+import scala.util.{Random, Try}
 
 object ParquetStreamsITSpec {
 
   case class Data(i: Long, s: String)
+
+  case class DataPartitioned(i: Long, s: String, a: String, b: String)
 
   object DataTransformed {
     def apply(data: Data, t: Timestamp): DataTransformed = DataTransformed(data.i, data.s , t)
@@ -40,12 +43,13 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
   override val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
-  implicit val mat: Materializer = ActorMaterializer()
 
+  val configuration: Configuration = new Configuration()
   val writeOptions: ParquetWriter.Options = ParquetWriter.Options(
     compressionCodecName = CompressionCodecName.SNAPPY,
     pageSize = 512,
-    rowGroupSize = 4 * 512
+    rowGroupSize = 4 * 512,
+    hadoopConf = configuration
   )
 
   val count: Int = 4 * writeOptions.rowGroupSize
@@ -62,6 +66,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     clearTemp()
   }
 
+
   "ParquetStreams" should "write single file and read it correctly" in {
     val outputPath = s"$tempPathString/writeSingleFile"
     val outputFileName = "data.parquet"
@@ -73,7 +78,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath, writeOptions)
+      files <- filesAtPath(outputPath, configuration)
       readData <- read[Data](outputPath)
     } yield {
       files should be(List(outputFileName))
@@ -100,6 +105,71 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     }
   }
 
+  it should "be able to read partitioned data" in {
+    val outputPath = s"$tempPathString/readDataPartitioned"
+    val outputFileName = "data.parquet"
+
+    val write = (a: String, b: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$outputPath/a=$a/b=$b/$outputFileName",
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write("A", "1")
+      _ <- write("A", "2")
+      _ <- write("B", "1")
+      _ <- write("B", "2")
+      readData <- read[DataPartitioned](outputPath)
+    } yield {
+      readData should have size count * 4
+      readData.filter(d => d.a == "A" && d.b == "1") should have size count
+      readData.filter(d => d.a == "A" && d.b == "2") should have size count
+      readData.filter(d => d.a == "B" && d.b == "1") should have size count
+      readData.filter(d => d.a == "B" && d.b == "2") should have size count
+    }
+  }
+
+  it should "be fail informing about inconsistent partitions at given path" in {
+    val outputPath = s"$tempPathString/readInconsistentPartitions"
+    val outputFileName = "data.parquet"
+
+    val write = (midPath: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$outputPath/$midPath/$outputFileName",
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write("a=A/b=1")
+      _ <- write("b=2")
+      _ <- write("a=B")
+      error <- read[DataPartitioned](outputPath).failed
+    } yield error.getCause should be(an[AssertionError])
+  }
+
+  it should "be filter data by partition" in {
+    val outputPath = s"$tempPathString/filterDataByPartition"
+    val outputFileName = "data.parquet"
+
+    val write = (midPath: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$outputPath/$midPath/$outputFileName",
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write("a=A/b=1")
+      _ <- write("a=A/b=2")
+      _ <- write("a=B/b=1")
+      readData <- read[DataPartitioned](outputPath, filter = Col("a") === "A" && Col("b") === 1)
+    } yield {
+      forAll(readData) { elem =>
+        elem.a should be("A")
+        elem.b should be("1")
+      }
+    }
+  }
+
+
+  /*
   it should "split data into sequential chunks and read it correctly" in {
     val outputPath = s"$tempPathString/writeSequentiallySplitFiles"
     val outputFileNames = List("part-00000.parquet", "part-00001.parquet")
@@ -112,7 +182,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath, writeOptions)
+      files <- filesAtPath(outputPath, configuration)
       readData <- read[Data](outputPath)
     } yield {
       files should contain theSameElementsAs outputFileNames
@@ -132,7 +202,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath, writeOptions)
+      files <- filesAtPath(outputPath, configuration)
       readData <- read[Data](outputPath)
     } yield {
       files should have size 2
@@ -153,7 +223,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath, writeOptions)
+      files <- filesAtPath(outputPath, configuration)
       readData <- read[Data](outputPath)
     } yield {
       files should have size 4
@@ -179,7 +249,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       postWriteData <- write()
-      files <- filesAtPath(outputPath, writeOptions)
+      files <- filesAtPath(outputPath, configuration)
       readData <- read[DataTransformed](outputPath)
     } yield {
       postWriteData should have size count
@@ -190,6 +260,8 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
       readData.map(_.toData) should contain theSameElementsAs data
     }
   }
+
+  */
 
   override def afterAll(): Unit = {
     Await.ready(system.terminate(), Duration.Inf)

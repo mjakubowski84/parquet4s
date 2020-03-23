@@ -1,14 +1,34 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.apache.hadoop.fs.Path
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileStatus, FileSystem, Path, RemoteIterator}
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
 import org.slf4j.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
+import scala.language.implicitConversions
+import scala.util.matching.Regex
+
+private[parquet4s] object IOOps {
+
+  case class Partition(name: String, value: String)
+  case class PartitionedPath(path: Path, partitions: List[Partition]) {
+    lazy val partitionMap: Map[String, String] = partitions.map(partition => partition.name -> partition.value).toMap
+  }
+
+  private implicit class RemoteIteratorWrapper[T](wrapped: RemoteIterator[T]) extends Iterator[T] {
+    override def hasNext: Boolean = wrapped.hasNext
+    override def next(): T = wrapped.next()
+  }
+
+  private val PartitionRegexp: Regex = """(?<name>\w+)=(?<value>\w+)""".r
+
+}
 
 trait IOOps {
+
+  import IOOps._
 
   protected val logger: Logger
 
@@ -26,23 +46,60 @@ trait IOOps {
     } finally fs.close()
   }
 
-  protected def filesAtPath(path: Path, writeOptions: ParquetWriter.Options)
+  protected def filesAtPath(path: Path, configuration: Configuration)
                            (implicit ec: ExecutionContext): Future[List[String]] = Future {
     scala.concurrent.blocking {
-      val fs = path.getFileSystem(writeOptions.hadoopConf)
+      val fs = path.getFileSystem(configuration)
       try {
-        val iter = fs.listFiles(path, false)
-        Stream
-          .continually(Try(iter.next()))
-          .takeWhile(_.isSuccess)
-          .map(_.get)
+        fs.listFiles(path, false)
           .map(_.getPath.getName)
           .toList
       } finally fs.close()
     }
   }
 
-  protected def filesAtPath(path: String, writeOptions: ParquetWriter.Options)
-                           (implicit ec: ExecutionContext): Future[List[String]] = filesAtPath(new Path(path), writeOptions)
+  protected def filesAtPath(path: String, configuration: Configuration)
+                           (implicit ec: ExecutionContext): Future[List[String]] = filesAtPath(new Path(path), configuration)
+
+  protected def findPartitionedPaths(path: Path, configuration: Configuration): Either[AssertionError, List[PartitionedPath]] = {
+    val fs = path.getFileSystem(configuration)
+    try {
+      val partitionedPaths = findPartitionedPaths(fs, path, List.empty)
+      val grouped = partitionedPaths.groupBy(_.partitions.map(_.name))
+
+      Either.cond(
+        test = grouped.size == 1,
+        right = partitionedPaths,
+        left = new AssertionError(
+          s"""Inconsistent partitioning.
+              |Parquet files must live in leaf directories.
+              |Every files must contain the same numbers of partitions.
+              |Partition directories at the same level must have the same names.
+              |Check following directories: ${grouped.values.map(_.head).mkString("\n\t", "\n\t", "")}
+              |""".stripMargin)
+      )
+    } finally fs.close()
+  }
+
+  protected def findPartitionedPaths(path: String, configuration: Configuration): Either[AssertionError, List[PartitionedPath]]
+   = findPartitionedPaths(new Path(path), configuration)
+
+  private def findPartitionedPaths(fs: FileSystem, path: Path, partitions: List[Partition]): List[PartitionedPath] = {
+    val partitionedDirs = listDirs(fs, path).flatMap(matchPartition)
+    if (partitionedDirs.isEmpty) List(PartitionedPath(path, partitions))
+    else partitionedDirs.flatMap { case (subPath, partition) =>
+      findPartitionedPaths(fs, subPath, partitions :+ partition)
+    }
+  }
+
+  private def listDirs(fs: FileSystem, path: Path): List[FileStatus] = fs.listStatus(path).toList.filter(_.isDirectory)
+
+  private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
+    val path = fileStatus.getPath
+    path.getName match {
+      case PartitionRegexp(name, value) => Some(path, Partition(name, value))
+      case _ => None
+    }
+  }
 
 }
