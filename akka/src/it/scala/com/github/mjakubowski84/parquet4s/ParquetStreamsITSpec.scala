@@ -66,7 +66,7 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     clearTemp()
   }
 
-
+  /*
   "ParquetStreams" should "write single file and read it correctly" in {
     val outputPath = s"$tempPathString/writeSingleFile"
     val outputFileName = "data.parquet"
@@ -146,7 +146,8 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     } yield error.getCause should be(an[AssertionError])
   }
 
-  it should "be filter data by partition" in {
+   */
+  it should "filter data by partition" in {
     val outputPath = s"$tempPathString/filterDataByPartition"
     val outputFileName = "data.parquet"
 
@@ -156,14 +157,32 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     ))
 
     for {
-      _ <- write("a=A/b=1")
-      _ <- write("a=A/b=2")
-      _ <- write("a=B/b=1")
-      readData <- read[DataPartitioned](outputPath, filter = Col("a") === "A" && Col("b") === 1)
+      _ <- write("a=number/b=1")
+      _ <- write("a=number/b=2")
+      _ <- write("a=number/b=3")
+      _ <- write("a=letter/b=a")
+      _ <- write("a=letter/b=b")
+      _ <- write("a=letter/b=c")
+      letterA <- read[DataPartitioned](outputPath, filter = Col("b") === "a")
+      letterBnC <- read[DataPartitioned](outputPath, filter = Col("a") === "letter" && (Col("b") !== "a"))
+      number1n3 <- read[DataPartitioned](outputPath, filter = Col("a") === "number" && (Col("b") < "2" || Col("b") > "2"))
+      number2 <- read[DataPartitioned](outputPath, filter = Col("a") === "number" && (Col("b") >= "2" && Col("b") <= "2"))
     } yield {
-      forAll(readData) { elem =>
-        elem.a should be("A")
-        elem.b should be("1")
+      forExactly(count, letterA) { elem =>
+        elem.a should be("letter")
+        elem.b should be("a")
+      }
+      forExactly(count, letterBnC) { elem =>
+        elem.a should be("letter")
+        elem.b should (be("b") or be("c"))
+      }
+      forExactly(count, number1n3) { elem =>
+        elem.a should be("number")
+        elem.b should (be("1") or be("3"))
+      }
+      forExactly(count, number2) { elem =>
+        elem.a should be("number")
+        elem.b should be("2")
       }
     }
   }
