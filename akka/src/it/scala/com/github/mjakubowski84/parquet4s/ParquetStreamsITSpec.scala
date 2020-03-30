@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import java.sql.Timestamp
-import java.util.concurrent.TimeUnit
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
@@ -12,8 +11,8 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.immutable
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionException, Future}
-import scala.util.{Random, Try}
+import scala.concurrent.{Await, Future}
+import scala.util.Random
 
 object ParquetStreamsITSpec {
 

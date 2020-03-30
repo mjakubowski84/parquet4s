@@ -14,12 +14,12 @@ case class PartitionedPath(path: Path, partitions: List[Partition]) {
     partitions.map(partition => partition.name -> Binary.fromString(partition.value)).toMap
 }
 
-private object PartitionFilter {
+private[parquet4s] object PartitionFilter {
 
   import PartitionFilterRewriter._
 
   def filter(filterPredicate: FilterPredicate)(partitionedPath: PartitionedPath): Boolean =
-    PartitionFilterRewriter.rewrite(filterPredicate, partitionedPath) match {
+    PartitionFilterRewriter.rewrite(filterPredicate, partitionedPath) match { // TODO do not rewrite per each path
       case AssumeTrue =>
         println("Rewritten predicate is assumed to be always true")
         true
@@ -30,25 +30,25 @@ private object PartitionFilter {
 
 }
 
-class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPredicate.Visitor[Boolean] {
+private class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPredicate.Visitor[Boolean] {
 
   override def visit[T <: Comparable[T]](eq: Operators.Eq[T]): Boolean =
-    applyOperator(eq.getColumn, eq.getValue, _ == 0)
+    applyOperator(eq.getColumn, eq.getValue)(_ == 0)
 
   override def visit[T <: Comparable[T]](notEq: Operators.NotEq[T]): Boolean =
-    applyOperator(notEq.getColumn, notEq.getValue, _ != 0)
+    applyOperator(notEq.getColumn, notEq.getValue)(_ != 0)
 
   override def visit[T <: Comparable[T]](lt: Operators.Lt[T]): Boolean =
-    applyOperator(lt.getColumn, lt.getValue, _ < 0)
+    applyOperator(lt.getColumn, lt.getValue)(_ < 0)
 
   override def visit[T <: Comparable[T]](ltEq: Operators.LtEq[T]): Boolean =
-    applyOperator(ltEq.getColumn, ltEq.getValue, _ <= 0)
+    applyOperator(ltEq.getColumn, ltEq.getValue)(_ <= 0)
 
   override def visit[T <: Comparable[T]](gt: Operators.Gt[T]): Boolean =
-    applyOperator(gt.getColumn, gt.getValue, _ > 0)
+    applyOperator(gt.getColumn, gt.getValue)(_ > 0)
 
   override def visit[T <: Comparable[T]](gtEq: Operators.GtEq[T]): Boolean =
-    applyOperator(gtEq.getColumn, gtEq.getValue, _ >= 0)
+    applyOperator(gtEq.getColumn, gtEq.getValue)(_ >= 0)
 
   override def visit(and: Operators.And): Boolean =
     and.getLeft.accept(this) || and.getRight.accept(this)
@@ -58,46 +58,42 @@ class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPredicate.
 
   override def visit(not: Operators.Not): Boolean = !not.accept(this)
 
-  override def visit[T <: Comparable[T], U <: UserDefinedPredicate[T]](udp: Operators.UserDefined[T, U]): Boolean = ???
+  override def visit[T <: Comparable[T], U <: UserDefinedPredicate[T]](udp: Operators.UserDefined[T, U]): Boolean =
+    applyOperator(udp.getColumn)(partitionValue => udp.getUserDefinedPredicate.keep(partitionValue.asInstanceOf[T]))
 
-  override def visit[T <: Comparable[T], U <: UserDefinedPredicate[T]](udp: Operators.LogicalNotUserDefined[T, U]): Boolean = ???
+  override def visit[T <: Comparable[T], U <: UserDefinedPredicate[T]](udp: Operators.LogicalNotUserDefined[T, U]): Boolean =
+    applyOperator(udp.getUserDefined.getColumn) { partitionValue =>
+      udp.getUserDefined.getUserDefinedPredicate.keep(partitionValue.asInstanceOf[T])
+    }
 
-  private def applyOperator[T <: Comparable[T]](column: Column[T],
-                                                value: T,
-                                                op: (Binary, Binary) => Boolean): Boolean = {
+  private def applyOperator[T <: Comparable[T]](column: Column[T])(op: Binary => Boolean) = {
     val columnPath = column.getColumnPath.toDotString
+    val filterType = column.getColumnType
     partitionedPath.partitionMap.get(columnPath) match {
       case None =>
         false
-      case Some(partitionValue) =>
-        val filterValue = value match {
-          case binary: Binary =>
-            binary
-          case _ =>
-            val filterType = column.getColumnType
-            throw new IllegalArgumentException(
-              s"Filter type does not match schema, column $columnPath is Binary String while filter is $filterType"
-            )
-        }
-        op(filterValue, partitionValue)
+      case Some(partitionValue) if filterType == classOf[Binary] =>
+        op(partitionValue)
+      case _ =>
+        throw new IllegalArgumentException(
+          s"Filter type does not match schema, column $columnPath is Binary String while filter is $filterType"
+        )
     }
   }
 
-  private def applyOperator[T <: Comparable[T]](column: Column[T],
-                                                value: T,
-                                                op: Int => Boolean): Boolean =
-    applyOperator(column, value, Function.untupled(op.compose((compareBinaries _).tupled)))
+  private def applyOperator[T <: Comparable[T]](column: Column[T], value: T)
+                                               (op: Int => Boolean): Boolean =
+    applyOperator(column)(partitionValue => op(compareBinaries(partitionValue, value.asInstanceOf[Binary])))
 
   private def compareBinaries(x: Binary, y: Binary): Int =
     PrimitiveComparator.UNSIGNED_LEXICOGRAPHICAL_BINARY_COMPARATOR.compare(x, y)
 
 }
 
-object PartitionFilterRewriter {
+private[parquet4s] object PartitionFilterRewriter {
 
   case object AssumeTrue extends FilterPredicate {
-    override def accept[R](visitor: FilterPredicate.Visitor[R]): R =
-      throw new UnsupportedOperationException
+    override def accept[R](visitor: FilterPredicate.Visitor[R]): R = throw new UnsupportedOperationException
   }
 
   def rewrite(filterPredicate: FilterPredicate, partitionedPath: PartitionedPath): FilterPredicate =
@@ -168,16 +164,14 @@ private class PartitionFilterRewriter(partitionedPath: PartitionedPath)
     else AssumeTrue
 }
 
-object FilterRewriter {
+private[parquet4s] object FilterRewriter {
 
   case object IsTrue extends FilterPredicate {
-    override def accept[R](visitor: FilterPredicate.Visitor[R]): R =
-      throw new UnsupportedOperationException
+    override def accept[R](visitor: FilterPredicate.Visitor[R]): R = throw new UnsupportedOperationException
   }
 
   case object IsFalse extends FilterPredicate {
-    override def accept[R](visitor: FilterPredicate.Visitor[R]): R =
-      throw new UnsupportedOperationException
+    override def accept[R](visitor: FilterPredicate.Visitor[R]): R = throw new UnsupportedOperationException
   }
 
   def rewrite(filterPredicate: FilterPredicate, partitionedPath: PartitionedPath): FilterPredicate =
