@@ -61,9 +61,15 @@ private[parquet4s] object ParquetSource extends IOOps {
   private def createFilterForPartitionedPath(filterPredicate: FilterPredicate)
                                             (partitionedPath: PartitionedPath): Option[(FilterCompat.Filter, PartitionedPath)] =
     FilterRewriter.rewrite(filterPredicate, partitionedPath) match {
-      case IsTrue => Some(FilterCompat.NOOP, partitionedPath) // filter always returns true
-      case IsFalse => None // filter always returns false
-      case rewritten => Some(FilterCompat.get(rewritten), partitionedPath)
+      case IsTrue =>
+        println("IsTrue") // TODO debug LOG
+        Some(FilterCompat.NOOP, partitionedPath) // filter always returns true
+      case IsFalse =>
+        println("IsFalse") // TODO debug LOG
+        None // filter always returns false
+      case rewritten =>
+        println(s"Rewritten to $rewritten") // TODO debug LOG
+        Some(FilterCompat.get(rewritten), partitionedPath)
     }
 
 }

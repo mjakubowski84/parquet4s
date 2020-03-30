@@ -51,11 +51,11 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     hadoopConf = configuration
   )
 
-  val count: Int = 4 //* writeOptions.rowGroupSize
+  val count: Int = 4 * writeOptions.rowGroupSize
   val dict: Seq[String] = Vector("a", "b", "c", "d")
   val data: Stream[Data] = Stream
     .range(start = 0L, end = count, step = 1L)
-    .map(i => Data(i, dict(Random.nextInt(4))))
+    .map(i => Data(i = i, s = dict(Random.nextInt(4))))
 
   def read[T : ParquetRecordDecoder](path: String, filter: Filter = Filter.noopFilter): Future[immutable.Seq[T]] =
     ParquetStreams.fromParquet[T](path = path, filter = filter).runWith(Sink.seq)
@@ -162,31 +162,35 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
       _ <- write("a=letter/b=a")
       _ <- write("a=letter/b=b")
       _ <- write("a=letter/b=c")
-      letterA <- read[DataPartitioned](outputPath, filter = Col("b") === "a")
-      letterBnC <- read[DataPartitioned](outputPath, filter = Col("a") === "letter" && (Col("b") !== "a"))
-      number1n3 <- read[DataPartitioned](outputPath, filter = Col("a") === "number" && (Col("b") < "2" || Col("b") > "2"))
-      number2 <- read[DataPartitioned](outputPath, filter = Col("a") === "number" && (Col("b") >= "2" && Col("b") <= "2"))
+//      letterA <- read[DataPartitioned](outputPath, filter = Col("b") === "a")
+//      letterBnC <- read[DataPartitioned](outputPath, filter = Col("a") === "letter" && (Col("b") !== "a"))
+//      number1n3 <- read[DataPartitioned](outputPath, filter = Col("a") === "number" && (Col("b") < "2" || Col("b") > "2"))
+//      number2 <- read[DataPartitioned](outputPath, filter = Col("a") === "number" && (Col("b") >= "2" && Col("b") <= "2"))
+      mixed <- read[DataPartitioned](outputPath, filter = (Col("a").in("number", "letter") && Col("i") <= 10L) && !(Col("b").in("1", "2", "3") || Col("i") > 5L  ) )
     } yield {
-      letterA should not be(empty)
-      forAll(letterA) { elem =>
-        elem.a should be("letter")
-        elem.b should be("a")
-      }
-      letterBnC should not be(empty)
-      forAll(letterBnC) { elem =>
-        elem.a should be("letter")
-        elem.b should (be("b") or be("c"))
-      }
-      number1n3 should not be(empty)
-      forAll(number1n3) { elem =>
-        elem.a should be("number")
-        elem.b should (be("1") or be("3"))
-      }
-      number2 should not be(empty)
-      forAll(number2) { elem =>
-        elem.a should be("number")
-        elem.b should be("2")
-      }
+//      letterA should not be(empty)
+//      forAll(letterA) { elem =>
+//        elem.a should be("letter")
+//        elem.b should be("a")
+//      }
+//      letterBnC should not be(empty)
+//      forAll(letterBnC) { elem =>
+//        elem.a should be("letter")
+//        elem.b should (be("b") or be("c"))
+//      }
+//      number1n3 should not be(empty)
+//      forAll(number1n3) { elem =>
+//        elem.a should be("number")
+//        elem.b should (be("1") or be("3"))
+//      }
+//      number2 should not be(empty)
+//      forAll(number2) { elem =>
+//        elem.a should be("number")
+//        elem.b should be("2")
+//      }
+      mixed.foreach(println)
+      mixed should not be(empty)
+
     }
   }
 

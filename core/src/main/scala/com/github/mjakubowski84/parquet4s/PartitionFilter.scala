@@ -21,10 +21,10 @@ private[parquet4s] object PartitionFilter {
   def filter(filterPredicate: FilterPredicate)(partitionedPath: PartitionedPath): Boolean =
     PartitionFilterRewriter.rewrite(filterPredicate, partitionedPath) match { // TODO do not rewrite per each path
       case AssumeTrue =>
-        println("Rewritten predicate is assumed to be always true")
+        println("Rewritten predicate is assumed to be always true") // TODO debug LOG
         true
       case rewritten =>
-        println(s"Using rewritten predicate to filter partition: $rewritten")
+        println(s"Using rewritten predicate to filter partition: $rewritten") // TODO debug LOG
         rewritten.accept(new PartitionFilter(partitionedPath))
     }
 
@@ -51,12 +51,12 @@ private class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPr
     applyOperator(gtEq.getColumn, gtEq.getValue)(_ >= 0)
 
   override def visit(and: Operators.And): Boolean =
-    and.getLeft.accept(this) || and.getRight.accept(this)
+    and.getLeft.accept(this) && and.getRight.accept(this)
 
   override def visit(or: Operators.Or): Boolean =
-    or.getLeft.accept(this) && or.getRight.accept(this)
+    or.getLeft.accept(this) || or.getRight.accept(this)
 
-  override def visit(not: Operators.Not): Boolean = !not.accept(this)
+  override def visit(not: Operators.Not): Boolean = !not.getPredicate.accept(this)
 
   override def visit[T <: Comparable[T], U <: UserDefinedPredicate[T]](udp: Operators.UserDefined[T, U]): Boolean =
     applyOperator(udp.getColumn)(partitionValue => udp.getUserDefinedPredicate.keep(partitionValue.asInstanceOf[T]))
@@ -151,8 +151,8 @@ private class PartitionFilterRewriter(partitionedPath: PartitionedPath)
     }
 
   override def visit(not: Operators.Not): FilterPredicate = {
-    if (not.getPredicate == AssumeTrue) AssumeTrue // TODO AssumeFalse?
-    else not
+    if (not.getPredicate == AssumeTrue) AssumeTrue
+    else FilterApi.not(not.getPredicate)
   }
 
   override def visit[T <: Comparable[T], U <: UserDefinedPredicate[T]](udp: Operators.UserDefined[T, U]): FilterPredicate =
@@ -222,7 +222,7 @@ private class FilterRewriter(partitionedPath: PartitionedPath)
       case (IsTrue, IsTrue) => IsTrue
       case (IsTrue, right) => right
       case (left, IsTrue) => left
-      case (_, _) => and
+      case (left, right) => FilterApi.and(left, right)
     }
 
   override def visit(or: Operators.Or): FilterPredicate =
@@ -232,14 +232,14 @@ private class FilterRewriter(partitionedPath: PartitionedPath)
       case (IsFalse, IsFalse) => IsFalse
       case (IsFalse, right) => right
       case (left, IsFalse) => left
-      case (_, _) => or
+      case (left, right) => FilterApi.or(left, right)
     }
 
   override def visit(not: Operators.Not): FilterPredicate =
     not.getPredicate match {
       case IsTrue => IsFalse
       case IsFalse => IsTrue
-      case _ => not
+      case predicate => FilterApi.not(predicate)
     }
 
   override def visit[T <: Comparable[T], U <: UserDefinedPredicate[T]](udp: Operators.UserDefined[T, U]): FilterPredicate =
