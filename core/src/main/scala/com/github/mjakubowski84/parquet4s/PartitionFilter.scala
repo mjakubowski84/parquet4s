@@ -7,11 +7,9 @@ import org.apache.parquet.io.api.Binary
 import org.apache.parquet.schema.PrimitiveComparator
 
 
-case class Partition(name: String, value: String)
-
-case class PartitionedPath(path: Path, partitions: List[Partition]) {
+case class PartitionedPath(path: Path, partitions: List[(String, String)]) {
   lazy val partitionMap: Map[String, Binary] =
-    partitions.map(partition => partition.name -> Binary.fromString(partition.value)).toMap
+    partitions.map { case (name, value) => name -> Binary.fromString(value) }.toMap
 }
 
 private[parquet4s] object PartitionFilter {
@@ -150,10 +148,11 @@ private class PartitionFilterRewriter(partitionedPath: PartitionedPath)
       case (left, right) => FilterApi.or(left, right)
     }
 
-  override def visit(not: Operators.Not): FilterPredicate = {
-    if (not.getPredicate == AssumeTrue) AssumeTrue
-    else FilterApi.not(not.getPredicate)
-  }
+  override def visit(not: Operators.Not): FilterPredicate =
+    not.getPredicate.accept(this) match {
+      case AssumeTrue => AssumeTrue
+      case other => FilterApi.not(other)
+    }
 
   override def visit[T <: Comparable[T], U <: UserDefinedPredicate[T]](udp: Operators.UserDefined[T, U]): FilterPredicate =
     if (isPartitionFilter(udp.getColumn)) udp
@@ -236,7 +235,7 @@ private class FilterRewriter(partitionedPath: PartitionedPath)
     }
 
   override def visit(not: Operators.Not): FilterPredicate =
-    not.getPredicate match {
+    not.getPredicate.accept(this) match {
       case IsTrue => IsFalse
       case IsFalse => IsTrue
       case predicate => FilterApi.not(predicate)

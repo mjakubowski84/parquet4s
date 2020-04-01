@@ -3,10 +3,11 @@ package com.github.mjakubowski84.parquet4s
 import java.time.LocalDate
 import java.util.TimeZone
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class FilterSpec extends FlatSpec with Matchers {
+class FilterSpec extends AnyFlatSpec with Matchers {
 
   private val valueCodecConfiguration = ValueCodecConfiguration(timeZone = TimeZone.getDefault)
 

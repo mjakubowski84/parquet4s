@@ -1,9 +1,10 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class ValueCodecSpec extends FlatSpec with Matchers {
+class ValueCodecSpec extends AnyFlatSpec with Matchers {
 
   case class TestType(i: Int)
 
@@ -20,8 +21,8 @@ class ValueCodecSpec extends FlatSpec with Matchers {
     override protected def encodeNonNull(data: TestType, configuration: ValueCodecConfiguration): Value = IntValue(data.i)
   }
 
-  val testType = TestType(42)
-  val testValue = IntValue(testType.i)
+  val testType: TestType = TestType(42)
+  val testValue: IntValue = IntValue(testType.i)
   val configuration: ValueCodecConfiguration = ValueCodecConfiguration.default
 
   "Required value codec" should "encode non-null value" in {

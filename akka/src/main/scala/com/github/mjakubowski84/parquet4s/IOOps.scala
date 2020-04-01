@@ -17,7 +17,9 @@ private[parquet4s] object IOOps {
     override def next(): T = wrapped.next()
   }
 
-  private val PartitionRegexp: Regex = """(?<name>\w+)=(?<value>\w+)""".r
+  private type Partition = (String, String)
+
+  private val PartitionRegexp: Regex = """(\w+)=(\w+)""".r
 
 }
 
@@ -69,7 +71,7 @@ trait IOOps {
     val fs = path.getFileSystem(configuration)
     try {
       val partitionedPaths = findPartitionedPaths(fs, path, List.empty)
-      val grouped = partitionedPaths.groupBy(_.partitions.map(_.name))
+      val grouped = partitionedPaths.groupBy(_.partitions.map(_._1))
 
       Either.cond(
         test = grouped.size == 1,
@@ -115,7 +117,7 @@ trait IOOps {
   ): Option[(Path, Partition)] = {
     val path = fileStatus.getPath
     path.getName match {
-      case PartitionRegexp(name, value) => Some(path, Partition(name, value))
+      case PartitionRegexp(name, value) => Some(path, (name, value))
       case _                            => None
     }
   }
