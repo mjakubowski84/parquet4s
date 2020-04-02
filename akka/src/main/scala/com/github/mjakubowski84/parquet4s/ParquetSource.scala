@@ -22,13 +22,9 @@ private[parquet4s] object ParquetSource extends IOOps {
     val hadoopConf = options.hadoopConf
     findPartitionedPaths(path, hadoopConf).fold(
       Source.failed,
-      partitionedPaths => {
+      partitionedDirectory => {
 
-        val filterPredicate = filter.toPredicate(valueCodecConfiguration)
-
-        partitionedPaths
-          .filter(PartitionFilter.filter(filterPredicate))
-          .flatMap(createFilterForPartitionedPath(filterPredicate))
+        PartitionFilter.filter(filter.toPredicate(valueCodecConfiguration), partitionedDirectory)
           .map { case (filterCompat, partitionedPath) =>
 
             def decode(record: RowParquetRecord): T = ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
@@ -56,20 +52,5 @@ private[parquet4s] object ParquetSource extends IOOps {
       .withConf(hadoopConf)
       .withFilter(filterCompat)
       .build()
-
-
-  private def createFilterForPartitionedPath(filterPredicate: FilterPredicate)
-                                            (partitionedPath: PartitionedPath): Option[(FilterCompat.Filter, PartitionedPath)] =
-    FilterRewriter.rewrite(filterPredicate, partitionedPath) match {
-      case IsTrue =>
-        println("IsTrue") // TODO debug LOG
-        Some(FilterCompat.NOOP, partitionedPath) // filter always returns true
-      case IsFalse =>
-        println("IsFalse") // TODO debug LOG
-        None // filter always returns false
-      case rewritten =>
-        println(s"Rewritten to $rewritten") // TODO debug LOG
-        Some(FilterCompat.get(rewritten), partitionedPath)
-    }
 
 }

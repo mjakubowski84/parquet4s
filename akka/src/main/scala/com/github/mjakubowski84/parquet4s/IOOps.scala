@@ -64,34 +64,18 @@ trait IOOps {
     implicit ec: ExecutionContext
   ): Future[List[String]] = filesAtPath(new Path(path), configuration)
 
-  protected def findPartitionedPaths(
-    path: Path,
-    configuration: Configuration
-  ): Either[AssertionError, List[PartitionedPath]] = {
+  protected def findPartitionedPaths(path: Path,
+                                     configuration: Configuration): Either[Exception, PartitionedDirectory] = {
     val fs = path.getFileSystem(configuration)
     try {
-      val partitionedPaths = findPartitionedPaths(fs, path, List.empty)
-      val grouped = partitionedPaths.groupBy(_.partitions.map(_._1))
-
-      Either.cond(
-        test = grouped.size == 1,
-        right = partitionedPaths,
-        left = new AssertionError(s"""Inconsistent partitioning.
-              |Parquet files must live in leaf directories.
-              |Every files must contain the same numbers of partitions.
-              |Partition directories at the same level must have the same names.
-              |Check following directories: ${grouped.values
-                                       .map(_.head)
-                                       .mkString("\n\t", "\n\t", "")}
-              |""".stripMargin)
-      )
+      PartitionedDirectory(findPartitionedPaths(fs, path, List.empty))
     } finally fs.close()
   }
 
   protected def findPartitionedPaths(
     path: String,
     configuration: Configuration
-  ): Either[AssertionError, List[PartitionedPath]] =
+  ): Either[Exception, PartitionedDirectory] =
     findPartitionedPaths(new Path(path), configuration)
 
   private def findPartitionedPaths(

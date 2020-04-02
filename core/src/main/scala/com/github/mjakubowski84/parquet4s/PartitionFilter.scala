@@ -1,10 +1,14 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
+import com.github.mjakubowski84.parquet4s.PartitionedDirectory.PartitioningSchema
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators.Column
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Operators, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
 import org.apache.parquet.schema.PrimitiveComparator
+import org.slf4j.LoggerFactory
 
 
 case class PartitionedPath(path: Path, partitions: List[(String, String)]) {
@@ -12,19 +16,65 @@ case class PartitionedPath(path: Path, partitions: List[(String, String)]) {
     partitions.map { case (name, value) => name -> Binary.fromString(value) }.toMap
 }
 
+object PartitionedDirectory {
+
+  type PartitioningSchema = List[String]
+
+  def apply(partitionedPaths: Iterable[PartitionedPath]): Either[Exception, PartitionedDirectory] = {
+    val grouped = partitionedPaths.groupBy(_.partitions.map(_._1))
+    Either.cond(
+      test = grouped.size == 1,
+      right = new PartitionedDirectory {
+        override val schema: List[String] = grouped.head._1
+        override val paths: Iterable[PartitionedPath] = partitionedPaths
+      },
+      left = new IllegalArgumentException(
+        s"""Inconsistent partitioning.
+        |Parquet files must live in leaf directories.
+        |Every files must contain the same numbers of partitions.
+        |Partition directories at the same level must have the same names.
+        |Check following directories: ${grouped.values.map(_.head).mkString("\n\t", "\n\t", "")}
+        |""".stripMargin)
+    )
+  }
+
+}
+
+trait PartitionedDirectory {
+  def schema: PartitioningSchema
+  def paths: Iterable[PartitionedPath]
+}
+
 private[parquet4s] object PartitionFilter {
 
   import PartitionFilterRewriter._
 
-  def filter(filterPredicate: FilterPredicate)(partitionedPath: PartitionedPath): Boolean =
-    PartitionFilterRewriter.rewrite(filterPredicate, partitionedPath) match { // TODO do not rewrite per each path
-      case AssumeTrue =>
-        println("Rewritten predicate is assumed to be always true") // TODO debug LOG
-        true
-      case rewritten =>
-        println(s"Using rewritten predicate to filter partition: $rewritten") // TODO debug LOG
-        rewritten.accept(new PartitionFilter(partitionedPath))
-    }
+  private val logger = LoggerFactory.getLogger(this.getClass)
+
+  private def debug(msg: => String): Unit = logger.debug(msg)
+
+  def filter(filterPredicate: FilterPredicate, partitionedDirectory: PartitionedDirectory): Iterable[(FilterCompat.Filter, PartitionedPath)] = {
+    val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, partitionedDirectory.schema)
+    debug(s"Using rewritten predicate to filter partition: $partitionFilterPredicate")
+    partitionedDirectory
+      .paths
+      .filter {
+        case _ if partitionFilterPredicate == AssumeTrue => true
+        case partitionedPath => partitionFilterPredicate.accept(new PartitionFilter(partitionedPath))
+      }
+      .map(partitionedPath => (FilterRewriter.rewrite(filterPredicate, partitionedPath), partitionedPath))
+      .flatMap {
+        case (IsTrue, partitionedPath) =>
+          debug(s"Filter $filterPredicate for $partitionedPath is always true, filter will be ignored")
+          Some(FilterCompat.NOOP, partitionedPath)
+        case (IsFalse, partitionedPath) =>
+          debug(s"Filter $filterPredicate for $partitionedPath is always false, path won't be read")
+          None
+        case (rewritten, partitionedPath) =>
+          debug(s"Filter $filterPredicate for $partitionedPath is rewritten to $rewritten")
+          Some(FilterCompat.get(rewritten), partitionedPath)
+      }
+  }
 
 }
 
@@ -94,18 +144,18 @@ private[parquet4s] object PartitionFilterRewriter {
     override def accept[R](visitor: FilterPredicate.Visitor[R]): R = throw new UnsupportedOperationException
   }
 
-  def rewrite(filterPredicate: FilterPredicate, partitionedPath: PartitionedPath): FilterPredicate =
-    filterPredicate.accept(new PartitionFilterRewriter(partitionedPath))
+  def rewrite(filterPredicate: FilterPredicate, schema: PartitioningSchema): FilterPredicate =
+    filterPredicate.accept(new PartitionFilterRewriter(schema))
 
 }
 
-private class PartitionFilterRewriter(partitionedPath: PartitionedPath)
+private class PartitionFilterRewriter(schema: PartitioningSchema)
     extends FilterPredicate.Visitor[FilterPredicate] {
 
   import PartitionFilterRewriter._
 
   private def isPartitionFilter(column: Column[_]): Boolean =
-    partitionedPath.partitionMap.contains(column.getColumnPath.toDotString)
+    schema.contains(column.getColumnPath.toDotString)
 
   override def visit[T <: Comparable[T]](eq: Operators.Eq[T]): FilterPredicate = {
     if (isPartitionFilter(eq.getColumn)) eq
