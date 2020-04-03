@@ -10,10 +10,36 @@ import org.apache.parquet.io.api.Binary
 import org.apache.parquet.schema.PrimitiveComparator
 import org.slf4j.LoggerFactory
 
+object PartitionedPath {
 
-case class PartitionedPath(path: Path, partitions: List[(String, String)]) {
-  lazy val partitionMap: Map[String, Binary] =
-    partitions.map { case (name, value) => name -> Binary.fromString(value) }.toMap
+  def apply(path: Path, partitions: List[(String, String)]): PartitionedPath =
+    new PartitionedPathImpl(path, partitions.map { case (name, value) => (name, Binary.fromString(value))})
+
+}
+
+trait PartitionedPath {
+
+  def path: Path
+  def schema: PartitionedDirectory.PartitioningSchema
+  def value(partitionName: String): Option[Binary]
+  def partitions: List[(String, Binary)]
+
+}
+
+private class PartitionedPathImpl(
+                                   override val path: Path,
+                                   override val partitions: List[(String, Binary)]
+                                 ) extends PartitionedPath {
+
+  private val partitionMap: Map[String, Binary] = partitions
+    .foldLeft(Map.newBuilder[String, Binary])(_ += _).result()
+
+  override val schema: PartitioningSchema = partitions.map(_._1)
+
+  override def value(partitionName: String): Option[Binary] = partitionMap.get(partitionName)
+
+  override lazy val toString: String = path.toString
+
 }
 
 object PartitionedDirectory {
@@ -21,11 +47,11 @@ object PartitionedDirectory {
   type PartitioningSchema = List[String]
 
   def apply(partitionedPaths: Iterable[PartitionedPath]): Either[Exception, PartitionedDirectory] = {
-    val grouped = partitionedPaths.groupBy(_.partitions.map(_._1))
+    val grouped = partitionedPaths.groupBy(_.schema)
     Either.cond(
       test = grouped.size == 1,
       right = new PartitionedDirectory {
-        override val schema: List[String] = grouped.head._1
+        override val schema: PartitioningSchema = grouped.head._1
         override val paths: Iterable[PartitionedPath] = partitionedPaths
       },
       left = new IllegalArgumentException(
@@ -55,7 +81,7 @@ private[parquet4s] object PartitionFilter {
 
   def filter(filterPredicate: FilterPredicate, partitionedDirectory: PartitionedDirectory): Iterable[(FilterCompat.Filter, PartitionedPath)] = {
     val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, partitionedDirectory.schema)
-    debug(s"Using rewritten predicate to filter partition: $partitionFilterPredicate")
+    debug(s"Using rewritten predicate to filter partitions: $partitionFilterPredicate")
     partitionedDirectory
       .paths
       .filter {
@@ -114,10 +140,10 @@ private class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPr
       udp.getUserDefined.getUserDefinedPredicate.keep(partitionValue.asInstanceOf[T])
     }
 
-  private def applyOperator[T <: Comparable[T]](column: Column[T])(op: Binary => Boolean) = {
+  private def applyOperator[T <: Comparable[T]](column: Column[T])(op: Binary => Boolean): Boolean = {
     val columnPath = column.getColumnPath.toDotString
     val filterType = column.getColumnType
-    partitionedPath.partitionMap.get(columnPath) match {
+    partitionedPath.value(columnPath) match {
       case None =>
         false
       case Some(partitionValue) if filterType == classOf[Binary] =>
@@ -234,7 +260,7 @@ private class FilterRewriter(partitionedPath: PartitionedPath)
   import FilterRewriter._
 
   private def isPartitionFilter(column: Column[_]): Boolean =
-    partitionedPath.partitionMap.contains(column.getColumnPath.toDotString)
+    partitionedPath.schema.contains(column.getColumnPath.toDotString)
 
   private def evaluate(filterPredicate: FilterPredicate): FilterPredicate =
     if (filterPredicate.accept(new PartitionFilter(partitionedPath))) IsTrue

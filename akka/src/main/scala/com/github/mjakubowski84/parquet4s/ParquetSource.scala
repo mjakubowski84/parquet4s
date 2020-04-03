@@ -2,11 +2,9 @@ package com.github.mjakubowski84.parquet4s
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.filter2.predicate.FilterPredicate
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -20,29 +18,36 @@ private[parquet4s] object ParquetSource extends IOOps {
                                     ): Source[T, NotUsed] = {
     val valueCodecConfiguration = options.toValueCodecConfiguration
     val hadoopConf = options.hadoopConf
+
     findPartitionedPaths(path, hadoopConf).fold(
       Source.failed,
       partitionedDirectory => {
+        val sources = PartitionFilter
+          .filter(filter.toPredicate(valueCodecConfiguration), partitionedDirectory)
+          .map(createSource(valueCodecConfiguration, hadoopConf).tupled)
 
-        PartitionFilter.filter(filter.toPredicate(valueCodecConfiguration), partitionedDirectory)
-          .map { case (filterCompat, partitionedPath) =>
-
-            def decode(record: RowParquetRecord): T = ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
-
-            Source.unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
-              create = () => createReader(hadoopConf, filterCompat, partitionedPath),
-              read = reader => Option(reader.read()),
-              close = _.close()
-            ).map { record =>
-              partitionedPath.partitionMap.foreach { case (name, value) =>
-                record.add(name, BinaryValue(value))
-              }
-              record
-            }.map(decode)
-          }.reduceLeft(_.concat(_))
-
+        if (sources.isEmpty) Source.empty
+        else sources.reduceLeft(_.concat(_))
       }
     )
+  }
+
+  private def createSource[T: ParquetRecordDecoder](valueCodecConfiguration: ValueCodecConfiguration,
+                                                    hadoopConf: Configuration)
+                                                   (filterCompat: FilterCompat.Filter,
+                                                    partitionedPath: PartitionedPath): Source[T, NotUsed] = {
+    def decode(record: RowParquetRecord): T = ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
+
+    Source.unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
+      create = () => createReader(hadoopConf, filterCompat, partitionedPath),
+      read = reader => Option(reader.read()),
+      close = _.close()
+    ).map { record =>
+      partitionedPath.partitions.foreach { case (name, value) =>
+        record.add(name, BinaryValue(value))
+      }
+      record
+    }.map(decode)
   }
 
   private def createReader(hadoopConf: Configuration,
