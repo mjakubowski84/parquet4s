@@ -49,9 +49,9 @@ object PartitionedDirectory {
   def apply(partitionedPaths: Iterable[PartitionedPath]): Either[Exception, PartitionedDirectory] = {
     val grouped = partitionedPaths.groupBy(_.schema)
     Either.cond(
-      test = grouped.size == 1,
+      test = grouped.size <= 1,
       right = new PartitionedDirectory {
-        override val schema: PartitioningSchema = grouped.head._1
+        override val schema: PartitioningSchema = grouped.headOption.map(_._1).getOrElse(List.empty)
         override val paths: Iterable[PartitionedPath] = partitionedPaths
       },
       left = new IllegalArgumentException(
@@ -60,7 +60,8 @@ object PartitionedDirectory {
         |Every files must contain the same numbers of partitions.
         |Partition directories at the same level must have the same names.
         |Check following directories: ${grouped.values.map(_.head).mkString("\n\t", "\n\t", "")}
-        |""".stripMargin)
+        |""".stripMargin
+      )
     )
   }
 
@@ -79,7 +80,20 @@ private[parquet4s] object PartitionFilter {
 
   private def debug(msg: => String): Unit = logger.debug(msg)
 
-  def filter(filterPredicate: FilterPredicate, partitionedDirectory: PartitionedDirectory): Iterable[(FilterCompat.Filter, PartitionedPath)] = {
+  def filter(
+              filter: Filter,
+              valueCodecConfiguration: ValueCodecConfiguration,
+              partitionedDirectory: PartitionedDirectory
+            ): Iterable[(FilterCompat.Filter, PartitionedPath)] =
+    if (filter == Filter.noopFilter) {
+      val filterCompat = filter.toFilterCompat(valueCodecConfiguration)
+      partitionedDirectory.paths.map(pp => (filterCompat, pp))
+    } else filterNonEmptyPredicate(filter.toPredicate(valueCodecConfiguration), partitionedDirectory)
+
+  private def filterNonEmptyPredicate(
+                                       filterPredicate: FilterPredicate,
+                                       partitionedDirectory: PartitionedDirectory
+                                     ): Iterable[(FilterCompat.Filter, PartitionedPath)] = {
     val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, partitionedDirectory.schema)
     debug(s"Using rewritten predicate to filter partitions: $partitionFilterPredicate")
     partitionedDirectory
@@ -94,6 +108,10 @@ private[parquet4s] object PartitionFilter {
           debug(s"Filter $filterPredicate for $partitionedPath is always true, filter will be ignored")
           Some(FilterCompat.NOOP, partitionedPath)
         case (IsFalse, partitionedPath) =>
+          /*
+            Should never happen as filtering by partition covers this case but let's be safe in case complex
+            (user defined?) would pass partition filtering
+           */
           debug(s"Filter $filterPredicate for $partitionedPath is always false, path won't be read")
           None
         case (rewritten, partitionedPath) =>

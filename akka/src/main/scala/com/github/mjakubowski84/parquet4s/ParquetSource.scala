@@ -23,7 +23,7 @@ private[parquet4s] object ParquetSource extends IOOps {
       Source.failed,
       partitionedDirectory => {
         val sources = PartitionFilter
-          .filter(filter.toPredicate(valueCodecConfiguration), partitionedDirectory)
+          .filter(filter, valueCodecConfiguration, partitionedDirectory)
           .map(createSource(valueCodecConfiguration, hadoopConf).tupled)
 
         if (sources.isEmpty) Source.empty
