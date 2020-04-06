@@ -109,8 +109,8 @@ private[parquet4s] object PartitionFilter {
           Some(FilterCompat.NOOP, partitionedPath)
         case (IsFalse, partitionedPath) =>
           /*
-            Should never happen as filtering by partition covers this case but let's be safe in case complex
-            (user defined?) would pass partition filtering
+            Should never happen as filtering by partition covers this case but let's be safe in case some complex
+            (user defined?) predicate passes partition filtering
            */
           debug(s"Filter $filterPredicate for $partitionedPath is always false, path won't be read")
           None

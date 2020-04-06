@@ -12,7 +12,7 @@ import org.apache.parquet.filter2.compat.FilterCompat.FilterPredicateCompat
 import org.apache.parquet.filter2.predicate.FilterApi.{and => AND, eq => EQ, gt => GT, gtEq => GTE, lt => LT, ltEq => LTE, not => NOT, notEq => NEQ, or => OR, userDefined => UDP, _}
 import org.apache.parquet.filter2.predicate.{FilterPredicate, Operators, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
-import org.scalatest.Inside
+import org.scalatest.{EitherValues, Inside}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -27,7 +27,7 @@ object PartitionFilterSpec {
 
 }
 
-class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside {
+class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with EitherValues {
 
   val (i, j, k, l, other) = ("i", "j", "k", "l", "other")
   val (colI, colJ, colK, colL) = (binaryColumn(i), binaryColumn(j), binaryColumn(k), binaryColumn(l))
@@ -51,8 +51,42 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside {
     PartitionedPath(new Path("/"), partitions.toList)
 
   def partitionedDirectory(partitionedPaths: PartitionedPath*): PartitionedDirectory =
-    PartitionedDirectory(partitionedPaths).toTry.get
+    PartitionedDirectory(partitionedPaths).right.value
 
+
+  "PartitionedDirectory" should "accept empty input" in {
+    val dir = partitionedDirectory()
+    dir.schema should be(empty)
+    dir.paths should be(empty)
+  }
+
+  it should "accept paths without partitions" in {
+    val dir = partitionedDirectory(partitionedPath(), partitionedPath(), partitionedPath())
+    dir.schema should be (empty)
+    dir.paths should have size 3
+  }
+
+  it should "accept single partitioned path" in {
+    val dir = partitionedDirectory(partitionedPath("x" -> "4", "y" -> "2"))
+    dir.schema should be (List("x", "y"))
+    dir.paths should have size 1
+  }
+
+  it should "rise exception if number of partitions is inconsistent among paths" in {
+    PartitionedDirectory(Seq(
+      partitionedPath("x" -> "1", "y" -> "A"),
+      partitionedPath("x" -> "2"),
+      partitionedPath("x" -> "3", "y" -> "C"),
+    )).left.value should be(an[IllegalArgumentException])
+  }
+
+  it should "rise exception if order of partitions is inconsistent among paths" in {
+    PartitionedDirectory(Seq(
+      partitionedPath("x" -> "1", "y" -> "A"),
+      partitionedPath("y" -> "B", "x" -> "2"),
+      partitionedPath("x" -> "3", "y" -> "C"),
+    )).left.value should be(an[IllegalArgumentException])
+  }
 
   "PartitionFilter visitor" should "handle case when there predicate does not match any column" in {
     eqi.accept(new PartitionFilter(partitionedPath())) should be(false)
