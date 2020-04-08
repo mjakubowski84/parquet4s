@@ -4,7 +4,7 @@ Simple I/O for Parquet. Allows you to easily read and write Parquet files in Sca
 
 Use just Scala case class to define the schema of your data. No need to use Avro, Protobuf, Thrift or other data serialisation systems.
 
-Compatible with files generated with Apache Spark. However, unlike in Spark, you do not have to start a cluster to perform I/O operatotions.
+Compatible with files generated with Apache Spark. However, unlike in Spark, you do not have to start a cluster to perform I/O operations.
 
 Based on official Parquet library, Hadoop Client and Shapeless.
 
