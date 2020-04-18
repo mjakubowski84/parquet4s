@@ -9,11 +9,11 @@ libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.6",
 
   // tests
-  "org.mockito" %% "mockito-scala-scalatest" % "1.7.1" % "test",
-  "org.scalatest" %% "scalatest" % "3.0.8" % "test,it",
+  "org.mockito" %% "mockito-scala-scalatest" % "1.13.1" % "test",
+  "org.scalatest" %% "scalatest" % "3.1.1" % "test,it",
   "ch.qos.logback" % "logback-classic" % "1.2.3" % "test,it",
   "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it",
-  "com.google.guava" % "guava" % "28.1-jre" % "it"
+  "com.google.guava" % "guava" % "28.2-jre" % "it"
 )
 
 lazy val sparkDeps = Seq(

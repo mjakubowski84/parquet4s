@@ -6,10 +6,11 @@ import java.util.TimeZone
 import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder.{DecodingException, decode}
 import com.github.mjakubowski84.parquet4s.TestCases._
 import com.github.mjakubowski84.parquet4s.ValueImplicits._
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
+class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
 
   def dateTimeAsBinary(epochDays: Int, timeInNanos: Long, timeZone: TimeZone): BinaryValue =
     BinaryValue {

@@ -3,12 +3,13 @@ package com.github.mjakubowski84.parquet4s
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.TimeZone
 
-import org.scalatest.{FlatSpec, Matchers}
-import ValueImplicits._
-import TestCases._
-import ParquetRecordEncoder.{EncodingException, encode}
+import com.github.mjakubowski84.parquet4s.ParquetRecordEncoder.{EncodingException, encode}
+import com.github.mjakubowski84.parquet4s.TestCases._
+import com.github.mjakubowski84.parquet4s.ValueImplicits._
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
+class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
 
   "Parquet record encoder" should "be used to encode empty record" in {
     encode(Empty()) should be(RowParquetRecord())

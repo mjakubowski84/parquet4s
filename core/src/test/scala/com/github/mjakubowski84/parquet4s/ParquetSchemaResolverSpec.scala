@@ -4,11 +4,12 @@ import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.resolveSchema
 import com.github.mjakubowski84.parquet4s.TestCases._
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
 import org.apache.parquet.schema.Type.Repetition._
-import org.apache.parquet.schema.{OriginalType, PrimitiveType, Types}
-import org.scalatest.{FlatSpec, Matchers}
+import org.apache.parquet.schema.{OriginalType, Types}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 
-class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
+class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
 
   "ParquetSchemaResolver" should "resolve schema for type with no fields" in {
     resolveSchema[Empty] should be(Message())
