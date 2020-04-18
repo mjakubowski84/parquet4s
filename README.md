@@ -149,7 +149,10 @@ Source(data).runWith(ParquetStreams.toParquetIndefinite(
 ))
   
 // Reads file or files from the path. Please also have a look at optional parameters.
-ParquetStreams.fromParquet[User]("file:///data/users", ParquetReader.Options(hadoopConf=conf)).runForeach(println)
+ParquetStreams.fromParquet[User](
+  path = "file:///data/users", 
+  options = ParquetReader.Options(hadoopConf = conf)
+).runForeach(println)
 ```
 
 ## Before-read filtering or Filter pushdown
@@ -172,6 +175,10 @@ ParquetStreams.fromParquet[Stats](
   filter = Col("stats.score") > 0.9 && Col("stats.score") <= 1.0
 )
 ```
+
+> **TAKE NOTE!**
+>
+> Take note that due to an issue with implicit resolution in **Scala 2.11** you may need to define all parameters of `ParquetStreams.fromParquet` even if some have default values. It specifically refers to a case when you would like to omit `options` but define `filter`. Such situation doesn't appear in Scala 2.12 and 2.13.
 
 You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, and `in` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
 

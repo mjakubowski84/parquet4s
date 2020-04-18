@@ -21,6 +21,12 @@ object ParquetStreams {
     * <br/>
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
+    * <br/> <br/>
+    *
+    * <b>Take note!</b> that due to an issue with implicit resolution in <b>Scala 2.11</b> you may need to define
+    * <b>all parameters</b> of `ParquetStreams.fromParquet` even if some have default values. It specifically refers to
+    * a case when you would like to omit `options` but define `filter`. Such situation doesn't appear in Scala 2.12 and
+    * 2.13.
     *
     * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
     * @param options configuration of how Parquet files should be read
