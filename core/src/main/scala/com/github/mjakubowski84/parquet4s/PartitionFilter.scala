@@ -60,23 +60,24 @@ object PartitionedDirectory {
 
   type PartitioningSchema = List[String]
 
+  private[parquet4s] def failed(invalidPaths: Iterable[Path]): Left[Exception, PartitionedDirectory] =
+    Left(new IllegalArgumentException(
+      s"""Inconsistent partitioning.
+         |Parquet files must live in leaf directories.
+         |Every files must contain the same numbers of partitions.
+         |Partition directories at the same level must have the same names.
+         |Check following directories: ${invalidPaths.mkString("\n\t", "\n\t", "")}
+         |""".stripMargin
+    ))
+
   def apply(partitionedPaths: Iterable[PartitionedPath]): Either[Exception, PartitionedDirectory] = {
     val grouped = partitionedPaths.groupBy(_.schema)
-    Either.cond(
-      test = grouped.size <= 1,
-      right = new PartitionedDirectory {
+    if (grouped.size <= 1) Right(
+      new PartitionedDirectory {
         override val schema: PartitioningSchema = grouped.headOption.map(_._1).getOrElse(List.empty)
         override val paths: Iterable[PartitionedPath] = partitionedPaths
-      },
-      left = new IllegalArgumentException(
-        s"""Inconsistent partitioning.
-        |Parquet files must live in leaf directories.
-        |Every files must contain the same numbers of partitions.
-        |Partition directories at the same level must have the same names.
-        |Check following directories: ${grouped.values.map(_.head).mkString("\n\t", "\n\t", "")}
-        |""".stripMargin
-      )
-    )
+      }
+    ) else failed(grouped.values.flatMap(_.headOption).map(_.path))
   }
 
 }

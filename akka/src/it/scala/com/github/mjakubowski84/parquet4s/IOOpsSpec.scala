@@ -105,11 +105,21 @@ class IOOpsSpec
     dir.schema should be(List("x", "y", "z"))
   }
 
-  it should "fail to create partitions from inconsistent directory" in {
+  it should "fail to create partitions from inconsistent directory [case1]" in {
     val path1 = tempPath.suffix("/x=1/y=a")
     val path2 = tempPath.suffix("/y=1/x=b")
     fileSystem.mkdirs(path1)
     fileSystem.mkdirs(path2)
+
+    findPartitionedPaths(tempPath, configuration) should be a 'Left
+  }
+
+  it should "fail to create partitions from inconsistent directory [case2]" in {
+    val path1 = tempPath.suffix("/x=1/y=a")
+    val path2 = tempPath.suffix("/x=1")
+    fileSystem.mkdirs(path1)
+    fileSystem.mkdirs(path2)
+    fileSystem.create(path2.suffix("/not_in_a_leaf.file"))
 
     findPartitionedPaths(tempPath, configuration) should be a 'Left
   }

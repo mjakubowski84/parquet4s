@@ -85,6 +85,18 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     }
   }
 
+  it should "should return empty stream when reading empty directory" in {
+    fileSystem.mkdirs(tempPath)
+
+    for {
+      files <- filesAtPath(tempPath, configuration)
+      readData <- read[Data](tempPath)
+    } yield {
+      files should be(empty)
+      readData should be(empty)
+    }
+  }
+
   it should "be able to filter files during reading" in {
     val outputFileName = "data.parquet"
 
@@ -144,6 +156,23 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
         elem.s should be("a")
       }
     }
+  }
+
+  it should "fail to read data that is improperly partitioned" in {
+    val outputFileName = "data.parquet"
+
+    val write = (midPath: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$tempPath/$midPath/$outputFileName",
+      options = writeOptions
+    ))
+
+    val fut = for {
+      _ <- write("a=A/b=1")
+      _ <- write("a=A")
+      _ <- read[DataPartitioned](tempPath)
+    } yield ()
+
+    recoverToSucceededIf[IllegalArgumentException](fut)
   }
 
   it should "split data into sequential chunks and read it correctly" in {

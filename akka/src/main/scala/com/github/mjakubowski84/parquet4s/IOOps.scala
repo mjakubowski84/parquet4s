@@ -66,7 +66,10 @@ trait IOOps {
                                      configuration: Configuration): Either[Exception, PartitionedDirectory] = {
     val fs = path.getFileSystem(configuration)
     try {
-      PartitionedDirectory(findPartitionedPaths(fs, path, List.empty))
+      findPartitionedPaths(fs, path, List.empty).fold(
+        PartitionedDirectory.failed,
+        PartitionedDirectory.apply
+      )
     } finally fs.close()
   }
 
@@ -76,18 +79,29 @@ trait IOOps {
 
   private def findPartitionedPaths(fs: FileSystem,
                                    path: Path,
-                                   partitions: List[Partition]): List[PartitionedPath] = {
-    val partitionedDirs = listDirs(fs, path).flatMap(matchPartition)
-    if (partitionedDirs.isEmpty)
-      List(PartitionedPath(path, partitions))
-    else
-      partitionedDirs.flatMap { case (subPath, partition) =>
-          findPartitionedPaths(fs, subPath, partitions :+ partition)
-      }
+                                   partitions: List[Partition]): Either[List[Path], List[PartitionedPath]] = {
+    val (dirs, files) = fs.listStatus(path).toList.partition(_.isDirectory)
+    if (dirs.nonEmpty && files.nonEmpty)
+      Left(path :: Nil) // path is invalid because it contains both dirs and files
+    else {
+      val partitionedDirs = dirs.flatMap(matchPartition)
+      if (partitionedDirs.isEmpty)
+        Right(List(PartitionedPath(path, partitions))) // leaf dir
+      else
+        partitionedDirs
+          .map { case (subPath, partition) => findPartitionedPaths(fs, subPath, partitions :+ partition) }
+          .foldLeft[Either[List[Path], List[PartitionedPath]]](Right(List.empty)) {
+            case (Left(invalidPaths), Left(moreInvalidPaths)) =>
+              Left(invalidPaths ++ moreInvalidPaths)
+            case (Right(partitionedPaths), Right(morePartitionedPaths)) =>
+              Right(partitionedPaths ++ morePartitionedPaths)
+            case (left @ Left(_), _) =>
+              left
+            case (_, left @ Left(_)) =>
+              left
+        }
+    }
   }
-
-  private def listDirs(fs: FileSystem, path: Path): List[FileStatus] =
-    fs.listStatus(path).toList.filter(_.isDirectory)
 
   private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
     val path = fileStatus.getPath

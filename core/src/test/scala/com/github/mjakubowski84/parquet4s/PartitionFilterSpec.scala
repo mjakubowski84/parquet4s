@@ -76,7 +76,7 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
     PartitionedDirectory(Seq(
       partitionedPath("x" -> "1", "y" -> "A"),
       partitionedPath("x" -> "2"),
-      partitionedPath("x" -> "3", "y" -> "C"),
+      partitionedPath("x" -> "3", "y" -> "C")
     )).left.value should be(an[IllegalArgumentException])
   }
 
@@ -84,7 +84,7 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
     PartitionedDirectory(Seq(
       partitionedPath("x" -> "1", "y" -> "A"),
       partitionedPath("y" -> "B", "x" -> "2"),
-      partitionedPath("x" -> "3", "y" -> "C"),
+      partitionedPath("x" -> "3", "y" -> "C")
     )).left.value should be(an[IllegalArgumentException])
   }
 
