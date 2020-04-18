@@ -27,7 +27,7 @@ private[parquet4s] object UnorderedParallelParquetSink extends IOOps {
 
     Flow[T]
       .zipWithIndex
-      .groupBy(parallelism, elemAndIndex => Math.floorMod(elemAndIndex._2, parallelism))
+      .groupBy(parallelism, elemAndIndex => Math.floorMod(elemAndIndex._2, parallelism.toLong))
       .map(elemAndIndex => encode(elemAndIndex._1))
       .fold(UnorderedChunk(path, schema, options))(_.write(_))
       .map(_.close())
