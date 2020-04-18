@@ -24,7 +24,7 @@ private[parquet4s] object ParquetSource extends IOOps {
       partitionedDirectory => {
         val sources = PartitionFilter
           .filter(filter, valueCodecConfiguration, partitionedDirectory)
-          .map(createSource(valueCodecConfiguration, hadoopConf).tupled)
+          .map(createSource[T](valueCodecConfiguration, hadoopConf).tupled)
 
         if (sources.isEmpty) Source.empty
         else sources.reduceLeft(_.concat(_))
@@ -32,22 +32,21 @@ private[parquet4s] object ParquetSource extends IOOps {
     )
   }
 
-  private def createSource[T: ParquetRecordDecoder](valueCodecConfiguration: ValueCodecConfiguration,
-                                                    hadoopConf: Configuration)
-                                                   (filterCompat: FilterCompat.Filter,
-                                                    partitionedPath: PartitionedPath): Source[T, NotUsed] = {
-    def decode(record: RowParquetRecord): T = ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
+  private def createSource[T: ParquetRecordDecoder](valueCodecConfiguration: ValueCodecConfiguration, hadoopConf: Configuration):
+                                                   (FilterCompat.Filter, PartitionedPath) => Source[T, NotUsed] = {
+    (filterCompat, partitionedPath) =>
+      def decode(record: RowParquetRecord): T = ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
 
-    Source.unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
-      create = () => createReader(hadoopConf, filterCompat, partitionedPath),
-      read = reader => Option(reader.read()),
-      close = _.close()
-    ).map { record =>
-      partitionedPath.partitions.foreach { case (name, value) =>
-        record.add(name, BinaryValue(value))
-      }
-      record
-    }.map(decode)
+      Source.unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
+        create = () => createReader(hadoopConf, filterCompat, partitionedPath),
+        read = reader => Option(reader.read()),
+        close = _.close()
+      ).map { record =>
+        partitionedPath.partitions.foreach { case (name, value) =>
+          record.add(name, BinaryValue(value))
+        }
+        record
+      }.map(decode)
   }
 
   private def createReader(hadoopConf: Configuration,

@@ -35,9 +35,7 @@ trait IOOps {
     try {
       if (fs.exists(path)) {
         if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
-          throw new AlreadyExistsException(
-            s"File or directory already exists: $path"
-          )
+          throw new AlreadyExistsException(s"File or directory already exists: $path")
         else {
           if (logger.isDebugEnabled)
             logger.debug(s"Deleting $path in order to override with new data.")
@@ -47,22 +45,22 @@ trait IOOps {
     } finally fs.close()
   }
 
-  protected def filesAtPath(path: Path, configuration: Configuration)(
-    implicit ec: ExecutionContext
-  ): Future[List[String]] = Future {
-    scala.concurrent.blocking {
-      val fs = path.getFileSystem(configuration)
-      try {
-        fs.listFiles(path, false)
-          .map(_.getPath.getName)
-          .toList
-      } finally fs.close()
+  protected def filesAtPath(path: Path, configuration: Configuration)
+                           (implicit ec: ExecutionContext): Future[List[String]] =
+    Future {
+      scala.concurrent.blocking {
+        val fs = path.getFileSystem(configuration)
+        try {
+          fs.listFiles(path, false)
+            .map(_.getPath.getName)
+            .toList
+        } finally fs.close()
+      }
     }
-  }
 
-  protected def filesAtPath(path: String, configuration: Configuration)(
-    implicit ec: ExecutionContext
-  ): Future[List[String]] = filesAtPath(new Path(path), configuration)
+  protected def filesAtPath(path: String, configuration: Configuration)
+                           (implicit ec: ExecutionContext): Future[List[String]] =
+    filesAtPath(new Path(path), configuration)
 
   protected def findPartitionedPaths(path: Path,
                                      configuration: Configuration): Either[Exception, PartitionedDirectory] = {
@@ -72,23 +70,18 @@ trait IOOps {
     } finally fs.close()
   }
 
-  protected def findPartitionedPaths(
-    path: String,
-    configuration: Configuration
-  ): Either[Exception, PartitionedDirectory] =
+  protected def findPartitionedPaths(path: String,
+                                     configuration: Configuration): Either[Exception, PartitionedDirectory] =
     findPartitionedPaths(new Path(path), configuration)
 
-  private def findPartitionedPaths(
-    fs: FileSystem,
-    path: Path,
-    partitions: List[Partition]
-  ): List[PartitionedPath] = {
+  private def findPartitionedPaths(fs: FileSystem,
+                                   path: Path,
+                                   partitions: List[Partition]): List[PartitionedPath] = {
     val partitionedDirs = listDirs(fs, path).flatMap(matchPartition)
     if (partitionedDirs.isEmpty)
       List(PartitionedPath(path, partitions))
     else
-      partitionedDirs.flatMap {
-        case (subPath, partition) =>
+      partitionedDirs.flatMap { case (subPath, partition) =>
           findPartitionedPaths(fs, subPath, partitions :+ partition)
       }
   }
@@ -96,9 +89,7 @@ trait IOOps {
   private def listDirs(fs: FileSystem, path: Path): List[FileStatus] =
     fs.listStatus(path).toList.filter(_.isDirectory)
 
-  private def matchPartition(
-    fileStatus: FileStatus
-  ): Option[(Path, Partition)] = {
+  private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
     val path = fileStatus.getPath
     path.getName match {
       case PartitionRegexp(name, value) => Some(path, (name, value))

@@ -40,6 +40,20 @@ private class PartitionedPathImpl(
 
   override lazy val toString: String = path.toString
 
+  def canEqual(other: Any): Boolean = other.isInstanceOf[PartitionedPathImpl]
+
+  override def equals(other: Any): Boolean = other match {
+    case that: PartitionedPathImpl =>
+      (that canEqual this) &&
+        path == that.path &&
+        partitions == that.partitions
+    case _ => false
+  }
+
+  override def hashCode(): Int = {
+    val state = Seq(path, partitions)
+    state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
+  }
 }
 
 object PartitionedDirectory {
