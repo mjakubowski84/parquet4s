@@ -6,12 +6,13 @@ import java.time.LocalDate
 
 import com.google.common.io.Files
 import org.apache.parquet.filter2.predicate.Operators.{Column, DoubleColumn, FloatColumn, SupportsEqNotEq}
-import org.scalatest.{BeforeAndAfterAll, FlatSpec, Inspectors, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfterAll, Inspectors}
 
 import scala.util.Random
 
-class FilteringByListSpec extends FlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
-
+class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
 
   case class Embedded(x: Int)
 

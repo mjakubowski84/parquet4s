@@ -3,10 +3,12 @@ package com.github.mjakubowski84.parquet4s
 import java.util.TimeZone
 
 import com.github.mjakubowski84.parquet4s.CompatibilityTestCases.TimePrimitives
-import org.scalatest.{BeforeAndAfter, FlatSpec, Matchers}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 class TimeEncodingCompatibilityItSpec extends
-  FlatSpec
+  AnyFlatSpec
     with Matchers
     with BeforeAndAfter
     with SparkHelper {

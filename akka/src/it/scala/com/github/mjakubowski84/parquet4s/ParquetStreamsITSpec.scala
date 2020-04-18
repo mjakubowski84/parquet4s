@@ -31,13 +31,14 @@ object ParquetStreamsITSpec {
 
 }
 
-class ParquetStreamsITSpec extends AsyncFlatSpec
-  with Matchers
-  with TestUtils
-  with IOOps
-  with Inspectors
-  with BeforeAndAfter
-  with BeforeAndAfterAll {
+class ParquetStreamsITSpec
+  extends AsyncFlatSpec
+    with Matchers
+    with TestUtils
+    with IOOps
+    with Inspectors
+    with BeforeAndAfter
+    with BeforeAndAfterAll {
 
   import ParquetRecordDecoder._
   import ParquetStreamsITSpec._

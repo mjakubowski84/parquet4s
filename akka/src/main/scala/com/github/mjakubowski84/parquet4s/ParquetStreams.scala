@@ -40,7 +40,7 @@ object ParquetStreams {
                                              options: ParquetReader.Options = ParquetReader.Options(),
                                              filter: Filter = Filter.noopFilter
                                            ): Source[T, NotUsed] =
-    ParquetSource[T](new Path(path), options, filter)
+    ParquetSource(new Path(path), options, filter)
 
   /**
     * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to single file at the specified path (including

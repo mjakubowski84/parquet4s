@@ -3,12 +3,14 @@ package com.github.mjakubowski84.parquet4s
 import java.nio.file.Files
 
 import org.apache.parquet.hadoop.ParquetFileWriter
-import org.scalatest.{BeforeAndAfter, FreeSpec, Matchers}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 
 import scala.util.Random
 
 class ParquetWriterItSpec
-  extends FreeSpec
+  extends AnyFreeSpec
     with Matchers
     with BeforeAndAfter {
 
