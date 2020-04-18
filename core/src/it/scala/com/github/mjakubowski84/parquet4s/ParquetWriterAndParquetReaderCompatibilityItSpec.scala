@@ -2,10 +2,12 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.Case.CaseDef
 import com.github.mjakubowski84.parquet4s.CompatibilityParty._
-import org.scalatest.{BeforeAndAfter, FreeSpec, Matchers}
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.BeforeAndAfter
+import org.scalatest.freespec.AnyFreeSpec
 
 class ParquetWriterAndParquetReaderCompatibilityItSpec extends
-  FreeSpec
+  AnyFreeSpec
     with Matchers
     with BeforeAndAfter
     with TestUtils {
