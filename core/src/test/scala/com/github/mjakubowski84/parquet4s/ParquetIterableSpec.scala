@@ -5,7 +5,8 @@ import com.github.mjakubowski84.parquet4s.ValueImplicits._
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.mockito.scalatest.IdiomaticMockito
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
 object ParquetIterableSpec {
 
@@ -16,7 +17,7 @@ object ParquetIterableSpec {
   val options: ParquetReader.Options = ParquetReader.Options()
 }
 
-class ParquetIterableSpec extends FlatSpec with Matchers with IdiomaticMockito {
+class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockito {
 
   import ParquetIterableSpec._
 

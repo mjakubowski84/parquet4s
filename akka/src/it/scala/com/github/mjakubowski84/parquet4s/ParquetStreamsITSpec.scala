@@ -4,9 +4,11 @@ import java.sql.Timestamp
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorMaterializer, Materializer}
+import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
-import org.scalatest.{AsyncFlatSpec, BeforeAndAfterAll, Inspectors, Matchers}
+import org.scalatest.flatspec.AsyncFlatSpec
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Inspectors}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.immutable
@@ -18,8 +20,10 @@ object ParquetStreamsITSpec {
 
   case class Data(i: Long, s: String)
 
+  case class DataPartitioned(i: Long, s: String, a: String, b: String)
+
   object DataTransformed {
-    def apply(data: Data, t: Timestamp): DataTransformed = DataTransformed(data.i, data.s , t)
+    def apply(data: Data, t: Timestamp): DataTransformed = DataTransformed(data.i, data.s, t)
   }
   case class DataTransformed(i: Long, s: String, t: Timestamp) {
     def toData: Data = Data(i, s)
@@ -27,12 +31,12 @@ object ParquetStreamsITSpec {
 
 }
 
-
 class ParquetStreamsITSpec extends AsyncFlatSpec
   with Matchers
   with TestUtils
   with IOOps
   with Inspectors
+  with BeforeAndAfter
   with BeforeAndAfterAll {
 
   import ParquetRecordDecoder._
@@ -40,41 +44,40 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
   override val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
-  implicit val mat: Materializer = ActorMaterializer()
 
   val writeOptions: ParquetWriter.Options = ParquetWriter.Options(
     compressionCodecName = CompressionCodecName.SNAPPY,
     pageSize = 512,
-    rowGroupSize = 4 * 512
+    rowGroupSize = 4 * 512,
+    hadoopConf = configuration
   )
 
   val count: Int = 4 * writeOptions.rowGroupSize
   val dict: Seq[String] = Vector("a", "b", "c", "d")
   val data: Stream[Data] = Stream
     .range(start = 0L, end = count, step = 1L)
-    .map(i => Data(i, dict(Random.nextInt(4))))
+    .map(i => Data(i = i, s = dict(Random.nextInt(4))))
 
-  def read[T : ParquetRecordDecoder](path: String, filter: Filter = Filter.noopFilter): Future[immutable.Seq[T]] =
-    ParquetStreams.fromParquet[T](path = path, filter = filter).runWith(Sink.seq)
+  def read[T : ParquetRecordDecoder](path: Path, filter: Filter = Filter.noopFilter): Future[immutable.Seq[T]] =
+    ParquetStreams.fromParquet[T](path = path.toString, filter = filter).runWith(Sink.seq)
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
+  before {
     clearTemp()
   }
 
+
   "ParquetStreams" should "write single file and read it correctly" in {
-    val outputPath = s"$tempPathString/writeSingleFile"
     val outputFileName = "data.parquet"
 
     val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
-      path = s"$outputPath/$outputFileName",
+      path = s"$tempPath/$outputFileName",
       options = writeOptions
     ))
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath, writeOptions)
-      readData <- read[Data](outputPath)
+      files <- filesAtPath(tempPath, configuration)
+      readData <- read[Data](tempPath)
     } yield {
       files should be(List(outputFileName))
       readData should have size count
@@ -82,58 +85,127 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
     }
   }
 
+  it should "should return empty stream when reading empty directory" in {
+    fileSystem.mkdirs(tempPath)
+
+    for {
+      files <- filesAtPath(tempPath, configuration)
+      readData <- read[Data](tempPath)
+    } yield {
+      files should be(empty)
+      readData should be(empty)
+    }
+  }
+
   it should "be able to filter files during reading" in {
-    val outputPath = s"$tempPathString/writeSingleFileAndFilterIt"
     val outputFileName = "data.parquet"
 
     val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
-      path = s"$outputPath/$outputFileName",
+      path = s"$tempPath/$outputFileName",
       options = writeOptions
     ))
 
     for {
       _ <- write()
-      readData <- read[Data](outputPath, filter = Col("s") === "a")
+      readData <- read[Data](tempPath, filter = Col("s") === "a")
     } yield {
       readData should not be empty
       forAll(readData) { _.s should be("a") }
     }
   }
 
+  it should "be able to read partitioned data" in {
+    val outputFileName = "data.parquet"
+
+    val write = (a: String, b: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$tempPath/a=$a/b=$b/$outputFileName",
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write("A", "1")
+      _ <- write("A", "2")
+      _ <- write("B", "1")
+      _ <- write("B", "2")
+      readData <- read[DataPartitioned](tempPath)
+    } yield {
+      readData should have size count * 4
+      readData.filter(d => d.a == "A" && d.b == "1") should have size count
+      readData.filter(d => d.a == "A" && d.b == "2") should have size count
+      readData.filter(d => d.a == "B" && d.b == "1") should have size count
+      readData.filter(d => d.a == "B" && d.b == "2") should have size count
+    }
+  }
+
+  it should "filter data by partition and file content" in {
+    val outputFileName = "data.parquet"
+
+    val write = (midPath: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$tempPath/$midPath/$outputFileName",
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write("a=A/b=1")
+      _ <- write("a=A/b=2")
+      readData <- read[DataPartitioned](tempPath, filter = Col("b") === "1" && Col("s") === "a")
+    } yield {
+      readData should not be empty
+      forAll(readData) { elem =>
+        elem.b should be("1")
+        elem.s should be("a")
+      }
+    }
+  }
+
+  it should "fail to read data that is improperly partitioned" in {
+    val outputFileName = "data.parquet"
+
+    val write = (midPath: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$tempPath/$midPath/$outputFileName",
+      options = writeOptions
+    ))
+
+    val fut = for {
+      _ <- write("a=A/b=1")
+      _ <- write("a=A")
+      _ <- read[DataPartitioned](tempPath)
+    } yield ()
+
+    recoverToSucceededIf[IllegalArgumentException](fut)
+  }
+
   it should "split data into sequential chunks and read it correctly" in {
-    val outputPath = s"$tempPathString/writeSequentiallySplitFiles"
     val outputFileNames = List("part-00000.parquet", "part-00001.parquet")
 
     val write = () => Source(data).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
-      path = outputPath,
+      path = tempPathString,
       maxRecordsPerFile = 2 * writeOptions.rowGroupSize,
       options = writeOptions
     ))
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath, writeOptions)
-      readData <- read[Data](outputPath)
+      files <- filesAtPath(tempPath, configuration)
+      readData <- read[Data](tempPath)
     } yield {
       files should contain theSameElementsAs outputFileNames
       readData should have size count
-      readData should contain theSameElementsAs data // TODO check how files can be always read in correct order
+      readData should contain theSameElementsAs data
     }
   }
 
   it should "write data in parallel as chunks and read it correctly" in {
-    val outputPath = s"$tempPathString/writeParallelUnordered"
-
     val write = () => Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
-      path = outputPath,
+      path = tempPathString,
       parallelism = 2,
       options = writeOptions
     ))
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath, writeOptions)
-      readData <- read[Data](outputPath)
+      files <- filesAtPath(tempPath, configuration)
+      readData <- read[Data](tempPath)
     } yield {
       files should have size 2
       readData should have size count
@@ -142,10 +214,8 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
   }
 
   it should "split data into sequential chunks using indefinite stream support with default settings" in {
-    val outputPath = s"$tempPathString/writeIndefiniteDefault"
-
     val write = () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
-      path = outputPath,
+      path = tempPathString,
       maxChunkSize = writeOptions.rowGroupSize,
       chunkWriteTimeWindow = 10.seconds,
       options = writeOptions
@@ -153,8 +223,8 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       _ <- write()
-      files <- filesAtPath(outputPath, writeOptions)
-      readData <- read[Data](outputPath)
+      files <- filesAtPath(tempPath, configuration)
+      readData <- read[Data](tempPath)
     } yield {
       files should have size 4
       readData should have size count
@@ -163,12 +233,11 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
   }
 
   it should "split data into sequential chunks using indefinite stream support with custom settings" in {
-    val outputPath = s"$tempPathString/writeIndefiniteCustom"
     val expectedFileNames = List("0.parquet", "2048.parquet", "4096.parquet", "6144.parquet")
     val currentTime = new Timestamp(System.currentTimeMillis())
 
     val write = () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
-      path = outputPath,
+      path = tempPathString,
       maxChunkSize = writeOptions.rowGroupSize,
       chunkWriteTimeWindow = 10.seconds,
       buildChunkPath = { case (basePath, chunk) => basePath.suffix(s"/${chunk.head.i}.parquet")},
@@ -179,8 +248,8 @@ class ParquetStreamsITSpec extends AsyncFlatSpec
 
     for {
       postWriteData <- write()
-      files <- filesAtPath(outputPath, writeOptions)
-      readData <- read[DataTransformed](outputPath)
+      files <- filesAtPath(tempPath, configuration)
+      readData <- read[DataTransformed](tempPath)
     } yield {
       postWriteData should have size count
       postWriteData should contain theSameElementsAs data

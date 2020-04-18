@@ -1,8 +1,10 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class DecimalsSpec extends FlatSpec with Matchers {
+
+class DecimalsSpec extends AnyFlatSpec with Matchers {
 
   "Decimals" should "be able to convert decimal to binary and back" in {
     val decimal = BigDecimal(1001, 2)
