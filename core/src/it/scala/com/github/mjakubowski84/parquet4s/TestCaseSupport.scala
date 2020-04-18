@@ -21,10 +21,10 @@ object Case {
   type CaseDef = Case[_ <: Product]
 
   def apply[T <: Product : TypeTag : ParquetReader : ParquetWriterFactory](
-                                                                     description: String,
-                                                                     data: Seq[T],
-                                                                     compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
-                                                                   ): Case[T] =
+                                                                            description: String,
+                                                                            data: Seq[T],
+                                                                            compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
+                                                                          ): Case[T] =
     new Case(
       description = description,
       compatibilityParties = compatibilityParties,

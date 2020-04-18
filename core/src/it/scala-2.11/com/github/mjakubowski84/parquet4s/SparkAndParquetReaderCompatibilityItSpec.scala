@@ -1,10 +1,12 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.CompatibilityParty._
-import org.scalatest.{BeforeAndAfter, FreeSpec, Matchers}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.freespec.AnyFreeSpec
+import org.scalatest.matchers.should.Matchers
 
 class SparkAndParquetReaderCompatibilityItSpec extends
-  FreeSpec
+  AnyFreeSpec
     with Matchers
     with BeforeAndAfter
     with SparkHelper {

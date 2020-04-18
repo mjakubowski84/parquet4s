@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s.akka
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorMaterializer, Materializer}
 import com.github.mjakubowski84.parquet4s.{Col, ParquetReader, ParquetStreams}
 import com.google.common.io.Files
 
@@ -28,7 +27,6 @@ object WriteAndReadFilteredAkkaApp extends App {
   val path = Files.createTempDir().getAbsolutePath
 
   implicit val system: ActorSystem = ActorSystem()
-  implicit val materializer: Materializer = ActorMaterializer()
   import system.dispatcher
 
   val options = ParquetReader.Options()

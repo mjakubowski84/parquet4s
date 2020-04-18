@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s.akka
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import akka.stream.{ActorMaterializer, Materializer}
 import com.github.mjakubowski84.parquet4s.CustomType._
 import com.github.mjakubowski84.parquet4s.ParquetStreams
 import com.google.common.io.Files
@@ -18,7 +17,6 @@ object WriteAndReadCustomTypeAkkaApp extends App {
   val path = Files.createTempDir().getAbsolutePath
 
   implicit val system: ActorSystem = ActorSystem()
-  implicit val materializer: Materializer = ActorMaterializer()
   import system.dispatcher
 
   for {
