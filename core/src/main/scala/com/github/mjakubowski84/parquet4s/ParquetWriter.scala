@@ -152,6 +152,9 @@ private class DefaultParquetWriter[T : ParquetRecordEncoder : ParquetSchemaResol
     if (closed) {
       logger.warn("Attempted to close a writer which was already closed")
     } else {
+      if (logger.isDebugEnabled) {
+        logger.debug(s"Finished writing to $path and closing writer.")
+      }
       closed = true
       internalWriter.close()
     }
