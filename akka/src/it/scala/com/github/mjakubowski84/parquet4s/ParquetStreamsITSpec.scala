@@ -261,6 +261,11 @@ class ParquetStreamsITSpec
     }
   }
 
+  it should "write partitioned data" in {
+    val fut = Source(data).via(ParquetPartitioningFlow(tempPathString, writeOptions.rowGroupSize, 1.minute)).runWith(Sink.seq)
+    fut.map(_ should be(data))
+  }
+
   override def afterAll(): Unit = {
     Await.ready(system.terminate(), Duration.Inf)
     super.afterAll()
