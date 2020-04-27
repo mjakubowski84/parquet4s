@@ -66,7 +66,6 @@ class ParquetStreamsITSpec
     clearTemp()
   }
 
-
   "ParquetStreams" should "write single file and read it correctly" in {
     val outputFileName = "data.parquet"
 
@@ -262,7 +261,8 @@ class ParquetStreamsITSpec
   }
 
   it should "write partitioned data" in {
-    val fut = Source(data).via(ParquetPartitioningFlow(tempPathString, writeOptions.rowGroupSize, 1.minute)).runWith(Sink.seq)
+    val flow = ParquetPartitioningFlow.builder[Data](tempPathString).build()
+    val fut = Source(data).via(flow).runWith(Sink.seq)
     fut.map(_ should be(data))
   }
 
