@@ -2,8 +2,9 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.{MessageType, Type}
-import scala.collection.JavaConverters._
 
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 
 /**
@@ -87,6 +88,28 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
   def add[T](name: String, value: T, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueCodec: ValueCodec[T]): This =
     add(name, valueCodec.encode(value, valueCodecConfiguration))
 
+  def add(path: List[String], value: Value): This = {
+    path match {
+      case Nil =>
+        this
+      case name :: Nil =>
+        this.add(name, value)
+      case name :: tail =>
+        val subrecord = this.get(name) match {
+          case NullValue =>
+            val newRecord = RowParquetRecord.empty
+            this.add(name, newRecord)
+            newRecord
+          case existingRecord : RowParquetRecord =>
+            existingRecord
+          case _ =>
+            throw new IllegalArgumentException("Invalid path when setting value of nested record")
+        }
+        subrecord.add(tail, value)
+        this
+    }
+  }
+
   /**
     * @return fields held in record
     */
@@ -163,6 +186,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
     val groupSchema = schema.asGroupType()
+    // TODO probably we should not start (and end) a group if there are no fields to write
     recordConsumer.startGroup()
     values.foreach {
       case (_, NullValue) =>

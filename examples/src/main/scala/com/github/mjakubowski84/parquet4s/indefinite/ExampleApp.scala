@@ -23,7 +23,7 @@ object ExampleApp
   logger.info(s"Starting stream that reads messages from Kafka and writes them to $baseWritePath...")
   val streamControl: DrainingControl[Done] = messageSource
     .toMat(messageSink)(Keep.both)
-    .mapMaterializedValue(DrainingControl.apply)
+    .mapMaterializedValue(DrainingControl.apply[Done])
     .run()
 
   def stopStream(): Unit = {

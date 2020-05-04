@@ -106,7 +106,7 @@ object ParquetStreams {
 
   /**
     * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to files at the specified path. Sink splits files
-    * when <i>maxChunkSize</i> is reached or time equal to <i>chunkWriteTimeWindow</i> elapses. 
+    * when <i>maxChunkSize</i> is reached or time equal to <i>chunkWriteTimeWindow</i> elapses.
     * Files are named and written to path according to <i>buildChunkPath</i>. By default path looks like
     * <pre>PATH/part-RANDOM_UUID.parquet</pre>.
     * Objects coming into sink can be optionally transformed using <i>preWriteTransformation</i> and later handled by means
@@ -128,7 +128,7 @@ object ParquetStreams {
     *                 {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     * @tparam Mat type of sink's materalized value
     * @return The sink that writes Parquet files
-    */ 
+    */
   def toParquetIndefinite[In, ToWrite: ParquetWriterFactory, Mat](path: String,
                                                                   maxChunkSize: Int,
                                                                   chunkWriteTimeWindow: FiniteDuration,
@@ -137,5 +137,8 @@ object ParquetStreams {
                                                                   postWriteSink: Sink[Seq[In], Mat] = Sink.ignore,
                                                                   options: ParquetWriter.Options = ParquetWriter.Options()
                                                                  ): Sink[In, Mat] =
-    IndefiniteStreamParquetSink(new Path(path), maxChunkSize, chunkWriteTimeWindow, buildChunkPath, preWriteTransformation, postWriteSink, options)
+    IndefiniteStreamParquetSink[In, ToWrite, Mat](new Path(path), maxChunkSize, chunkWriteTimeWindow, buildChunkPath, preWriteTransformation, postWriteSink, options)
+
+  def viaParquet[T](path: String): ParquetPartitioningFlow.Builder[T, T] =
+    ParquetPartitioningFlow.builder(new Path(path))
 }

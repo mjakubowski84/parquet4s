@@ -39,7 +39,7 @@ object ParquetRecordEncoder {
   def encode[T](entity: T, configuration: ValueCodecConfiguration = ValueCodecConfiguration.default)
                (implicit ev: ParquetRecordEncoder[T]): RowParquetRecord = ev.encode(entity, configuration)
 
-  implicit val nilDEncoder: ParquetRecordEncoder[HNil] = new ParquetRecordEncoder[HNil] {
+  implicit val nilEncoder: ParquetRecordEncoder[HNil] = new ParquetRecordEncoder[HNil] {
     override def encode(nil: HNil, configuration: ValueCodecConfiguration): RowParquetRecord = RowParquetRecord()
   }
 
