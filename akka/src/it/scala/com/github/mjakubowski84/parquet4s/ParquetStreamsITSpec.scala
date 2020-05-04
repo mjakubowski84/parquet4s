@@ -260,10 +260,81 @@ class ParquetStreamsITSpec
     }
   }
 
-  it should "write partitioned data" in {
-    val flow = ParquetPartitioningFlow.builder[Data](tempPathString).build()
-    val fut = Source(data).via(flow).runWith(Sink.seq)
-    fut.map(_ should be(data))
+  it should "write and read partitioned data" in {
+
+    case class User(name: String, address: Address)
+    case class Address(street: Street, country: String, postCode: String)
+    case class Street(name: String, more: String)
+
+    val flow = ParquetStreams.viaParquet[User](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withMaxCount(writeOptions.rowGroupSize)
+      .withMaxDuration(100.millis)
+      .withPartitionBy("address.country", "address.postCode")
+      .build()
+
+    val users = Seq(
+      User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456"))
+    ).toStream
+
+    val firstPartitionPath = tempPath.suffix("/address.country=ABC")
+    val secondPartitionPath = firstPartitionPath.suffix("/address.postCode=123456")
+
+    for {
+      writtenData <- Source(users).via(flow).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[User](tempPathString).runWith(Sink.seq)
+      rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
+      firstPartitionFiles = fileSystem.listStatus(firstPartitionPath).map(_.getPath).toSeq
+      secondPartitionFiles = fileSystem.listStatus(secondPartitionPath).map(_.getPath.getName).toSeq
+    } yield {
+      rootFiles should be(Seq(firstPartitionPath))
+      firstPartitionFiles should be(Seq(secondPartitionPath))
+      every(secondPartitionFiles) should endWith(".snappy.parquet")
+      writtenData should be(users)
+      readData should be(users)
+    }
+  }
+
+  it should "write and read data partitioned by all fields of case class " in {
+
+    case class User(name: String, address: Address)
+    case class Address(postcode: String, country: String)
+
+    val flow = ParquetStreams.viaParquet[User](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withMaxCount(writeOptions.rowGroupSize)
+      .withMaxDuration(100.millis)
+      .withPartitionBy("address.country", "address.postcode")
+      .build()
+
+    val users = Seq(
+      User(name = "John", address = Address("123456", "ABC"))
+    ).toStream
+
+    for {
+      writtenData <- Source(users).via(flow).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[User](tempPathString).runWith(Sink.seq)
+    } yield {
+      writtenData should be(users)
+      readData should be(users)
+    }
+  }
+
+  it should "fail to write a case class when partitioning consumes all its fields" in {
+
+    case class User(name: String)
+
+    val flow = ParquetStreams.viaParquet[User](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withMaxCount(writeOptions.rowGroupSize)
+      .withMaxDuration(100.millis)
+      .withPartitionBy("name")
+      .build()
+
+    val users = Seq(User(name = "John")).toStream
+
+    val fut = Source(users).via(flow).runWith(Sink.ignore)
+    recoverToSucceededIf[org.apache.parquet.schema.InvalidSchemaException](fut)
   }
 
   override def afterAll(): Unit = {

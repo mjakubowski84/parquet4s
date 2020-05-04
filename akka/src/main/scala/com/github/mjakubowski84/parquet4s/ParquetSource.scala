@@ -43,7 +43,7 @@ private[parquet4s] object ParquetSource extends IOOps {
         close = _.close()
       ).map { record =>
         partitionedPath.partitions.foreach { case (name, value) =>
-          record.add(name, BinaryValue(value))
+          record.add(name.split("\\.").toList, BinaryValue(value)) // TODO use DotPath here
         }
         record
       }.map(decode)
