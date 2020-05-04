@@ -19,7 +19,7 @@ private[parquet4s] object IOOps {
 
   private type Partition = (String, String)
 
-  private val PartitionRegexp: Regex = """(\w+)=(\w+)""".r
+  private val PartitionRegexp: Regex = """([a-zA-Z0-9\._]+)=([a-zA-Z0-9\._]+)""".r
 
 }
 
@@ -95,9 +95,9 @@ trait IOOps {
               Left(invalidPaths ++ moreInvalidPaths)
             case (Right(partitionedPaths), Right(morePartitionedPaths)) =>
               Right(partitionedPaths ++ morePartitionedPaths)
-            case (left @ Left(_), _) =>
+            case (left: Left[_, _], _) =>
               left
-            case (_, left @ Left(_)) =>
+            case (_, left: Left[_, _]) =>
               left
         }
     }

@@ -2,11 +2,13 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.io.api.Binary
 import org.scalatest.enablers.Sequencing
-import org.scalatest.{FlatSpec, Inspectors, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.Inspectors
+import org.scalatest.matchers.should.Matchers
 
 import scala.collection.mutable
 
-class ParquetRecordSpec extends FlatSpec with Matchers with Inspectors {
+class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
 
   private val vcc = ValueCodecConfiguration.default
   private implicit val sequencing: Sequencing[mutable.Seq[Value]] = Sequencing.sequencingNatureOfGenSeq[Value, mutable.Seq]
