@@ -6,6 +6,7 @@ import java.util.TimeZone
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
+import org.apache.parquet.schema.Type
 
 /**
   * Type class that reads Parquet files from given path.
@@ -42,14 +43,17 @@ object ParquetReader {
   def apply[T : ParquetRecordDecoder](path: String, options: Options = Options(), filter: Filter = Filter.noopFilter): ParquetIterable[T] =
     newParquetIterable(path, options, filter)
 
-  private def newParquetIterable[T : ParquetRecordDecoder](path: String, options: Options, filter: Filter): ParquetIterable[T] =
-    newParquetIterable(HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path)), options, filter)
+  private def newParquetIterable[T : ParquetRecordDecoder](path: String, options: Options, filter: Filter): ParquetIterable[T] = {
+    val readSupport = new ParquetReadSupport()
+    newParquetIterable(HadoopParquetReader.builder[RowParquetRecord](readSupport, new Path(path)), readSupport, options, filter)
+  }
 
   private[parquet4s] def newParquetIterable[T : ParquetRecordDecoder](
                                                                        builder: Builder,
+                                                                       readSupport: ParquetReadSupport,
                                                                        options: Options,
                                                                        filter: Filter = Filter.noopFilter): ParquetIterable[T] =
-    new ParquetIterableImpl(builder, options, filter)
+    new ParquetIterableImpl(builder, readSupport, options, filter)
 
   /**
     * Creates new [[ParquetIterable]] over data from given path.
@@ -80,14 +84,18 @@ object ParquetReader {
 
 }
 
+trait HasSchema {
+  def schema: List[Type]
+}
 /**
   * Allows to iterate over Parquet file(s). Remember to call `close()` when you are done.
   * @tparam T type that represents schema of Parquet file
   */
-trait ParquetIterable[T] extends Iterable[T] with Closeable
+trait ParquetIterable[T] extends Iterable[T] with Closeable with HasSchema
 
 private class ParquetIterableImpl[T : ParquetRecordDecoder](
                                                              builder: ParquetReader.Builder,
+                                                             readSupport: ParquetReadSupport,
                                                              options: ParquetReader.Options,
                                                              parquetFilter: Filter
                                                            )
@@ -97,11 +105,15 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](
 
   private val openCloseables = new scala.collection.mutable.ArrayBuffer[Closeable]()
 
+  private val reader = builder
+    .withFilter(parquetFilter.toFilterCompat(valueCodecConfiguration))
+    .withConf(options.hadoopConf)
+    .build()
+
+  private var _schema: List[Type] = null
+  def schema = _schema
+
   override def iterator: Iterator[T] = new Iterator[T] {
-    private val reader = builder
-      .withFilter(parquetFilter.toFilterCompat(valueCodecConfiguration))
-      .withConf(options.hadoopConf)
-      .build()
 
     openCloseables.synchronized(openCloseables.append(reader))
 
@@ -111,6 +123,7 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](
     override def hasNext: Boolean = {
       if (!recordPreRead) {
         nextRecord = Option(reader.read()).map((ParquetRecordDecoder.decode[T] _).curried(_)(valueCodecConfiguration))
+        _schema = readSupport.schema
         recordPreRead = true
       }
       nextRecord.nonEmpty

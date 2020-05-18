@@ -68,7 +68,7 @@ lazy val publishSettings = {
     ),
     Test / publishArtifact := false,
     IntegrationTest / publishArtifact := false
-  ) ++ Signing.signingSettings
+  ) ++ (if (sys.env contains "SONATYPE_USER_NAME") Signing.signingSettings else Seq.empty)
 }
 
 lazy val itSettings = Defaults.itSettings ++

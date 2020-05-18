@@ -9,7 +9,7 @@ import scala.collection.mutable.ArrayBuffer
   * Special type of [[Value]] that represents a record in Parquet file.
   * A record is a complex type of data that contains series of other value entries inside.
   */
-sealed trait ParquetRecord extends Value {
+sealed trait ParquetRecord extends Value  {
 
   type Self
 
@@ -48,7 +48,7 @@ object RowParquetRecord {
   * a non-empty list of fields with other values associated with each of them.
   * Cannot be empty while being saved.
   */
-class RowParquetRecord private extends ParquetRecord {
+class RowParquetRecord private extends ParquetRecord with Iterable[(String, Value)] {
 
   override type Self = this.type
 
@@ -59,6 +59,8 @@ class RowParquetRecord private extends ParquetRecord {
     values.append((name, value))
     this
   }
+
+  override def iterator: Iterator[(String, Value)] = values.iterator
 
   /**
     * @return fields held in record
@@ -146,6 +148,7 @@ class ListParquetRecord private extends ParquetRecord {
     values.append(value)
     this
   }
+
 
   /**
     * @return collection of elements held in record

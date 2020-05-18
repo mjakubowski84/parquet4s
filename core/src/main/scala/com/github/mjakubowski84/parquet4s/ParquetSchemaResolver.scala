@@ -51,7 +51,7 @@ object ParquetSchemaResolver
 
 object Message {
 
-  val name = "parquet4s-schema"
+  val name = "Parquet4sSchema"
 
   def apply(fields: Type*): MessageType = Types.buildMessage().addFields(fields:_*).named(name)
 

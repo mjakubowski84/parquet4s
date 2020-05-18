@@ -13,6 +13,9 @@ import scala.collection.JavaConverters._
 
 private[parquet4s] class ParquetReadSupport extends ReadSupport[RowParquetRecord] {
 
+  private var types: List[Type] = null;
+  def schema = types
+
   override def prepareForRead(
                                configuration: Configuration,
                                keyValueMetaData: util.Map[String, String],
@@ -21,7 +24,10 @@ private[parquet4s] class ParquetReadSupport extends ReadSupport[RowParquetRecord
                              ): RecordMaterializer[RowParquetRecord] =
     new ParquetRecordMaterializer(fileSchema)
 
-  override def init(context: InitContext): ReadSupport.ReadContext = new ReadSupport.ReadContext(context.getFileSchema)
+  override def init(context: InitContext): ReadSupport.ReadContext = {
+    types = context.getFileSchema.getFields.asScala.toList
+    new ReadSupport.ReadContext(context.getFileSchema)
+  }
 
 }
 
