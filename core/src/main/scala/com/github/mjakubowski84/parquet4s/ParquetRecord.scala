@@ -1,9 +1,10 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.ListParquetRecord.fromSeq
 import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.Type
 
-import scala.collection.mutable
+import scala.collection.{IterableFactoryDefaults, IterableOps, MapFactory, SpecificIterableFactory, StrictOptimizedIterableOps, StrictOptimizedSeqOps, mutable}
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -26,13 +27,15 @@ sealed trait ParquetRecord[A] extends Value with Iterable[A] {
 
 }
 
-object RowParquetRecord {
+object RowParquetRecord extends SpecificIterableFactory[(String, Value), RowParquetRecord]{
 
   /**
     * @param fields fields to init the record with
     * @return A new instance of [[RowParquetRecord]] initialized with given list of fields.
     */
-  def apply(fields : (String, Value)*): RowParquetRecord =
+  override def apply(fields : (String, Value)*): RowParquetRecord = fromSeq(fields)
+
+  def fromSeq(fields: Seq[(String, Value)]): RowParquetRecord =
     fields.foldLeft(RowParquetRecord.empty) {
       case (record, (key, value)) => record.add(key, value)
     }
@@ -42,6 +45,13 @@ object RowParquetRecord {
     */
   def empty: RowParquetRecord = new RowParquetRecord()
 
+  override def newBuilder: mutable.Builder[(String, Value), RowParquetRecord] =
+    Seq.newBuilder[(String, Value)].mapResult(fromSeq)
+
+  override def fromSpecific(it: IterableOnce[(String, Value)]): RowParquetRecord = it match {
+    case s: Seq[(String, Value)] => fromSeq(s)
+    case _ => fromSeq(it.iterator.toSeq)
+  }
 }
 
 /**
@@ -49,7 +59,10 @@ object RowParquetRecord {
   * a non-empty list of fields with other values associated with each of them.
   * Cannot be empty while being saved.
   */
-class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutable.Seq[(String, Value)]{
+class RowParquetRecord private extends ParquetRecord[(String, Value)]
+                               with mutable.IndexedBuffer[(String, Value)]
+                               with mutable.IndexedSeqOps[(String, Value), mutable.IndexedBuffer, RowParquetRecord]
+                               with StrictOptimizedSeqOps[(String, Value), mutable.IndexedBuffer, RowParquetRecord] {
 
   override type Self = this.type
 
@@ -100,6 +113,35 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     */
   def length = values.length
 
+
+  override def prepend(elem: (String, Value)): RowParquetRecord.this.type = {values.prepend(elem); this}
+  override def insert(idx: Int, elem: (String, Value)): Unit = values.insert(idx, elem)
+  override def insertAll(idx: Int, elems: IterableOnce[(String, Value)]): Unit = values.insertAll(idx, elems)
+  override def remove(idx: Int): (String, Value) = values.remove(idx)
+  override def remove(idx: Int, count: Int): Unit = values.remove(idx, count)
+  override def addOne(elem: (String, Value)): RowParquetRecord.this.type = {values.addOne(elem); this}
+  override def clear(): Unit = values.clear()
+
+  override def fromSpecific(coll: IterableOnce[(String, Value)]): RowParquetRecord = RowParquetRecord.fromSpecific(coll)
+  override protected def newSpecificBuilder: mutable.Builder[(String, Value), RowParquetRecord] = RowParquetRecord.newBuilder
+  override def empty: RowParquetRecord = RowParquetRecord.empty
+
+
+  // Overloading of `appended`, `prepended`, `appendedAll`, `prependedAll`,
+  // `map`, `flatMap` and `concat` to return a `ListParquetRecord` when possible
+  def concat(suffix: IterableOnce[(String, Value)]): RowParquetRecord = strictOptimizedConcat(suffix, newSpecificBuilder)
+  @inline final def ++ (suffix: IterableOnce[(String, Value)]): RowParquetRecord = concat(suffix)
+  def appended(fld: (String, Value)): RowParquetRecord = (newSpecificBuilder ++= this += fld).result()
+  def appendedAll(suffix: Iterable[(String, Value)]): RowParquetRecord = strictOptimizedConcat(suffix, newSpecificBuilder)
+  def prepended(fld: (String, Value)): RowParquetRecord = (newSpecificBuilder += fld ++= this).result()
+  def prependedAll(prefix: Iterable[(String, Value)]): RowParquetRecord = (newSpecificBuilder ++= prefix ++= this).result()
+  def map(f: (String, Value) => (String, Value)): RowParquetRecord =
+    strictOptimizedMap[(String, Value), RowParquetRecord](newSpecificBuilder, f.tupled)
+  def flatMap(f: (String, Value) => IterableOnce[(String, Value)]): RowParquetRecord =
+    strictOptimizedFlatMap[(String, Value), RowParquetRecord](newSpecificBuilder, f.tupled)
+
+
+
   override def toString: String =
     values
       .map { case (key, value) => s"$key=$value"}
@@ -109,6 +151,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     values.prepend((name, value))
     this
   }
+
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
     val groupSchema = schema.asGroupType()
@@ -140,7 +183,8 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
   }
 }
 
-object ListParquetRecord {
+object ListParquetRecord extends SpecificIterableFactory[Value, ListParquetRecord] {
+
 
   private val ListFieldName = "list"
   private val ElementFieldName = "element"
@@ -149,7 +193,9 @@ object ListParquetRecord {
     * @param elements to init the record with
     * @return An instance of [[ListParquetRecord]] pre-filled with given elements
     */
-  def apply(elements: Value*): ListParquetRecord =
+  override def apply(elements: Value*): ListParquetRecord = fromSeq(elements)
+
+  def fromSeq(elements: Seq[Value]) =
     elements.foldLeft(ListParquetRecord.empty) {
       case (record, element) => record.add(ListFieldName, RowParquetRecord(ElementFieldName -> element))
     }
@@ -159,13 +205,22 @@ object ListParquetRecord {
     */
   def empty: ListParquetRecord = new ListParquetRecord()
 
+  override def newBuilder: mutable.Builder[Value, ListParquetRecord] =  Seq.newBuilder[Value].mapResult(fromSeq)
+
+  override def fromSpecific(it: IterableOnce[Value]): ListParquetRecord = it match {
+    case s: Seq[Value] => fromSeq(s)
+    case _ => fromSeq(it.iterator.toSeq)
+  }
 }
 
 /**
   * A type of [[ParquetRecord]] that represents a record holding a repeated amount of entries
   * of the same type. Can be empty.
   */
-class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Value]{
+class ListParquetRecord private extends ParquetRecord[Value]
+                                with mutable.IndexedBuffer[Value]
+                                with mutable.IndexedSeqOps[Value, mutable.IndexedBuffer, ListParquetRecord]
+                                with StrictOptimizedSeqOps[Value, mutable.IndexedBuffer, ListParquetRecord] {
   import ListParquetRecord._
 
   override type Self = this.type
@@ -204,8 +259,32 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
   def update(idx: Int, newVal: Value) = values(idx) = newVal
   def length = values.length
 
-
   override def iterator: Iterator[Value] = values.iterator
+
+
+  override def prepend(elem: Value): ListParquetRecord.this.type = {values.prepend(elem); this}
+  override def insert(idx: Int, elem: Value): Unit = values.insert(idx, elem)
+  override def insertAll(idx: Int, elems: IterableOnce[Value]): Unit = values.insertAll(idx, elems)
+  override def remove(idx: Int): Value = values.remove(idx)
+  override def remove(idx: Int, count: Int): Unit = values.remove(idx, count)
+  override def addOne(elem: Value): ListParquetRecord.this.type = {values.addOne(elem); this}
+  override def clear(): Unit = values.clear()
+
+  override def fromSpecific(coll: IterableOnce[Value]): ListParquetRecord = ListParquetRecord.fromSpecific(coll)
+  override protected def newSpecificBuilder: mutable.Builder[Value, ListParquetRecord] = ListParquetRecord.newBuilder
+  override def empty: ListParquetRecord = ListParquetRecord.empty
+
+
+  // Overloading of `appended`, `prepended`, `appendedAll`, `prependedAll`,
+  // `map`, `flatMap` and `concat` to return a `ListParquetRecord` when possible
+  def concat(suffix: IterableOnce[Value]): ListParquetRecord = strictOptimizedConcat(suffix, newSpecificBuilder)
+  @inline final def ++ (suffix: IterableOnce[Value]): ListParquetRecord = concat(suffix)
+  def appended(base: Value): ListParquetRecord = (newSpecificBuilder ++= this += base).result()
+  def appendedAll(suffix: Iterable[Value]): ListParquetRecord = strictOptimizedConcat(suffix, newSpecificBuilder)
+  def prepended(base: Value): ListParquetRecord = (newSpecificBuilder += base ++= this).result()
+  def prependedAll(prefix: Iterable[Value]): ListParquetRecord = (newSpecificBuilder ++= prefix ++= this).result()
+  def map(f: Value => Value): ListParquetRecord = strictOptimizedMap(newSpecificBuilder, f)
+  def flatMap(f: Value => IterableOnce[Value]): ListParquetRecord = strictOptimizedFlatMap(newSpecificBuilder, f)
 
   override def toString: String = values.mkString(getClass.getSimpleName + " (", ",", ")")
 
@@ -244,27 +323,39 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
 
 }
 
-object MapParquetRecord {
+object MapParquetRecord extends SpecificIterableFactory[(Value, Value), MapParquetRecord] {
 
   private val MapKeyValueFieldName = "map"
   private val KeyFieldName = "key"
   private val ValueFieldName = "value"
 
-  def apply(entries : (Value, Value)*): MapParquetRecord = {
+  override def apply(entries : (Value, Value)*): MapParquetRecord = fromSeq(entries)
+
+  def fromSeq(entries: Seq[(Value, Value)]): MapParquetRecord =
     entries.foldLeft(MapParquetRecord.empty) {
       case (record, (key, value)) => record.add(MapKeyValueFieldName, RowParquetRecord(KeyFieldName -> key, ValueFieldName -> value))
     }
-  }
+
+  def fromMap(map: Map[Value, Value]): MapParquetRecord = fromSeq(map.toSeq)
 
   def empty: MapParquetRecord = new MapParquetRecord()
 
+  override def newBuilder: mutable.Builder[(Value, Value), MapParquetRecord] = Seq.newBuilder[(Value, Value)].mapResult(fromSeq)
+
+  override def fromSpecific(it: IterableOnce[(Value, Value)]): MapParquetRecord = it match {
+    case s: Seq[(Value, Value)] => fromSeq(s)
+    case _ => fromSeq(it.iterator.toSeq)
+  }
 }
 
 /**
   * A type of [[ParquetRecord]] that represents a map from one entry type to another. Can be empty.
   * A key entry cannot be null, a value entry can.
   */
-class MapParquetRecord private extends ParquetRecord[(Value, Value)] with mutable.Map[Value, Value] {
+class MapParquetRecord private extends ParquetRecord[(Value, Value)]
+                               with mutable.Map[Value, Value]
+                               with mutable.MapOps[Value, Value, mutable.Map, MapParquetRecord]
+                               with StrictOptimizedIterableOps[(Value, Value), mutable.Iterable, MapParquetRecord]{
   import MapParquetRecord._
 
   override type Self = this.type
@@ -338,6 +429,11 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)] with mutabl
     entries.addOne(elem)
     this
   }
+
+
+  protected override def fromSpecific(coll: IterableOnce[(Value, Value)]): MapParquetRecord = MapParquetRecord.fromSpecific(coll)
+  protected override def newSpecificBuilder: mutable.Builder[(Value, Value), MapParquetRecord] = MapParquetRecord.newBuilder
+  override def empty: MapParquetRecord = MapParquetRecord.empty
 
   override def iterator: Iterator[(Value, Value)] = entries.iterator
 
