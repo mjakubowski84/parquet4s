@@ -11,7 +11,7 @@ import org.scalatest.{FlatSpec, Matchers}
 
 class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
 
-  def dateTimeAsBinary(epochDays: Int, timeInNanos: Long, timeZone: TimeZone) =
+  def dateTimeAsBinary(epochDays: Int, timeInNanos: Long, timeZone: TimeZone): BinaryValue =
     BinaryValue {
       val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
       // tz offset is expressed in millis while time in Parquet is expressed in nanos

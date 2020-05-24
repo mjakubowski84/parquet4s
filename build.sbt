@@ -1,12 +1,12 @@
 import bloop.integrations.sbt.BloopDefaults
 
 
-lazy val supportedScalaVersions = Seq("2.11.12", "2.12.10", "2.13.1")
+lazy val supportedScalaVersions = Seq("2.11.12", "2.12.11", "2.13.2")
 
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "1.1.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
-ThisBuild / scalaVersion := "2.13.1"
+ThisBuild / scalaVersion := "2.13.2"
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8")
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature")
 ThisBuild / resolvers := Seq(

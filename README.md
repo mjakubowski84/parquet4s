@@ -178,7 +178,7 @@ ParquetStreams.fromParquet[Stats](
 
 > **TAKE NOTE!**
 >
-> Take note that due to an issue with implicit resolution in **Scala 2.11** you may need to define all parameters of `ParquetStreams.fromParquet` even if some have default values. It specifically refers to a case when you would like to omit `options` but define `filter`. Such situation doesn't appear in Scala 2.12 and 2.13.
+> Take note that due to an issue with implicit resolution in **Scala 2.11** you may need to define all parameters of `ParquetStreams.fromParquet` even if some have default values. Parameters must be specified in default order even when you use named arguments. It specifically refers to a case when you would like to omit `options` but define `filter`. Such a situation doesn't appear in Scala 2.12 and 2.13.
 
 You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, and `in` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
 

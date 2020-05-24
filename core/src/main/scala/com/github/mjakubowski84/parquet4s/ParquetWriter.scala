@@ -166,7 +166,7 @@ private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, Str
 
   override def write(record: RowParquetRecord): Unit = {
     consumer.startMessage()
-    record.fields.foreach {
+    record.iterator.foreach {
       case (_, NullValue) =>
         // ignoring nulls
       case (name, value) =>

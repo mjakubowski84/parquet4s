@@ -4,15 +4,15 @@ import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.Type
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 /**
   * Special type of [[Value]] that represents a record in Parquet file.
+  * Mutable and <b>NOT</b> thread-safe.
   * A record is a complex type of data that contains series of other value entries inside.
   */
 sealed trait ParquetRecord[A] extends Value with Iterable[A] {
 
-  type Self
+  type This
 
   /**
     * Creates a new entry in record.
@@ -20,7 +20,7 @@ sealed trait ParquetRecord[A] extends Value with Iterable[A] {
     * @param value value of the entry
     * @return a record with an entry added
     */
-  def add(name: String, value: Value): Self
+  def add(name: String, value: Value): This
 
   override def toString: String
 
@@ -48,24 +48,38 @@ object RowParquetRecord {
   * Represents a basic type of [[ParquetRecord]] an object that contains
   * a non-empty list of fields with other values associated with each of them.
   * Cannot be empty while being saved.
+  * Mutable and <b>NOT</b> thread-safe.
   */
 class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutable.Seq[(String, Value)]{
 
-  override type Self = this.type
+  override type This = this.type
 
-  private val values = ArrayBuffer.empty[(String, Value)]
+  private val values = mutable.ArrayBuffer.empty[(String, Value)]
 
-  override def add(name: String, value: Value): Self = {
+  private var lookupCache: Map[String, Value] = _
+
+  override def add(name: String, value: Value): This = {
     // TODO handle case when this field is already there!
     values.append((name, value))
+    lookupCache = null
     this
   }
 
   /**
     * @return fields held in record
     */
+  @deprecated("1.1", "Use iterator to iterate or other functions to access or modify record elements.")
   def fields: Map[String, Value] = values.toMap
 
+  /**
+   *
+   * @param fieldName field/column name
+   * @return value associated with the field name or [[NullValue]] if no value is found
+   */
+  def get(fieldName: String): Value = {
+    if (lookupCache == null) lookupCache = values.toMap
+    lookupCache.getOrElse(fieldName, NullValue)
+  }
 
   override def iterator: Iterator[(String, Value)] = values.iterator
 
@@ -73,32 +87,35 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     *
     * @param idx The index
     * @return The field name and value
-    *  @throws   IndexOutOfBoundsException if the index is not valid.
+    * @throws IndexOutOfBoundsException if the index is not valid.
     */
-  override def apply(idx: Int) = values(idx)
+  override def apply(idx: Int): (String, Value) = values(idx)
 
 
   /** Replaces field name and value at given index with a new field name and value.
     *
     *  @param idx      the index of the element to replace.
     *  @param newEntry     the new field name and value.
-    *  @throws   IndexOutOfBoundsException if the index is not valid.
+    *  @throws IndexOutOfBoundsException if the index is not valid.
     */
-  override def update(idx: Int, newEntry: (String, Value)): Unit = values(idx) = newEntry
+  override def update(idx: Int, newEntry: (String, Value)): Unit = {
+    values(idx) = newEntry
+    lookupCache = null
+  }
 
   /** Replaces value at given index with a new value.
     *
     *  @param idx      the index of the value to replace.
     *  @param newVal     the new value.
-    *  @throws   IndexOutOfBoundsException if the index is not valid.
+    *  @throws IndexOutOfBoundsException if the index is not valid.
     */
-  def update(idx: Int, newVal: Value) = values(idx) = values(idx).copy(_2 = newVal)
+  def update(idx: Int, newVal: Value): Unit = values(idx) = values(idx).copy(_2 = newVal)
 
   /**
     *
     * @return The number of columns in this record
     */
-  def length = values.length
+  def length: Int = values.length
 
   override def toString: String =
     values
@@ -124,7 +141,6 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     }
     recordConsumer.endGroup()
   }
-
 
   override def canEqual(other: Any): Boolean = other.isInstanceOf[RowParquetRecord]
 
@@ -164,20 +180,21 @@ object ListParquetRecord {
 /**
   * A type of [[ParquetRecord]] that represents a record holding a repeated amount of entries
   * of the same type. Can be empty.
+  * Mutable and <b>NOT</b> thread-safe.
   */
 class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Value]{
   import ListParquetRecord._
 
-  override type Self = this.type
+  override type This = this.type
 
-  private val values = ArrayBuffer.empty[Value]
+  private val values = mutable.ArrayBuffer.empty[Value]
 
-  override def add(name: String, value: Value): Self = {
+  override def add(name: String, value: Value): This = {
     // name should always be equal to ListFieldName
-    add(value.asInstanceOf[RowParquetRecord].fields.getOrElse(ElementFieldName, NullValue))
+    add(value.asInstanceOf[RowParquetRecord].get(ElementFieldName))
   }
 
-  def add(value: Value): Self = {
+  def add(value: Value): This = {
     values.append(value)
     this
   }
@@ -185,25 +202,26 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
   /**
     * @return collection of elements held in record
     */
-  def elements: List[Value] = values.toList // TODO let's use vector, check if ArrayBuffer is a good choice
+  @deprecated("1.1", "Use iterator to iterate or other functions to access or modify record elements.")
+  def elements: List[Value] = values.toList
 
   /** Get the value at the specified index.
     *
     * @param idx The index
     * @return The value
-    *  @throws   IndexOutOfBoundsException if the index is not valid.
+    * @throws IndexOutOfBoundsException if the index is not valid.
     */
-  def apply(idx: Int) = values(idx)
+  def apply(idx: Int): Value = values(idx)
 
   /** Replaces value at given index with a new value.
     *
     *  @param idx      the index of the element to replace.
     *  @param newVal     the new value.
-    *  @throws   IndexOutOfBoundsException if the index is not valid.
+    *  @throws IndexOutOfBoundsException if the index is not valid.
     */
-  def update(idx: Int, newVal: Value) = values(idx) = newVal
-  def length = values.length
+  def update(idx: Int, newVal: Value): Unit = values(idx) = newVal
 
+  def length: Int = values.length
 
   override def iterator: Iterator[Value] = values.iterator
 
@@ -263,22 +281,25 @@ object MapParquetRecord {
 /**
   * A type of [[ParquetRecord]] that represents a map from one entry type to another. Can be empty.
   * A key entry cannot be null, a value entry can.
+  * Mutable and <b>NOT</b> thread-safe.
   */
-class MapParquetRecord private extends ParquetRecord[(Value, Value)] with mutable.Map[Value, Value] {
+class MapParquetRecord private extends ParquetRecord[(Value, Value)]
+  with mutable.Map[Value, Value]
+  with ShrinkableCompat {
   import MapParquetRecord._
 
-  override type Self = this.type
+  override type This = this.type
 
-  private val entries = scala.collection.mutable.Map.empty[Value, Value]
+  protected val entries = mutable.Map.empty[Value, Value]
 
-  override def add(name: String, value: Value): Self = {
+  override def add(name: String, value: Value): This = {
     val keyValueRecord = value.asInstanceOf[RowParquetRecord]
-    val mapKey = keyValueRecord.fields("key")
-    val mapValue = keyValueRecord.fields.getOrElse("value", NullValue)
+    val mapKey = keyValueRecord.get(KeyFieldName)
+    val mapValue = keyValueRecord.get(ValueFieldName)
     add(mapKey, mapValue)
   }
 
-  def add(key: Value, value: Value): Self = {
+  def add(key: Value, value: Value): This = {
     entries.put(key, value)
     this
   }
@@ -286,6 +307,7 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)] with mutabl
   /**
     * @return map of values held by record
     */
+  @deprecated("1.1", "Use iterator to iterate or other functions to access or modify record elements.")
   def getMap: Map[Value, Value] = entries.toMap
 
   /** Retrieves the value which is associated with the given key.
@@ -314,30 +336,9 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)] with mutabl
     *  @param key    The key to update
     *  @param newVal  The new value
     */
-  override def update(key: Value, newVal: Value) = entries(key) = newVal
+  override def update(key: Value, newVal: Value): Unit = entries(key) = newVal
 
-  override def keys = entries.keys
-
-  /** Removes a single entry from this map.
-    *
-    *  @param key  the key of the entry to remove.
-    *  @return the MapParquetRecord itself
-    */
-  override def subtractOne(key: Value) = {
-    entries.subtractOne(key)
-    this
-  }
-
-
-  /** ${Add}s a single element to this map.
-    *
-    *  @param elem  the element to $add.
-    *  @return the MapParquetRecord itself
-    */
-  override def addOne(elem: (Value, Value)) = {
-    entries.addOne(elem)
-    this
-  }
+  override def keys: Iterable[Value] = entries.keys
 
   override def iterator: Iterator[(Value, Value)] = entries.iterator
 

@@ -50,7 +50,7 @@ object ParquetRecordDecoder {
     new ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] {
       override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): FieldType[FieldName, Head] :: Tail = {
         val fieldName = witness.value.name
-        val fieldValue = record.fields.getOrElse(fieldName, NullValue)
+        val fieldValue = record.get(fieldName)
         val decodedFieldValue = try {
           headDecoder.decode(fieldValue, configuration)
         } catch {

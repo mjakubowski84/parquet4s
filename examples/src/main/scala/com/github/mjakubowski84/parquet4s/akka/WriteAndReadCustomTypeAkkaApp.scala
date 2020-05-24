@@ -10,11 +10,11 @@ import com.google.common.io.Files
 object WriteAndReadCustomTypeAkkaApp extends App {
 
   object Data {
-    def generate(count: Int): Seq[Data] = (1 to count).map { i => Data(id = i, dict = Dict.random) }
+    def generate(count: Int): Iterator[Data] = Iterator.range(1, count).map { i => Data(id = i, dict = Dict.random) }
   }
   case class Data(id: Long, dict: Dict.Type)
 
-  val data = Data.generate(count = 100)
+  val data = () => Data.generate(count = 100)
   val path = Files.createTempDir().getAbsolutePath
 
   implicit val system: ActorSystem = ActorSystem()
@@ -23,7 +23,7 @@ object WriteAndReadCustomTypeAkkaApp extends App {
 
   for {
     // write
-    _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile(s"$path/data.parquet"))
+    _ <- Source.fromIterator(data).runWith(ParquetStreams.toParquetSingleFile(s"$path/data.parquet"))
     // read
     // hint: you can filter by dict using string value, for example: filter = Col("dict") === "A"
     _ <- ParquetStreams.fromParquet[Data](path).runWith(Sink.foreach(println))
