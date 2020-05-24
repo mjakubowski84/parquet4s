@@ -318,7 +318,7 @@ trait ComplexValueCodecs {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Col[T] =
       value match {
         case listRecord: ListParquetRecord =>
-          collectionTransformer.to(listRecord.elements.map((elementCodec.decode _).curried(_)(configuration)))
+          collectionTransformer.to(listRecord.toList.map((elementCodec.decode _).curried(_)(configuration)))
       }
 
     override def encodeNonNull(data: Col[T], configuration: ValueCodecConfiguration): Value =
@@ -352,7 +352,7 @@ trait ComplexValueCodecs {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Map[K, V] =
       value match {
         case mapParquetRecord: MapParquetRecord =>
-          mapParquetRecord.getMap.map { case (mapKey, mapValue) =>
+          mapParquetRecord.toMap.map { case (mapKey, mapValue) =>
             require(mapKey != NullValue, "Map cannot have null keys")
             kCodec.decode(mapKey, configuration) -> vCodec.decode(mapValue, configuration)
           }

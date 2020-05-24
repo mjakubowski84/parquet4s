@@ -18,15 +18,15 @@ jobs:
           # fallback to using the latest cache if no exact match is found
           - v1-deps-
       # compile all sources
-      - run: cat /dev/null | sbt test:compile it:compile
+      - run: cat /dev/null | sbt +test:compile +it:compile
       # cache dependencies
       - save_cache:
           paths:
           - ~/.ivy2
           - ~/.sbt
           key: v1-deps--{{ checksum "build.sbt" }}
-      # run tests!
-      - run: cat /dev/null | sbt test it:test
+      # run tests! in every supported Scala version
+      - run: cat /dev/null | sbt +test +it:test
 
   release:
     docker:
