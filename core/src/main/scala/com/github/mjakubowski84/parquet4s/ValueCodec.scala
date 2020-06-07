@@ -328,7 +328,7 @@ trait ComplexValueCodecs {
       evidence(data)
         .foldLeft(ListParquetRecord.empty) {
           case (record, element) =>
-            record.add(elementCodec.encode(element, configuration))
+            record.add(element, configuration)
         }
   }
 
@@ -353,7 +353,7 @@ trait ComplexValueCodecs {
         evidence(data)
           .foldLeft(ListParquetRecord.empty) {
             case (record, element) =>
-              record.add(elementCodec.encode(element, configuration))
+              record.add(element, configuration)
           }
 
   }
@@ -388,7 +388,7 @@ trait ComplexValueCodecs {
     override def encodeNonNull(data: Map[K, V], configuration: ValueCodecConfiguration): Value =
       data.foldLeft(MapParquetRecord.empty) { case (record, (key, value)) =>
         require(key != null, "Map cannot have null keys")
-        record.add(kCodec.encode(key, configuration), vCodec.encode(value, configuration))
+        record.add(key, value, configuration)
       }
   }
 
