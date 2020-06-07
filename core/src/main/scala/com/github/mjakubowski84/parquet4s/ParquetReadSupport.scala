@@ -141,7 +141,7 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord[_]](
 private class RowParquetRecordConverter(schema: GroupType, name: Option[String], parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_]]])
   extends ParquetRecordConverter[RowParquetRecord](schema, name, parent) {
 
-  def this(schema: GroupType) {
+  def this(schema: GroupType) = {
     this(schema, None, None)
   }
 

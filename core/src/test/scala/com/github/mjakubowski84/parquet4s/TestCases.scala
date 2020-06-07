@@ -45,6 +45,14 @@ object TestCases {
         case _ => false
       }
   }
+  case class ArrayOfBytes(bytes: Array[Byte]) {
+    override def equals(obj: Any): Boolean =
+      obj match {
+        case other @ ArrayOfBytes(bytes) =>
+          (other canEqual this) && this.bytes.sameElements(bytes)
+        case _ => false
+      }
+  }
   case class ContainsCollectionOfOptionalPrimitives(list: List[Option[Int]])
   case class ContainsCollectionOfCollections(listOfSets: List[Set[Int]])
   case class ContainsMapOfPrimitives(map: Map[String, Int])

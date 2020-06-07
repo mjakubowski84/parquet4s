@@ -6,7 +6,9 @@ import java.util.TimeZone
 
 import org.apache.parquet.io.api.Binary
 
+import scala.collection.compat._
 import scala.language.higherKinds
+import scala.reflect.ClassTag
 
 /**
   * Contains implicit instances of all [[ValueCodec]]
@@ -312,23 +314,48 @@ trait TimeValueCodecs {
 trait ComplexValueCodecs {
 
   implicit def collectionCodec[T, Col[_]](implicit
+                                          evidence: Col[T] <:< Iterable[T],
                                           elementCodec: ValueCodec[T],
-                                          collectionTransformer: CollectionTransformer[T, Col]
+                                          factory: Factory[T, Col[T]]
                                          ): ValueCodec[Col[T]] = new OptionalValueCodec[Col[T]] {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Col[T] =
       value match {
         case listRecord: ListParquetRecord =>
-          collectionTransformer.to(listRecord.toList.map((elementCodec.decode _).curried(_)(configuration)))
+          listRecord.map((elementCodec.decode _).curried(_)(configuration)).to(factory)
       }
 
     override def encodeNonNull(data: Col[T], configuration: ValueCodecConfiguration): Value =
-      collectionTransformer
-        .from(data)
-        .map((elementCodec.encode _).curried(_)(configuration))
+      evidence(data)
         .foldLeft(ListParquetRecord.empty) {
           case (record, element) =>
-            record.add(element)
+            record.add(elementCodec.encode(element, configuration))
         }
+  }
+
+  implicit def arrayCodec[T, Col[_]](implicit
+                                     evidence: Col[T] =:= Array[T],
+                                     classTag: ClassTag[T],
+                                     factory: Factory[T, Col[T]],
+                                     elementCodec: ValueCodec[T]
+                                    ): ValueCodec[Col[T]] = new OptionalValueCodec[Col[T]] {
+    override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Col[T] =
+      value match {
+        case listRecord: ListParquetRecord =>
+          listRecord.map((elementCodec.decode _).curried(_)(configuration)).to(factory)
+        case binaryValue: BinaryValue if classTag.runtimeClass == classOf[Byte] =>
+          binaryValue.value.getBytes.asInstanceOf[Col[T]]
+      }
+
+    override def encodeNonNull(data: Col[T], configuration: ValueCodecConfiguration): Value =
+      if (classTag.runtimeClass == classOf[Byte])
+        BinaryValue(data.asInstanceOf[Array[Byte]])
+      else
+        evidence(data)
+          .foldLeft(ListParquetRecord.empty) {
+            case (record, element) =>
+              record.add(elementCodec.encode(element, configuration))
+          }
+
   }
 
   implicit def optionCodec[T](implicit elementCodec: ValueCodec[T]): ValueCodec[Option[T]] = new ValueCodec[Option[T]] {

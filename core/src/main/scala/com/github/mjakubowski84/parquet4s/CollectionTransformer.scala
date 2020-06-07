@@ -8,7 +8,7 @@ import scala.reflect.ClassTag
   * @tparam Element type of element of collection
   * @tparam Col type of collection
   */
-// TODO use more performant Vector as a basis collection
+@deprecated(message = "This trait is no longer in use", since = "1.2.0")
 trait CollectionTransformer[Element, Col[_]] {
   /**
     * Creates list from collection
@@ -20,6 +20,7 @@ trait CollectionTransformer[Element, Col[_]] {
   def to(list: List[Element]): Col[Element]
 }
 
+@deprecated(message = "This object is no longer in use", since = "1.2.0")
 object CollectionTransformer {
 
   implicit def seqTransformer[E]: CollectionTransformer[E, Seq] = new CollectionTransformer[E, Seq] {
