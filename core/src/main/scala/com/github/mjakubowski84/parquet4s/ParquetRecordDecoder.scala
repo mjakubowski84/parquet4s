@@ -50,9 +50,8 @@ object ParquetRecordDecoder {
     new ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] {
       override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): FieldType[FieldName, Head] :: Tail = {
         val fieldName = witness.value.name
-        val fieldValue = record.get(fieldName)
         val decodedFieldValue = try {
-          headDecoder.decode(fieldValue, configuration)
+          record.get[Head](fieldName, configuration)
         } catch {
           case NonFatal(cause) =>
             throw DecodingException(s"Failed to decode field $fieldName of record: $record", cause)

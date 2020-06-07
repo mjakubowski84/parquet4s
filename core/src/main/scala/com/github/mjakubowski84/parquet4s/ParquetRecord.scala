@@ -66,6 +66,12 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
   }
 
   /**
+    * Encodes the value end appends it to the record.
+    */
+  def add[T](name: String, value: T, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueCodec: ValueCodec[T]): This =
+    add(name, valueCodec.encode(value, valueCodecConfiguration))
+
+  /**
     * @return fields held in record
     */
   @deprecated("1.1", "Use iterator to iterate or other functions to access or modify record elements.")
@@ -80,6 +86,14 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     if (lookupCache == null) lookupCache = values.toMap
     lookupCache.getOrElse(fieldName, NullValue)
   }
+
+  /**
+    * Retrieves value from the record and decodes it.
+    * @param fieldName field/column name
+    * @return decoded field value or `null` if such field does not exist
+    */
+  def get[T](fieldName: String, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueCodec: ValueCodec[T]): T =
+    valueCodec.decode(get(fieldName), valueCodecConfiguration)
 
   override def iterator: Iterator[(String, Value)] = values.iterator
 
@@ -106,7 +120,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
   /** Replaces value at given index with a new value.
     *
     *  @param idx      the index of the value to replace.
-    *  @param newVal     the new value.
+    *  @param newVal   the new value.
     *  @throws IndexOutOfBoundsException if the index is not valid.
     */
   def update(idx: Int, newVal: Value): Unit = values(idx) = values(idx).copy(_2 = newVal)
@@ -122,8 +136,12 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
       .map { case (key, value) => s"$key=$value"}
       .mkString(getClass.getSimpleName + " (", ",", ")")
 
-  def prepend(name: String, value: Value): RowParquetRecord = {
+  /**
+    * Adds a new field to the front of the record.
+    */
+  def prepend(name: String, value: Value): This = {
     values.prepend((name, value))
+    lookupCache = null
     this
   }
 
@@ -194,10 +212,19 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
     add(value.asInstanceOf[RowParquetRecord].get(ElementFieldName))
   }
 
+  /**
+    * Appends value to the list.
+    */
   def add(value: Value): This = {
     values.append(value)
     this
   }
+
+  /**
+    * Appends value to the list.
+    */
+  def add[T](value: T, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueCodec: ValueCodec[T]): This =
+    this.add(valueCodec.encode(value, valueCodecConfiguration))
 
   /**
     * @return collection of elements held in record
@@ -212,6 +239,9 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
     * @throws IndexOutOfBoundsException if the index is not valid.
     */
   def apply(idx: Int): Value = values(idx)
+
+  def apply[T](idx: Int, valueCodecConfiguration: ValueCodecConfiguration)(implicit codec: ValueCodec[T]): T =
+    codec.decode(this.apply(idx), valueCodecConfiguration)
 
   /** Replaces value at given index with a new value.
     *
@@ -299,10 +329,20 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
     add(mapKey, mapValue)
   }
 
+  /**
+    * The same as [[update]] but returns updated record.
+    */
   def add(key: Value, value: Value): This = {
     entries.put(key, value)
     this
   }
+
+  /**
+    * The same as [[update]] but returns updated record.
+    */
+  def add[K, V](key: K, newVal: V, valueCodecConfiguration: ValueCodecConfiguration)
+                  (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): This =
+    this.add(kCodec.encode(key, valueCodecConfiguration), vCodec.encode(newVal, valueCodecConfiguration))
 
   /**
     * @return map of values held by record
@@ -311,14 +351,28 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
   def getMap: Map[Value, Value] = entries.toMap
 
   /** Retrieves the value which is associated with the given key.
-    * If there is no entry for the given key,throws a
-    *  `NoSuchElementException`.
     *
     *  @param  key the key
     *  @return     the value associated with the given key, or the result of the
     *              map's `default` method, if none exists.
+    *  @throws NoSuchElementException if there is no entry for the given key
     */
   override def apply(key: Value): Value = entries(key)
+
+  /** Retrieves the value which is associated with the given key.
+    *
+    * @param key the key
+    * @param valueCodecConfiguration configuration used by some of codecs
+    * @param kCodec key codec
+    * @param vCodec value codec
+    * @tparam K type of the key
+    * @tparam V type of the value
+    * @return retrieved value
+    * @throws NoSuchElementException if there is no entry for the given key
+    */
+  def apply[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)
+                 (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): V =
+    vCodec.decode(this.apply(kCodec.encode(key, valueCodecConfiguration)), valueCodecConfiguration)
 
 
   /** Optionally returns the value associated with a key.
@@ -329,6 +383,22 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
     */
   override def get(key: Value): Option[Value] = entries.get(key)
 
+  /** Retrieves the value which is associated with the given key.
+    *
+    * @param key the key
+    * @param valueCodecConfiguration configuration used by some of codecs
+    * @param kCodec key codec
+    * @param vCodec value codec
+    * @tparam K type of the key
+    * @tparam V type of the value
+    * @return retrieved value or None if there is no value associated with the key
+    */
+  def get[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)
+               (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): Option[V] =
+    this
+      .get(kCodec.encode(key, valueCodecConfiguration))
+      .map(v => vCodec.decode(v, valueCodecConfiguration))
+
   /** Adds a new key/value pair to this map.
     *  If the map already contains a
     *  mapping for the key, it will be overridden by the new value.
@@ -337,6 +407,20 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
     *  @param newVal  The new value
     */
   override def update(key: Value, newVal: Value): Unit = entries(key) = newVal
+
+  /**
+    * Updates map with a value for a given key
+    * @param key the key to update
+    * @param newVal the new value
+    * @param valueCodecConfiguration configuration used by some codecs
+    * @param kCodec key codec
+    * @param vCodec value codec
+    * @tparam K type of the kye
+    * @tparam V type of the value
+    */
+  def update[K, V](key: K, newVal: V, valueCodecConfiguration: ValueCodecConfiguration)
+                  (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): Unit =
+    this.update(kCodec.encode(key, valueCodecConfiguration), vCodec.encode(newVal, valueCodecConfiguration))
 
   override def keys: Iterable[Value] = entries.keys
 
