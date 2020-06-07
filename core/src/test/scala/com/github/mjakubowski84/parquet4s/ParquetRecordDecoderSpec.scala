@@ -203,6 +203,16 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
     ))
   }
 
+  it should "decode record containing array of bytes" in {
+    decode[ArrayOfBytes](RowParquetRecord(
+      "bytes" -> BinaryValue(Array.empty[Byte])
+    )) should be(ArrayOfBytes(Array.empty))
+    val bytes = Array.apply[Byte](1, 2, 3)
+    decode[ArrayOfBytes](RowParquetRecord(
+      "bytes" -> BinaryValue(bytes)
+    )) should be(ArrayOfBytes(bytes))
+  }
+
   it should "decode record containing collection of optional primitives" in {
     decode[ContainsCollectionOfOptionalPrimitives](RowParquetRecord(
       "list" -> ListParquetRecord.empty
@@ -309,7 +319,7 @@ class ParquetRecordDecoderSpec extends FlatSpec with Matchers {
       "array" -> listOfNestedRecords
     )) should be(CollectionsOfNestedClass(
       list = expectedList,
-      seq = expectedList.toSeq,
+      seq = expectedList,
       vector = expectedList.toVector,
       set = expectedList.toSet,
       array = expectedList.toArray

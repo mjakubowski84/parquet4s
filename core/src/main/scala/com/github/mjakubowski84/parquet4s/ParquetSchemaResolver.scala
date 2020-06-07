@@ -6,6 +6,7 @@ import shapeless._
 import shapeless.labelled._
 
 import scala.language.higherKinds
+import scala.reflect.ClassTag
 
 /**
   * Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
@@ -226,7 +227,7 @@ trait SchemaDefs {
         precision = Some(Decimals.Precision),
         scale = Some(Decimals.Scale),
         length = Some(Decimals.ByteArrayLength)
-        )
+      )
     )
 
   implicit val localDateSchema: TypedSchemaDef[java.time.LocalDate] =
@@ -259,10 +260,25 @@ trait SchemaDefs {
       tSchemaDef.withRequired(false)
     )
 
-  implicit def collectionSchema[E, Col[_]](implicit elementSchema: TypedSchemaDef[E]): TypedSchemaDef[Col[E]] =
+  implicit def collectionSchema[E, Col[_]](implicit
+                                           elementSchema: TypedSchemaDef[E],
+                                           ev: Col[E] <:< Iterable[E]): TypedSchemaDef[Col[E]] =
     typedSchemaDef[Col[E]](
       ListSchemaDef.optional(elementSchema)
     )
+
+  implicit def arraySchema[E, Col[_]](implicit
+                                      elementSchema: TypedSchemaDef[E],
+                                      ev: Col[E] =:= Array[E],
+                                      classTag: ClassTag[E]): TypedSchemaDef[Col[E]] =
+    if (classTag.runtimeClass == classOf[Byte])
+      typedSchemaDef[Col[E]](
+        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false)
+      )
+    else
+      typedSchemaDef[Col[E]](
+        ListSchemaDef.optional(elementSchema)
+      )
 
   implicit def mapSchema[MapKey, MapValue](implicit
                                            keySchema: TypedSchemaDef[MapKey],

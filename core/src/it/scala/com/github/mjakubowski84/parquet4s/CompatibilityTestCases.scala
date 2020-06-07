@@ -58,6 +58,16 @@ object CompatibilityTestCases extends TestCaseSupport {
         case _ => false
       }
   }
+  case class ArrayOfBytes(bytes: Array[Byte]) {
+    override def equals(obj: Any): Boolean =
+      obj match {
+        case other @ ArrayOfBytes(null) =>
+          (other canEqual this) && this.bytes == null
+        case other @ ArrayOfBytes(bytes) =>
+          (other canEqual this) && this.bytes.sameElements(bytes)
+        case _ => false
+      }
+  }
   case class ContainsCollectionOfOptionalPrimitives(list: List[Option[Int]])
   case class ContainsCollectionOfCollections(listOfSets: List[Set[Int]])
   case class ContainsMapOfPrimitives(map: Map[String, Int])
@@ -174,6 +184,11 @@ object CompatibilityTestCases extends TestCaseSupport {
         set = Set("a", "b", "c"),
         array = Array("a", "b", "c")
       )
+    )),
+    Case("array of bytes", Seq(
+      ArrayOfBytes(bytes = null),
+      ArrayOfBytes(bytes = Array.empty),
+      ArrayOfBytes(bytes = Array(1, 2, 3))
     )),
     Case("collection with optional primitives", Seq(
       ContainsCollectionOfOptionalPrimitives(List.empty),

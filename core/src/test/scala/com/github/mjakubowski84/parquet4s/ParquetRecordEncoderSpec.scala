@@ -246,6 +246,16 @@ class ParquetRecordEncoderSpec extends FlatSpec with Matchers {
     ))
   }
 
+  it should "encode record containing array of bytes" in {
+    encode(ArrayOfBytes(bytes = Array.empty)) should be(RowParquetRecord(
+      "bytes" -> BinaryValue(Array.empty[Byte])
+    ))
+    val bytes = Array.apply[Byte](1, 2, 3)
+    encode(ArrayOfBytes(bytes = bytes)) should be(RowParquetRecord(
+      "bytes" -> BinaryValue(bytes)
+    ))
+  }
+
   it should "encode record containing map with records as value" in {
     val dataWithEmptyMap = ContainsMapOfNestedClassAsValue(Map.empty)
     val dataWithMap = ContainsMapOfNestedClassAsValue(Map("1" -> Nested(1), "2" -> Nested(2)))
