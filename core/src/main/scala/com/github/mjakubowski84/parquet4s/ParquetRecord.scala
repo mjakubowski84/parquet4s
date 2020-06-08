@@ -1,7 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.io.api.RecordConsumer
-import org.apache.parquet.schema.Type
+import org.apache.parquet.schema.{MessageType, Type}
+import scala.collection.JavaConverters._
 
 import scala.collection.mutable
 
@@ -41,6 +42,21 @@ object RowParquetRecord {
     * @return A new empty instance of [[RowParquetRecord]]
     */
   def empty: RowParquetRecord = new RowParquetRecord()
+
+  implicit def genericParquetSchemaResolver(implicit message: MessageType): ParquetSchemaResolver[RowParquetRecord] =
+    new ParquetSchemaResolver[RowParquetRecord] {
+      override def resolveSchema: List[Type] = message.getFields.iterator().asScala.toList
+    }
+
+  implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] =
+    new ParquetRecordEncoder[RowParquetRecord] {
+      override def encode(entity: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = entity
+    }
+  
+  implicit val genericParquetDecoder: ParquetRecordDecoder[RowParquetRecord] =
+    new ParquetRecordDecoder[RowParquetRecord] {
+      override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
+    }
 
 }
 
