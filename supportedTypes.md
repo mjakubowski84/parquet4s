@@ -15,6 +15,7 @@ Primitive types
 | java.time.LocalDate     | &#x2611;            | &#x2611;  |
 | java.sql.Timestamp      | &#x2611;            | &#x2612;  |
 | java.sql.Date           | &#x2611;            | &#x2611;  |
+| Array[Byte]             | &#x2611;            | &#x2611;  |
 
 Complex Types
 -------------
@@ -24,6 +25,6 @@ Complex Types
  * Seq
  * Vector
  * Set
- * Array
+ * Array - Array of bytes is treated as primitive binary
  * Map - **Key must be of primitive type**
  * *Any case class*
