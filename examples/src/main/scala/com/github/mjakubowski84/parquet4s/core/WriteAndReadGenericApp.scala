@@ -24,7 +24,7 @@ object WriteAndReadGenericApp extends App {
   val users = List(
     (1L, "Alice", LocalDate.of(2000, 1, 1)),
     (2L, "Bob", LocalDate.of(1980, 2, 28)),
-    (3L, "Cecilia", LocalDate.of(1977, 3, 15)),
+    (3L, "Cecilia", LocalDate.of(1977, 3, 15))
   ).map { case (id, name, birthday) =>
     RowParquetRecord.empty
       .add(ID, id, vcc)
