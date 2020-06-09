@@ -1,11 +1,11 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.apache.parquet.schema.{DecimalMetadata, OriginalType, PrimitiveType, Types}
-import PrimitiveType.PrimitiveTypeName._
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.resolveSchema
+import com.github.mjakubowski84.parquet4s.TestCases._
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
 import org.apache.parquet.schema.Type.Repetition._
+import org.apache.parquet.schema.{OriginalType, PrimitiveType, Types}
 import org.scalatest.{FlatSpec, Matchers}
-import TestCases._
-import ParquetSchemaResolver.resolveSchema
 
 
 class ParquetSchemaResolverSpec extends FlatSpec with Matchers {
