@@ -2,7 +2,7 @@
 
 Simple I/O for Parquet. Allows you to easily read and write Parquet files in Scala.
 
-Use just Scala case class to define the schema of your data. No need to use Avro, Protobuf, Thrift or other data serialisation systems.
+Use just Scala case class to define the schema of your data. No need to use Avro, Protobuf, Thrift or other data serialisation systems. You can use generic records if you don't want to use case class, too.
 
 Compatible with files generated with Apache Spark. However, unlike in Spark, you do not have to start a cluster to perform I/O operations.
 
@@ -46,7 +46,7 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 Add the library to your dependencies:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-core" % "1.1.0"
+"com.github.mjakubowski84" %% "parquet4s-core" % "1.2.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -79,7 +79,7 @@ try {
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "1.1.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "1.2.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -155,7 +155,7 @@ ParquetStreams.fromParquet[User](
 ).runForeach(println)
 ```
 
-## Before-read filtering or Filter pushdown
+## Before-read filtering or filter pushdown
 
 One of the best features of Parquet is efficient way of fitering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Since version 0.10.0 Parquet4S allows do define filter predicates both in core and akka module in order to push filtering out from Scala collections or Akka Stream down to point before file content is even read.
 
@@ -187,6 +187,12 @@ Check ScalaDoc and code for more!
 ## Supported types
 
 List of types that are supported out of the box for reading, writing and filtering can be found [here](supportedTypes.md).
+
+## Generic Records
+
+You may want to not use strict schema and process your data in a generic way. Since version 1.2.0 Parquet4S has rich API that allows to build and trasnform Parquet records in easy way. Each implementation of  `ParquetRecord` is Scala `Iterable` and a mutable collection. You can execute operations on `RowParquetRecord` and `ListParquetRecord` as on mutable `Seq` and you can treat `MapParquetRecord` as mutable `Map`. Moreover, records received addition functions like `get` and `add` (and more) that take implicit `ValueCodec` and allow to read and modify records using regular Scala types.
+
+Funcionality is available both in core and Akka module. See [examples](https://github.com/mjakubowski84/parquet4s/blob/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/core/WriteAndReadGenericApp.scala).
 
 ## Customisation and extensibility
 

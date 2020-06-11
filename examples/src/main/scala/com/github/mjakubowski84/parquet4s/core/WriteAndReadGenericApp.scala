@@ -11,8 +11,6 @@ import org.apache.parquet.schema.{MessageType, OriginalType, Types}
 
 object WriteAndReadGenericApp extends App {
 
-  import RowParquetRecord._
-
   val ID = "id"
   val Name = "name"
   val Birthday = "birthday"
