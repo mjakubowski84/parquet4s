@@ -19,12 +19,14 @@ Primitive types
 
 Complex Types
 -------------
-**Only immutable types are supported**. Complex types can be arbitrarily nested.
+Complex types can be arbitrarily nested.
  * Option
  * List
  * Seq
  * Vector
  * Set
  * Array - Array of bytes is treated as primitive binary
- * Map - **Key must be of primitive type**
+ * Map - **Key must be of primitive type**, only **immutable** version. 
+ * Any Scala collection that has Scala 2.13 collection Factory (in 2.11 and 2.12 it is derived from CanBuildFrom). Refers to both mutable and immutable collections. Collection must be bounded only by one type of element - because of that Map is supported only in immutable version (for now).
  * *Any case class*
+ 
