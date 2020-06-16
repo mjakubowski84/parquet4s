@@ -1,5 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
+import org.apache.parquet.io.api.Binary
 import org.scalatest.{FlatSpec, Matchers}
 
 class ParquetRecordSpec extends FlatSpec with Matchers {
@@ -43,6 +44,55 @@ class ParquetRecordSpec extends FlatSpec with Matchers {
     record should be(empty)
     record should have size 0
   }
+
+  "ListParquetRecord" should "accumulate normal primitive values" in {
+    val lst = ListParquetRecord.empty
+    val b1 = Binary.fromString("a string")
+    val b2 = Binary.fromString("another string")
+    lst.add("list", RowParquetRecord("element" -> BinaryValue(b1)))
+    lst.add("list", RowParquetRecord("element" -> BinaryValue(b2)))
+    lst should have size 2
+    lst(0).asInstanceOf[BinaryValue].value should be(b1)
+    lst(1).asInstanceOf[BinaryValue].value should be(b2)
+  }
+
+  "ListParquetRecord" should "accumulate normal compound values" in {
+    val lst = ListParquetRecord.empty
+    val r1 = RowParquetRecord("a"-> IntValue(1), "b"-> IntValue(2))
+    val r2 = RowParquetRecord("c"-> IntValue(3), "d"-> IntValue(4))
+    lst.add("list", RowParquetRecord("element" -> r1))
+    lst.add("list", RowParquetRecord("element" -> r2))
+    lst should have size 2
+    lst(0).asInstanceOf[RowParquetRecord].get("a") should be(IntValue(1))
+    lst(0).asInstanceOf[RowParquetRecord].get("b") should be(IntValue(2))
+    lst(1).asInstanceOf[RowParquetRecord].get("c") should be(IntValue(3))
+    lst(1).asInstanceOf[RowParquetRecord].get("d") should be(IntValue(4))
+  }
+
+  "ListParquetRecord" should "accumulate legacy primitive values" in {
+    val lst = ListParquetRecord.empty
+    val b1 = Binary.fromString("a string")
+    val b2 = Binary.fromString("another string")
+    lst.add("array",  BinaryValue(b1))
+    lst.add("array",  BinaryValue(b2))
+    lst should have size 2
+    lst(0).asInstanceOf[BinaryValue].value should be(b1)
+    lst(1).asInstanceOf[BinaryValue].value should be(b2)
+  }
+
+  "ListParquetRecord" should "accumulate legacy compound values" in {
+    val lst = ListParquetRecord.empty
+    val r1 = RowParquetRecord("a"-> IntValue(1), "b"-> IntValue(2))
+    val r2 = RowParquetRecord("c"-> IntValue(3), "d"-> IntValue(4))
+    lst.add("array", r1)
+    lst.add("array", r2)
+    lst should have size 2
+    lst(0).asInstanceOf[RowParquetRecord].get("a") should be(IntValue(1))
+    lst(0).asInstanceOf[RowParquetRecord].get("b") should be(IntValue(2))
+    lst(1).asInstanceOf[RowParquetRecord].get("c") should be(IntValue(3))
+    lst(1).asInstanceOf[RowParquetRecord].get("d") should be(IntValue(4))
+  }
+
 
   it should "fail to get field from invalid index" in {
     an[NoSuchElementException] should be thrownBy ListParquetRecord.empty.head
