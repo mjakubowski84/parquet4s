@@ -225,7 +225,13 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
 
   override def add(name: String, value: Value): This = {
     // name should always be equal to ListFieldName
-    add(value.asInstanceOf[RowParquetRecord].get(ElementFieldName))
+    if (value.isInstanceOf[RowParquetRecord]) {
+      val repeated = value.asInstanceOf[RowParquetRecord]
+      if (repeated.length > 1 || repeated.head._1 != ElementFieldName) add(value)
+      else add(value.asInstanceOf[RowParquetRecord].get(ElementFieldName))
+    } else {
+      add(value)
+    }
   }
 
   /**
