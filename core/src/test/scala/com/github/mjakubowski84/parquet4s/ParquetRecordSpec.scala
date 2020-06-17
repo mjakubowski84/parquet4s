@@ -1,11 +1,15 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.io.api.Binary
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.enablers.Sequencing
+import org.scalatest.{FlatSpec, Inspectors, Matchers}
 
-class ParquetRecordSpec extends FlatSpec with Matchers {
+import scala.collection.mutable
+
+class ParquetRecordSpec extends FlatSpec with Matchers with Inspectors {
 
   private val vcc = ValueCodecConfiguration.default
+  private implicit val sequencing: Sequencing[mutable.Seq[Value]] = Sequencing.sequencingNatureOfGenSeq[Value, mutable.Seq]
 
   "RowParquetRecord" should "indicate that is empty" in {
     val record = RowParquetRecord.empty
@@ -45,65 +49,45 @@ class ParquetRecordSpec extends FlatSpec with Matchers {
     record should have size 0
   }
 
-  "ListParquetRecord" should "accumulate normal primitive values" in {
+  it should "accumulate normal primitive values" in {
+    val b1 = BinaryValue(Binary.fromString("a string"))
+    val b2 = BinaryValue(Binary.fromString("another string"))
     val lst = ListParquetRecord.empty
-    val b1 = Binary.fromString("a string")
-    val b2 = Binary.fromString("another string")
-    lst.add("list", RowParquetRecord("element" -> BinaryValue(b1)))
-    lst.add("list", RowParquetRecord("element" -> BinaryValue(b2)))
-    lst should have size 2
-    lst(0).asInstanceOf[BinaryValue].value should be(b1)
-    lst(1).asInstanceOf[BinaryValue].value should be(b2)
+      .add("list", RowParquetRecord("element" -> b1))
+      .add("list", RowParquetRecord("element" -> b2))
+    lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
-  "ListParquetRecord" should "accumulate normal compound values" in {
-    val lst = ListParquetRecord.empty
+  it should "accumulate normal compound values" in {
     val r1 = RowParquetRecord("a"-> IntValue(1), "b"-> IntValue(2))
     val r2 = RowParquetRecord("c"-> IntValue(3), "d"-> IntValue(4))
-    lst.add("list", RowParquetRecord("element" -> r1))
-    lst.add("list", RowParquetRecord("element" -> r2))
-    lst should have size 2
-    lst(0).asInstanceOf[RowParquetRecord].get("a") should be(IntValue(1))
-    lst(0).asInstanceOf[RowParquetRecord].get("b") should be(IntValue(2))
-    lst(1).asInstanceOf[RowParquetRecord].get("c") should be(IntValue(3))
-    lst(1).asInstanceOf[RowParquetRecord].get("d") should be(IntValue(4))
+    val lst = ListParquetRecord.empty
+      .add("list", RowParquetRecord("element" -> r1))
+      .add("list", RowParquetRecord("element" -> r2))
+    lst should contain theSameElementsInOrderAs Seq(r1, r2)
   }
 
-  "ListParquetRecord" should "accumulate legacy primitive values" in {
-    val lst = ListParquetRecord.empty
-    val b1 = Binary.fromString("a string")
-    val b2 = Binary.fromString("another string")
-    lst.add("array",  BinaryValue(b1))
-    lst.add("array",  BinaryValue(b2))
-    lst should have size 2
-    lst(0).asInstanceOf[BinaryValue].value should be(b1)
-    lst(1).asInstanceOf[BinaryValue].value should be(b2)
+  it should "accumulate legacy primitive values" in {
+    val b1 = BinaryValue(Binary.fromString("a string"))
+    val b2 = BinaryValue(Binary.fromString("another string"))
+    val lst = ListParquetRecord.empty.add("array",  b1).add("array",  b2)
+    lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
-  "ListParquetRecord" should "accumulate legacy compound values" in {
-    val lst = ListParquetRecord.empty
+  it should "accumulate legacy compound values" in {
     val r1 = RowParquetRecord("a"-> IntValue(1), "b"-> IntValue(2))
     val r2 = RowParquetRecord("c"-> IntValue(3), "d"-> IntValue(4))
-    lst.add("array", r1)
-    lst.add("array", r2)
-    lst should have size 2
-    lst(0).asInstanceOf[RowParquetRecord].get("a") should be(IntValue(1))
-    lst(0).asInstanceOf[RowParquetRecord].get("b") should be(IntValue(2))
-    lst(1).asInstanceOf[RowParquetRecord].get("c") should be(IntValue(3))
-    lst(1).asInstanceOf[RowParquetRecord].get("d") should be(IntValue(4))
+    val lst = ListParquetRecord.empty.add("array", r1).add("array", r2)
+    lst should contain theSameElementsInOrderAs Seq(r1, r2)
   }
 
-  "ListParquetRecord" should "accumulate null values" in {
+  it should "accumulate null values" in {
     val lst = ListParquetRecord.empty
-    val nofields = RowParquetRecord()
-    lst.add("array", nofields)
-    lst.add("array", nofields)
-    lst.add("array", nofields)
+      .add("array", RowParquetRecord.empty)
+      .add("array", RowParquetRecord.empty)
+      .add("array", RowParquetRecord.empty)
     lst should have size 3
-    for { elem <- lst } {
-      elem should be(NullValue)
-    }
-
+    every(lst) should be(NullValue)
   }
 
 
