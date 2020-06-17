@@ -93,6 +93,19 @@ class ParquetRecordSpec extends FlatSpec with Matchers {
     lst(1).asInstanceOf[RowParquetRecord].get("d") should be(IntValue(4))
   }
 
+  "ListParquetRecord" should "accumulate null values" in {
+    val lst = ListParquetRecord.empty
+    val nofields = RowParquetRecord()
+    lst.add("array", nofields)
+    lst.add("array", nofields)
+    lst.add("array", nofields)
+    lst should have size 3
+    for { elem <- lst } {
+      elem should be(NullValue)
+    }
+
+  }
+
 
   it should "fail to get field from invalid index" in {
     an[NoSuchElementException] should be thrownBy ListParquetRecord.empty.head
