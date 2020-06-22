@@ -8,12 +8,14 @@ import shapeless.labelled._
 import scala.language.higherKinds
 import scala.reflect.ClassTag
 
+
 /**
   * Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
   * @tparam T scala type that represents schema of Parquet data.
   */
 trait ParquetSchemaResolver[T] {
 
+  def name: String
   /**
     * @return list of [[org.apache.parquet.schema.Type]] for each product element that <i>T</i> contains.
     */
@@ -27,9 +29,10 @@ object ParquetSchemaResolver
   /**
     * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
     */
-  def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType = Message(g.resolveSchema:_*)
+  def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType = Message(g.name, g.resolveSchema:_*)
 
   implicit val hnil: ParquetSchemaResolver[HNil] = new ParquetSchemaResolver[HNil] {
+    def name: String = ???
     def resolveSchema: List[Type] = List.empty
   }
 
@@ -39,23 +42,26 @@ object ParquetSchemaResolver
                                                  rest: ParquetSchemaResolver[T]
                                                 ): ParquetSchemaResolver[FieldType[K, V] :: T] =
     new ParquetSchemaResolver[FieldType[K, V] :: T] {
+      def name: String = ???
       def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
     }
 
   implicit def generic[T, G](implicit
+                             ct: ClassTag[T],
                              lg: LabelledGeneric.Aux[T, G],
                              rest: Lazy[ParquetSchemaResolver[G]]
                             ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
+    def name: String = ct.runtimeClass.getCanonicalName
     def resolveSchema: List[Type] = rest.value.resolveSchema
   }
 }
 
 object Message {
 
-  val name = "parquet4s_schema"
-
-  def apply(fields: Type*): MessageType = Types.buildMessage().addFields(fields:_*).named(name)
-
+  def apply(name: String, fields: Type*): MessageType = Types.buildMessage()
+                                                             .addFields(fields:_*)
+                                                             .named(Option(name)
+                                                                      .getOrElse("parquet4s_schema"))
 }
 
 trait SchemaDef {

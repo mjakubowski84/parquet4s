@@ -45,6 +45,7 @@ object RowParquetRecord {
 
   implicit def genericParquetSchemaResolver(implicit message: MessageType): ParquetSchemaResolver[RowParquetRecord] =
     new ParquetSchemaResolver[RowParquetRecord] {
+      override def name: String = message.getName
       override def resolveSchema: List[Type] = message.getFields.iterator().asScala.toList
     }
 
