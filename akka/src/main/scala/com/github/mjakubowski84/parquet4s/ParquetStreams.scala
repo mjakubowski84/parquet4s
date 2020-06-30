@@ -21,8 +21,12 @@ object ParquetStreams {
     * <br/>
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
-    * <br/> <br/>
-    *
+    * <br/>
+    * Can read also <b>partitioned</b> directories. Filter applies also to partition values. Partition values are set
+    * as fields in read entities at path defined by partition name. Path can be a simple column name or a dot-separated
+    * path to nested field. Missing intermediate fields are automatically created for each read record.
+    * <br/>
+    * <br/>
     * <b>Take note!</b> that due to an issue with implicit resolution in <b>Scala 2.11</b> you may need to define
     * <b>all parameters</b> of `ParquetStreams.fromParquet` even if some have default values. It specifically refers to
     * a case when you would like to omit `options` but define `filter`. Such situation doesn't appear in Scala 2.12 and
@@ -70,6 +74,7 @@ object ParquetStreams {
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     *
+    * @deprecated In the future only [[viaParquet]] and [[toParquetSingleFile]] may be only supported writers
     * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
     * @param maxRecordsPerFile the maximum size of file
     * @param options set of options that define how Parquet files will be created
@@ -91,6 +96,7 @@ object ParquetStreams {
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     *
+    * @deprecated In the future only [[viaParquet]] and [[toParquetSingleFile]] may be only supported writers
     * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
     * @param parallelism defines how many files are created and how many parallel threads are responsible for it
     * @param options set of options that define how Parquet files will be created
@@ -129,6 +135,7 @@ object ParquetStreams {
     * @tparam Mat type of sink's materalized value
     * @return The sink that writes Parquet files
     */
+  @deprecated(message = "Use viaParquet instead", since = "1.3.0")
   def toParquetIndefinite[In, ToWrite: ParquetWriterFactory, Mat](path: String,
                                                                   maxChunkSize: Int,
                                                                   chunkWriteTimeWindow: FiniteDuration,
@@ -139,6 +146,18 @@ object ParquetStreams {
                                                                  ): Sink[In, Mat] =
     IndefiniteStreamParquetSink[In, ToWrite, Mat](new Path(path), maxChunkSize, chunkWriteTimeWindow, buildChunkPath, preWriteTransformation, postWriteSink, options)
 
+  /**
+   * Builds a flow that:
+   * <ol>
+   *   <li>Is designed to write Parquet files indefinitely</li>
+   *   <li>Is able to (optionally) partition data by a list of provided fields</li>
+   *   <li>Flushes and rotates files after given number of rows is written or given time period elapses</li>
+   *   <li>Outputs incoming message after it is written but can write an effect of provided message transformation.</li>
+   * </ol>
+   * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
+   * @tparam T type of message that flow is meant to accept
+   * @return Builder of [[ParquetPartitioningFlow]]
+   */
   def viaParquet[T](path: String): ParquetPartitioningFlow.Builder[T, T] =
     ParquetPartitioningFlow.builder(new Path(path))
 }

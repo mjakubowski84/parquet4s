@@ -23,6 +23,9 @@ private[parquet4s] object IOOps {
 
 }
 
+/**
+ * Utility functions that perform operations on HDFS.
+ */
 trait IOOps {
 
   import IOOps._

@@ -3,6 +3,10 @@ package com.github.mjakubowski84.parquet4s
 import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
+/**
+  * Extracts a value of String field from a tree of case classes.
+  * @tparam T type of the root case class
+  */
 private[parquet4s] trait PartitionLens[T] {
 
   def apply(cursor: Cursor, obj: T): Either[PartitionLens.LensError, String]
@@ -13,7 +17,7 @@ private[parquet4s] object PartitionLens {
 
   case class LensError(cursor: Cursor, message: String)
 
-  implicit val hnilStringLens: PartitionLens[HNil] = new PartitionLens[HNil] {
+  implicit val hnilLens: PartitionLens[HNil] = new PartitionLens[HNil] {
     override def apply(cursor: Cursor, obj: HNil): Either[LensError, String] =
       Left(LensError(cursor, s"Field '${cursor.objective}' does not exist."))
   }
@@ -34,9 +38,9 @@ private[parquet4s] object PartitionLens {
       }
     }
 
-  implicit def genericStringLens[T, R](implicit
-                                       gen: LabelledGeneric.Aux[T, R],
-                                       lens: Lazy[PartitionLens[R]]): PartitionLens[T] =
+  implicit def genericLens[T, R](implicit
+                                 gen: LabelledGeneric.Aux[T, R],
+                                 lens: Lazy[PartitionLens[R]]): PartitionLens[T] =
     new PartitionLens[T] {
       override def apply(cursor: Cursor, obj: T): Either[LensError, String] =
         lens.value.apply(cursor, gen.to(obj))
@@ -68,8 +72,7 @@ private[parquet4s] object PartitionLens {
       Left(LensError(cursor, "Only String field can be used for partitioning."))
   }
 
-  def apply[T](obj: T, path: String)(implicit lens: PartitionLens[T]): (String, String) = {
-
+  def apply[T](obj: T, path: String)(implicit lens: PartitionLens[T]): (String, String) =
     lens.apply(Cursor.following(path), obj) match {
       case Left(LensError(cursor, message)) =>
         val cursorPath = cursor.path.mkString(".")
@@ -77,7 +80,5 @@ private[parquet4s] object PartitionLens {
       case Right(result) =>
         (path, result)
     }
-
-  }
 
 }

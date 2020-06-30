@@ -4,8 +4,17 @@ import org.apache.parquet.schema.{MessageType, Type}
 import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
+/**
+  * Type class that builds a schema of Parquet file for given type. Can skip some fields according to [[Cursor]]
+  * indications.
+  * @tparam T type for which schema is built
+  */
 trait SkippingParquetSchemaResolver[T] {
 
+  /**
+    * @param cursor facilitates traversal over T
+    * @return list of [[org.apache.parquet.schema.Type]] for each product element that <i>T</i> contains.
+    */
   def resolveSchema(cursor: Cursor): List[Type]
 
 }
@@ -19,6 +28,10 @@ object SkippingParquetSchemaResolver
     def invokeOther(otherSchemaDef: TypedSchemaDef[V]): Type = otherSchemaDef(fieldName)
   }
 
+  /**
+    * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
+    * @param toSkip iterable of columns or dot-separated column paths that should be skipped when generating the schema
+    */
   def resolveSchema[T](toSkip: Iterable[String])(implicit g: SkippingParquetSchemaResolver[T]): MessageType =
     Message(g.resolveSchema(Cursor.skipping(toSkip)):_*)
 
