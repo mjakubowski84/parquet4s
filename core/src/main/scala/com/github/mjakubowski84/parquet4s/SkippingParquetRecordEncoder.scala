@@ -7,8 +7,19 @@ import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 import scala.util.control.NonFatal
 
 
+/**
+  * Type class that allows to encode given data entity as [[RowParquetRecord]].
+  * Can skip some fields according to indication of the [[Cursor]].
+  * @tparam T type of source data
+  */
 trait SkippingParquetRecordEncoder[T] {
 
+  /**
+    * @param cursor cursor that facilitates traversal over T
+    * @param entity data to be encoded
+    * @param configuration [ValueCodecConfiguration] used by some codecs
+    * @return [[RowParquetRecord]] containing product elements from the data
+    */
   def encode(cursor: Cursor, entity: T, configuration: ValueCodecConfiguration): RowParquetRecord
 
 }

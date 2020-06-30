@@ -295,7 +295,7 @@ class ParquetStreamsITSpec
     }
   }
 
-  it should "write and read data partitioned by all fields of case class " in {
+  it should "write and read data partitioned by all fields of case class" in {
 
     case class User(name: String, address: Address)
     case class Address(postcode: String, country: String)
@@ -335,6 +335,32 @@ class ParquetStreamsITSpec
 
     val fut = Source(users).via(flow).runWith(Sink.ignore)
     recoverToSucceededIf[org.apache.parquet.schema.InvalidSchemaException](fut)
+  }
+
+  it should "write and read data using partitioning flow but with no partition defined" in {
+
+    case class User(name: String, address: Address)
+    case class Address(postcode: String, country: String)
+
+    val flow = ParquetStreams.viaParquet[User](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withMaxCount(writeOptions.rowGroupSize)
+      .withMaxDuration(100.millis)
+      .build()
+
+    val users = Seq(
+      User(name = "John", address = Address("123456", "ABC")),
+      User(name = "Ben", address = Address("111111", "CDE")),
+      User(name = "Cynthia", address = Address("7654321", "XYZ"))
+    ).toStream
+
+    for {
+      writtenData <- Source(users).via(flow).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[User](tempPathString).runWith(Sink.seq)
+    } yield {
+      writtenData should be(users)
+      readData should be(users)
+    }
   }
 
   override def afterAll(): Unit = {

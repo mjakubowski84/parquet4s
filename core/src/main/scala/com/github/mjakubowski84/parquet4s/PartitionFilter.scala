@@ -17,11 +17,27 @@ object PartitionedPath {
 
 }
 
+/**
+  * Represents a path in file system that leads to a leaf directory containing Parquet files.
+  * Path can be partitioned, that is, parent directories may be named in a following manner:
+  * {{{ partition_name=partition_value }}}
+  */
 trait PartitionedPath {
-
+  /**
+    * @return file system path
+    */
   def path: Path
+  /**
+    * @return list of partition names
+    */
   def schema: PartitionedDirectory.PartitioningSchema
+  /**
+    * @return value of given partition or None if there is no such partition in that path
+    */
   def value(partitionName: String): Option[Binary]
+  /**
+    * @return list of all partitions and their values in that path
+    */
   def partitions: List[(String, Binary)]
 
 }
@@ -82,8 +98,20 @@ object PartitionedDirectory {
 
 }
 
+/**
+  * Represents a directory tree containing Parquet files in the leafs. Node directories can be partitioned, that is,
+  * they can be named in a following manner:
+  * {{{ partition_name=partition_value }}}
+  * Depth of the tree is the same for each leaf. Each leaf has the same path to the root.
+  */
 trait PartitionedDirectory {
+  /**
+    * @return list of partition names used by each [[PartitionedPath]] in the directory tree.
+    */
   def schema: PartitioningSchema
+  /**
+    * @return all [[PartitionedPath]]s belonging to this directory
+    */
   def paths: Iterable[PartitionedPath]
 }
 
@@ -93,8 +121,15 @@ private[parquet4s] object PartitionFilter {
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
-  private def debug(msg: => String): Unit = logger.debug(msg)
+  private def debug(msg: => String): Unit = if (logger.isDebugEnabled()) logger.debug(msg)
 
+  /**
+    * Generates an iterable of pairs: Parquet filter and [[PartitionedPath]] for given [[PartitionedDirectory]].
+    * @param filter filter that shall be applied to both partitions and Parquet files
+    * @param valueCodecConfiguration configuration used when decoding filter values
+    * @param partitionedDirectory directory to read
+    * @return paths that meet the filter accompanied by rewritten filters that shall be used to process Parquet files
+    */
   def filter(
               filter: Filter,
               valueCodecConfiguration: ValueCodecConfiguration,
@@ -203,6 +238,13 @@ private[parquet4s] object PartitionFilterRewriter {
     override def accept[R](visitor: FilterPredicate.Visitor[R]): R = throw new UnsupportedOperationException
   }
 
+  /**
+    * Rewrites given filter predicate so that it can be used to filter partitioned path. Only arguments matching
+    * partition names are left, all other predicates are assumed to be true.
+    * @param filterPredicate predicate to be rewritten
+    * @param schema list of partition names
+    * @return rewritten filter predicate.
+    */
   def rewrite(filterPredicate: FilterPredicate, schema: PartitioningSchema): FilterPredicate =
     filterPredicate.accept(new PartitionFilterRewriter(schema))
 
@@ -282,6 +324,13 @@ private[parquet4s] object FilterRewriter {
     override def accept[R](visitor: FilterPredicate.Visitor[R]): R = throw new UnsupportedOperationException
   }
 
+  /**
+    * Rewrites given filter predicate so that it doesn't contain conditions that are already met by partition filter.
+    * Result shall be used to filter Parquet files.
+    * @param filterPredicate predicate to rewrite
+    * @param partitionedPath partitioned path against which filter has to be rewritten
+    * @return rewritten filter predicate
+    */
   def rewrite(filterPredicate: FilterPredicate, partitionedPath: PartitionedPath): FilterPredicate =
     filterPredicate.accept(new FilterRewriter(partitionedPath))
 

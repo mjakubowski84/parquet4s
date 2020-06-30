@@ -11,12 +11,14 @@ import scala.language.{higherKinds, implicitConversions}
 /**
   * Filter provides a way to define filtering predicates with a simple algebra. Use filters to process
   * your files while it is read from a file system and BEFORE its content is transferred to your application.
-  *
+  * <br/>
   * You can filter by values of leaf fields of your schema. Check
   * [[https://github.com/mjakubowski84/parquet4s/blob/master/supportedTypes.md here]] which field types are supported.
   * Refer to fields/columns using case class [[Col]]. Define filtering conditions using simple algebraic operators, like
   * equality or greater then (check [[Col]]'s fields. Combine filter by means of simple algebraic operators `&&`, `||`
   * and `!`.
+  * <br/>
+  * You can also define filters for partitions. Keep in mind that partition value can be only a String.
   *
   * @example
   *          Given schema:

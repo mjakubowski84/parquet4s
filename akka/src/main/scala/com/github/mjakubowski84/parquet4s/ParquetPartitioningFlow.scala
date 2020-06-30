@@ -21,12 +21,59 @@ object ParquetPartitioningFlow {
 
   def builder[T](basePath: Path): Builder[T, T] = BuilderImpl(basePath)
 
+  /**
+   * Builds an instance [[ParquetPartitioningFlow]]
+   * @tparam T Type of message that flow accepts
+   * @tparam W Schema of Parquet file that flow writes
+   */
   trait Builder[T, W] {
+    /**
+     * @param maxCount max number of records to be written before file rotation
+     */
     def withMaxCount(maxCount: Long): Builder[T, W]
+    /**
+     * @param maxDuration max time after which partition file is rotated
+     */
     def withMaxDuration(maxDuration: FiniteDuration): Builder[T, W]
+    /**
+     * @param writeOptions writer options used by the flow
+     */
     def withWriteOptions(writeOptions: ParquetWriter.Options): Builder[T, W]
+    /**
+     * Sets partition paths that flow partitions data by. Can be empty.
+     * Partition path can be a simple string column (e.g. "color") or a dot-separated path pointing nested string field
+     * (e.g. "user.address.postcode"). Partition path is used to extract data from the entity and to create
+     * a tree of subdirectories for partitioned files. Using aforementioned partitions effects in creation
+     * of (example) following tree:
+     * {{{
+     * ../color=blue
+     *      /user.address.postcode=XY1234/
+     *      /user.address.postcode=AB4321/
+     *   /color=green
+     *      /user.address.postcode=XY1234/
+     *      /user.address.postcode=CV3344/
+     *      /user.address.postcode=GH6732/
+     * }}}
+     * Take <b>note</b>:
+     * <ol>
+     *   <li>PartitionBy must point a string field.</li>
+     *   <li>Partitioning removes partition fields from the schema. Data is stored in name of subdirectory
+     *       instead of Parquet file.</li>
+     *   <li>Partitioning cannot end in having empty schema. If you remove all fields of the message you will
+     *       get an error.</li>
+     *   <li>Partitioned directories can be filtered effectively during reading.</li>
+     * </ol>
+     * @param partitionBy partition paths
+     */
     def withPartitionBy(partitionBy: String*): Builder[T, W]
+    /**
+     * @param transformation function that is called by flow in order to obtain Parquet schema. Identity by default.
+     * @tparam X Schema type
+     */
     def withPreWriteTransformation[X](transformation: T => X): Builder[T, X]
+    /**
+     * Builds final flow
+     */
     def build()(implicit
                 partitionLens: PartitionLens[W],
                 schemaResolver: SkippingParquetSchemaResolver[W],
