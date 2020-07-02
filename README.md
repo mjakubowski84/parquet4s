@@ -46,7 +46,7 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 Add the library to your dependencies:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-core" % "1.2.1"
+"com.github.mjakubowski84" %% "parquet4s-core" % "1.3.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -79,7 +79,7 @@ try {
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "1.2.1"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "1.3.0"
 ```
 **Note:** Since version `0.5.0` you need to define your own version of `hadoop-client`:
 ```scala
@@ -122,7 +122,7 @@ Source(users).runWith(ParquetStreams.toParquetSingleFile(
 
 // Sequentially splits data into files of 'maxRecordsPerFile'.
 // Recommended to use in environments with limitted available resources.
-Source(data).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
+Source(users).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
   path = "file:///data/users",
   // will create files consisting of max 2 row groups
   maxRecordsPerFile = 2 * writeOptions.rowGroupSize,
@@ -132,7 +132,7 @@ Source(data).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
 // Writes files in parallel in number equal to 'parallelism'.
 // Recommended to use in order to achieve better performance under condition that
 // file order does not have to be preserved.
-Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
+Source(users).runWith(ParquetStreams.toParquetParallelUnordered(
   path = "file:///data/users",
   parallelism = 4,
   options = writeOptions
@@ -140,15 +140,18 @@ Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
 
 // Tailored for writing indefinite streams.
 // Writes file when chunk reaches size limit or defined time period elapses.
-// Check also all other parameters and example usage in project sources.
-Source(data).runWith(ParquetStreams.toParquetIndefinite(
-  path = "file:///data/users",
-  maxChunkSize = writeOptions.rowGroupSize,
-  chunkWriteTimeWindow = 30.seconds,
-  options = writeOptions
-))
+// Can also partition files!
+// Check all other parameters and example usage in project sources.
+Source(users).via(
+  ParquetStreams
+    .viaParquet[User]("file:///data/users")
+    .withMaxCount(writeOptions.rowGroupSize)
+    .withMaxDuration(30.seconds)
+    .withWriteOptions(writeOptions)
+		.build()
+).runForeach(user => println(s"Just wrote user ${user.userId}..."))
   
-// Reads file or files from the path. Please also have a look at optional parameters.
+// Reads a file or files from the path. Please also have a look at optional parameters.
 ParquetStreams.fromParquet[User](
   path = "file:///data/users", 
   options = ParquetReader.Options(hadoopConf = conf)
@@ -167,7 +170,7 @@ In core library:
 ParquetReader.read[User](path = "file://my/path", filter = Col("email") === "user@email.com")
 ```
 
-In Akka:
+In Akka filter applies both to content of files and partitions:
 
 ```scala
 ParquetStreams.fromParquet[Stats](
@@ -239,8 +242,7 @@ implicit val customTypeSchema: TypedSchemaDef[CustomType] =
 
 Please check [examples](examples) where you can find simple code covering basics both for `core` and `akka` modules.
 
-Moreover, examples contain simple application of lib comprising Akka Streams and Kafka. It shows how you can write
-Parquet files with data coming from indefinite stream.
+Moreover, examples contain a simple application of lib comprising Akka Streams and Kafka. It shows how you can write partitioned Parquet files with data coming from an indefinite stream.
 
 ## Contributing
 
