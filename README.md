@@ -148,7 +148,7 @@ Source(users).via(
     .withMaxCount(writeOptions.rowGroupSize)
     .withMaxDuration(30.seconds)
     .withWriteOptions(writeOptions)
-		.build()
+    .build()
 ).runForeach(user => println(s"Just wrote user ${user.userId}..."))
   
 // Reads a file or files from the path. Please also have a look at optional parameters.
