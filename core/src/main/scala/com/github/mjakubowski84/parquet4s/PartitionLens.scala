@@ -7,13 +7,13 @@ import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
   * Extracts a value of String field from a tree of case classes.
   * @tparam T type of the root case class
   */
-private[parquet4s] trait PartitionLens[T] {
+trait PartitionLens[T] {
 
   def apply(cursor: Cursor, obj: T): Either[PartitionLens.LensError, String]
 
 }
 
-private[parquet4s] object PartitionLens {
+object PartitionLens {
 
   case class LensError(cursor: Cursor, message: String)
 
