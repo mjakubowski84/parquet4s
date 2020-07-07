@@ -44,6 +44,8 @@ object ParquetWriter  {
 
   type ParquetWriterFactory[T] = (String, Options) => ParquetWriter[T]
 
+  private val SignatureMetadata = Map("MadeBy" -> "https://github.com/mjakubowski84/parquet4s")
+
   private class Builder(path: Path, schema: MessageType) extends HadoopParquetWriter.Builder[RowParquetRecord, Builder](path) {
     private val logger = LoggerFactory.getLogger(ParquetWriter.this.getClass)
 
@@ -53,7 +55,8 @@ object ParquetWriter  {
 
     override def self(): Builder = this
 
-    override def getWriteSupport(conf: Configuration): WriteSupport[RowParquetRecord] = new ParquetWriteSupport(schema, Map.empty)
+    override def getWriteSupport(conf: Configuration): WriteSupport[RowParquetRecord] =
+      new ParquetWriteSupport(schema, SignatureMetadata)
   }
 
   /**

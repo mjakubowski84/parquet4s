@@ -4,6 +4,8 @@ import org.apache.parquet.schema.{MessageType, Type}
 import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
+import scala.reflect.ClassTag
+
 /**
   * Type class that builds a schema of Parquet file for given type. Can skip some fields according to [[Cursor]]
   * indications.
@@ -16,6 +18,11 @@ trait SkippingParquetSchemaResolver[T] {
     * @return list of [[org.apache.parquet.schema.Type]] for each product element that <i>T</i> contains.
     */
   def resolveSchema(cursor: Cursor): List[Type]
+
+  /**
+    * @return a name to be given to schema
+    */
+  def schemaName: Option[String] = None
 
 }
 
@@ -33,7 +40,7 @@ object SkippingParquetSchemaResolver
     * @param toSkip iterable of columns or dot-separated column paths that should be skipped when generating the schema
     */
   def resolveSchema[T](toSkip: Iterable[String])(implicit g: SkippingParquetSchemaResolver[T]): MessageType =
-    Message(g.resolveSchema(Cursor.skipping(toSkip)):_*)
+    Message(g.schemaName, g.resolveSchema(Cursor.skipping(toSkip)):_*)
 
   implicit val hnil: SkippingParquetSchemaResolver[HNil] = new SkippingParquetSchemaResolver[HNil] {
     def resolveSchema(cursor: Cursor): List[Type] = List.empty
@@ -46,7 +53,7 @@ object SkippingParquetSchemaResolver
                                                            rest: SkippingParquetSchemaResolver[T]
                                                 ): SkippingParquetSchemaResolver[FieldType[K, V] :: T] =
     new SkippingParquetSchemaResolver[FieldType[K, V] :: T] {
-      def resolveSchema(cursor: Cursor): List[Type] = {
+      override def resolveSchema(cursor: Cursor): List[Type] = {
         cursor.advance[K] match {
           case Some(newCursor) =>
             newCursor.accept(new TypedSchemaDefInvoker(schemaDef), visitor) match {
@@ -63,9 +70,11 @@ object SkippingParquetSchemaResolver
 
   implicit def generic[T, G](implicit
                              lg: LabelledGeneric.Aux[T, G],
-                             rest: Lazy[SkippingParquetSchemaResolver[G]]
+                             rest: Lazy[SkippingParquetSchemaResolver[G]],
+                             classTag: ClassTag[T]
                             ): SkippingParquetSchemaResolver[T] = new SkippingParquetSchemaResolver[T] {
-    def resolveSchema(cursor: Cursor): List[Type] = rest.value.resolveSchema(cursor)
+    override def resolveSchema(cursor: Cursor): List[Type] = rest.value.resolveSchema(cursor)
+    override def schemaName: Option[String] = Option(classTag.runtimeClass.getCanonicalName)
   }
 
   trait SchemaVisitor[K <: Symbol, V] extends Cursor.Visitor[TypedSchemaDefInvoker[K, V], Option[Type]] {

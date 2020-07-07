@@ -2,8 +2,11 @@ package com.github.mjakubowski84.parquet4s
 
 import java.nio.file.Files
 
-import org.apache.parquet.hadoop.ParquetFileWriter
-import org.scalatest.BeforeAndAfter
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.Path
+import org.apache.parquet.hadoop.util.HadoopInputFile
+import org.apache.parquet.hadoop.{ParquetFileReader, ParquetFileWriter}
+import org.scalatest.{BeforeAndAfter, Entry}
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -82,6 +85,14 @@ class ParquetWriterItSpec
     val w = ParquetWriter.writer[Record](writePath.toString)
     noException should be thrownBy w.close()
     noException should be thrownBy w.close()
+  }
+
+  "ParquetWriter should add metadata with Parquet4S signature" in {
+    ParquetWriter.writeAndClose(writePath.toString, records)
+    val meta = ParquetFileReader.open(
+      HadoopInputFile.fromPath(new Path(writePath.toString), new Configuration())
+    ).getFileMetaData.getKeyValueMetaData
+    meta should contain (Entry("MadeBy", "https://github.com/mjakubowski84/parquet4s"))
   }
 
 }
