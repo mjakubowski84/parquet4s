@@ -15,6 +15,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
 
   "SkippingParquetSchemaResolver" should "skip a field at a long path" in {
     resolveSchema[Person](Set("address.street.name")) should be(Message(
+      Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(OriginalType.UTF8).named("name"),
       Types.primitive(INT32, REQUIRED).as(OriginalType.INT_32).named("age"),
       Types.optionalGroup()
@@ -28,6 +29,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
 
   it should "skip a mid path" in {
     resolveSchema[Person](Set("address.street")) should be(Message(
+      Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(OriginalType.UTF8).named("name"),
       Types.primitive(INT32, REQUIRED).as(OriginalType.INT_32).named("age"),
       Types.optionalGroup()
@@ -38,6 +40,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
 
   it should "skip all fields of case class" in {
     resolveSchema[Person](Set("address.street.name", "address.street.more")) should be(Message(
+      Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(OriginalType.UTF8).named("name"),
       Types.primitive(INT32, REQUIRED).as(OriginalType.INT_32).named("age"),
       Types.optionalGroup()
@@ -48,12 +51,12 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
 
   it should "skip the only field from a simple case class" in {
     case class Simple(field: String)
-    resolveSchema[Simple](Set("field")) should be(Message())
+    resolveSchema[Simple](Set("field")) should be(Message(None))
   }
 
   it should "process empty class" in {
     case class Empty()
-    resolveSchema[Empty](Set("field")) should be(Message())
+    resolveSchema[Empty](Set("field")) should be(Message(None))
   }
 
 }
