@@ -40,7 +40,6 @@ class PartitionLensSpec extends AnyFlatSpec with Matchers {
 
   it should "fail to extract non-existing field" in {
     val e = intercept[IllegalArgumentException](PartitionLens[Person](person, "address.state"))
-    println(e.getMessage)
     e.getMessage should be(s"Invalid element at path 'address'. Field 'address.state' does not exist.")
   }
 

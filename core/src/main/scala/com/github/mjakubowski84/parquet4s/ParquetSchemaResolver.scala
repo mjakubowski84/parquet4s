@@ -19,6 +19,11 @@ trait ParquetSchemaResolver[T] {
     */
   def resolveSchema: List[Type]
 
+  /**
+    * @return a name to be given to schema
+    */
+  def schemaName: Option[String] = None
+
 }
 
 object ParquetSchemaResolver
@@ -27,10 +32,11 @@ object ParquetSchemaResolver
   /**
     * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
     */
-  def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType = Message(g.resolveSchema:_*)
+  def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType =
+    Message(g.schemaName, g.resolveSchema:_*)
 
   implicit val hnil: ParquetSchemaResolver[HNil] = new ParquetSchemaResolver[HNil] {
-    def resolveSchema: List[Type] = List.empty
+    override def resolveSchema: List[Type] = List.empty
   }
 
   implicit def hcons[K <: Symbol, V, T <: HList](implicit
@@ -39,22 +45,25 @@ object ParquetSchemaResolver
                                                  rest: ParquetSchemaResolver[T]
                                                 ): ParquetSchemaResolver[FieldType[K, V] :: T] =
     new ParquetSchemaResolver[FieldType[K, V] :: T] {
-      def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
+      override def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
     }
 
   implicit def generic[T, G](implicit
                              lg: LabelledGeneric.Aux[T, G],
-                             rest: Lazy[ParquetSchemaResolver[G]]
+                             rest: Lazy[ParquetSchemaResolver[G]],
+                             classTag: ClassTag[T]
                             ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
-    def resolveSchema: List[Type] = rest.value.resolveSchema
+    override def resolveSchema: List[Type] = rest.value.resolveSchema
+    override def schemaName: Option[String] = Option(classTag.runtimeClass.getCanonicalName)
   }
 }
 
 object Message {
 
-  val name = "parquet4s_schema"
+  val DefaultName = "parquet4s_schema"
 
-  def apply(fields: Type*): MessageType = Types.buildMessage().addFields(fields:_*).named(name)
+  def apply(name: Option[String], fields: Type*): MessageType =
+    Types.buildMessage().addFields(fields:_*).named(name.getOrElse(DefaultName))
 
 }
 
