@@ -31,9 +31,14 @@ trait Cursor {
   def accept[T, R](obj: T, visitor: Cursor.Visitor[T, R]): R
 
   /**
-    * @return description what the cursor seeks for
+    * @return Text description what the cursor seeks for
     */
-  def objective: String
+  def objectiveAsString: String
+
+  /**
+   * @return what the cursor seeks for
+   */
+  def objective: Any
 
 }
 
@@ -62,7 +67,7 @@ object Cursor {
     */
   def following(path: String): Cursor = FollowingCursor(DotPath(path))
 
-  final class Completed(val path: DotPath, val objective: String) extends Cursor {
+  final class Completed(val path: DotPath, val objective: Any, val objectiveAsString: String) extends Cursor {
     override def accept[T, R](obj: T, visitor: Visitor[T, R]): R = visitor.onCompleted(this, obj)
     override def advance[FieldName <: Symbol : Witness.Aux]: Option[Cursor] = None
   }
@@ -96,7 +101,8 @@ private object SkippingCursor {
 
 private class SkippingCursor private (val path: Cursor.DotPath, toSkip: Set[Cursor.DotPath]) extends Cursor with Cursor.Active {
 
-  override lazy val objective: String = toSkip.map(Cursor.DotPath.toString).mkString("[", ", ", "]")
+  override lazy val objective: Any = toSkip
+  override lazy val objectiveAsString: String = toSkip.map(Cursor.DotPath.toString).mkString("[", ", ", "]")
 
   override def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor] = {
     val newPath = path :+ implicitly[Witness.Aux[FieldName]].value.name
@@ -108,18 +114,19 @@ private class SkippingCursor private (val path: Cursor.DotPath, toSkip: Set[Curs
 
 private object FollowingCursor {
   def apply(toFollow: Cursor.DotPath): Cursor =
-    if (toFollow.isEmpty) new Cursor.Completed(Cursor.DotPath.empty, "")
+    if (toFollow.isEmpty) new Cursor.Completed(Cursor.DotPath.empty, objective = toFollow, objectiveAsString = "")
     else new FollowingCursor(Cursor.DotPath.empty, toFollow)
 }
 
 private class FollowingCursor private(val path: Cursor.DotPath, toFollow: Cursor.DotPath) extends Cursor with Cursor.Active {
 
-  override lazy val objective: String = Cursor.DotPath.toString(toFollow)
+  override lazy val objective: Any = toFollow
+  override lazy val objectiveAsString: String = Cursor.DotPath.toString(toFollow)
 
   override def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor] = {
     val newPath = path :+ implicitly[Witness.Aux[FieldName]].value.name
     if (toFollow == newPath)
-      Some(new Cursor.Completed(newPath, objective))
+      Some(new Cursor.Completed(newPath, objective, objectiveAsString))
     else if (toFollow.startsWith(newPath))
       Some(new FollowingCursor(newPath, toFollow))
     else None

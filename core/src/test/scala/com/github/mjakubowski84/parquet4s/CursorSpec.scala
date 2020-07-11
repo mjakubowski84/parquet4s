@@ -53,6 +53,20 @@ class CursorSpec extends AnyFlatSpec with Matchers {
     paths should be(Some(DotPath("a.b.c"), DotPath("a.b.d"), DotPath("a.b.e")))
   }
 
+  it should "have a proper objective" in {
+    val c1 = Cursor.skipping(Seq.empty)
+    c1.objective should be(Set.empty)
+    c1.objectiveAsString should be("[]")
+
+    val c2 = Cursor.skipping(Seq("a"))
+    c2.objective should be(Set(List("a")))
+    c2.objectiveAsString should be("[a]")
+
+    val c3 = Cursor.skipping(Seq("a.b.c", "x.y.z"))
+    c3.objective should be(Set(List("a", "b", "c"), List("x", "y", "z")))
+    c3.objectiveAsString should be("[a.b.c, x.y.z]")
+  }
+
   "Following cursor" should "advance a path provided in the parameter and stop when it is reached" in {
     val (a, b, c, d) = ('a, 'b, 'c, 'd)
 
@@ -63,7 +77,8 @@ class CursorSpec extends AnyFlatSpec with Matchers {
     } yield cursorAtC
 
     cursorAtCOpt.map(_.path) should be(Some(DotPath("a.b.c")))
-    cursorAtCOpt.map(_.objective) should be(Some("a.b.c"))
+    cursorAtCOpt.map(_.objective) should be(Some(DotPath("a.b.c")))
+    cursorAtCOpt.map(_.objectiveAsString) should be(Some("a.b.c"))
     cursorAtCOpt.flatMap(_.advance[d.type]) should be(None)
   }
 
@@ -79,7 +94,8 @@ class CursorSpec extends AnyFlatSpec with Matchers {
     val emptyCursor = Cursor.following("")
 
     emptyCursor.advance[a.type] should be(None)
-    emptyCursor.objective should be("")
+    emptyCursor.objective should be(List(""))
+    emptyCursor.objectiveAsString should be("")
     emptyCursor.path should be(empty)
   }
 

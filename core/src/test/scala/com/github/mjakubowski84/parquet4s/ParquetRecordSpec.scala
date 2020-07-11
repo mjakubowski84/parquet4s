@@ -33,6 +33,19 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
     record.length should be(3)
   }
 
+  it should "succeed to add and retrieve a field using a path" in {
+    val record = RowParquetRecord.empty
+      .add("a", "a", vcc)
+      .add(List("x", "y", "z"), BinaryValue("xyz".getBytes))
+    record.get(List("a")) should be(BinaryValue("a".getBytes))
+    record.get(List("a", "b")) should be(NullValue)
+    record.get(List("k")) should be(NullValue)
+    record.get(List("x")) should be(RowParquetRecord.empty.add(List("y", "z"), BinaryValue("xyz".getBytes)))
+    record.get(List("x", "y")) should be(RowParquetRecord.empty.add("z", BinaryValue("xyz".getBytes)))
+    record.get(List("x", "y", "z")) should be(BinaryValue("xyz".getBytes))
+    record.length should be(2)
+  }
+
   it should "be updatable" in {
     val record = RowParquetRecord.empty.add("a", "a", vcc).add("b", "b", vcc).add("c", "c", vcc)
     record.update(0, BinaryValue("x".getBytes))
@@ -43,6 +56,45 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
     record.get[String]("a", vcc) should be("x")
     record.get[String]("z", vcc) should be("z")
     record.get[String]("c", vcc) should be("c")
+  }
+
+  it should "allow to remove fields by id" in {
+    val record = RowParquetRecord.empty.add("a", "a", vcc).add("b", "b", vcc).add("c", "c", vcc)
+    record.remove(2) should be(("c", BinaryValue("c".getBytes)))
+    record.remove(0) should be(("a", BinaryValue("a".getBytes)))
+    record.remove(0) should be(("b", BinaryValue("b".getBytes)))
+    an[IndexOutOfBoundsException] should be thrownBy record.remove(0)
+    record should be(empty)
+  }
+
+  it should "allow to remove fields by name" in {
+    val record = RowParquetRecord.empty.add("a", "a", vcc).add("b", "b", vcc).add("c", "c", vcc)
+    record.remove("c") should be(Some(BinaryValue("c".getBytes)))
+    record.remove("c") should be(None)
+    record should have size 2
+  }
+
+  it should "allow to remove fields by path" in {
+    def createRecord() = RowParquetRecord.empty
+      .add("a", "a", vcc)
+      .add(List("x", "y", "z"), BinaryValue("xyz".getBytes))
+
+    val r1 = createRecord()
+    val r2 = createRecord()
+    val r3 = createRecord()
+    val r4 = createRecord()
+
+    r1.remove(List("a")) should be(Some(BinaryValue("a".getBytes)))
+    r1 should be(RowParquetRecord.empty.add(List("x", "y", "z"), BinaryValue("xyz".getBytes)))
+
+    r2.remove(List("x")) should be(Some(RowParquetRecord.empty.add(List("y", "z"), BinaryValue("xyz".getBytes))))
+    r2 should be(RowParquetRecord.empty.add("a", "a", vcc))
+
+    r3.remove(List("x", "y")) should be(Some(RowParquetRecord.empty.add(List("z"), BinaryValue("xyz".getBytes))))
+    r3 should be(RowParquetRecord.empty.add("a", "a", vcc))
+
+    r4.remove(List("x", "y", "z")) should be(Some(BinaryValue("xyz".getBytes)))
+    r4 should be(RowParquetRecord.empty.add("a", "a", vcc))
   }
 
   "ListParquetRecord" should "indicate that is empty" in {

@@ -19,7 +19,7 @@ object PartitionLens {
 
   implicit val hnilLens: PartitionLens[HNil] = new PartitionLens[HNil] {
     override def apply(cursor: Cursor, obj: HNil): Either[LensError, String] =
-      Left(LensError(cursor, s"Field '${cursor.objective}' does not exist."))
+      Left(LensError(cursor, s"Field '${cursor.objectiveAsString}' does not exist."))
   }
 
   implicit def headValueLens[FieldName <: Symbol, Head, Tail <: HList](implicit
@@ -61,7 +61,7 @@ object PartitionLens {
       Right(field)
 
     override def onActive(cursor: Cursor, obj: String): Either[LensError, String] =
-      Left(LensError(cursor, s"Attempted to access child field '${cursor.objective}' from parent String."))
+      Left(LensError(cursor, s"Attempted to access child field '${cursor.objectiveAsString}' from parent String."))
   }
 
   private def defaultFieldVisitor[T]: FieldVisitor[T] = new FieldVisitor[T] {
@@ -74,9 +74,11 @@ object PartitionLens {
 
   def apply[T](obj: T, path: String)(implicit lens: PartitionLens[T]): (String, String) =
     lens.apply(Cursor.following(path), obj) match {
-      case Left(LensError(cursor, message)) =>
+      case Left(LensError(cursor, message)) if cursor.path.nonEmpty =>
         val cursorPath = cursor.path.mkString(".")
         throw new IllegalArgumentException(s"Invalid element at path '$cursorPath'. $message")
+      case Left(LensError(_, message)) =>
+        throw new IllegalArgumentException(s"Invalid path '$path'. $message")
       case Right(result) =>
         (path, result)
     }

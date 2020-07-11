@@ -4,8 +4,10 @@ import java.sql.Timestamp
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
+import com.github.mjakubowski84.parquet4s.Cursor.DotPath
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
+import org.apache.parquet.schema.MessageType
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Inspectors}
@@ -360,6 +362,53 @@ class ParquetStreamsITSpec
     } yield {
       writtenData should be(users)
       readData should be(users)
+    }
+  }
+
+  it should "write and read partitioned data using generic records" in {
+    import com.github.mjakubowski84.parquet4s.ValueImplicits._
+
+    case class User(name: String, address: Address)
+    case class Address(street: Street, country: String, postCode: String)
+    case class Street(name: String, more: String)
+
+    implicit val message: MessageType = ParquetSchemaResolver.resolveSchema[User]
+
+    val flow = ParquetStreams.viaParquet[RowParquetRecord](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withMaxCount(writeOptions.rowGroupSize)
+      .withMaxDuration(100.millis)
+      .withPartitionBy("address.country", "address.postCode")
+      .build()
+
+    val genericUsers = Seq(
+      RowParquetRecord.empty
+          .add("name", "John")
+          .add(DotPath("address.street.name"), "Broad St")
+          .add(DotPath("address.street.more"), "12")
+          .add(DotPath("address.country"), "ABC")
+          .add(DotPath("address.postCode"), "123456")
+    ).toStream
+
+    val expectedUsers = Seq(
+      User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456"))
+    )
+
+    val firstPartitionPath = tempPath.suffix("/address.country=ABC")
+    val secondPartitionPath = firstPartitionPath.suffix("/address.postCode=123456")
+
+    for {
+      writtenData <- Source(genericUsers).via(flow).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[RowParquetRecord](tempPathString).runWith(Sink.seq)
+      rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
+      firstPartitionFiles = fileSystem.listStatus(firstPartitionPath).map(_.getPath).toSeq
+      secondPartitionFiles = fileSystem.listStatus(secondPartitionPath).map(_.getPath.getName).toSeq
+    } yield {
+      rootFiles should be(Seq(firstPartitionPath))
+      firstPartitionFiles should be(Seq(secondPartitionPath))
+      every(secondPartitionFiles) should endWith(".snappy.parquet")
+      writtenData should be(genericUsers)
+      readData.map(ParquetRecordDecoder.decode[User](_)) should be(expectedUsers)
     }
   }
 
