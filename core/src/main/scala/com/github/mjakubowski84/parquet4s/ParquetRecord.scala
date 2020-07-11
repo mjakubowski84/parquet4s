@@ -1,9 +1,10 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.PartitionLens.LensError
 import org.apache.parquet.io.api.RecordConsumer
-import org.apache.parquet.schema.{MessageType, Type}
+import org.apache.parquet.schema.Type.Repetition
+import org.apache.parquet.schema.{GroupType, MessageType, Type}
 
-import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
@@ -55,11 +56,53 @@ object RowParquetRecord {
       override def encode(entity: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = entity
     }
   
-  implicit val genericParquetDecoder: ParquetRecordDecoder[RowParquetRecord] =
+  implicit val genericParquetRecordDecoder: ParquetRecordDecoder[RowParquetRecord] =
     new ParquetRecordDecoder[RowParquetRecord] {
       override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
     }
 
+  implicit val genericSkippingParquetRecordEncoder: SkippingParquetRecordEncoder[RowParquetRecord] =
+    new SkippingParquetRecordEncoder[RowParquetRecord] {
+      override def encode(cursor: Cursor, entity: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = {
+        cursor.objective match {
+          case paths: Set[Cursor.DotPath] => paths.foreach(entity.remove)
+        }
+        entity
+      }
+    }
+
+  implicit def genericSkippingParquetSchemaResolver(implicit message: MessageType): SkippingParquetSchemaResolver[RowParquetRecord] =
+    new SkippingParquetSchemaResolver[RowParquetRecord] {
+      override def schemaName: Option[String] = Option(message.getName)
+      override def resolveSchema(cursor: Cursor): List[Type] = skipFields(cursor, message.getFields.asScala.toList)
+
+      private def skipFields(cursor: Cursor, fields: List[Type]): List[Type] =
+        fields.flatMap {
+          case groupField: GroupType =>
+            val fieldSymbol = Symbol(groupField.getName)
+            cursor.advance[fieldSymbol.type].flatMap { newCursor =>
+              val fields = skipFields(newCursor, groupField.getFields.asScala.toList)
+              if (fields.isEmpty) None
+              else Some(GroupSchemaDef(fields, required = groupField.getRepetition == Repetition.REQUIRED)(groupField.getName))
+            }
+          case field =>
+            val fieldSymbol = Symbol(field.getName)
+            cursor.advance[fieldSymbol.type].map(_ => field)
+        }
+    }
+
+  implicit val genericPartitionLens: PartitionLens[RowParquetRecord] = new PartitionLens[RowParquetRecord] {
+    override def apply(cursor: Cursor, obj: RowParquetRecord): Either[PartitionLens.LensError, String] = {
+      cursor.objective match {
+        case path: Cursor.DotPath =>
+          obj.get(path) match {
+            case NullValue => Left(LensError(cursor, s"Field '${cursor.objectiveAsString}' does not exist."))
+            case BinaryValue(binary) => Right(binary.toStringUsingUTF8)
+            case _ => Left(LensError(cursor, "Only String field can be used for partitioning."))
+          }
+      }
+    }
+  }
 }
 
 /**
@@ -89,6 +132,12 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
   def add[T](name: String, value: T, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueCodec: ValueCodec[T]): This =
     add(name, valueCodec.encode(value, valueCodecConfiguration))
 
+  /**
+   * Adds a value at the given path. Creates intermediate records at the path if missing.
+   * @param path list of field names that form the path
+   * @param value value to be added at the end of path
+   * @return this record with value added
+   */
   def add(path: List[String], value: Value): This = {
     path match {
       case Nil =>
@@ -96,7 +145,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
       case name :: Nil =>
         this.add(name, value)
       case name :: tail =>
-        val subrecord = this.get(name) match {
+        val subRecord = this.get(name) match {
           case NullValue =>
             val newRecord = RowParquetRecord.empty
             this.add(name, newRecord)
@@ -106,7 +155,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
           case _ =>
             throw new IllegalArgumentException("Invalid path when setting value of nested record")
         }
-        subrecord.add(tail, value)
+        subRecord.add(tail, value)
         this
     }
   }
@@ -134,6 +183,24 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     */
   def get[T](fieldName: String, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueCodec: ValueCodec[T]): T =
     valueCodec.decode(get(fieldName), valueCodecConfiguration)
+
+  /**
+   *
+   * @param path list of field names that form a path
+   * @return value associated with given path or [[NullValue]] if no value is found
+   */
+  def get(path: List[String]): Value =
+    path match {
+      case Nil =>
+        NullValue
+      case fieldName :: Nil =>
+        get(fieldName)
+      case fieldName :: tail =>
+        get(fieldName) match {
+          case subRecord : RowParquetRecord => subRecord.get(tail)
+          case _ => NullValue
+        }
+    }
 
   override def iterator: Iterator[(String, Value)] = values.iterator
 
@@ -164,6 +231,51 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     *  @throws IndexOutOfBoundsException if the index is not valid.
     */
   def update(idx: Int, newVal: Value): Unit = values(idx) = values(idx).copy(_2 = newVal)
+
+  /**
+   * Removes field at given index.
+   * @param idx index of the field to be removed
+   * @return name of removed field and its value
+   * @throws IndexOutOfBoundsException if the index is not valid.
+   */
+  def remove(idx: Int): (String, Value) = {
+    val element = values.remove(idx)
+    lookupCache = null
+    element
+  }
+
+  /**
+   * Removes field of given name
+   * @param fieldName name of the field to be removed
+   * @return Some Value of the removed field or None if no such a field exists
+   */
+  def remove(fieldName: String): Option[Value] = {
+    val idx = indexWhere(_._1 == fieldName)
+    if (idx >= 0) Some(remove(idx)._2)
+    else None
+  }
+
+  /**
+   * Removes field at given path
+   * @param path list of field names that form the path
+   * @return Some value of the removed field ir None if path is invalid
+   */
+  def remove(path: List[String]): Option[Value] =
+    path match {
+      case Nil =>
+        None
+      case fieldName :: Nil =>
+        remove(fieldName)
+      case fieldName :: tail =>
+        get(fieldName) match {
+          case subRecord: RowParquetRecord =>
+            val valueOpt = subRecord.remove(tail)
+            if (subRecord.isEmpty) remove(fieldName)
+            valueOpt
+          case _ =>
+            None
+        }
+    }
 
   /**
     *
