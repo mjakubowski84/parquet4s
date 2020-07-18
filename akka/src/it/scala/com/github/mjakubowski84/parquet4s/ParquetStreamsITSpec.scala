@@ -13,6 +13,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Inspectors}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.collection.compat.immutable.LazyList
 import scala.collection.immutable
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -57,7 +58,7 @@ class ParquetStreamsITSpec
 
   val count: Int = 4 * writeOptions.rowGroupSize
   val dict: Seq[String] = Vector("a", "b", "c", "d")
-  val data: Stream[Data] = Stream
+  val data: LazyList[Data] = LazyList
     .range(start = 0L, end = count, step = 1L)
     .map(i => Data(i = i, s = dict(Random.nextInt(4))))
 

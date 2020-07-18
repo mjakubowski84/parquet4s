@@ -1,7 +1,8 @@
 import bloop.integrations.sbt.BloopDefaults
 
 
-lazy val supportedScalaVersions = Seq("2.11.12", "2.12.11", "2.13.3")
+lazy val supportedScalaVersions = Seq("2.11.12", "2.12.12", "2.13.3")
+lazy val fs2ScalaVersions = Seq("2.12.12", "2.13.3")
 
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "1.5.0-SNAPSHOT"
@@ -92,6 +93,16 @@ lazy val akka = (project in file("akka"))
   .settings(
     name := "parquet4s-akka",
     crossScalaVersions := supportedScalaVersions
+  )
+  .settings(itSettings)
+  .settings(publishSettings)
+  .dependsOn(core % "compile->compile;it->it")
+
+lazy val fs2 = (project in file("fs2"))
+  .configs(IntegrationTest)
+  .settings(
+    name := "parquet4s-fs2",
+    crossScalaVersions := fs2ScalaVersions
   )
   .settings(itSettings)
   .settings(publishSettings)
