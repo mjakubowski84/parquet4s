@@ -1,4 +1,4 @@
-package com.github.mjakubowski84.parquet4s.indefinite
+package com.github.mjakubowski84.parquet4s.akka.indefinite
 
 import net.manub.embeddedkafka.EmbeddedKafka
 

@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import java.io.File
-import java.net.URI
 
 import com.google.common.io.Files
 import org.apache.hadoop.conf.Configuration

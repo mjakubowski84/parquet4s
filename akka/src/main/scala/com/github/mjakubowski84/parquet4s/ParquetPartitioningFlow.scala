@@ -19,7 +19,14 @@ object ParquetPartitioningFlow {
   val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
   private val TimerKey = "ParquetPartitioningFlow.Rotation"
 
-  def builder[T](basePath: Path): Builder[T, T] = BuilderImpl(basePath)
+  def builder[T](basePath: Path): Builder[T, T] = BuilderImpl(
+    basePath = basePath,
+    maxCount = DefaultMaxCount,
+    maxDuration = DefaultMaxDuration,
+    preWriteTransformation = identity,
+    partitionBy = Seq.empty,
+    writeOptions = ParquetWriter.Options()
+  )
 
   /**
    * Builds an instance [[ParquetPartitioningFlow]]
@@ -82,11 +89,11 @@ object ParquetPartitioningFlow {
 
   private case class BuilderImpl[T, W](
                                         basePath: Path,
-                                        maxCount: Long = DefaultMaxCount,
-                                        maxDuration: FiniteDuration = DefaultMaxDuration,
-                                        preWriteTransformation: T => W = identity[T] _,
-                                        partitionBy: Seq[String]  = Seq.empty,
-                                        writeOptions: ParquetWriter.Options = ParquetWriter.Options()
+                                        maxCount: Long,
+                                        maxDuration: FiniteDuration,
+                                        preWriteTransformation: T => W,
+                                        partitionBy: Seq[String],
+                                        writeOptions: ParquetWriter.Options
                                       ) extends Builder[T, W] {
 
     def withMaxCount(maxCount: Long): Builder[T, W] = copy(maxCount = maxCount)
@@ -146,7 +153,7 @@ private class ParquetPartitioningFlow[T, W](
         new Path(path, s"$key=$value")
     }
 
-    private def compressionExtension = writeOptions.compressionCodecName.getExtension
+    private def compressionExtension: String = writeOptions.compressionCodecName.getExtension
     private def newFileName: String = UUID.randomUUID().toString + compressionExtension + ".parquet"
 
     private def write(msg: T): Unit = {

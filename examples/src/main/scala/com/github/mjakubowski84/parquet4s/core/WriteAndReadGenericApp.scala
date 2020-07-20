@@ -14,7 +14,7 @@ object WriteAndReadGenericApp extends App {
   val ID = "id"
   val Name = "name"
   val Birthday = "birthday"
-  val Schema = "user_schema"
+  val SchemaName = "user_schema"
 
   val path = Files.createTempDir().getAbsolutePath
   val vcc = ValueCodecConfiguration(TimeZone.getTimeZone(ZoneOffset.UTC))
@@ -35,7 +35,7 @@ object WriteAndReadGenericApp extends App {
     .addField(Types.primitive(INT64, REQUIRED).as(OriginalType.INT_64).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(OriginalType.UTF8).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(OriginalType.DATE).named(Birthday))
-    .named(Schema)
+    .named(SchemaName)
 
   ParquetWriter.writeAndClose(s"$path/users.parquet", users)
 

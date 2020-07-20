@@ -1,4 +1,4 @@
-package com.github.mjakubowski84.parquet4s.indefinite
+package com.github.mjakubowski84.parquet4s.akka.indefinite
 
 import akka.actor.{Actor, ActorRef, Cancellable, Props, Scheduler}
 import akka.pattern.ask
@@ -74,7 +74,7 @@ private class FluctuatingSchedulerActor(action: () => Unit) extends Actor {
     case ScheduleNext =>
       action()
 
-      val rate = Random.nextFloat / 10.0f
+      val rate = Random.nextFloat() / 10.0f
       val step = (delay.toMillis * rate).millis
       val (newDirection, newDelay) = direction match {
         case Up if delay + step < MaxDelay =>

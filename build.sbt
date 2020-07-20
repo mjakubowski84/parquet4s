@@ -7,7 +7,7 @@ lazy val fs2ScalaVersions = Seq("2.12.12", "2.13.3")
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "1.5.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
-ThisBuild / scalaVersion := "2.11.12"
+ThisBuild / scalaVersion := "2.13.3"
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8")
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature")
 ThisBuild / resolvers := Seq(
@@ -111,11 +111,11 @@ lazy val fs2 = (project in file("fs2"))
 lazy val examples = (project in file("examples"))
   .settings(
     name := "parquet4s-examples",
-    crossScalaVersions := supportedScalaVersions,
+    crossScalaVersions := fs2ScalaVersions,
     publish / skip := true,
     publishLocal / skip := true
   )
-  .dependsOn(akka)
+  .dependsOn(akka, fs2)
 
 lazy val root = (project in file("."))
   .settings(publishSettings)
@@ -124,4 +124,4 @@ lazy val root = (project in file("."))
     publish / skip := true,
     publishLocal / skip := true
   )
-  .aggregate(core, akka, examples)
+  .aggregate(core, akka, fs2, examples)

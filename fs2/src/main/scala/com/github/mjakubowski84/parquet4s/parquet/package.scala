@@ -1,80 +1,128 @@
 package com.github.mjakubowski84.parquet4s
 
-import cats.effect.{Resource, Sync}
-import fs2.{Chunk, Pipe, Pull, Stream}
-import org.apache.hadoop.fs.Path
-import cats.implicits._
-import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
+import java.util.concurrent.TimeUnit
 
+import cats.effect.{Blocker, Concurrent, ContextShift, Sync, Timer}
+import fs2.{Pipe, Stream}
+import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
+
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
 package object parquet {
 
-  private class Writer[T, F[_]](internalWriter: ParquetWriter.InternalWriter, encode: T => RowParquetRecord)
-                               (implicit F: Sync[F]) extends AutoCloseable {
+  val DefaultMaxCount: Long = HadoopParquetWriter.DEFAULT_BLOCK_SIZE
+  val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
 
-    def write(elem: T): F[Writer[T, F]] =
-      for {
-        record <- F.delay(encode(elem))
-        _ <- F.delay(internalWriter.write(record))
-      } yield this
+  def read[T: ParquetRecordDecoder, F[_]: Sync: ContextShift](blocker: Blocker,
+                                                              path: String,
+                                                              options: ParquetReader.Options = ParquetReader.Options(),
+                                                              filter: Filter = Filter.noopFilter
+                                                             ): Stream[F, T] =
+    reader.read(blocker, path, options, filter)
 
-    def writePull(chunk: Chunk[T]): Pull[F, Nothing, Writer[T, F]] =
-      Pull.eval(chunk.foldM(this)(_.write(_)))
 
-    def writeAll(in: Stream[F, T]): Pull[F, Nothing, Writer[T, F]] = {
-      in.pull.uncons.flatMap {
-        case Some((chunk, tail)) => writePull(chunk).flatMap(_.writeAll(tail))
-        case None                => Pull.pure(this)
-      }
-    }
+  def writeSingleFile[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: Sync: ContextShift](blocker: Blocker,
+                                                                                                  path: String,
+                                                                                                  options: ParquetWriter.Options = ParquetWriter.Options()
+                                                                                                 ): Pipe[F, T, Unit] =
+    writer.write(blocker, path, options)
 
-    override def close(): Unit = internalWriter.close()
-  }
-
-  private def writerResource[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]](path: String, options: ParquetWriter.Options)
-                                                                                    (implicit F: Sync[F]): Resource[F, Writer[T, F]] =
-      Resource.fromAutoCloseable(
-        for {
-          valueCodecConfiguration <- F.delay(options.toValueCodecConfiguration)
-          schema <- F.delay(ParquetSchemaResolver.resolveSchema[T])
-          internalWriter <- F.delay(ParquetWriter.internalWriter(new Path(path), schema, options))
-          encode = { (entity: T) => ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration) }
-        } yield new Writer[T, F](internalWriter, encode)
-      )
-
-  def writeSingleFile[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: Sync](path: String,
-                                                                                    options: ParquetWriter.Options = ParquetWriter.Options()
-                                                                                   ): Pipe[F, T, Unit] =
-    in =>
-      Stream
-        .resource(writerResource[T, F](path, options))
-        .flatMap(_.writeAll(in).void.stream)
-
-  private def readerResource[F[_]](path: String,
-                             options: ParquetReader.Options,
-                             filter: Filter
-                            )(implicit F: Sync[F]): Resource[F, HadoopParquetReader[RowParquetRecord]] =
-    Resource.fromAutoCloseable(
-      F.delay(
-        HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(), new Path(path))
-          .withConf(options.hadoopConf)
-          .withFilter(filter.toFilterCompat(options.toValueCodecConfiguration))
-          .build())
+  def viaParquet[F[_], T]: Builder[F, T, T] =
+    BuilderImpl[F, T, T](
+      maxCount = DefaultMaxCount,
+      maxDuration = DefaultMaxDuration,
+      preWriteTransformation = t => Stream.emit(t),
+      partitionBy = Seq.empty,
+      writeOptions = ParquetWriter.Options()
     )
 
-  def read[T: ParquetRecordDecoder, F[_]: Sync](
-                                                 path: String,
-                                                 options: ParquetReader.Options = ParquetReader.Options(),
-                                                 filter: Filter = Filter.noopFilter
-                                   ): Stream[F, T] = {
-    val vcc = options.toValueCodecConfiguration
-    val decode = (record: RowParquetRecord) => Sync[F].delay(ParquetRecordDecoder.decode(record, vcc))
-    Stream.resource(readerResource(path, options, filter)).flatMap { reader =>
-      Stream.unfoldEval(reader) { r =>
-        Sync[F].delay(r.read()).map(record => Option(record).map((_, r)))
-      }.evalMap(decode)
-    }
+
+  trait Builder[F[_], T, W] {
+    /**
+     * @param maxCount max number of records to be written before file rotation
+     */
+    def maxCount(maxCount: Long): Builder[F, T, W]
+    /**
+     * @param maxDuration max time after which partition file is rotated
+     */
+    def maxDuration(maxDuration: FiniteDuration): Builder[F, T, W]
+    /**
+     * @param writeOptions writer options used by the flow
+     */
+    def options(writeOptions: ParquetWriter.Options): Builder[F, T, W]
+    /**
+     * Sets partition paths that stream partitions data by. Can be empty.
+     * Partition path can be a simple string column (e.g. "color") or a dot-separated path pointing nested string field
+     * (e.g. "user.address.postcode"). Partition path is used to extract data from the entity and to create
+     * a tree of subdirectories for partitioned files. Using aforementioned partitions effects in creation
+     * of (example) following tree:
+     * {{{
+     * ../color=blue
+     *      /user.address.postcode=XY1234/
+     *      /user.address.postcode=AB4321/
+     *   /color=green
+     *      /user.address.postcode=XY1234/
+     *      /user.address.postcode=CV3344/
+     *      /user.address.postcode=GH6732/
+     * }}}
+     * Take <b>note</b>:
+     * <ol>
+     *   <li>PartitionBy must point a string field.</li>
+     *   <li>Partitioning removes partition fields from the schema. Data is stored in name of subdirectory
+     *       instead of Parquet file.</li>
+     *   <li>Partitioning cannot end in having empty schema. If you remove all fields of the message you will
+     *       get an error.</li>
+     *   <li>Partitioned directories can be filtered effectively during reading.</li>
+     * </ol>
+     * @param partitionBy partition paths
+     */
+    def partitionBy(partitionBy: String*): Builder[F, T, W]
+    /**
+     * @param transformation function that is called by stream in order to obtain Parquet schema. Identity by default.
+     * @tparam X Schema type
+     */
+    def withPreWriteTransformation[X](transformation: T => Stream[F, X]): Builder[F, T, X]
+    /**
+     * Builds final writer.
+     */
+    def write(blocker: Blocker, basePath: String)(implicit
+                                                  schemaResolver: SkippingParquetSchemaResolver[W],
+                                                  encoder: ParquetRecordEncoder[W],
+                                                  sync: Sync[F],
+                                                  timer : Timer[F],
+                                                  concurrent: Concurrent[F],
+                                                  contextShift: ContextShift[F]): Pipe[F, T, T]
   }
 
+  private case class BuilderImpl[F[_], T, W](
+                                             maxCount: Long,
+                                             maxDuration: FiniteDuration,
+                                             preWriteTransformation: T => Stream[F, W],
+                                             partitionBy: Seq[String],
+                                             writeOptions: ParquetWriter.Options
+                                            ) extends Builder[F, T, W] {
+
+    override def maxCount(maxCount: Long): Builder[F, T, W] = copy(maxCount = maxCount)
+    override def maxDuration(maxDuration: FiniteDuration): Builder[F, T, W] = copy(maxDuration = maxDuration)
+    override def options(writeOptions: ParquetWriter.Options): Builder[F, T, W] = copy(writeOptions = writeOptions)
+    override def partitionBy(partitionBy: String*): Builder[F, T, W] = copy(partitionBy = partitionBy)
+    override def write(blocker: Blocker, basePath: String)(implicit
+                                                           schemaResolver: SkippingParquetSchemaResolver[W],
+                                                           encoder: ParquetRecordEncoder[W],
+                                                           sync: Sync[F],
+                                                           timer : Timer[F],
+                                                           concurrent: Concurrent[F],
+                                                           contextShift: ContextShift[F]): Pipe[F, T, T] =
+      rotatingWriter.write[F, T, W](blocker, basePath, maxCount, maxDuration, partitionBy, preWriteTransformation ,writeOptions)
+
+    override def withPreWriteTransformation[X](transformation: T => Stream[F, X]): Builder[F, T, X] =
+      BuilderImpl(
+        maxCount = maxCount,
+        maxDuration = maxDuration,
+        preWriteTransformation = transformation,
+        partitionBy = partitionBy,
+        writeOptions = writeOptions
+      )
+  }
 }
