@@ -111,7 +111,7 @@ class IOOpsSpec
     fileSystem.mkdirs(path1)
     fileSystem.mkdirs(path2)
 
-    findPartitionedPaths(tempPath, configuration) should be a 'Left
+    findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
   }
 
   it should "fail to create partitions from inconsistent directory [case2]" in {
@@ -121,7 +121,7 @@ class IOOpsSpec
     fileSystem.mkdirs(path2)
     fileSystem.create(path2.suffix("/not_in_a_leaf.file"))
 
-    findPartitionedPaths(tempPath, configuration) should be a 'Left
+    findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
   }
 
 }

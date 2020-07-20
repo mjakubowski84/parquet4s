@@ -86,7 +86,7 @@ trait IOOps {
     val (dirs, files) = fs.listStatus(path).toList.partition(_.isDirectory)
     if (dirs.nonEmpty && files.nonEmpty)
       Left(path :: Nil) // path is invalid because it contains both dirs and files
-    else {
+    else { // TODO do not return leaf nodes that are empty
       val partitionedDirs = dirs.flatMap(matchPartition)
       if (partitionedDirs.isEmpty)
         Right(List(PartitionedPath(path, partitions))) // leaf dir

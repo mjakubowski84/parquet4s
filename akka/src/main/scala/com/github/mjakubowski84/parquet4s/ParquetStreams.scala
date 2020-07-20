@@ -74,7 +74,6 @@ object ParquetStreams {
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     *
-    * @deprecated In the future only [[viaParquet]] and [[toParquetSingleFile]] may be only supported writers
     * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
     * @param maxRecordsPerFile the maximum size of file
     * @param options set of options that define how Parquet files will be created
@@ -82,6 +81,10 @@ object ParquetStreams {
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     * @return The sink that writes Parquet files
     */
+  @deprecated(
+    message = "In the future only viaParquet and toParquetSingleFile may be only supported writers",
+    since = "1.4.0"
+  )
   def toParquetSequentialWithFileSplit[T: ParquetRecordEncoder : ParquetSchemaResolver](path: String,
                                                                                         maxRecordsPerFile: Long,
                                                                                         options: ParquetWriter.Options = ParquetWriter.Options()
@@ -96,7 +99,6 @@ object ParquetStreams {
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     *
-    * @deprecated In the future only [[viaParquet]] and [[toParquetSingleFile]] may be only supported writers
     * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
     * @param parallelism defines how many files are created and how many parallel threads are responsible for it
     * @param options set of options that define how Parquet files will be created
@@ -104,6 +106,10 @@ object ParquetStreams {
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     * @return The sink that writes Parquet files
     */
+  @deprecated(
+    message = "In the future only viaParquet and toParquetSingleFile may be only supported writers",
+    since = "1.4.0"
+  )
   def toParquetParallelUnordered[T: ParquetRecordEncoder : ParquetSchemaResolver](path: String,
                                                                                   parallelism: Int,
                                                                                   options: ParquetWriter.Options = ParquetWriter.Options()

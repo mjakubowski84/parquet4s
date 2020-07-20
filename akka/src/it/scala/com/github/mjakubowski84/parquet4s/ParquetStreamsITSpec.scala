@@ -278,7 +278,7 @@ class ParquetStreamsITSpec
 
     val users = Seq(
       User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456"))
-    ).toStream
+    ).toList
 
     val firstPartitionPath = tempPath.suffix("/address.country=ABC")
     val secondPartitionPath = firstPartitionPath.suffix("/address.postCode=123456")
@@ -312,7 +312,7 @@ class ParquetStreamsITSpec
 
     val users = Seq(
       User(name = "John", address = Address("123456", "ABC"))
-    ).toStream
+    ).toList
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
@@ -334,7 +334,7 @@ class ParquetStreamsITSpec
       .withPartitionBy("name")
       .build()
 
-    val users = Seq(User(name = "John")).toStream
+    val users = Seq(User(name = "John")).toList
 
     val fut = Source(users).via(flow).runWith(Sink.ignore)
     recoverToSucceededIf[org.apache.parquet.schema.InvalidSchemaException](fut)
@@ -355,7 +355,7 @@ class ParquetStreamsITSpec
       User(name = "John", address = Address("123456", "ABC")),
       User(name = "Ben", address = Address("111111", "CDE")),
       User(name = "Cynthia", address = Address("7654321", "XYZ"))
-    ).toStream
+    ).toList
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
@@ -389,7 +389,7 @@ class ParquetStreamsITSpec
           .add(DotPath("address.street.more"), "12")
           .add(DotPath("address.country"), "ABC")
           .add(DotPath("address.postCode"), "123456")
-    ).toStream
+    ).toList
 
     val expectedUsers = Seq(
       User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456"))
