@@ -15,7 +15,7 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x.
 ## Tutorial
 
 1. [Quick Start](#quick-start)
-1. [S3](#s3)
+1. [AWS S3](#aws-s3)
 1. [Akka Streams](#akka-streams)
 1. [Before-read filtering or filter pushdown](#before-read-filtering-or-filter-pushdown)
 1. [Supported storage types](#supported-storage-types)
@@ -31,8 +31,8 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x.
 
 ```scala
 libraryDependencies ++= Seq(
-  "com.github.mjakubowski84" %% "parquet4s-core" % "1.3.1",
-  "org.apache.hadoop" % "hadoop-client" % "2.6.0",
+  "com.github.mjakubowski84" %% "parquet4s-core" % "1.4.0",
+  "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 )
 ```
 
@@ -40,8 +40,8 @@ libraryDependencies ++= Seq(
 
 ```scala
 def ivyDeps = Agg(
-  ivy"com.github.mjakubowski84::parquet4s-core:1.3.1",
-  ivy"org.apache.hadoop:hadoop-client:2.6.0"
+  ivy"com.github.mjakubowski84::parquet4s-core:1.4.0",
+  ivy"org.apache.hadoop:hadoop-client:$yourHadoopVersion"
 )
 ```
 
@@ -67,7 +67,7 @@ try {
 
 ## AWS S3
 
-In order to connect to AWS S3 you need to import:
+In order to connect to AWS S3 you need to define one more dependency:
 
 ```scala
 "org.apache.hadoop" % "hadoop-aws" % yourHadoopVersion
@@ -92,6 +92,7 @@ Parquet4S has an integration module that allows you to read and write Parquet fi
 
 ```scala
 "com.github.mjakubowski84" %% "parquet4s-akka" % "1.4.0"
+"org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
 Parquet4S has so far a single `Source` for reading single file or directory and **four** `Sink`s for writing. Choose one that suits you most.
@@ -205,6 +206,8 @@ As it is based on Hadoop Client, Parquet4S can read and write from a variety of 
 - Google Storage
 - Azure
 - OpenStack
+
+Please refer to Hadoop Client documentation or your storage provider to check how to connect to your storage.
 
 ## Supported types
 
