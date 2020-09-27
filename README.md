@@ -8,15 +8,16 @@ Compatible with files generated with Apache Spark. However, unlike in Spark, you
 
 Based on official Parquet library, Hadoop Client and Shapeless.
 
-Integration for Akka Streams.
+Integrations for Akka Streams and FS2.
 
-Released for Scala 2.11.x, 2.12.x and 2.13.x.
+Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2.12.x and 2.13.x.
 
 ## Tutorial
 
 1. [Quick Start](#quick-start)
 1. [AWS S3](#aws-s3)
 1. [Akka Streams](#akka-streams)
+1. [FS2](#FS2)
 1. [Before-read filtering or filter pushdown](#before-read-filtering-or-filter-pushdown)
 1. [Supported storage types](#supported-storage-types)
 1. [Supported types](#supported-types)
@@ -31,7 +32,7 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x.
 
 ```scala
 libraryDependencies ++= Seq(
-  "com.github.mjakubowski84" %% "parquet4s-core" % "1.4.0",
+  "com.github.mjakubowski84" %% "parquet4s-core" % "1.5.0",
   "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 )
 ```
@@ -40,7 +41,7 @@ libraryDependencies ++= Seq(
 
 ```scala
 def ivyDeps = Agg(
-  ivy"com.github.mjakubowski84::parquet4s-core:1.4.0",
+  ivy"com.github.mjakubowski84::parquet4s-core:1.5.0",
   ivy"org.apache.hadoop:hadoop-client:$yourHadoopVersion"
 )
 ```
@@ -88,14 +89,14 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 
 ## Akka Streams
 
-Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams! Just import it:
+Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams. Just import:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "1.4.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "1.5.0"
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
-Parquet4S has so far a single `Source` for reading single file or directory and **four** `Sink`s for writing. Choose one that suits you most.
+Parquet4S has so far a single `Source` for reading single file or directory and `Sink`s for writing.
 
 ```scala
 import com.github.mjakubowski84.parquet4s.{ParquetStreams, ParquetWriter}
@@ -109,8 +110,8 @@ import scala.concurrent.duration._
 
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
-implicit val system: ActorSystem =  ActorSystem()
-implicit val materializer: Materializer =  ActorMaterializer()
+implicit val system: ActorSystem = ActorSystem()
+implicit val materializer: Materializer = ActorMaterializer()
 
 val users: Iterable[User] = ???
 
@@ -126,24 +127,6 @@ val writeOptions = ParquetWriter.Options(
 // Writes a single file.
 Source(users).runWith(ParquetStreams.toParquetSingleFile(
   path = "file:///data/users/user-303.parquet",
-  options = writeOptions
-))
-
-// Sequentially splits data into files of 'maxRecordsPerFile'.
-// Recommended to use in environments with limitted available resources.
-Source(users).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
-  path = "file:///data/users",
-  // will create files consisting of max 2 row groups
-  maxRecordsPerFile = 2 * writeOptions.rowGroupSize,
-  options = writeOptions
-))
-
-// Writes files in parallel in number equal to 'parallelism'.
-// Recommended to use in order to achieve better performance under condition that
-// file order does not have to be preserved.
-Source(users).runWith(ParquetStreams.toParquetParallelUnordered(
-  path = "file:///data/users",
-  parallelism = 4,
   options = writeOptions
 ))
 
@@ -167,9 +150,20 @@ ParquetStreams.fromParquet[User](
 ).runForeach(println)
 ```
 
+## FS2
+
+FS2 integration allows you to read and write Parquet using function streams. In order to use it please import:
+
+```scala
+"com.github.mjakubowski84" %% "parquet4s-fs2" % "1.5.0"
+"org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
+```
+
+Please check [examples](./examples/src/main/scala/com/github/mjakubowski84/parquet4s/fs2) to learn more.
+
 ## Before-read filtering or filter pushdown
 
-One of the best features of Parquet is efficient way of fitering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Since version 0.10.0 Parquet4S allows do define filter predicates both in core and akka module in order to push filtering out from Scala collections or Akka Stream down to point before file content is even read.
+One of the best features of Parquet is efficient way of fitering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Parquet4S allows do define filter predicates in all modules in order to push filtering out from Scala collections and Akka or FS2 Stream down to point before file content is even read.
 
 You define you filters using simple algebra as follows.
 
@@ -248,7 +242,7 @@ Complex types can be arbitrarily nested.
 
 You may want to not use strict schema and process your data in a generic way. Since version 1.2.0 Parquet4S has rich API that allows to build, transform, write and read Parquet records in easy way. Each implementation of  `ParquetRecord` is Scala `Iterable` and a mutable collection. You can execute operations on `RowParquetRecord` and `ListParquetRecord` as on mutable `Seq` and you can treat `MapParquetRecord` as mutable `Map`. Moreover, records received addition functions like `get` and `add` (and more) that take implicit `ValueCodec` and allow to read and modify records using regular Scala types.  There is default `ParquetRecordEndcoder`, `ParquetRecordDecoder` and `ParquetSchemaResolver` for  `RowParquetRecord` so reading Parquet in a generic way works out of the box! In order to write you still need to provide a schema in form of Parquet's `MessageType`.
 
-Funcionality is available both in core and Akka module. See [examples](https://github.com/mjakubowski84/parquet4s/blob/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/core/WriteAndReadGenericApp.scala).
+Funcionality is available in all modules. See [examples](https://github.com/mjakubowski84/parquet4s/blob/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/core/WriteAndReadGenericApp.scala).
 
 ## Customisation and Extensibility
 
@@ -293,9 +287,9 @@ implicit val customTypeSchema: TypedSchemaDef[CustomType] =
 
 ## More Examples
 
-Please check [examples](./examples) where you can find simple code covering basics both for `core` and `akka` modules.
+Please check [examples](./examples) where you can find simple code covering basics both for `core`, `akka` and `fs2` modules.
 
-Moreover, examples contain a simple application of lib comprising Akka Streams and Kafka. It shows how you can write partitioned Parquet files with data coming from an indefinite stream.
+Moreover, examples contain two simple applications comprising Akka Streams or FS2 and Kafka. It shows how you can write partitioned Parquet files with data coming from an indefinite stream.
 
 ## Contributing
 
