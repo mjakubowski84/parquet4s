@@ -8,7 +8,7 @@ import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
 import org.apache.parquet.io.api._
 import org.apache.parquet.schema._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 
 private[parquet4s] class ParquetReadSupport extends ReadSupport[RowParquetRecord] {

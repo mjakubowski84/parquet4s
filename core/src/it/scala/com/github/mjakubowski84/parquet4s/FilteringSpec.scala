@@ -10,6 +10,8 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Inspectors}
 
 import scala.util.Random
+import scala.collection.compat._
+import immutable.LazyList
 
 class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
 
@@ -36,8 +38,8 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
     override def compare(x: LocalDate, y: LocalDate): Int = x.compareTo(y)
   }
 
-  def data: Stream[Data] =
-    Stream.range(0, dataSize).map { i =>
+  def data: LazyList[Data] =
+    LazyList.range(0, dataSize).map { i =>
       Data(
         idx = i,
         float = (BigDecimal("0.01") * BigDecimal(i)).toFloat,

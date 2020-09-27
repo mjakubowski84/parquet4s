@@ -95,14 +95,14 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns testRecord(1)
 
-    newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator.next should be(TestRow(1))
+    newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator.next() should be(TestRow(1))
   }
 
   it should "throw NoSuchElementException for empty resource" in {
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns null
 
-    a[NoSuchElementException] should be thrownBy newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator.next
+    a[NoSuchElementException] should be thrownBy newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator.next()
   }
 
   it should "try to read record only once in case of sequential calls for missing record" in {
@@ -110,9 +110,9 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     reader.read() returns null
 
     val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
-    a[NoSuchElementException] should be thrownBy iterator.next
-    a[NoSuchElementException] should be thrownBy iterator.next
-    a[NoSuchElementException] should be thrownBy iterator.next
+    a[NoSuchElementException] should be thrownBy iterator.next()
+    a[NoSuchElementException] should be thrownBy iterator.next()
+    a[NoSuchElementException] should be thrownBy iterator.next()
 
     reader.read() wasCalled once
   }
@@ -122,10 +122,10 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     reader.read() returns testRecord(1) andThen testRecord(2) andThen testRecord(3) andThen null
 
     val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
-    iterator.next should be(TestRow(1))
-    iterator.next should be(TestRow(2))
-    iterator.next should be(TestRow(3))
-    a[NoSuchElementException] should be thrownBy iterator.next
+    iterator.next() should be(TestRow(1))
+    iterator.next() should be(TestRow(2))
+    iterator.next() should be(TestRow(3))
+    a[NoSuchElementException] should be thrownBy iterator.next()
   }
 
   it should "not call 'read' if 'hasNext' already did it (and throw exception)" in {
@@ -134,7 +134,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
 
     val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
     iterator.hasNext should be(false)
-    a[NoSuchElementException] should be thrownBy iterator.next
+    a[NoSuchElementException] should be thrownBy iterator.next()
 
     reader.read() wasCalled once
   }
@@ -145,7 +145,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
 
     val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
     iterator.hasNext should be(true)
-    iterator.next should be(TestRow(1))
+    iterator.next() should be(TestRow(1))
 
     reader.read() wasCalled once
   }
@@ -156,9 +156,9 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
 
     val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
     iterator.hasNext should be(true)
-    iterator.next should be(TestRow(1))
+    iterator.next() should be(TestRow(1))
     iterator.hasNext should be(false)
-    a[NoSuchElementException] should be thrownBy iterator.next
+    a[NoSuchElementException] should be thrownBy iterator.next()
 
     reader.read() wasCalled twice
   }
@@ -169,11 +169,11 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
 
     val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
     iterator.hasNext should be(true)
-    iterator.next should be(TestRow(1))
+    iterator.next() should be(TestRow(1))
     iterator.hasNext should be(true)
-    iterator.next should be(TestRow(2))
+    iterator.next() should be(TestRow(2))
     iterator.hasNext should be(false)
-    a[NoSuchElementException] should be thrownBy iterator.next
+    a[NoSuchElementException] should be thrownBy iterator.next()
 
     reader.read() wasCalled 3.times
   }

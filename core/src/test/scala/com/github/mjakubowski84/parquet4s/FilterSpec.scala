@@ -42,7 +42,7 @@ class FilterSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "build in predicate with varargs" in {
-    val predicate = (Col("i") in(1, 2, 3)).toPredicate(valueCodecConfiguration)
+    val predicate = Col("i").in(1, 2, 3).toPredicate(valueCodecConfiguration)
     predicate.toString should be("userdefinedbyinstance(i, in(1, 2, 3))")
   }
 

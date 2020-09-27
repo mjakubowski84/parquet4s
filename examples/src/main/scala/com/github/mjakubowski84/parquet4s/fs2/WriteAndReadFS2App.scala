@@ -25,7 +25,7 @@ object WriteAndReadFS2App extends IOApp {
       _ <- Stream.range[IO](start = 0, stopExclusive = Count)
         .map { i => Data(id = i, text = Random.nextString(4)) }
         .through(writeSingleFile(blocker, path.resolve("data.parquet").toString))
-        .append(read[Data, IO](blocker, path.toString).showLinesStdOut.drain)
+        .append(read[IO, Data](blocker, path.toString).showLinesStdOut.drain)
     } yield ()
 
     stream.compile.drain.as(ExitCode.Success)

@@ -6,7 +6,7 @@ libraryDependencies ++= Seq(
   "com.chuusai" %% "shapeless" % "2.3.3",
   "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
   "org.slf4j" % "slf4j-api" % slf4jVersion,
-  "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.6",
+  "org.scala-lang.modules" %% "scala-collection-compat" % "2.2.0",
 
   // tests
   "org.mockito" %% "mockito-scala-scalatest" % "1.13.11" % "test",
