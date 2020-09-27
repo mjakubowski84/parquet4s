@@ -10,6 +10,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Inspectors}
 
+import scala.collection.compat._
+import immutable.LazyList
 import scala.util.Random
 
 class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
@@ -46,8 +48,8 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
     override def compare(x: Date, y: Date): Int = x.compareTo(y)
   }
 
-  def data: Stream[Data] =
-    Stream.range(0, dataSize).map { i =>
+  def data: LazyList[Data] =
+    LazyList.range(0, dataSize).map { i =>
       Data(
         idx = i,
         short = (i % Short.MaxValue).toShort,
@@ -65,7 +67,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
       )
     }
 
-  def everyOtherDatum: Stream[Data] = data.filter(_.idx % 2 == 0)
+  def everyOtherDatum: LazyList[Data] = data.filter(_.idx % 2 == 0)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -126,7 +128,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
   it should "filter data by a list of embedded values" in genericFilterTest("embedded.x", _.idx)
 
   it should "filter data by a hard-coded list of values" in {
-    val filteredRecords = ParquetReader.read[Data](filePath, filter = Col("idx") in(1, 2, 3))
+    val filteredRecords = ParquetReader.read[Data](filePath, filter = Col("idx").in(1, 2, 3))
     try {
       filteredRecords.size should equal(3)
       filteredRecords.map(_.idx) should contain allOf(1, 2, 3)
@@ -134,7 +136,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
   }
 
   it should "reject an empty set of keys" in {
-    a[IllegalArgumentException] should be thrownBy (Col("idx") in(Seq.empty:_*))
+    a[IllegalArgumentException] should be thrownBy Col("idx").in(Seq.empty:_*)
     a[IllegalArgumentException] should be thrownBy (Col("idx") in Set.empty[Int])
   }
 }
