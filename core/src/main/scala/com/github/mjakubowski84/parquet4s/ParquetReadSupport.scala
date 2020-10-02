@@ -11,7 +11,8 @@ import org.apache.parquet.schema._
 import scala.jdk.CollectionConverters._
 
 
-private[parquet4s] class ParquetReadSupport extends ReadSupport[RowParquetRecord] {
+private[parquet4s] class ParquetReadSupport(projectedSchemaOpt: Option[MessageType] = None)
+  extends ReadSupport[RowParquetRecord] {
 
   override def prepareForRead(
                                configuration: Configuration,
@@ -19,9 +20,10 @@ private[parquet4s] class ParquetReadSupport extends ReadSupport[RowParquetRecord
                                fileSchema: MessageType,
                                readContext: ReadSupport.ReadContext
                              ): RecordMaterializer[RowParquetRecord] =
-    new ParquetRecordMaterializer(fileSchema)
+    new ParquetRecordMaterializer(readContext.getRequestedSchema)
 
-  override def init(context: InitContext): ReadSupport.ReadContext = new ReadSupport.ReadContext(context.getFileSchema)
+  override def init(context: InitContext): ReadSupport.ReadContext =
+    new ReadSupport.ReadContext(projectedSchemaOpt.foldLeft(context.getFileSchema)(ReadSupport.getSchemaForRead))
 
 }
 
@@ -36,10 +38,10 @@ private class ParquetRecordMaterializer(schema: MessageType) extends RecordMater
 }
 
 private abstract class ParquetRecordConverter[R <: ParquetRecord[_]](
-                                                           schema: GroupType,
-                                                           name: Option[String],
-                                                           parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_]]]
-                                                         ) extends GroupConverter {
+                                                                     schema: GroupType,
+                                                                     name: Option[String],
+                                                                     parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_]]]
+                                                                   ) extends GroupConverter {
 
   protected var record: R = _
 
