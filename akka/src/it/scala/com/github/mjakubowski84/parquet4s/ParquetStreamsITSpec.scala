@@ -2,6 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import java.sql.Timestamp
 
+import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import com.github.mjakubowski84.parquet4s.Cursor.DotPath
@@ -411,6 +412,25 @@ class ParquetStreamsITSpec
       writtenData should be(genericUsers)
       readData.map(ParquetRecordDecoder.decode[User](_)) should be(expectedUsers)
     }
+  }
+
+  it should "close viaParquet properly" in {
+    val numberOfSuccessfulWrites = 5
+
+    val failingSource = Source(data).map {
+      case data @ Data(i, _) if i < numberOfSuccessfulWrites => data
+      case _ => throw new RuntimeException("test exception")
+    }
+
+    val flow = ParquetStreams.viaParquet[Data](tempPathString)
+      .withWriteOptions(writeOptions)
+      .build()
+
+    for {
+      _ <- failingSource.via(flow).runWith(Sink.ignore).recover { case _ => Done }
+      readData <- ParquetStreams.fromParquet[Data](tempPathString).runWith(Sink.seq)
+    } yield
+      readData should have size numberOfSuccessfulWrites
   }
 
   override def afterAll(): Unit = {

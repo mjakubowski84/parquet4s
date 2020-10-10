@@ -215,6 +215,11 @@ private class ParquetPartitioningFlow[T, W](
       completeStage()
     }
 
+    override def onUpstreamFailure(ex: Throwable): Unit = {
+      close()
+      super.onUpstreamFailure(ex)
+    }
+
   }
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new Logic()

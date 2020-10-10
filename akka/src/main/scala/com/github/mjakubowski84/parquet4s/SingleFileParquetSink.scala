@@ -6,6 +6,8 @@ import org.apache.hadoop.fs.Path
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future
+import scala.util.Try
+import scala.util.control.NonFatal
 
 private[parquet4s] object SingleFileParquetSink {
 
@@ -27,6 +29,10 @@ private[parquet4s] object SingleFileParquetSink {
       .map { count =>
         if (isDebugEnabled) logger.debug(s"$count records were successfully written to $path")
         writer.close()
+      }
+      .recover { case NonFatal(e) =>
+        Try(writer.close())
+        throw e
       }
       .toMat(Sink.ignore)(Keep.right)
   }
