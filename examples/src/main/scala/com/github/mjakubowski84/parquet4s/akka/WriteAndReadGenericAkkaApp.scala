@@ -46,7 +46,7 @@ object WriteAndReadGenericAkkaApp extends App {
     // write
     _ <- Source(users).runWith(ParquetStreams.toParquetSingleFile(s"$path/data.parquet"))
     // read
-    _ <- ParquetStreams.fromParquet[RowParquetRecord](path).runWith(Sink.foreach(println))
+    _ <- ParquetStreams.fromParquet[RowParquetRecord].read(path).runWith(Sink.foreach(println))
     // finish
     _ <- system.terminate()
   } yield ()

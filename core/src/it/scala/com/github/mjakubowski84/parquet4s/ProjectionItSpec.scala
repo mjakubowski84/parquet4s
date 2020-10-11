@@ -59,7 +59,7 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
       RowParquetRecord("nested" -> RowParquetRecord("b" -> ListParquetRecord(
         RowParquetRecord("x" -> 1),
         RowParquetRecord("x" -> 2),
-        RowParquetRecord("x" -> 3),
+        RowParquetRecord("x" -> 3)
       )))
     )
   }

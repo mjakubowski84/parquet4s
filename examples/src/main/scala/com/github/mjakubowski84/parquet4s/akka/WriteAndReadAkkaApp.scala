@@ -22,7 +22,7 @@ object WriteAndReadAkkaApp extends App {
     // write
     _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile(s"$path/data.parquet"))
     // read
-    _ <- ParquetStreams.fromParquet[Data](path).runWith(Sink.foreach(println))
+    _ <- ParquetStreams.fromParquet[Data].read(path).runWith(Sink.foreach(println))
     // finish
     _ <- system.terminate()
   } yield ()

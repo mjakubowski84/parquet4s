@@ -64,7 +64,7 @@ class ParquetStreamsITSpec
     .map(i => Data(i = i, s = dict(Random.nextInt(4))))
 
   def read[T : ParquetRecordDecoder](path: Path, filter: Filter = Filter.noopFilter): Future[immutable.Seq[T]] =
-    ParquetStreams.fromParquet[T](path = path.toString, filter = filter).runWith(Sink.seq)
+    ParquetStreams.fromParquet[T].withFilter(filter).read(path.toString).runWith(Sink.seq)
 
   before {
     clearTemp()
@@ -286,7 +286,7 @@ class ParquetStreamsITSpec
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[User](tempPathString).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
       rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
       firstPartitionFiles = fileSystem.listStatus(firstPartitionPath).map(_.getPath).toSeq
       secondPartitionFiles = fileSystem.listStatus(secondPartitionPath).map(_.getPath.getName).toSeq
@@ -317,7 +317,7 @@ class ParquetStreamsITSpec
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[User](tempPathString).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
     } yield {
       writtenData should be(users)
       readData should be(users)
@@ -360,7 +360,7 @@ class ParquetStreamsITSpec
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[User](tempPathString).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
     } yield {
       writtenData should be(users)
       readData should be(users)
@@ -401,7 +401,7 @@ class ParquetStreamsITSpec
 
     for {
       writtenData <- Source(genericUsers).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[RowParquetRecord](tempPathString).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[RowParquetRecord].read(tempPathString).runWith(Sink.seq)
       rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
       firstPartitionFiles = fileSystem.listStatus(firstPartitionPath).map(_.getPath).toSeq
       secondPartitionFiles = fileSystem.listStatus(secondPartitionPath).map(_.getPath.getName).toSeq
@@ -428,7 +428,7 @@ class ParquetStreamsITSpec
 
     for {
       _ <- failingSource.via(flow).runWith(Sink.ignore).recover { case _ => Done }
-      readData <- ParquetStreams.fromParquet[Data](tempPathString).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
     } yield
       readData should have size numberOfSuccessfulWrites
   }

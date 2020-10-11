@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.akka
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import com.github.mjakubowski84.parquet4s.{Col, ParquetReader, ParquetStreams}
+import com.github.mjakubowski84.parquet4s.{Col, ParquetStreams}
 import com.google.common.io.Files
 
 import scala.concurrent.Future
@@ -29,7 +29,6 @@ object WriteAndReadFilteredAkkaApp extends App {
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher
 
-  val options = ParquetReader.Options()
   val printingSink = Sink.foreach(println)
 
   for {
@@ -37,9 +36,9 @@ object WriteAndReadFilteredAkkaApp extends App {
     _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile(s"$path/data.parquet"))
     // read filtered
     _ <- Future(println("""dict == "A""""))
-    _ <- ParquetStreams.fromParquet[Data](path, options = options, filter = Col("dict") === Dict.A).runWith(printingSink)
+    _ <- ParquetStreams.fromParquet[Data].withFilter(Col("dict") === Dict.A).read(path).runWith(printingSink)
     _ <- Future(println("""id >= 20 && id < 40"""))
-    _ <- ParquetStreams.fromParquet[Data](path, options = options, filter = Col("id") >= 20 && Col("id") < 40).runWith(printingSink)
+    _ <- ParquetStreams.fromParquet[Data].withFilter(Col("id") >= 20 && Col("id") < 40).read(path).runWith(printingSink)
     // finish
     _ <- system.terminate()
   } yield ()
