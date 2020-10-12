@@ -111,7 +111,7 @@ object IndefiniteFS2App extends IOApp {
       .options(WriterOptions)
       .maxCount(MaxNumberOfRecordPerFile)
       .maxDuration(MaxDurationOfFileWrite)
-      .withPreWriteTransformation[Data] { kafkaRecord =>
+      .preWriteTransformation[Data] { kafkaRecord =>
         kafkaRecord.record.timestamp.createTime.map(l => new Timestamp(l)).fold[Stream[IO, Data]](Stream.empty) { timestamp =>
           val dateTime = timestamp.toLocalDateTime
           Stream.emit(Data(

@@ -59,7 +59,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
     ))
 
   def read[T: ParquetRecordDecoder](blocker: Blocker, path: Path): Stream[IO, Vector[T]] =
-    parquet.read[IO, T](blocker, path.toString).fold(Vector.empty[T])(_ :+ _)
+    parquet.fromParquet[IO, T].read(blocker, path.toString).fold(Vector.empty[T])(_ :+ _)
 
   def listParquetFiles(blocker: Blocker, path: Path): Stream[IO, Vector[Path]] =
     directoryStream[IO](blocker, path)
@@ -197,7 +197,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         .iterable(partitionData)
         .through(parquet.viaParquet[IO, Data]
           .maxCount(partitionSize)
-          .withPreWriteTransformation[DataTransformed] { data =>
+          .preWriteTransformation[DataTransformed] { data =>
             Stream.iterable(partitions).map(partition => DataTransformed(data, partition))
           }
           .partitionBy("partition")
@@ -208,7 +208,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
 
     def read(blocker: Blocker, path: Path): Stream[IO, Map[String, Vector[Data]]] =
       parquet
-        .read[IO, DataTransformed](blocker, path.toString)
+        .fromParquet[IO, DataTransformed].read(blocker, path.toString)
         .map { case DataTransformed(i, s, partition) => Map(partition -> Vector(Data(i, s))) }
         .reduceSemigroup
 

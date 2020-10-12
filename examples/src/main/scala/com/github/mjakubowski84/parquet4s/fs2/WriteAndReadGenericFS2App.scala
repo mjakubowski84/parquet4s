@@ -51,7 +51,7 @@ object WriteAndReadGenericFS2App extends IOApp {
       path <- tempDirectoryStream[IO](blocker, dir = TmpPath)
       _ <- Stream.iterable[IO, RowParquetRecord](users)
         .through(writeSingleFile(blocker, path.resolve("data.parquet").toString))
-        .append(read[IO, RowParquetRecord](blocker, path.toString).showLinesStdOut.drain)
+        .append(fromParquet[IO, RowParquetRecord].read(blocker, path.toString).showLinesStdOut.drain)
     } yield ()
 
     stream.compile.drain.as(ExitCode.Success)
