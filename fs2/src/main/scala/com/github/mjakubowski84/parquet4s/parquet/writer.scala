@@ -36,15 +36,15 @@ private[parquet4s] object writer {
   def write[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: Sync: ContextShift](blocker: Blocker,
                                                                                         path: String,
                                                                                         options: ParquetWriter.Options
-                                                                                       ): Pipe[F, T, Unit] =
+                                                                                       ): Pipe[F, T, fs2.INothing] =
     in =>
       for {
         hadoopPath <- Stream.eval(io.makePath(path))
         logger <- Stream.eval(logger(getClass))
         _ <- Stream.eval(io.validateWritePath(blocker, hadoopPath, options, logger))
         writer <- Stream.resource(writerResource[T, F](blocker, hadoopPath, options))
-        _ <- writer.writeAll(in).stream
-      } yield ()
+        nothing <- writer.writeAll(in).stream
+      } yield nothing
 
   private def writerResource[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: ContextShift](blocker: Blocker,
                                                                                                    path: Path,

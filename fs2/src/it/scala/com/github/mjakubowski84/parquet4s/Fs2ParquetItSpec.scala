@@ -7,6 +7,9 @@ import cats.implicits._
 import fs2.Stream
 import fs2.io.file.{directoryStream, tempDirectoryStream, walk}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64
+import org.apache.parquet.schema.Type._
+import org.apache.parquet.schema.{MessageType, Types}
 import org.scalatest.Inspectors
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -57,6 +60,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
       a = dictA(Random.nextInt(3)),
       b = dictB(Random.nextInt(3))
     ))
+  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.default
 
   def read[T: ParquetRecordDecoder](blocker: Blocker, path: Path): Stream[IO, Vector[T]] =
     parquet.fromParquet[IO, T].read(blocker, path.toString).fold(Vector.empty[T])(_ :+ _)
@@ -68,7 +72,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
 
   it should "write and read single parquet file" in {
     val outputFileName = "data.parquet"
-    def write(blocker: Blocker, path: Path): Stream[IO, Unit] =
+    def write(blocker: Blocker, path: Path): Stream[IO, fs2.INothing] =
       Stream
         .iterable(data)
         .through(parquet.writeSingleFile[IO, Data](blocker, path.resolve(outputFileName).toString, writeOptions))
@@ -77,9 +81,34 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
       for {
         blocker <- Stream.resource(Blocker[IO])
         path <- tempDirectoryStream[IO](blocker, tmpDir)
-        _ <- write(blocker, path)
-        readData <- read[Data](blocker, path)
+        readData <- write(blocker, path) ++ read[Data](blocker, path)
       } yield readData should contain theSameElementsInOrderAs data
+
+    testStream.compile.drain.as(succeed).unsafeToFuture()
+  }
+
+  it should "write and read single parquet file using projection" in {
+    val outputFileName = "data.parquet"
+    def write(blocker: Blocker, path: Path): Stream[IO, fs2.INothing] =
+      Stream
+        .iterable(data)
+        .through(parquet.writeSingleFile[IO, Data](blocker, path.resolve(outputFileName).toString, writeOptions))
+
+    implicit val projectedSchema: MessageType = Types.buildMessage().addField(
+      Types.primitive(INT64, Repetition.REQUIRED).named("i")
+    ).named("projected-schema")
+
+    def readProjected[T: ParquetRecordDecoder: ParquetSchemaResolver](blocker: Blocker, path: Path): Stream[IO, Vector[T]] =
+      parquet.fromParquet[IO, T].projection.read(blocker, path.toString).fold(Vector.empty[T])(_ :+ _)
+
+    val expectedRecords = data.map(d => RowParquetRecord.empty.add("i", d.i, vcc))
+
+    val testStream =
+      for {
+        blocker <- Stream.resource(Blocker[IO])
+        path <- tempDirectoryStream[IO](blocker, tmpDir)
+        readData <- write(blocker, path) ++ readProjected[RowParquetRecord](blocker, path)
+      } yield readData should contain theSameElementsInOrderAs expectedRecords
 
     testStream.compile.drain.as(succeed).unsafeToFuture()
   }
