@@ -179,6 +179,25 @@ class ParquetStreamsITSpec
     recoverToSucceededIf[IllegalArgumentException](fut)
   }
 
+  it should "use projection when reading files" in {
+    val outputFileName = "data.parquet"
+
+    val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
+      path = s"$tempPath/$outputFileName",
+      options = writeOptions
+    ))
+
+    for {
+      _ <- write()
+      files <- filesAtPath(tempPath, configuration)
+      readData <- read[Data](tempPath)
+    } yield {
+      files should be(List(outputFileName))
+      readData should have size count
+      readData should contain theSameElementsInOrderAs data
+    }
+  }
+
   it should "split data into sequential chunks and read it correctly" in {
     val outputFileNames = List("part-00000.parquet", "part-00001.parquet")
 

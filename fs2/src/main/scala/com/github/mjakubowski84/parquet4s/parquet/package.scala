@@ -62,7 +62,7 @@ package object parquet {
 
   /**
    * Creates a [[fs2.Pipe]] that writes Parquet data to single file at the specified path (including
-   * file name).
+   * file name). The resulting stream returns <b>nothing</b>, that is, it doesn't emit any element.
    * <br/>
    * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
    * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
@@ -77,7 +77,7 @@ package object parquet {
   def writeSingleFile[F[_]: Sync: ContextShift, T : ParquetRecordEncoder : ParquetSchemaResolver](blocker: Blocker,
                                                                                                   path: String,
                                                                                                   options: ParquetWriter.Options = ParquetWriter.Options()
-                                                                                                 ): Pipe[F, T, Unit] =
+                                                                                                 ): Pipe[F, T, fs2.INothing] =
     writer.write(blocker, path, options)
 
   /**

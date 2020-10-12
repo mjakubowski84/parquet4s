@@ -6,6 +6,7 @@
 .metals
 .bloop
 .idea
+.bsp
 target
 spark-warehouse
 project/.plugins.sbt.swp
