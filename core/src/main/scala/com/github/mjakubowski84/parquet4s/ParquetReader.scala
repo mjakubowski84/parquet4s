@@ -101,7 +101,6 @@ object ParquetReader {
       )
   }
 
-
 }
 
 /**
