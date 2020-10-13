@@ -19,7 +19,7 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2
 1. [Akka Streams](#akka-streams)
 1. [FS2](#FS2)
 1. [Before-read filtering or filter pushdown](#before-read-filtering-or-filter-pushdown)
-1. [Schema projection](#schema projection)
+1. [Schema projection](#schema-projection)
 1. [Supported storage types](#supported-storage-types)
 1. [Supported types](#supported-types)
 1. [Generic Records](#generic-records)
@@ -188,7 +188,7 @@ Check ScalaDoc and code for more!
 
 ## Schema projection
 
-Schema projection is another way of optimization of reads. By default Parquet4S reads the whole content of each Parquet record even when you provide a case class that maps only a part of the columns. Such a behaviour is expected because you may want to use [generic records](#generic records) to process your data. However, you can explicitely tell Parquet4S to use the provided case class (or implicit `ParquetSchemaResolver`) as an override for the original file schema. In effect, all columns not matching your schema will be skipped and not read. This functionality is available in every module of Parquet4S.
+Schema projection is another way of optimization of reads. By default Parquet4S reads the whole content of each Parquet record even when you provide a case class that maps only a part of the columns. Such a behaviour is expected because you may want to use [generic records](#generic-records) to process your data. However, you can explicitely tell Parquet4S to use the provided case class (or implicit `ParquetSchemaResolver`) as an override for the original file schema. In effect, all columns not matching your schema will be skipped and not read. This functionality is available in every module of Parquet4S.
 
 ```scala
 // core
