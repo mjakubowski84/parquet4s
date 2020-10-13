@@ -2,7 +2,7 @@
 
 Simple I/O for Parquet. Allows you to easily read and write Parquet files in Scala.
 
-Use just a Scala case class to define the schema of your data. No need to use Avro, Protobuf, Thrift or other data serialisation systems. You can use generic records if you don't want to use case class, too.
+Use just a Scala case class to define the schema of your data. No need to use Avro, Protobuf, Thrift or other data serialisation systems. You can use generic records if you don't want to use the case class, too.
 
 Compatible with files generated with Apache Spark. However, unlike in Spark, you do not have to start a cluster to perform I/O operations.
 
@@ -19,6 +19,7 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2
 1. [Akka Streams](#akka-streams)
 1. [FS2](#FS2)
 1. [Before-read filtering or filter pushdown](#before-read-filtering-or-filter-pushdown)
+1. [Schema projection](#schema projection)
 1. [Supported storage types](#supported-storage-types)
 1. [Supported types](#supported-types)
 1. [Generic Records](#generic-records)
@@ -32,7 +33,7 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2
 
 ```scala
 libraryDependencies ++= Seq(
-  "com.github.mjakubowski84" %% "parquet4s-core" % "1.5.1",
+  "com.github.mjakubowski84" %% "parquet4s-core" % "1.6.0",
   "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 )
 ```
@@ -41,7 +42,7 @@ libraryDependencies ++= Seq(
 
 ```scala
 def ivyDeps = Agg(
-  ivy"com.github.mjakubowski84::parquet4s-core:1.5.1",
+  ivy"com.github.mjakubowski84::parquet4s-core:1.6.0",
   ivy"org.apache.hadoop:hadoop-client:$yourHadoopVersion"
 )
 ```
@@ -92,7 +93,7 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams. Just import:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "1.5.1"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "1.6.0"
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
@@ -133,7 +134,7 @@ Source(users).runWith(ParquetStreams.toParquetSingleFile(
 // Tailored for writing indefinite streams.
 // Writes file when chunk reaches size limit or defined time period elapses.
 // Can also partition files!
-// Check all other parameters and example usage in project sources.
+// Check all the parameters and example usage in project sources.
 Source(users).via(
   ParquetStreams
     .viaParquet[User]("file:///data/users")
@@ -143,19 +144,19 @@ Source(users).via(
     .build()
 ).runForeach(user => println(s"Just wrote user ${user.userId}..."))
   
-// Reads a file or files from the path. Please also have a look at optional parameters.
-ParquetStreams.fromParquet[User](
-  path = "file:///data/users",
-  options = ParquetReader.Options(hadoopConf = conf)
-).runForeach(println)
+// Reads a file or files from the path. Please also have a look at the rest of parameters.
+ParquetStreams.fromParquet[User]
+  .withOptions(ParquetReader.Options(hadoopConf = conf))
+  .read("file:///data/users")
+  .runForeach(println)
 ```
 
 ## FS2
 
-FS2 integration allows you to read and write Parquet using function streams. In order to use it please import:
+FS2 integration allows you to read and write Parquet using functional streams. In order to use it please import:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-fs2" % "1.5.1"
+"com.github.mjakubowski84" %% "parquet4s-fs2" % "1.6.0"
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
@@ -163,7 +164,7 @@ Please check [examples](./examples/src/main/scala/com/github/mjakubowski84/parqu
 
 ## Before-read filtering or filter pushdown
 
-One of the best features of Parquet is efficient way of fitering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Parquet4S allows do define filter predicates in all modules in order to push filtering out from Scala collections and Akka or FS2 Stream down to point before file content is even read.
+One of the best features of Parquet is an efficient way of fitering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Parquet4S allows do define filter predicates in all modules in order to push filtering out from Scala collections and Akka or FS2 stream down to point before file content is even read.
 
 You define you filters using simple algebra as follows.
 
@@ -176,19 +177,30 @@ ParquetReader.read[User](path = "file://my/path", filter = Col("email") === "use
 In Akka filter applies both to content of files and partitions:
 
 ```scala
-ParquetStreams.fromParquet[Stats](
-  path = "file://my/path",
-  filter = Col("stats.score") > 0.9 && Col("stats.score") <= 1.0
-)
+ParquetStreams.fromParquet[Stats]
+  .withFilter(Col("stats.score") > 0.9 && Col("stats.score") <= 1.0)
+  .read("file://my/path")
 ```
-
-> **TAKE NOTE!**
->
-> Take note that due to an issue with implicit resolution in **Scala 2.11** you may need to define all parameters of `ParquetStreams.fromParquet` even if some have default values. Parameters must be specified in default order even when you use named arguments. It specifically refers to a case when you would like to omit `options` but define `filter`. Such a situation doesn't appear in Scala 2.12 and 2.13.
 
 You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, and `in` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
 
 Check ScalaDoc and code for more!
+
+## Schema projection
+
+Schema projection is another way of optimization of reads. By default Parquet4S reads the whole content of each Parquet record even when you provide a case class that maps only a part of the columns. Such a behaviour is expected because you may want to use [generic records](#generic records) to process your data. However, you can explicitely tell Parquet4S to use the provided case class (or implicit `ParquetSchemaResolver`) as an override for the original file schema. In effect, all columns not matching your schema will be skipped and not read. This functionality is available in every module of Parquet4S.
+
+```scala
+// core
+ParquetReader.withProjection[User].read(path = "file://my/path")
+
+// akka
+ParquetStreams.fromParquet[User].withProjection.read("file://my/path")
+
+// fs2
+import com.github.mjakubowski84.parquet4s.parquet._
+fromParquet[IO, User].projection.read(blocker, "file://my/path")
+```
 
 ## Supported storage types
 
