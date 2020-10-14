@@ -1,14 +1,14 @@
 # Parquet4S
 
-Simple I/O for Parquet. Allows you to easily read and write Parquet files in Scala.
+Simple I/O for [Parquet](https://parquet.apache.org/). Allows you to easily read and write Parquet files in [Scala](https://www.scala-lang.org/).
 
 Use just a Scala case class to define the schema of your data. No need to use Avro, Protobuf, Thrift or other data serialisation systems. You can use generic records if you don't want to use the case class, too.
 
-Compatible with files generated with Apache Spark. However, unlike in Spark, you do not have to start a cluster to perform I/O operations.
+Compatible with files generated with [Apache Spark](https://spark.apache.org/). However, unlike in Spark, you do not have to start a cluster to perform I/O operations.
 
-Based on official Parquet library, Hadoop Client and Shapeless.
+Based on official [Parquet library](https://github.com/apache/parquet-mr), [Hadoop Client](https://github.com/apache/hadoop) and [Shapeless](https://github.com/milessabin/shapeless).
 
-Integrations for Akka Streams and FS2.
+Integrations for [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [FS2](https://fs2.io/).
 
 Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2.12.x and 2.13.x.
 

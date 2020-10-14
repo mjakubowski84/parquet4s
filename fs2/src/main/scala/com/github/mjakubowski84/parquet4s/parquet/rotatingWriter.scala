@@ -218,7 +218,7 @@ object rotatingWriter {
         case Some((DataEvent(data), tail)) =>
           writePull(data) >> rotatePull("max count reached") >> writeAllPull(tail, count = 0)
         case Some((RotateEvent(), tail)) =>
-          rotatePull(s"write timeout") >> writeAllPull(tail, count = 0)
+          rotatePull("write timeout") >> writeAllPull(tail, count = 0)
         case Some((OutputEvent(out), tail)) =>
           Pull.output1(out) >> writeAllPull(tail, count)
         case _ =>
