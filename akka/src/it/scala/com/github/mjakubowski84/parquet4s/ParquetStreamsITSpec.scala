@@ -318,6 +318,56 @@ class ParquetStreamsITSpec
     }
   }
 
+  it should "monitor written rows and flush on signal" in {
+    case class User(name: String, id: Int, id_part: String)
+
+    def genUser(id: Int) = User(s"name_$id", id, (id % 2).toString)
+
+    var metrics = Vector.empty[Long]
+
+    def gauge(v: Long): Unit = metrics :+= v
+
+    val maxCount = 10
+
+    val flow = ParquetStreams.viaParquet[User](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withMaxCount(maxCount)
+      .withMaxDuration(100.millis)
+      .withPartitionBy("id_part")
+      .withPostWriteHandler { state =>
+        gauge(state.count)
+        if (state.lastProcessed.id >= 32) state.flush()
+      }
+      .build()
+
+    val users = ((1 to 33) map genUser).toList
+
+    for {
+      writtenData <- Source(users).via(flow).runWith(Sink.seq)
+      readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
+      rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
+      files = rootFiles.flatMap(p => fileSystem.listStatus(p).map(_.getPath).toSeq)
+      readDataPartitioned <- Future.sequence(
+        files.map(file =>
+          ParquetStreams.fromParquet[User].read(file.toString).runWith(Sink.seq)
+        ))
+    } yield {
+      every(files.map(_.getName)) should endWith(".snappy.parquet")
+      writtenData should be(users)
+
+      readData should have size users.size
+      readData should contain allElementsOf (users)
+
+      files should have size 9
+      metrics should be(Vector.fill(3)(1 to maxCount).flatMap(_.toVector) ++ Vector(1,2,3) )
+
+      val (remainder, full) = readDataPartitioned.partition(_.head.id >= 31)
+      every(full) should have size 5
+      remainder should have size 3
+      every(remainder) should have size 1
+    }
+  }
+
   it should "write and read data partitioned by all fields of case class" in {
 
     case class User(name: String, address: Address)
@@ -437,7 +487,7 @@ class ParquetStreamsITSpec
     val numberOfSuccessfulWrites = 5
 
     val failingSource = Source(data).map {
-      case data @ Data(i, _) if i < numberOfSuccessfulWrites => data
+      case data@Data(i, _) if i < numberOfSuccessfulWrites => data
       case _ => throw new RuntimeException("test exception")
     }
 

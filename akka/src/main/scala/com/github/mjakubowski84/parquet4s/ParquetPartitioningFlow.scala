@@ -25,7 +25,8 @@ object ParquetPartitioningFlow {
     maxDuration = DefaultMaxDuration,
     preWriteTransformation = identity,
     partitionBy = Seq.empty,
-    writeOptions = ParquetWriter.Options()
+    writeOptions = ParquetWriter.Options(),
+    postWriteHandler = None
   )
 
   /**
@@ -78,6 +79,16 @@ object ParquetPartitioningFlow {
      * @tparam X Schema type
      */
     def withPreWriteTransformation[X](transformation: T => X): Builder[T, X]
+
+    /**
+     * Adds a handler after record writes, exposing some of the internal state of the flow.
+     * Intended for lower level monitoring and control.
+     *
+     * @param handler a function called after writing a record,
+     *                receiving a snapshot of the internal state of the flow as a parameter.
+     */
+    def withPostWriteHandler(handler: PostWriteState[T] => Unit): Builder[T, W]
+
     /**
      * Builds final flow
      */
@@ -93,7 +104,8 @@ object ParquetPartitioningFlow {
                                         maxDuration: FiniteDuration,
                                         preWriteTransformation: T => W,
                                         partitionBy: Seq[String],
-                                        writeOptions: ParquetWriter.Options
+                                        writeOptions: ParquetWriter.Options,
+                                        postWriteHandler: Option[PostWriteState[T] => Unit]
                                       ) extends Builder[T, W] {
 
     def withMaxCount(maxCount: Long): Builder[T, W] = copy(maxCount = maxCount)
@@ -105,10 +117,11 @@ object ParquetPartitioningFlow {
                 schemaResolver: SkippingParquetSchemaResolver[W],
                 encoder: SkippingParquetRecordEncoder[W]
     ): GraphStage[FlowShape[T, T]] = {
-      val lenses = partitionBy.map(lensPath => (obj: W) => PartitionLens(obj, lensPath) )
+      val lenses = partitionBy.map(lensPath => (obj: W) => PartitionLens(obj, lensPath))
       val schema = SkippingParquetSchemaResolver.resolveSchema[W](toSkip = partitionBy)
       val encode = (obj: W, vcc: ValueCodecConfiguration) => SkippingParquetRecordEncoder.encode(partitionBy, obj, vcc)
-      new ParquetPartitioningFlow[T, W](basePath, maxCount, maxDuration, preWriteTransformation, lenses, encode, schema, writeOptions)
+      new ParquetPartitioningFlow[T, W](basePath, maxCount, maxDuration, preWriteTransformation,
+        lenses, encode, schema, writeOptions, postWriteHandler)
     }
 
     override def withPreWriteTransformation[X](transformation: T => X): Builder[T, X] =
@@ -118,9 +131,18 @@ object ParquetPartitioningFlow {
         maxDuration = maxDuration,
         preWriteTransformation = transformation,
         partitionBy = partitionBy,
+        postWriteHandler = postWriteHandler,
         writeOptions = writeOptions
       )
+
+    override def withPostWriteHandler(handler: PostWriteState[T] => Unit): Builder[T, W] = copy(postWriteHandler = Some(handler))
   }
+
+  private case class PostWriteState[T](count: Long,
+                                       lastProcessed: T,
+                                       partitions: Set[Path],
+                                       flush: () => Unit
+                                      )
 
 }
 
@@ -132,7 +154,8 @@ private class ParquetPartitioningFlow[T, W](
                                              partitionBy: Seq[W => (String, String)],
                                              encode: (W, ValueCodecConfiguration) => RowParquetRecord,
                                              schema: MessageType,
-                                             writeOptions: ParquetWriter.Options
+                                             writeOptions: ParquetWriter.Options,
+                                             postWriteHandler: Option[PostWriteState[T] => Unit]
                                            ) extends GraphStage[FlowShape[T, T]] {
   val in: Inlet[T] = Inlet[T]("ParquetPartitioningFlow.in")
   val out: Outlet[T] = Outlet[T]("ParquetPartitioningFlow.out")
@@ -201,6 +224,12 @@ private class ParquetPartitioningFlow[T, W](
       if (count >= maxCount) {
         shouldRotate = true
       }
+
+      postWriteHandler.foreach(_.apply(PostWriteState(count,
+        lastProcessed = msg,
+        partitions = writers.keySet,
+        flush = () => close()
+      )))
 
       push(out, msg)
     }
