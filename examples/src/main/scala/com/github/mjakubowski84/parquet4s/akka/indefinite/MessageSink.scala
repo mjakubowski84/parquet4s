@@ -35,7 +35,7 @@ object MessageSink {
 
 trait MessageSink {
 
-  this: Akka =>
+  this: Akka with Logger =>
 
   import MessageSink._
   import MessageSource._
@@ -70,6 +70,9 @@ trait MessageSink {
       .withMaxCount(MaxChunkSize)
       .withMaxDuration(ChunkWriteTimeWindow)
       .withWriteOptions(writerOptions)
+      .withPostWriteHandler { state =>
+        logger.info(s"Batch of ${state.count} collected.")
+      }
       .build()
 
 }
