@@ -138,11 +138,11 @@ object ParquetPartitioningFlow {
     override def withPostWriteHandler(handler: PostWriteState[T] => Unit): Builder[T, W] = copy(postWriteHandler = Some(handler))
   }
 
-  private case class PostWriteState[T](count: Long,
-                                       lastProcessed: T,
-                                       partitions: Set[Path],
-                                       flush: () => Unit
-                                      )
+  case class PostWriteState[T](count: Long,
+                               lastProcessed: T,
+                               partitions: Set[Path],
+                               flush: () => Unit
+                              )
 
 }
 

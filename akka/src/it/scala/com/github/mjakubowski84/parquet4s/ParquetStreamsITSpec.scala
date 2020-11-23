@@ -321,33 +321,36 @@ class ParquetStreamsITSpec
   it should "monitor written rows and flush on signal" in {
     case class User(name: String, id: Int, id_part: String)
 
-    def genUser(id: Int) = User(s"name_$id", id, (id % 2).toString)
-
-    var metrics = Vector.empty[Long]
-
-    def gauge(v: Long): Unit = metrics :+= v
-
     val maxCount = 10
+    val usersToWrite = 33
+    val partitions = 2
+    val lastToFlushOnDemand = 2
+
+    def genUser(id: Int) = User(s"name_$id", id, (id % partitions).toString) // Two partitions : even and odd `id`
+
+    // Mimics a metrics library
+    var metrics = Vector.empty[Long]
+    def gauge(v: Long): Unit = metrics :+= v
 
     val flow = ParquetStreams.viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(maxCount)
-      .withMaxDuration(100.millis)
       .withPartitionBy("id_part")
       .withPostWriteHandler { state =>
-        gauge(state.count)
-        if (state.lastProcessed.id >= 32) state.flush()
+        gauge(state.count)                                               // use-case 1 : monitoring internal counter
+        if (state.lastProcessed.id > usersToWrite - lastToFlushOnDemand) // use-case 2 : on demand flush. e.g: the last two records must be in separate files
+          state.flush()
       }
       .build()
 
-    val users = ((1 to 33) map genUser).toList
+    val users = ((1 to usersToWrite) map genUser).toList
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
       readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
       rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
       files = rootFiles.flatMap(p => fileSystem.listStatus(p).map(_.getPath).toSeq)
-      readDataPartitioned <- Future.sequence(
+      readDataPartitioned <- Future.sequence( // generate the file lists in a partitioned form
         files.map(file =>
           ParquetStreams.fromParquet[User].read(file.toString).runWith(Sink.seq)
         ))
@@ -358,13 +361,14 @@ class ParquetStreamsITSpec
       readData should have size users.size
       readData should contain allElementsOf (users)
 
-      files should have size 9
-      metrics should be(Vector.fill(3)(1 to maxCount).flatMap(_.toVector) ++ Vector(1,2,3) )
+      files should have size (((usersToWrite / maxCount) * partitions) + 1 + lastToFlushOnDemand) // 9 == ( 33 / 10 ) * 2 + 1[remainder] + 2
 
-      val (remainder, full) = readDataPartitioned.partition(_.head.id >= 31)
-      every(full) should have size 5
-      remainder should have size 3
-      every(remainder) should have size 1
+      metrics should be((0 until usersToWrite) map (i => (i % 10) + 1)) // Vector(1..10,1..10,1..10,1,2,3) - the counter is flushed 3 time and the last "batch" is just 1,2,3
+
+      val (remainder, full) = readDataPartitioned.partition(_.head.id >= usersToWrite - lastToFlushOnDemand)
+      every(full) should have size (maxCount / partitions)                              // == 5 records in completed files
+      remainder should have size (usersToWrite - (usersToWrite / maxCount) * maxCount)  // == 3 files are flushed prematurely
+      every(remainder) should have size 1                                               // == 1 record in prematurely flushed files
     }
   }
 
