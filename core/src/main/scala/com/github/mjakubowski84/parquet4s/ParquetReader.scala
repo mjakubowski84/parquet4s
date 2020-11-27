@@ -1,17 +1,21 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.io.Closeable
-import java.util.TimeZone
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.apache.parquet.schema.MessageType
 
+import java.io.Closeable
+import java.util.TimeZone
+import scala.annotation.implicitNotFound
+
 /**
   * Type class that reads Parquet files from given path.
   * @tparam T Type that represents schema of Parquet file
   */
+@implicitNotFound("Cannot read data of type ${T}. " +
+  "Please check if there is implicit ValueCodec available for each field and subfield of ${T}."
+)
 trait ParquetReader[T] {
 
   /**
@@ -42,27 +46,31 @@ object ParquetReader {
     private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
   }
 
-  @deprecated(message = "Please use read function or ParquetReader type class", since = "0.3.0")
-  def apply[T : ParquetRecordDecoder](path: String, options: Options = Options(), filter: Filter = Filter.noopFilter): ParquetIterable[T] =
-    newParquetIterable(path, options, filter, None)
-
   private def newParquetIterable[T : ParquetRecordDecoder](
                                                             path: String,
                                                             options: Options,
                                                             filter: Filter,
                                                             projectedSchemaOpt: Option[MessageType]
-                                                          ): ParquetIterable[T] =
+                                                          ): ParquetIterable[T] = {
+    val valueCodecConfiguration = options.toValueCodecConfiguration
+    val hadoopPath = new Path(path)
     newParquetIterable(
-      builder = HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), new Path(path)),
-      options = options,
-      filter = filter
+      builder = HadoopParquetReader
+        .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), hadoopPath)
+        .withConf(options.hadoopConf)
+        .withFilter(filter.toFilterCompat(valueCodecConfiguration))
+      ,
+      valueCodecConfiguration = valueCodecConfiguration,
+      stats = Stats(hadoopPath, options, projectedSchemaOpt, filter)
     )
+  }
 
   private[parquet4s] def newParquetIterable[T : ParquetRecordDecoder](
                                                                        builder: Builder,
-                                                                       options: Options,
-                                                                       filter: Filter = Filter.noopFilter): ParquetIterable[T] =
-    new ParquetIterableImpl(builder, options, filter)
+                                                                       valueCodecConfiguration: ValueCodecConfiguration,
+                                                                       stats: Stats
+                                                                       ): ParquetIterable[T] =
+    new ParquetIterableImpl(builder, valueCodecConfiguration, stats)
 
   /**
     * Creates new [[ParquetIterable]] over data from given path.
@@ -107,24 +115,24 @@ object ParquetReader {
   * Allows to iterate over Parquet file(s). Remember to call `close()` when you are done.
   * @tparam T type that represents schema of Parquet file
   */
-trait ParquetIterable[T] extends Iterable[T] with Closeable
+trait ParquetIterable[T] extends Iterable[T] with Closeable {
+
+  def min[V: Ordering: ValueCodec](columnPath: String): Option[V]
+
+  def max[V: Ordering: ValueCodec](columnPath: String): Option[V]
+
+}
 
 private class ParquetIterableImpl[T : ParquetRecordDecoder](
                                                              builder: ParquetReader.Builder,
-                                                             options: ParquetReader.Options,
-                                                             parquetFilter: Filter
-                                                           )
-  extends ParquetIterable[T] {
-
-  private val valueCodecConfiguration = options.toValueCodecConfiguration
+                                                             valueCodecConfiguration: ValueCodecConfiguration,
+                                                             stats: Stats
+                                                           ) extends ParquetIterable[T] {
 
   private val openCloseables = new scala.collection.mutable.ArrayBuffer[Closeable]()
 
   override def iterator: Iterator[T] = new Iterator[T] {
-    private val reader = builder
-      .withFilter(parquetFilter.toFilterCompat(valueCodecConfiguration))
-      .withConf(options.hadoopConf)
-      .build()
+    private val reader = builder.build()
 
     openCloseables.synchronized(openCloseables.append(reader))
 
@@ -162,5 +170,11 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](
       openCloseables.clear()
     }
   }
+
+  override def min[V: Ordering : ValueCodec](columnPath: String): Option[V] = stats.min(columnPath)
+
+  override def max[V: Ordering : ValueCodec](columnPath: String): Option[V] = stats.max(columnPath)
+
+  override def size: Int = stats.recordCount.toInt
 
 }

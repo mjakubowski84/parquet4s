@@ -27,7 +27,7 @@ private[parquet4s] class ParquetReadSupport(projectedSchemaOpt: Option[MessageTy
 
 }
 
-private class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[RowParquetRecord] {
+private[parquet4s] class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[RowParquetRecord] {
 
   private val root = new RowParquetRecordConverter(schema)
 

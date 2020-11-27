@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import shapeless.labelled.{FieldType, field}
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
+import scala.annotation.implicitNotFound
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -10,6 +11,9 @@ import scala.util.control.NonFatal
   * Type class that allows to decode instances of [[RowParquetRecord]]
   * @tparam T represents schema of [[RowParquetRecord]]
   */
+@implicitNotFound("Cannot read data of type ${T}. " +
+  "Please check if there is implicit ValueCodec available for each field and subfield of ${T}."
+)
 trait ParquetRecordDecoder[T] {
 
   /**

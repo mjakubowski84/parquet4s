@@ -3,9 +3,9 @@ package com.github.mjakubowski84.parquet4s
 import java.nio.{ByteBuffer, ByteOrder}
 import java.time._
 import java.util.TimeZone
-
 import org.apache.parquet.io.api.Binary
 
+import scala.annotation.implicitNotFound
 import scala.collection.compat._
 import scala.language.higherKinds
 import scala.reflect.ClassTag
@@ -19,6 +19,7 @@ object ValueCodec extends AllValueCodecs
   * Type class that allows to decode data from Parquet [[Value]] or encode it as [[Value]]
   * @tparam T data type to decode to or encode from
   */
+@implicitNotFound("Missing ValueCodec for value type ${T}. Implement your own codec in order de/serialise your data.")
 trait ValueCodec[T] {
 
   /**
