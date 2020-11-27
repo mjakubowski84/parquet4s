@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import java.io.Closeable
 import java.util.TimeZone
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.api.WriteSupport
@@ -13,6 +12,7 @@ import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.MessageType
 import org.slf4j.LoggerFactory
 
+import scala.annotation.implicitNotFound
 import scala.jdk.CollectionConverters._
 
 
@@ -42,6 +42,9 @@ object ParquetWriter  {
 
   private[parquet4s] type InternalWriter = HadoopParquetWriter[RowParquetRecord]
 
+  @implicitNotFound("Cannot write data of type ${T}. " +
+      "Please check if there are implicit ValueCodec and TypedSchemaDef available for each field and subfield of ${T}."
+  )
   type ParquetWriterFactory[T] = (String, Options) => ParquetWriter[T]
 
   private val SignatureMetadata = Map("MadeBy" -> "https://github.com/mjakubowski84/parquet4s")

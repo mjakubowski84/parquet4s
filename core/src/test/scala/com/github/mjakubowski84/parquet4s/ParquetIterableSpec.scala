@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ParquetReader.newParquetIterable
 import com.github.mjakubowski84.parquet4s.ValueImplicits._
-import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.mockito.scalatest.IdiomaticMockito
 import org.scalatest.flatspec.AnyFlatSpec
@@ -14,7 +13,7 @@ object ParquetIterableSpec {
 
   def testRecord(int: Int): RowParquetRecord = RowParquetRecord("int" -> int)
 
-  val options: ParquetReader.Options = ParquetReader.Options()
+  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.default
 }
 
 class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockito {
@@ -23,8 +22,6 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
 
   private def mockTestBuilder(reader: HadoopParquetReader[RowParquetRecord]) = {
     val builder = mock[ParquetReader.Builder]
-    builder.withConf(options.hadoopConf) returns builder
-    builder.withFilter(FilterCompat.NOOP) returns builder
     builder.build() returns reader
     builder
   }
@@ -32,19 +29,18 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
   "iterator" should "build instance of iterator over row class containing record reader" in {
     newParquetIterable[TestRow](
       mockTestBuilder(mock[HadoopParquetReader[RowParquetRecord]]),
-      options
+      vcc,
+      mock[Stats]
     ).iterator should be(an[Iterator[_]])
   }
 
   it should "build a new iterator with new reader every time called" in {
     val builder = mockTestBuilder(mock[HadoopParquetReader[RowParquetRecord]])
 
-    newParquetIterable[TestRow](builder, options).iterator should be(an[Iterator[_]])
-    newParquetIterable[TestRow](builder, options).iterator should be(an[Iterator[_]])
-    newParquetIterable[TestRow](builder, options).iterator should be(an[Iterator[_]])
+    newParquetIterable[TestRow](builder, vcc, mock[Stats]).iterator should be(an[Iterator[_]])
+    newParquetIterable[TestRow](builder, vcc, mock[Stats]).iterator should be(an[Iterator[_]])
+    newParquetIterable[TestRow](builder, vcc, mock[Stats]).iterator should be(an[Iterator[_]])
 
-    builder.withConf(*) wasCalled 3.times
-    builder.withFilter(*) wasCalled 3.times
     builder.build() wasCalled 3.times
   }
 
@@ -52,7 +48,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns null
 
-    newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator.hasNext should be(false)
+    newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator.hasNext should be(false)
 
     reader.read() was called
   }
@@ -61,7 +57,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns testRecord(1)
 
-    newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator.hasNext should be(true)
+    newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator.hasNext should be(true)
 
     reader.read() was called
   }
@@ -71,7 +67,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns null
 
-    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
+    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator
     iterator.hasNext should be(false)
     iterator.hasNext should be(false)
     iterator.hasNext should be(false)
@@ -83,7 +79,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns testRecord(1)
 
-    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
+    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator
     iterator.hasNext should be(true)
     iterator.hasNext should be(true)
     iterator.hasNext should be(true)
@@ -95,21 +91,22 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns testRecord(1)
 
-    newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator.next() should be(TestRow(1))
+    newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator.next() should be(TestRow(1))
   }
 
   it should "throw NoSuchElementException for empty resource" in {
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns null
 
-    a[NoSuchElementException] should be thrownBy newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator.next()
+    a[NoSuchElementException] should be thrownBy newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats])
+      .iterator.next()
   }
 
   it should "try to read record only once in case of sequential calls for missing record" in {
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns null
 
-    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
+    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator
     a[NoSuchElementException] should be thrownBy iterator.next()
     a[NoSuchElementException] should be thrownBy iterator.next()
     a[NoSuchElementException] should be thrownBy iterator.next()
@@ -121,7 +118,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns testRecord(1) andThen testRecord(2) andThen testRecord(3) andThen null
 
-    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
+    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator
     iterator.next() should be(TestRow(1))
     iterator.next() should be(TestRow(2))
     iterator.next() should be(TestRow(3))
@@ -132,7 +129,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns null
 
-    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
+    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator
     iterator.hasNext should be(false)
     a[NoSuchElementException] should be thrownBy iterator.next()
 
@@ -143,7 +140,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns testRecord(1)
 
-    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
+    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator
     iterator.hasNext should be(true)
     iterator.next() should be(TestRow(1))
 
@@ -154,7 +151,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns testRecord(1) andThen null
 
-    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
+    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator
     iterator.hasNext should be(true)
     iterator.next() should be(TestRow(1))
     iterator.hasNext should be(false)
@@ -167,7 +164,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns testRecord(1) andThen testRecord(2) andThen null
 
-    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), options).iterator
+    val iterator = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats]).iterator
     iterator.hasNext should be(true)
     iterator.next() should be(TestRow(1))
     iterator.hasNext should be(true)
@@ -181,7 +178,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
   "close" should "close reader created by iterator" in {
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
 
-    val iterable = newParquetIterable[TestRow](mockTestBuilder(reader), options)
+    val iterable = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats])
     iterable.iterator
     iterable.close()
 
@@ -190,7 +187,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
 
   it should "close all readers created by multiple iterators" in {
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
-    val iterable = newParquetIterable[TestRow](mockTestBuilder(reader), options)
+    val iterable = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats])
 
     iterable.iterator
     iterable.iterator
@@ -199,6 +196,36 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     iterable.close()
 
     reader.close() wasCalled 3.times
+  }
+
+  "size" should "use stats for returning record count" in {
+    val stats = mock[Stats]
+    newParquetIterable[TestRow](
+      mock[HadoopParquetReader.Builder[RowParquetRecord]],
+      vcc,
+      stats
+    ).size
+    stats.recordCount was called
+  }
+
+  "min" should "use stats for returning record count" in {
+    val stats = mock[Stats]
+    newParquetIterable[TestRow](
+      mock[HadoopParquetReader.Builder[RowParquetRecord]],
+      vcc,
+      stats
+    ).min[Int]("int")
+    stats.min("int")(any[ValueCodec[Int]], any[Ordering[Int]]) was called
+  }
+
+  "max" should "use stats for returning record count" in {
+    val stats = mock[Stats]
+    newParquetIterable[TestRow](
+      mock[HadoopParquetReader.Builder[RowParquetRecord]],
+      vcc,
+      stats
+    ).max[Int]("int")
+    stats.max("int")(any[ValueCodec[Int]], any[Ordering[Int]]) was called
   }
 
 }

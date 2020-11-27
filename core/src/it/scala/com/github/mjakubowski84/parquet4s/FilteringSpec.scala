@@ -44,7 +44,7 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
         idx = i,
         float = (BigDecimal("0.01") * BigDecimal(i)).toFloat,
         double = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
-        enum = enum(Random.nextInt(enum.size - 1)),
+        enum = enum(Random.nextInt(enum.size)),
         flag = Random.nextBoolean(),
         date = zeroDate.plusDays(i),
         decimal = BigDecimal.valueOf(0.001 * (i - halfSize)),

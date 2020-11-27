@@ -4,7 +4,6 @@ import akka.stream.scaladsl.{Sink, Source}
 import akka.{Done, NotUsed}
 import com.github.mjakubowski84.parquet4s.ParquetWriter.ParquetWriterFactory
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration

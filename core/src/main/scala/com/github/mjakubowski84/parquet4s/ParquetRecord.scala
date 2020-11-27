@@ -452,7 +452,7 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
 
 object MapParquetRecord {
 
-  private val MapKeyValueFieldName = "map"
+  private val MapKeyValueFieldName = "key_value"
   private val KeyFieldName = "key"
   private val ValueFieldName = "value"
 
