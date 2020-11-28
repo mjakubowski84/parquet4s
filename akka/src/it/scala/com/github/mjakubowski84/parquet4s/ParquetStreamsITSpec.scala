@@ -487,11 +487,11 @@ class ParquetStreamsITSpec
     }
   }
 
-  it should "close viaParquet properly" in {
-    val numberOfSuccessfulWrites = 5
+  it should "close viaParquet properly on upstream exception" in {
+    val numberOfSuccessfulWrites = 25
 
     val failingSource = Source(data).map {
-      case data@Data(i, _) if i < numberOfSuccessfulWrites => data
+      case data @ Data(i, _) if i < numberOfSuccessfulWrites => data
       case _ => throw new RuntimeException("test exception")
     }
 
@@ -501,6 +501,45 @@ class ParquetStreamsITSpec
 
     for {
       _ <- failingSource.via(flow).runWith(Sink.ignore).recover { case _ => Done }
+      readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
+    } yield
+      readData should have size numberOfSuccessfulWrites
+  }
+
+  it should "close viaParquet properly on downstream exception" in {
+    val numberOfSuccessfulWrites = 25
+
+    val failingSink = Sink.foreach[Data] {
+      case Data(i, _) if i < numberOfSuccessfulWrites => ()
+      case _ => throw new RuntimeException("test exception")
+    }
+
+    val flow = ParquetStreams.viaParquet[Data](tempPathString)
+      .withWriteOptions(writeOptions)
+      .build()
+
+    for {
+      _ <- Source(data).via(flow).runWith(failingSink).recover { case _ => Done }
+      readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
+    } yield
+      readData should have size numberOfSuccessfulWrites + 1
+  }
+
+  it should "close viaParquet properly on internal exception" in {
+    val numberOfSuccessfulWrites = 25
+
+    val parquetFlow = ParquetStreams.viaParquet[Data](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withPostWriteHandler {
+        case state if state.count >= numberOfSuccessfulWrites =>
+          throw new RuntimeException("test exception")
+        case _ =>
+          ()
+      }
+      .build()
+
+    for {
+      _ <- Source(data).via(parquetFlow).runWith(Sink.ignore).recover { case _ => Done }
       readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
     } yield
       readData should have size numberOfSuccessfulWrites

@@ -5,11 +5,11 @@ import java.util.concurrent.TimeUnit
 
 import akka.stream.stage._
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow._
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.parquet.schema.MessageType
 import org.slf4j.LoggerFactory
-import ParquetPartitioningFlow._
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -239,14 +239,9 @@ private class ParquetPartitioningFlow[T, W](
         pull(in)
       }
 
-    override def onUpstreamFinish(): Unit = {
+    override def postStop(): Unit = {
       close()
-      completeStage()
-    }
-
-    override def onUpstreamFailure(ex: Throwable): Unit = {
-      close()
-      super.onUpstreamFailure(ex)
+      super.postStop()
     }
 
   }

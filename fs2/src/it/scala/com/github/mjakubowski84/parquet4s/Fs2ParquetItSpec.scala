@@ -322,16 +322,20 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
   }
 
   it should "flush already processed files on failure when using rotating writer" in {
-    val numberOfProcessedElementsBeforeFailure = 5
+    val numberOfProcessedElementsBeforeFailure = 25
 
     def write(blocker: Blocker, path: Path): Stream[IO, Vector[Data]] =
       Stream
         .iterable(data)
-        .take(numberOfProcessedElementsBeforeFailure)
-        .append(Stream.raiseError[IO](new RuntimeException("test exception")))
         .through(parquet.viaParquet[IO, Data]
           .options(writeOptions)
           .partitionBy("s")
+          .postWriteHandler {
+            case state if state.count >= numberOfProcessedElementsBeforeFailure =>
+              IO.raiseError(new RuntimeException("test exception"))
+            case _ =>
+              IO.unit
+          }
           .write(blocker, path.toString)
         )
         .handleErrorWith(_ => Stream.empty)
