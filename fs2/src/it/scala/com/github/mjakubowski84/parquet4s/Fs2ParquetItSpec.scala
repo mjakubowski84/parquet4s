@@ -2,6 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import java.nio.file.{Path, Paths}
 
+import cats.effect.concurrent.Ref
 import cats.effect.{Blocker, ContextShift, IO, Timer}
 import cats.implicits._
 import fs2.Stream
@@ -187,6 +188,44 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         writtenData should contain theSameElementsAs data
         readData should contain theSameElementsAs data
         parquetFiles.size should be > 1
+      }
+
+    testStream.compile.drain.as(succeed).unsafeToFuture()
+  }
+
+  it should "apply postWriteHandlerWhenWriting" in {
+    val expectedNumberOfFiles = 8
+    val countOverride = count / expectedNumberOfFiles
+
+    def write(blocker: Blocker, path: Path, gaugeRef: Ref[IO, Vector[Long]]): Stream[IO, Vector[Data]] =
+      Stream
+        .iterable(data)
+        .through(parquet.viaParquet[IO, Data]
+          .maxCount(count)
+          .postWriteHandler {
+            case state if state.count >= countOverride =>
+              gaugeRef.update(_ :+ state.count) >> state.flush
+            case _ => IO.unit
+          }
+          .options(writeOptions)
+          .write(blocker, path.toString)
+        )
+        .fold(Vector.empty[Data])(_ :+ _)
+
+    val testStream =
+      for {
+        blocker <- Stream.resource(Blocker[IO])
+        path <- tempDirectoryStream[IO](blocker, tmpDir)
+        gaugeRef <- Stream.eval(Ref.of[IO, Vector[Long]](Vector.empty))
+        writtenData <- write(blocker, path, gaugeRef)
+        readData <- read[Data](blocker, path)
+        parquetFiles <- listParquetFiles(blocker, path)
+        gaugeValue <- Stream.eval(gaugeRef.get)
+      } yield {
+        writtenData should contain theSameElementsAs data
+        readData should contain theSameElementsAs data
+        parquetFiles should have size expectedNumberOfFiles
+        gaugeValue should be(Vector.fill(expectedNumberOfFiles)(countOverride))
       }
 
     testStream.compile.drain.as(succeed).unsafeToFuture()
