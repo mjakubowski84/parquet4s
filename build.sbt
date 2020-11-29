@@ -5,8 +5,8 @@ lazy val supportedScalaVersions = Seq("2.11.12", "2.12.12", "2.13.3")
 lazy val fs2ScalaVersions = Seq("2.12.12", "2.13.3")
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "1.7.0"
-ThisBuild / isSnapshot := false
+ThisBuild / version := "1.8.0-SNAPSHOT"
+ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := "2.12.12"
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8")
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature")

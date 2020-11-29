@@ -510,7 +510,7 @@ class ParquetStreamsITSpec
     val numberOfSuccessfulWrites = 25
 
     val failingSink = Sink.foreach[Data] {
-      case Data(i, _) if i < numberOfSuccessfulWrites => ()
+      case Data(i, _) if i < numberOfSuccessfulWrites - 1 => ()
       case _ => throw new RuntimeException("test exception")
     }
 
@@ -522,7 +522,7 @@ class ParquetStreamsITSpec
       _ <- Source(data).via(flow).runWith(failingSink).recover { case _ => Done }
       readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
     } yield
-      readData should have size numberOfSuccessfulWrites + 1
+      readData should have size numberOfSuccessfulWrites
   }
 
   it should "close viaParquet properly on internal exception" in {
