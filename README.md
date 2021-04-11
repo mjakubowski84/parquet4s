@@ -20,6 +20,7 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2
 1. [FS2](#FS2)
 1. [Before-read filtering or filter pushdown](#before-read-filtering-or-filter-pushdown)
 1. [Schema projection](#schema-projection)
+1. [Statistics](#Statistics)
 1. [Supported storage types](#supported-storage-types)
 1. [Supported types](#supported-types)
 1. [Generic Records](#generic-records)
@@ -33,7 +34,7 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2
 
 ```scala
 libraryDependencies ++= Seq(
-  "com.github.mjakubowski84" %% "parquet4s-core" % "1.7.0",
+  "com.github.mjakubowski84" %% "parquet4s-core" % "1.8.0",
   "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 )
 ```
@@ -42,7 +43,7 @@ libraryDependencies ++= Seq(
 
 ```scala
 def ivyDeps = Agg(
-  ivy"com.github.mjakubowski84::parquet4s-core:1.7.0",
+  ivy"com.github.mjakubowski84::parquet4s-core:1.8.0",
   ivy"org.apache.hadoop:hadoop-client:$yourHadoopVersion"
 )
 ```
@@ -93,7 +94,7 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams. Just import:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "1.7.0"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "1.8.0"
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
@@ -153,10 +154,10 @@ ParquetStreams.fromParquet[User]
 
 ## FS2
 
-FS2 integration allows you to read and write Parquet using functional streams. In order to use it please import:
+FS2 integration allows you to read and write Parquet using functional streams. Functionality is exactly the same as in case of Akka module. In order to use it please import:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-fs2" % "1.7.0"
+"com.github.mjakubowski84" %% "parquet4s-fs2" % "1.8.0"
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
@@ -201,6 +202,10 @@ ParquetStreams.fromParquet[User].withProjection.read("file://my/path")
 import com.github.mjakubowski84.parquet4s.parquet._
 fromParquet[IO, User].projection.read(blocker, "file://my/path")
 ```
+
+## Statistics
+
+Parquet4S leverages Parquet metadata to efficiently read record count as well as max and min value of the column of Parquet files. It provides correct value for both filtered and unfiltered files. Functionality is available in core module either by direct call to [Stats](src/main/scala/com/github/mjakubowski84/parquet4s/Stats.scala) or via API of `ParquetReader` and `ParquetIterable`.
 
 ## Supported storage types
 
