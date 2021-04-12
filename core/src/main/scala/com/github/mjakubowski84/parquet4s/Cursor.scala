@@ -2,6 +2,8 @@ package com.github.mjakubowski84.parquet4s
 
 import shapeless.Witness
 
+import java.util.Calendar
+
 /**
   * Auxiliary construct that facilitates traversal over tree of case classes.
   * Apart from pointing if program should advance the tree it implements visitor pattern that allows to process
@@ -43,6 +45,8 @@ trait Cursor {
 }
 
 object Cursor {
+
+  Calendar.getInstance.getTime
 
   type DotPath = List[String]
   object DotPath {
