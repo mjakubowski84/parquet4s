@@ -59,6 +59,37 @@ jobs:
             - ~/.sbt
           key: v1-deps--{{ checksum "build.sbt" }}
 
+  debug:
+    docker:
+      - image: circleci/openjdk:8-jdk
+    working_directory: ~/repo
+    environment:
+      JVM_OPTS: -Xmx1024m
+      TERM: dumb
+    steps:
+      - checkout
+      - run: gpg --version
+      - run: gpg1 --version
+      # set required GPG_TTY
+      - run: echo 'export GPG_TTY=$(tty)' >> $BASH_ENV
+      # import public key
+      - run: echo $GPG_PUBLIC_KEY | base64 --decode | gpg --import --batch --no-tty --yes
+      # import private key
+      - run: echo $GPG_PRIVATE_KEY | base64 --decode | gpg --import --batch --no-tty --yes
+      # download cached dependencies
+      - restore_cache:
+          keys:
+            - v1-deps-{{ checksum "build.sbt" }}
+            - v1-deps-
+      # publish signed artifacts to sonatype
+      - run: cat /dev/null | sbt +publish
+      # cache dependencies
+      - save_cache:
+          paths:
+            - ~/.ivy2
+            - ~/.sbt
+          key: v1-deps--{{ checksum "build.sbt" }}
+
 workflows:
   version: 2
 
@@ -74,7 +105,7 @@ workflows:
       - build:
           filters:
             tags:
-              only: /.*/
+              only: /^v.*/
             branches:
               ignore: /.*/
       - release:
@@ -83,5 +114,14 @@ workflows:
           filters:
             tags:
               only: /^v.*/
+            branches:
+              ignore: /.*/
+
+  debug-and-release:
+    jobs:
+      - debug:
+          filters:
+            tags:
+              only: /^debug.*/
             branches:
               ignore: /.*/

@@ -16,12 +16,12 @@ object Signing {
     if (signatureFile.exists()) IO.delete(signatureFile)
 
     val command = "gpg"
-    val keyRingArgs = Seq("--no-default-keyring", "--keyring", (file(System.getProperty("user.home")) / ".gnupg" / "pubring.kbx").getAbsolutePath)
+//    val keyRingArgs = Seq("--no-default-keyring", "--keyring", (file(System.getProperty("user.home")) / ".gnupg" / "pubring.kbx").getAbsolutePath)
     val actionArgs = Seq("--detach-sign", "--armor")
-    val passwordArgs = Seq("--pinentry-mode", "loopback", "--passphrase", sys.env("GPG_PASSWORD"))
+    val passwordArgs = Seq("--batch", "--passphrase", sys.env("GPG_PASSWORD"))
     val outputArgs = Seq("--output", signatureFile.getAbsolutePath)
     val targetArgs = Seq(artifactFile.getAbsolutePath)
-    val args: Seq[String] = keyRingArgs ++ actionArgs ++ passwordArgs ++ outputArgs ++ targetArgs
+    val args: Seq[String] = actionArgs ++ passwordArgs ++ outputArgs ++ targetArgs
 
     sys.process.Process(command, args) ! match {
       case 0 => ()
