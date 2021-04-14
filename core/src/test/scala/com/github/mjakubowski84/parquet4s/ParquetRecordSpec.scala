@@ -128,6 +128,15 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
+  it should "accumulate 3-levels legacy primitive values" in {
+    val b1 = BinaryValue(Binary.fromString("a string"))
+    val b2 = BinaryValue(Binary.fromString("another string"))
+    val r1 = RowParquetRecord("array" -> b1)
+    val r2 = RowParquetRecord("array" -> b2)
+    val lst = ListParquetRecord.empty.add("bag",  r1).add("bag",  r2)
+    lst should contain theSameElementsInOrderAs Seq(b1, b2)
+  }
+
   it should "accumulate legacy compound values" in {
     val r1 = RowParquetRecord("a"-> IntValue(1), "b"-> IntValue(2))
     val r2 = RowParquetRecord("c"-> IntValue(3), "d"-> IntValue(4))
