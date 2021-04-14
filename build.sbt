@@ -75,9 +75,14 @@ lazy val publishSettings = {
 lazy val itSettings = Defaults.itSettings ++
   Project.inConfig(IntegrationTest)(Seq(
     fork := true,
-    parallelExecution := false
+    parallelExecution := false,
+    testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
   )) ++
   Project.inConfig(IntegrationTest)(BloopDefaults.configSettings)
+
+lazy val testReportSettings = Project.inConfig(Test)(Seq(
+  testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
+))
 
 lazy val core = (project in file("core"))
   .configs(IntegrationTest)
@@ -87,6 +92,7 @@ lazy val core = (project in file("core"))
   )
   .settings(itSettings)
   .settings(publishSettings)
+  .settings(testReportSettings)
 
 lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
@@ -96,6 +102,7 @@ lazy val akka = (project in file("akka"))
   )
   .settings(itSettings)
   .settings(publishSettings)
+  .settings(testReportSettings)
   .dependsOn(core % "compile->compile;it->it")
 
 lazy val fs2 = (project in file("fs2"))
@@ -106,6 +113,7 @@ lazy val fs2 = (project in file("fs2"))
   )
   .settings(itSettings)
   .settings(publishSettings)
+  .settings(testReportSettings)
   .dependsOn(core % "compile->compile;it->it")
 
 lazy val examples = (project in file("examples"))

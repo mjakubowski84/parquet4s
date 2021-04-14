@@ -1,94 +1,128 @@
-version: 2.0
+version: 2.1
+
+executors:
+  jdk:
+    docker:
+      - image: circleci/openjdk:8-jdk
+        auth:
+          username: $DOCKERHUB_USER
+          password: $DOCKERHUB_PASSWORD
+    environment:
+      JVM_OPTS: -Xmx1024m
+      TERM: dumb
+    working_directory: /tmp
+
+commands:
+  cache_dependencies:
+    parameters:
+      path:
+        description: repo directory
+        type: string
+    steps:
+      # cache downloaded dependencies
+      - save_cache:
+          paths:
+            - ~/.ivy2
+            - ~/.sbt
+            - ~/.cache/coursier/v1
+          key: v1-deps--{{ checksum "<< parameters.path >>/build.sbt" }}
+
+  download_cached_dependencies:
+    parameters:
+      path:
+        description: repo directory
+        type: string
+    steps:
+      # Download cached dependencies
+      - restore_cache:
+          keys:
+            - v1-deps-{{ checksum "<< parameters.path >>/build.sbt" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-deps-
+
+  save_test_results:
+    parameters:
+      path:
+        description: repo directory
+        type: string
+    steps:
+      - store_test_results:
+          path: << parameters.path >>/target/junit/2.11
+      - store_test_results:
+          path: << parameters.path >>/target/junit/2.12
+      - store_test_results:
+          path: << parameters.path >>/target/junit/2.13
+
+  setup_gpg:
+    steps:
+      # set required GPG_TTY
+      - run: echo 'export GPG_TTY=$(tty)' >> $BASH_ENV
+      # import public key
+      - run: echo $GPG_PUBLIC_KEY | base64 --decode | gpg --import --batch --no-tty --yes
+      # import private key
+      - run: echo $GPG_PRIVATE_KEY | base64 --decode | gpg --import --batch --no-tty --yes
 
 jobs:
 
   build:
-    docker:
-      - image: circleci/openjdk:8-jdk
-    working_directory: ~/repo
-    environment:
-      JVM_OPTS: -Xmx1024m
-      TERM: dumb
+    executor:
+      name: jdk
     steps:
-      - checkout
-      # Download cached dependencies
-      - restore_cache:
-          keys:
-          - v1-deps-{{ checksum "build.sbt" }}
-          # fallback to using the latest cache if no exact match is found
-          - v1-deps-
-      # compile all sources
-      - run: cat /dev/null | sbt +test:compile +it:compile
-      # cache dependencies
-      - save_cache:
+      - run:
+          name: Create workspace directory
+          command: mkdir -p workspace/repo
+      - checkout:
+          path: workspace/repo
+      - download_cached_dependencies:
+          path: workspace/repo
+      - run:
+          name: Compile
+          command: cat /dev/null | sbt +test:compile +it:compile
+          working_directory: workspace/repo
+      - cache_dependencies:
+          path: workspace/repo
+      - run:
+          name: Test
+          command: cat /dev/null | sbt +test +it:test
+          when: always
+          working_directory: workspace/repo
+      - persist_to_workspace:
+          root: workspace
           paths:
-          - ~/.ivy2
-          - ~/.sbt
-          key: v1-deps--{{ checksum "build.sbt" }}
-      # run tests! in every supported Scala version
-      - run: cat /dev/null | sbt +test +it:test
+            - repo
+      - save_test_results:
+          path: workspace/repo
 
   release:
-    docker:
-      - image: circleci/openjdk:8-jdk
-    working_directory: ~/repo
-    environment:
-      JVM_OPTS: -Xmx1024m
-      TERM: dumb
+    executor:
+      name: jdk
     steps:
-      - checkout
-      # set required GPG_TTY
-      - run: echo 'export GPG_TTY=$(tty)' >> $BASH_ENV
-      # import public key
-      - run: echo $GPG_PUBLIC_KEY | base64 --decode | gpg --import --batch --no-tty --yes
-      # import private key
-      - run: echo $GPG_PRIVATE_KEY | base64 --decode | gpg --import --batch --no-tty --yes
-      # download cached dependencies
-      - restore_cache:
-          keys:
-            - v1-deps-{{ checksum "build.sbt" }}
-            - v1-deps-
-      # publish signed artifacts to sonatype
-      - run: cat /dev/null | sbt +publish
-      # release
-      - run: cat /dev/null | sbt sonatypeReleaseAll
-      # cache dependencies
-      - save_cache:
-          paths:
-            - ~/.ivy2
-            - ~/.sbt
-          key: v1-deps--{{ checksum "build.sbt" }}
+      - attach_workspace:
+          at: workspace
+      - download_cached_dependencies:
+          path: workspace/repo
+      - setup_gpg
+      - run:
+          name: Sign & publish artifacts
+          command: cat /dev/null | sbt +publish
+          working_directory: workspace/repo
+      - run:
+          name: Release on Sonatype
+          command: cat /dev/null | sbt sonatypeReleaseAll
+          working_directory: workspace/repo
+      - cache_dependencies:
+          path: workspace/repo
 
   debug:
-    docker:
-      - image: circleci/openjdk:8-jdk
-    working_directory: ~/repo
-    environment:
-      JVM_OPTS: -Xmx1024m
-      TERM: dumb
+    executor:
+      name: jdk
     steps:
       - checkout
       - run: gpg --version
-      - run: gpg1 --version
-      # set required GPG_TTY
-      - run: echo 'export GPG_TTY=$(tty)' >> $BASH_ENV
-      # import public key
-      - run: echo $GPG_PUBLIC_KEY | base64 --decode | gpg --import --batch --no-tty --yes
-      # import private key
-      - run: echo $GPG_PRIVATE_KEY | base64 --decode | gpg --import --batch --no-tty --yes
-      # download cached dependencies
-      - restore_cache:
-          keys:
-            - v1-deps-{{ checksum "build.sbt" }}
-            - v1-deps-
-      # publish signed artifacts to sonatype
+      - setup_gpg
+      - download_cached_dependencies:
+          path: .
       - run: cat /dev/null | sbt +publish
-      # cache dependencies
-      - save_cache:
-          paths:
-            - ~/.ivy2
-            - ~/.sbt
-          key: v1-deps--{{ checksum "build.sbt" }}
 
 workflows:
   version: 2
