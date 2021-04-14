@@ -332,6 +332,7 @@ object ListParquetRecord {
   private val ListFieldName = "list"
   private val ElementFieldName = "element"
   private val LegacyElementFieldName = "array"
+  private val ElementNames = Set(ElementFieldName, LegacyElementFieldName)
 
   /**
     * @param elements to init the record with
@@ -363,8 +364,7 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
 
   override def add(name: String, value: Value): This =
     value match {
-      case repeated: RowParquetRecord if
-      repeated.length==1 && Set(ElementFieldName, LegacyElementFieldName).contains(repeated.head._1) =>
+      case repeated: RowParquetRecord if repeated.length == 1 && ElementNames.contains(repeated.head._1) =>
         add(repeated.head._2)
       case repeated: RowParquetRecord if repeated.isEmpty =>
         add(NullValue)
