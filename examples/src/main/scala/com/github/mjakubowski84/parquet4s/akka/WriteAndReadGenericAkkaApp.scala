@@ -1,15 +1,15 @@
 package com.github.mjakubowski84.parquet4s.akka
 
-import java.time.{LocalDate, ZoneOffset}
-import java.util.TimeZone
-
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import com.github.mjakubowski84.parquet4s.{ParquetStreams, RowParquetRecord, ValueCodecConfiguration}
-import com.google.common.io.Files
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
 import org.apache.parquet.schema.{MessageType, OriginalType, Types}
+
+import java.nio.file.Files
+import java.time.{LocalDate, ZoneOffset}
+import java.util.TimeZone
 
 object WriteAndReadGenericAkkaApp extends App {
 
@@ -37,7 +37,7 @@ object WriteAndReadGenericAkkaApp extends App {
       .add(Birthday, birthday, vcc)
   }
 
-  val path = Files.createTempDir().getAbsolutePath
+  val path = Files.createTempDirectory("example").toString
 
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher

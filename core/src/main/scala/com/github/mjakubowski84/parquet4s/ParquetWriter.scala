@@ -67,7 +67,7 @@ object ParquetWriter  {
     * <a href="https://parquet.apache.org/documentation/latest/">documentation of Parquet</a>
     * to understand what every configuration entry is responsible for.
     * Apart from options specific for Parquet file format there are some other - what follows:
-    * @param hadoopConf can be used to programmatically set Hadoop's [[Configuration]]
+    * @param hadoopConf can be used to programmatically set Hadoop's [[org.apache.hadoop.conf.Configuration]]
     * @param timeZone used when encoding time-based data, local machine's time zone is used by default
     */
   case class Options(

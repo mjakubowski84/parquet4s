@@ -24,7 +24,7 @@ class ParquetWriterItSpec
         Record(Random.nextInt(), Random.nextDouble(), Random.nextString(10)))
   }
 
-  private val tempDir = com.google.common.io.Files.createTempDir().toPath.toAbsolutePath
+  private val tempDir = Files.createTempDirectory("example").toAbsolutePath
   private val writePath = tempDir.resolve("file.parquet")
 
   // Generate records and do a single batch write.

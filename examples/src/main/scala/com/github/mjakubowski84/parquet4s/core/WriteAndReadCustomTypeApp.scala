@@ -3,7 +3,8 @@ package com.github.mjakubowski84.parquet4s.core
 import com.github.mjakubowski84.parquet4s.CustomType._
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver._
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter}
-import com.google.common.io.Files
+
+import java.nio.file.Files
 
 object WriteAndReadCustomTypeApp extends App {
 
@@ -13,7 +14,7 @@ object WriteAndReadCustomTypeApp extends App {
   case class Data(id: Long, dict: Dict.Type)
 
   val data = Data.generate(count = 100)
-  val path = Files.createTempDir().getAbsolutePath
+  val path = Files.createTempDirectory("example").toString
 
   // write
   ParquetWriter.writeAndClose(s"$path/data.parquet", data)

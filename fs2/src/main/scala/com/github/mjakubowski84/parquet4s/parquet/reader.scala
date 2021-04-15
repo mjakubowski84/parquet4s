@@ -38,9 +38,9 @@ object reader {
      * @param blocker Execution context for blocking operations
      * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
      * @param decoder decodes [[RowParquetRecord]] to your data type
-     * @param F [[Sync]] monad
-     * @param cs [[ContextShift]]
-     * @return final [[Stream]]
+     * @param F [[cats.effect.Sync!]] monad
+     * @param cs [[cats.effect.ContextShift!]]
+     * @return final [[fs2.Stream!]]
      */
     def read(blocker: Blocker, path: String)
             (implicit decoder: ParquetRecordDecoder[T], F: Sync[F], cs: ContextShift[F]): Stream[F, T]

@@ -1,8 +1,8 @@
 package com.github.mjakubowski84.parquet4s.core
 
 import com.github.mjakubowski84.parquet4s.{Col, ParquetReader, ParquetWriter}
-import com.google.common.io.Files
 
+import java.nio.file.Files
 import scala.util.Random
 
 object WriteAndReadFilteredApp extends App {
@@ -21,7 +21,7 @@ object WriteAndReadFilteredApp extends App {
 
   val count = 100
   val data = (1 to count).map { i => Data(id = i, dict = Dict.random) }
-  val path = Files.createTempDir().getAbsolutePath
+  val path = Files.createTempDirectory("example").toString
 
   // write
   ParquetWriter.writeAndClose(s"$path/data.parquet", data)

@@ -1,42 +1,62 @@
-import java.io.File
-
 import sbt.Keys._
+import sbt.internal.util.ManagedLogger
 import sbt.io.IO
 import sbt.librarymanagement.{Artifact, Configuration}
-import sbt.{Def, TaskKey, _}
+import sbt._
 
+import java.io.File
 import scala.language.postfixOps
+import scala.sys.process.ProcessLogger
 
 object Signing {
 
   private val SignatureExtension = "asc"
+  private val VersionLine = """gpg \(GnuPG\) ([0-9.]+)""".r
+  private val GPG1 = 1
 
-  private def createSignatureFile(artifactFile: File): File = {
+  private def createSignatureFile(artifactFile: File, logger: ManagedLogger): File = {
     val signatureFile = file(artifactFile.getAbsolutePath + "." + SignatureExtension)
     if (signatureFile.exists()) IO.delete(signatureFile)
 
     val command = "gpg"
 //    val keyRingArgs = Seq("--no-default-keyring", "--keyring", (file(System.getProperty("user.home")) / ".gnupg" / "pubring.kbx").getAbsolutePath)
     val actionArgs = Seq("--detach-sign", "--armor")
-    val passwordArgs = Seq("--batch", "--passphrase", sys.env("GPG_PASSWORD"))
+    val passwordArgs = if (gpgVersion == GPG1) {
+      Seq("--batch", "--passphrase", sys.env("GPG_PASSWORD"))
+    } else {
+      Seq("--pinentry-mode", "loopback", "--passphrase", sys.env("GPG_PASSWORD"))
+    }
     val outputArgs = Seq("--output", signatureFile.getAbsolutePath)
     val targetArgs = Seq(artifactFile.getAbsolutePath)
     val args: Seq[String] = actionArgs ++ passwordArgs ++ outputArgs ++ targetArgs
 
-    sys.process.Process(command, args) ! match {
+    sys.process.Process(command, args) ! ProcessLogger(
+      fout = out => logger.info(out),
+      ferr = err => logger.error(err)
+    ) match {
       case 0 => ()
-      case n => sys.error(s"""Failure running '${args.mkString(command + " ", " ", "")}'. Exit code: $n""")
+      case _ => sys.error(s"""Failure running '${args.mkString(command + " ", " ", "")}'.""")
     }
 
     signatureFile
   }
+
+  private def gpgVersion: Int =
+    // gpg (GnuPG) 1.4.23
+    // gpg (GnuPG) 2.2.27
+    sys.process.Process("gpg", Seq("--version")).lineStream.collectFirst {
+      case VersionLine(versionString) => versionString.substring(0, 1).toInt
+    } match {
+      case Some(version) => version
+      case None => sys.error("Failed to resolve GPG version")
+    }
 
   private def addSignatureArtifact(configuration: Configuration, packageTask: TaskKey[File]): Def.SettingsDefinition = {
 
     val signTaskDef = Def.task {
       val (artifact, artifactFile) = packagedArtifact.in(configuration, packageTask).value
       streams.value.log.info("Signing: " + artifact)
-      createSignatureFile(artifactFile)
+      createSignatureFile(artifactFile, streams.value.log)
     }
 
     val artifactDef = Def.setting {

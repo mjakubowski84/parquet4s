@@ -4,7 +4,8 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
 import com.github.mjakubowski84.parquet4s.CustomType._
 import com.github.mjakubowski84.parquet4s.ParquetStreams
-import com.google.common.io.Files
+
+import java.nio.file.Files
 
 object WriteAndReadCustomTypeAkkaApp extends App {
 
@@ -14,7 +15,7 @@ object WriteAndReadCustomTypeAkkaApp extends App {
   case class Data(id: Long, dict: Dict.Type)
 
   val data = () => Data.generate(count = 100)
-  val path = Files.createTempDir().getAbsolutePath
+  val path = Files.createTempDirectory("example").toString
 
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher

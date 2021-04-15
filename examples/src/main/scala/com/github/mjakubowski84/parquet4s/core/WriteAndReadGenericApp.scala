@@ -2,12 +2,12 @@ package com.github.mjakubowski84.parquet4s.core
 
 import java.time.{LocalDate, ZoneOffset}
 import java.util.TimeZone
-
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, RowParquetRecord, ValueCodecConfiguration}
-import com.google.common.io.Files
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
 import org.apache.parquet.schema.{MessageType, OriginalType, Types}
+
+import java.nio.file.Files
 
 object WriteAndReadGenericApp extends App {
 
@@ -16,7 +16,7 @@ object WriteAndReadGenericApp extends App {
   val Birthday = "birthday"
   val SchemaName = "user_schema"
 
-  val path = Files.createTempDir().getAbsolutePath
+  val path = Files.createTempDirectory("example").toString
   val vcc = ValueCodecConfiguration(TimeZone.getTimeZone(ZoneOffset.UTC))
 
   val users = List(

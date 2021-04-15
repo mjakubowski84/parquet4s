@@ -63,9 +63,10 @@ object RowParquetRecord {
 
   implicit val genericSkippingParquetRecordEncoder: SkippingParquetRecordEncoder[RowParquetRecord] =
     new SkippingParquetRecordEncoder[RowParquetRecord] {
+      private val cursorDothPathSet = shapeless.TypeCase[Set[Cursor.DotPath]]
       override def encode(cursor: Cursor, entity: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = {
         cursor.objective match {
-          case paths: Set[Cursor.DotPath] => paths.foreach(entity.remove)
+          case cursorDothPathSet(paths) => paths.foreach(entity.remove)
         }
         entity
       }
@@ -92,9 +93,10 @@ object RowParquetRecord {
     }
 
   implicit val genericPartitionLens: PartitionLens[RowParquetRecord] = new PartitionLens[RowParquetRecord] {
+    private val cursorDothPath = shapeless.TypeCase[Cursor.DotPath]
     override def apply(cursor: Cursor, obj: RowParquetRecord): Either[PartitionLens.LensError, String] = {
       cursor.objective match {
-        case path: Cursor.DotPath =>
+        case cursorDothPath(path) =>
           obj.get(path) match {
             case NullValue => Left(LensError(cursor, s"Field '${cursor.objectiveAsString}' does not exist."))
             case BinaryValue(binary) => Right(binary.toStringUsingUTF8)
@@ -208,7 +210,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     *
     * @param idx The index
     * @return The field name and value
-    * @throws IndexOutOfBoundsException if the index is not valid.
+    * @throws scala.IndexOutOfBoundsException if the index is not valid.
     */
   override def apply(idx: Int): (String, Value) = values(idx)
 
@@ -217,7 +219,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     *
     *  @param idx      the index of the element to replace.
     *  @param newEntry     the new field name and value.
-    *  @throws IndexOutOfBoundsException if the index is not valid.
+    *  @throws scala.IndexOutOfBoundsException if the index is not valid.
     */
   override def update(idx: Int, newEntry: (String, Value)): Unit = {
     values(idx) = newEntry
@@ -228,7 +230,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
     *
     *  @param idx      the index of the value to replace.
     *  @param newVal   the new value.
-    *  @throws IndexOutOfBoundsException if the index is not valid.
+    *  @throws scala.IndexOutOfBoundsException if the index is not valid.
     */
   def update(idx: Int, newVal: Value): Unit = values(idx) = values(idx).copy(_2 = newVal)
 
@@ -236,7 +238,7 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
    * Removes field at given index.
    * @param idx index of the field to be removed
    * @return name of removed field and its value
-   * @throws IndexOutOfBoundsException if the index is not valid.
+   * @throws scala.IndexOutOfBoundsException if the index is not valid.
    */
   def remove(idx: Int): (String, Value) = {
     val element = values.remove(idx)
@@ -396,7 +398,7 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
     *
     * @param idx The index
     * @return The value
-    * @throws IndexOutOfBoundsException if the index is not valid.
+    * @throws scala.IndexOutOfBoundsException if the index is not valid.
     */
   def apply(idx: Int): Value = values(idx)
 
@@ -407,7 +409,7 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
     *
     *  @param idx      the index of the element to replace.
     *  @param newVal     the new value.
-    *  @throws IndexOutOfBoundsException if the index is not valid.
+    *  @throws scala.IndexOutOfBoundsException if the index is not valid.
     */
   def update(idx: Int, newVal: Value): Unit = values(idx) = newVal
 
@@ -490,7 +492,7 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
   }
 
   /**
-    * The same as [[update]] but returns updated record.
+    * The same as [[update(Value,Value):Unit* update]] but returns updated record.
     */
   def add(key: Value, value: Value): This = {
     entries.put(key, value)
@@ -498,7 +500,7 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
   }
 
   /**
-    * The same as [[update]] but returns updated record.
+    * The same as [[update[K,V](K,V,ValueCodecConfiguration)(ValueCodec[K],ValueCodec(V)):This* update]] but returns updated record.
     */
   def add[K, V](key: K, newVal: V, valueCodecConfiguration: ValueCodecConfiguration)
                   (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): This =
@@ -515,7 +517,7 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
     *  @param  key the key
     *  @return     the value associated with the given key, or the result of the
     *              map's `default` method, if none exists.
-    *  @throws NoSuchElementException if there is no entry for the given key
+    *  @throws scala.NoSuchElementException if there is no entry for the given key
     */
   override def apply(key: Value): Value = entries(key)
 
@@ -528,7 +530,7 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
     * @tparam K type of the key
     * @tparam V type of the value
     * @return retrieved value
-    * @throws NoSuchElementException if there is no entry for the given key
+    * @throws scala.NoSuchElementException if there is no entry for the given key
     */
   def apply[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)
                  (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): V =

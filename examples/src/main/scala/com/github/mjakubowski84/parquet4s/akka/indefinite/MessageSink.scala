@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s.akka.indefinite
 
 import java.sql.Timestamp
-
 import akka.Done
 import akka.kafka.CommitterSettings
 import akka.kafka.ConsumerMessage.CommittableOffsetBatch
@@ -10,10 +9,10 @@ import akka.stream.FlowShape
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.stream.stage.GraphStage
 import com.github.mjakubowski84.parquet4s.{ParquetStreams, ParquetWriter}
-import com.google.common.io.Files
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
+import java.nio.file.Files
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -40,7 +39,7 @@ trait MessageSink {
   import MessageSink._
   import MessageSource._
 
-  protected val baseWritePath: String = new Path(Files.createTempDir().getAbsolutePath, WriteDirectoryName).toString
+  protected val baseWritePath: String = new Path(Files.createTempDirectory("example").toString, WriteDirectoryName).toString
 
   private val writerOptions = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
 

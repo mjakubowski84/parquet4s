@@ -51,7 +51,7 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
     PartitionedPath(new Path("/"), partitions.toList)
 
   def partitionedDirectory(partitionedPaths: PartitionedPath*): PartitionedDirectory =
-    PartitionedDirectory(partitionedPaths).right.value
+    PartitionedDirectory(partitionedPaths).value
 
 
   "PartitionedDirectory" should "accept empty input" in {
