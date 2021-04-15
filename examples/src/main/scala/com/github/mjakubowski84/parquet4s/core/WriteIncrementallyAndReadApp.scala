@@ -1,8 +1,8 @@
 package com.github.mjakubowski84.parquet4s.core
 
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter}
-import com.google.common.io.Files
 
+import java.nio.file.Files
 import scala.util.Random
 
 object WriteIncrementallyAndReadApp extends App {
@@ -11,7 +11,7 @@ object WriteIncrementallyAndReadApp extends App {
 
   val count = 100
   val data = (1 to count).map { i => Data(id = i, text = Random.nextString(4)) }
-  val path = Files.createTempDir().getAbsolutePath
+  val path = Files.createTempDirectory("example").toString
 
   // write
   val writer = ParquetWriter.writer[Data](s"$path/data.parquet")

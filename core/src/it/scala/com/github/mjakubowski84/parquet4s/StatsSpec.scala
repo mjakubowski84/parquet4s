@@ -1,10 +1,10 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.google.common.io.Files
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfterAll, Inspectors}
 
+import java.nio.file.Files
 import java.time.LocalDate
 import java.util.UUID
 import scala.collection.compat.immutable.LazyList
@@ -29,7 +29,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   val enum: Seq[String] = List("a", "b", "c", "d")
   val dataSize: Int = 256 * 256
   val halfSize: Int = dataSize / 2
-  val path: String = Files.createTempDir().getAbsolutePath
+  val path: String = Files.createTempDirectory("example").toString
   val zeroDate: LocalDate = LocalDate.of(1900, 1, 1)
   def decimal(i: Int): BigDecimal = BigDecimal.valueOf(0.001 * (i - halfSize))
 

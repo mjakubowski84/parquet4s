@@ -91,14 +91,14 @@ object IndefiniteFS2App extends IOApp {
       .flatMap(fluctuation => Stream.sleep_(fluctuation.delay) ++ Stream.emit(nextWord()))
       .map(word => ProducerRecord(topic = Topic, key = UUID.randomUUID().toString, value = word))
       .map(ProducerRecords.one[String, String])
-      .through(produce(producerSettings))
+      .through(KafkaProducer.pipe(producerSettings))
       .drain
 
   private def consumer(blocker: Blocker,
                        consumerSettings: ConsumerSettings[IO, String, String],
                        writePath: String): Stream[IO, INothing] =
-    consumerStream[IO]
-      .using(consumerSettings)
+    KafkaConsumer[IO]
+      .stream(consumerSettings)
       .evalTap(_.subscribeTo(Topic))
       .flatMap(_.stream)
       .through(write(blocker, writePath))

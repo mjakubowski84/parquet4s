@@ -1,9 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.nio.file.Paths
+import java.nio.file.{Files, Paths}
 import java.time.LocalDate
-
-import com.google.common.io.Files
 import org.apache.parquet.filter2.predicate.Operators.{Column, DoubleColumn, FloatColumn, SupportsLtGt}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -31,7 +29,7 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
   val enum: Seq[String] = List("a", "b", "c", "d")
   val dataSize: Int = 4096
   val halfSize: Int = dataSize / 2
-  val filePath: String = Paths.get(Files.createTempDir().getAbsolutePath, "file.parquet").toString
+  val filePath: String = Paths.get(Files.createTempDirectory("example").toString, "file.parquet").toString
   val zeroDate: LocalDate = LocalDate.of(1900, 1, 1)
 
   implicit val localDateOrdering: Ordering[LocalDate] = new Ordering[LocalDate] {

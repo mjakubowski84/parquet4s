@@ -1,3 +1,5 @@
+import DependecyVersions._
+import Releasing._
 import bloop.integrations.sbt.BloopDefaults
 
 
@@ -17,61 +19,6 @@ ThisBuild / resolvers := Seq(
 ThisBuild / makePomConfiguration := makePomConfiguration.value.withConfigurations(Configurations.defaultMavenConfigurations)
 
 
-lazy val publishSettings = {
-  import xerial.sbt.Sonatype._
-  Seq(
-    Keys.credentials ++= Seq(
-      Credentials(
-        realm = "Sonatype Nexus Repository Manager",
-        host = "oss.sonatype.org",
-        userName = sys.env.getOrElse(
-          "SONATYPE_USER_NAME",
-          {
-            streams.value.log.warn("Undefined environment variable: SONATYPE_USER_NAME")
-            "UNDEFINED"
-          }
-        ),
-        passwd = sys.env.getOrElse(
-          "SONATYPE_PASSWORD",
-          {
-            streams.value.log.warn("Undefined environment variable: SONATYPE_PASSWORD")
-            "UNDEFINED"
-          }
-        )
-      )
-    ),
-    licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT")),
-    homepage := Some(url("https://github.com/mjakubowski84/parquet4s")),
-    scmInfo := Some(
-      ScmInfo(
-        browseUrl = url("https://github.com/mjakubowski84/parquet4s"),
-        connection = "scm:git@github.com:mjakubowski84/parquet4s.git"
-      )
-    ),
-    sonatypeProjectHosting := Some(GitHubHosting(
-      user = "mjakubowski84", repository = "parquet4s", email = "mjakubowski84@gmail.com")
-    ),
-    sonatypeProfileName := "com.github.mjakubowski84",
-    developers := List(
-      Developer(
-        id = "mjakubowski84",
-        name = "Marcin Jakubowski",
-        email = "mjakubowski84@gmail.com",
-        url = url("https://github.com/mjakubowski84")
-      )
-    ),
-    publishMavenStyle := true,
-    publishTo := Some(
-      if (isSnapshot.value)
-        Opts.resolver.mavenLocalFile
-      else
-        Opts.resolver.sonatypeStaging
-    ),
-    Test / publishArtifact := false,
-    IntegrationTest / publishArtifact := false
-  ) ++ (if (sys.env contains "SONATYPE_USER_NAME") Signing.signingSettings else Seq.empty)
-}
-
 lazy val itSettings = Defaults.itSettings ++
   Project.inConfig(IntegrationTest)(Seq(
     fork := true,
@@ -84,11 +31,44 @@ lazy val testReportSettings = Project.inConfig(Test)(Seq(
   testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
 ))
 
+// used only for testing in core module
+lazy val sparkDeps = Seq(
+  "org.apache.spark" %% "spark-core" % sparkVersion % "it"
+    exclude(org = "org.apache.hadoop", name = "hadoop-client")
+    exclude(org = "org.slf4j", name = "slf4j-api")
+    exclude(org = "org.apache.parquet", name = "parquet-hadoop"),
+  "org.apache.spark" %% "spark-sql" % sparkVersion % "it"
+    exclude(org = "org.apache.hadoop", name = "hadoop-client")
+)
+
 lazy val core = (project in file("core"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-core",
-    crossScalaVersions := supportedScalaVersions
+    crossScalaVersions := supportedScalaVersions,
+    libraryDependencies ++= Seq(
+      "org.apache.parquet" % "parquet-hadoop" % parquetVersion
+        exclude(org = "org.slf4j", name = "slf4j-api"),
+      "com.chuusai" %% "shapeless" % "2.3.4",
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
+      "org.slf4j" % "slf4j-api" % slf4jVersion,
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.3",
+
+      // tests
+      "org.mockito" %% "mockito-scala-scalatest" % "1.16.37" % "test",
+      "org.scalatest" %% "scalatest" % "3.2.7" % "test,it",
+      "ch.qos.logback" % "logback-classic" % "1.2.3" % "test,it",
+      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
+    ) ++ {
+      val scala = scalaBinaryVersion.value
+      scala match {
+        case "2.11" | "2.12" => sparkDeps
+        case _ => Seq.empty
+      }
+    },
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.slf4j", "slf4j-log4j12")
+    )
   )
   .settings(itSettings)
   .settings(publishSettings)
@@ -98,7 +78,14 @@ lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-akka",
-    crossScalaVersions := supportedScalaVersions
+    crossScalaVersions := supportedScalaVersions,
+    libraryDependencies ++= Seq(
+      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided
+    ),
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.slf4j", "slf4j-log4j12")
+    )
   )
   .settings(itSettings)
   .settings(publishSettings)
@@ -109,7 +96,15 @@ lazy val fs2 = (project in file("fs2"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-fs2",
-    crossScalaVersions := fs2ScalaVersions
+    crossScalaVersions := fs2ScalaVersions,
+    libraryDependencies ++= Seq(
+      "co.fs2" %% "fs2-core" % fs2Version,
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
+      "co.fs2" %% "fs2-io" % fs2Version % "it"
+    ),
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.slf4j", "slf4j-log4j12")
+    )
   )
   .settings(itSettings)
   .settings(publishSettings)
@@ -121,7 +116,21 @@ lazy val examples = (project in file("examples"))
     name := "parquet4s-examples",
     crossScalaVersions := fs2ScalaVersions,
     publish / skip := true,
-    publishLocal / skip := true
+    publishLocal / skip := true,
+    libraryDependencies ++= Seq(
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
+      "io.github.embeddedkafka" %% "embedded-kafka" % "2.7.0",
+      "ch.qos.logback" % "logback-classic" % "1.2.3",
+      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
+      "com.typesafe.akka" %% "akka-stream-kafka" % "2.0.7",
+      "com.github.fd4s" %% "fs2-kafka" % "1.5.0",
+      "co.fs2" %% "fs2-io" % fs2Version
+    ),
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.slf4j", "slf4j-log4j12")
+    ),
+    run / cancelable := true,
+    run / fork := true
   )
   .dependsOn(akka, fs2)
 
