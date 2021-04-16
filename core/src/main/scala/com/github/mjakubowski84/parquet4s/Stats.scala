@@ -105,24 +105,7 @@ object Stats {
              options: ParquetReader.Options,
              projectionSchemaOpt: Option[MessageType],
              filter: Filter
-           ): Stats = {
-    val fs = FileSystem.get(options.hadoopConf)
-    val statsArray = fs.listStatus(path).map(status => this.apply(status, options, projectionSchemaOpt, filter))
-    if (statsArray.length == 1) statsArray.head
-    else new CompoundStats(statsArray)
-  }
-
-  private def apply(
-             status: FileStatus,
-             options: ParquetReader.Options,
-             projectionSchemaOpt: Option[MessageType],
-             filter: Filter
-           ): Stats =
-    if (filter == Filter.noopFilter) {
-      new FileStats(status, options, projectionSchemaOpt)
-    } else {
-      new FilteredFileStats(status, options, projectionSchemaOpt, filter)
-    }
+           ): Stats = new LazyDelegateStats(path, options, projectionSchemaOpt, filter)
 
 }
 
@@ -144,4 +127,29 @@ private class CompoundStats(statsSeq: Seq[Stats]) extends Stats {
       case (acc, stats) => stats.max(columnPath, acc)
     }
 
+}
+
+private class LazyDelegateStats(path: Path,
+                                options: ParquetReader.Options,
+                                projectionSchemaOpt: Option[MessageType],
+                                filter: Filter) extends Stats {
+  private lazy val delegate: Stats = {
+    val fs = path.getFileSystem(options.hadoopConf)
+    val statsArray = fs.listStatus(path).map {
+      case status if filter == Filter.noopFilter => new FileStats(status, options, projectionSchemaOpt)
+      case status => new FilteredFileStats(status, options, projectionSchemaOpt, filter)
+    }
+    if (statsArray.length == 1) statsArray.head
+    else new CompoundStats(statsArray)
+  }
+
+  override def recordCount: Long = delegate.recordCount
+
+  override protected[parquet4s] def min[V](columnPath: String, currentMin: Option[V])
+                                          (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
+    delegate.min(columnPath, currentMin)
+
+  override protected[parquet4s] def max[V](columnPath: String, currentMax: Option[V])
+                                          (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
+    delegate.max(columnPath, currentMax)
 }
