@@ -54,7 +54,7 @@ private[parquet4s] object writer {
       for {
         schema <- F.delay(ParquetSchemaResolver.resolveSchema[T])
         valueCodecConfiguration <- F.delay(options.toValueCodecConfiguration)
-        internalWriter <- F.delay(ParquetWriter.internalWriter(path, schema, options))
+        internalWriter <- blocker.delay(ParquetWriter.internalWriter(path, schema, options))
         encode = { (entity: T) => F.delay(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)) }
       } yield new Writer[T, F](blocker, internalWriter, encode)
     )
