@@ -9,7 +9,7 @@ lazy val fs2ScalaVersions = Seq("2.12.13", "2.13.5")
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "1.9.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
-ThisBuild / scalaVersion := "2.12.13"
+ThisBuild / scalaVersion := "2.13.5"
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8")
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature")
 ThisBuild / resolvers := Seq(
@@ -125,6 +125,26 @@ lazy val examples = (project in file("examples"))
       "com.typesafe.akka" %% "akka-stream-kafka" % "2.0.7",
       "com.github.fd4s" %% "fs2-kafka" % "1.5.0",
       "co.fs2" %% "fs2-io" % fs2Version
+    ),
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.slf4j", "slf4j-log4j12")
+    ),
+    run / cancelable := true,
+    run / fork := true
+  )
+  .dependsOn(akka, fs2)
+
+lazy val benchmarks = (project in file("benchmarks"))
+  .settings(
+    name := "parquet4s-benchmarks",
+    publish / skip := true,
+    publishLocal / skip := true,
+    crossScalaVersions := Nil,
+    libraryDependencies ++= Seq(
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
+      "com.storm-enroute" %% "scalameter" % "0.21",
+      "org.slf4j" % "slf4j-nop" % slf4jVersion,
+      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
