@@ -1,8 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.{TypedSchemaDef, typedSchemaDef}
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
 import org.apache.parquet.io.api.Binary
-import org.apache.parquet.schema.{OriginalType, PrimitiveType}
+import org.apache.parquet.schema.{LogicalTypeAnnotation, PrimitiveType}
 
 import scala.util.Random
 
@@ -33,13 +33,11 @@ object CustomType {
 
     // required for writing only
     implicit val schema: TypedSchemaDef[Type] =
-      typedSchemaDef[Type](
-        PrimitiveSchemaDef(
+        SchemaDef.primitive(
           primitiveType = PrimitiveType.PrimitiveTypeName.BINARY,
           required = false,
-          originalType = Some(OriginalType.UTF8)
-        )
-      )
+          logicalTypeAnnotation = Option(LogicalTypeAnnotation.stringType())
+        ).typed[Type]
   }
 
 }

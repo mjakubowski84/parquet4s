@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s.fs2
 import java.nio.file.Paths
 import java.time.{LocalDate, ZoneOffset}
 import java.util.TimeZone
-
 import cats.Show
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import com.github.mjakubowski84.parquet4s.parquet._
@@ -12,7 +11,7 @@ import fs2.Stream
 import fs2.io.file.tempDirectoryStream
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
-import org.apache.parquet.schema.{MessageType, OriginalType, Types}
+import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, OriginalType, Types}
 
 object WriteAndReadGenericFS2App extends IOApp {
 
@@ -22,9 +21,9 @@ object WriteAndReadGenericFS2App extends IOApp {
   private val SchemaName = "user_schema"
 
   implicit val schema: MessageType = Types.buildMessage()
-    .addField(Types.primitive(INT64, REQUIRED).as(OriginalType.INT_64).named(ID))
-    .addField(Types.primitive(BINARY, OPTIONAL).as(OriginalType.UTF8).named(Name))
-    .addField(Types.primitive(INT32, OPTIONAL).as(OriginalType.DATE).named(Birthday))
+    .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
+    .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
+    .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
   private implicit val showRecords: Show[RowParquetRecord] = Show.fromToString

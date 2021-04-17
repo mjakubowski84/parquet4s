@@ -289,17 +289,16 @@ implicit val customTypeCodec: OptionalValueCodec[CustomType] =
 Additionally, if you want to write your custom type, you have to define the schema for it:
 
 ```scala
-import org.apache.parquet.schema.{OriginalType, PrimitiveType}
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver._
+import org.apache.parquet.schema.{LogicalTypeAnnotation, PrimitiveType}
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
+import com.github.mjakubowski84.parquet4s.SchemaDef
 
 implicit val customTypeSchema: TypedSchemaDef[CustomType] =
-  typedSchemaDef[CustomType](
-    PrimitiveSchemaDef(
+    SchemaDef.primitive(
       primitiveType = PrimitiveType.PrimitiveTypeName.INT32,
       required = false,
-      originalType = Some(OriginalType.INT_32)
-    )
-  )
+      originalType = Option(LogicalTypeAnnotation.intType(32, true))
+    ).typed[CustomType]
 ```
 
 ## More Examples

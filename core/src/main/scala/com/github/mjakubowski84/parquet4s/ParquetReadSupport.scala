@@ -2,10 +2,10 @@ package com.github.mjakubowski84.parquet4s
 
 import java.math.MathContext
 import java.util
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
 import org.apache.parquet.io.api._
+import org.apache.parquet.schema.LogicalTypeAnnotation.{DecimalLogicalTypeAnnotation, IntLogicalTypeAnnotation, ListLogicalTypeAnnotation, MapLogicalTypeAnnotation, StringLogicalTypeAnnotation}
 import org.apache.parquet.schema._
 
 import scala.jdk.CollectionConverters._
@@ -48,29 +48,27 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord[_]](
   private val converters: List[Converter] = schema.getFields.asScala.toList.map(createConverter)
 
   private def createConverter(field: Type): Converter = {
-    Option(field.getOriginalType) match {
-      case Some(OriginalType.UTF8) if field.isPrimitive =>
+    Option(field.getLogicalTypeAnnotation) match {
+      case Some(_ : StringLogicalTypeAnnotation) =>
         new StringConverter(field.getName)
-      case Some(OriginalType.DECIMAL) if field.isPrimitive =>
-        val decimalMetadata = field.asPrimitiveType().getDecimalMetadata
+      case Some(ann : DecimalLogicalTypeAnnotation) =>
         new DecimalConverter(
           name = field.getName, 
-          scale = field.asPrimitiveType.getDecimalMetadata.getScale, 
-          precision = decimalMetadata.getPrecision
+          scale = ann.getScale,
+          precision = ann.getPrecision
         )
-      case Some(OriginalType.INT_16) if field.isPrimitive =>
-        new ShortConverter(field.getName)
-      case Some(OriginalType.INT_8) if field.isPrimitive =>
+      case Some(ann: IntLogicalTypeAnnotation) if ann.getBitWidth == 8 =>
         new ByteConverter(field.getName)
+      case Some(ann: IntLogicalTypeAnnotation) if ann.getBitWidth == 16 =>
+        new ShortConverter(field.getName)
       case _ if field.isPrimitive =>
         new ParquetPrimitiveConverter(field.getName)
-      case Some(OriginalType.MAP) =>
+      case Some(_: MapLogicalTypeAnnotation) =>
         new MapParquetRecordConverter(field.asGroupType(), field.getName, this)
-      case Some(OriginalType.LIST) =>
+      case Some(_: ListLogicalTypeAnnotation) =>
         new ListParquetRecordConverter(field.asGroupType(), field.getName, this)
       case _ =>
         new RowParquetRecordConverter(field.asGroupType(), Option(field.getName), Some(this))
-
     }
   }
 

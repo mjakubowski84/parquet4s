@@ -5,7 +5,7 @@ import java.util.TimeZone
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, RowParquetRecord, ValueCodecConfiguration}
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
-import org.apache.parquet.schema.{MessageType, OriginalType, Types}
+import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, OriginalType, Types}
 
 import java.nio.file.Files
 
@@ -32,9 +32,9 @@ object WriteAndReadGenericApp extends App {
 
   // write
   implicit val schema: MessageType = Types.buildMessage()
-    .addField(Types.primitive(INT64, REQUIRED).as(OriginalType.INT_64).named(ID))
-    .addField(Types.primitive(BINARY, OPTIONAL).as(OriginalType.UTF8).named(Name))
-    .addField(Types.primitive(INT32, OPTIONAL).as(OriginalType.DATE).named(Birthday))
+    .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
+    .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
+    .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
   ParquetWriter.writeAndClose(s"$path/users.parquet", users)

@@ -1,5 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
 import org.apache.parquet.schema.{MessageType, Type}
 import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
@@ -93,10 +94,8 @@ object SkippingParquetSchemaResolver
         resolver.resolveSchema(cursor) match {
           case Nil =>
             None
-          case list =>
-            Some(invoker.invokeOther(typedSchemaDef[V](
-              GroupSchemaDef.optional(list:_*)
-            )))
+          case fieldTypes =>
+            Option(invoker.invokeOther(SchemaDef.group(fieldTypes:_*).typed[V]))
         }
     }
 
