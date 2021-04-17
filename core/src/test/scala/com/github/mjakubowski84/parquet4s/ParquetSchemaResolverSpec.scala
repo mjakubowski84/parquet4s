@@ -1,16 +1,17 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.LogicalTypes._
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.resolveSchema
 import com.github.mjakubowski84.parquet4s.TestCases._
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
 import org.apache.parquet.schema.Type.Repetition._
-import org.apache.parquet.schema.{OriginalType, Types}
+import org.apache.parquet.schema.Types
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 
 class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
-
+  
   "ParquetSchemaResolver" should "resolve schema for type with no fields" in {
     resolveSchema[Empty] should be(Message(Some(classOf[Empty].getCanonicalName)))
   }
@@ -19,17 +20,15 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[Primitives] should be(Message(
       Some(classOf[Primitives].getCanonicalName),
       Types.primitive(BOOLEAN, REQUIRED).named("boolean"),
-      Types.primitive(INT32, REQUIRED).as(OriginalType.INT_32).named("int"),
-      Types.primitive(INT64, REQUIRED).as(OriginalType.INT_64).named("long"),
+      Types.primitive(INT32, REQUIRED).as(Int32Type).named("int"),
+      Types.primitive(INT64, REQUIRED).as(Int64Type).named("long"),
       Types.primitive(FLOAT, REQUIRED).named("float"),
       Types.primitive(DOUBLE, REQUIRED).named("double"),
-      Types.primitive(BINARY, OPTIONAL).as(OriginalType.UTF8).named("string"),
-      Types.primitive(INT32, REQUIRED).as(OriginalType.INT_16).named("short"),
-      Types.primitive(INT32, REQUIRED).as(OriginalType.INT_8).named("byte"),
-      Types.primitive(INT32, REQUIRED).as(OriginalType.INT_32).named("char"),
-      Types.primitive(FIXED_LEN_BYTE_ARRAY, OPTIONAL).as(OriginalType.DECIMAL)
-        .precision(Decimals.Precision)
-        .scale(Decimals.Scale)
+      Types.primitive(BINARY, OPTIONAL).as(StringType).named("string"),
+      Types.primitive(INT32, REQUIRED).as(Int16Type).named("short"),
+      Types.primitive(INT32, REQUIRED).as(Int8Type).named("byte"),
+      Types.primitive(INT32, REQUIRED).as(Int32Type).named("char"),
+      Types.primitive(FIXED_LEN_BYTE_ARRAY, OPTIONAL).as(DecimalType)
         .length(Decimals.ByteArrayLength)
         .named("bigDecimal")
     ))
@@ -38,12 +37,12 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   it should "resolve schema for type containing optional types" in {
     resolveSchema[ContainsOption] should be(Message(
       Some(classOf[ContainsOption].getCanonicalName),
-      Types.optional(INT32).as(OriginalType.INT_32).named("optional")
+      Types.optional(INT32).as(Int32Type).named("optional")
     ))
   }
 
   it should "resolve schema for type containing collections of primitives" in {
-    val elementType = Types.required(INT32).as(OriginalType.INT_32).named(ListSchemaDef.ElementName)
+    val elementType = Types.required(INT32).as(Int32Type).named(ListSchemaDef.ElementName)
     resolveSchema[Collections] should be(Message(
       Some(classOf[Collections].getCanonicalName),
       Types.optionalList.element(elementType).named("list"),
@@ -58,7 +57,7 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsCollectionOfOptionalPrimitives] should be(Message(
       Some(classOf[ContainsCollectionOfOptionalPrimitives].getCanonicalName),
       Types.optionalList
-        .element(Types.optional(INT32).as(OriginalType.INT_32).named(ListSchemaDef.ElementName))
+        .element(Types.optional(INT32).as(Int32Type).named(ListSchemaDef.ElementName))
         .named("list")
     ))
   }
@@ -69,7 +68,7 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
       Types.optionalList
         .element(
           Types.optionalList
-            .element(Types.required(INT32).as(OriginalType.INT_32)
+            .element(Types.required(INT32).as(Int32Type)
             .named(ListSchemaDef.ElementName)
         ).named(ListSchemaDef.ElementName)
       ).named("listOfSets")
@@ -80,8 +79,8 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsMapOfPrimitives] should be(Message(
       Some(classOf[ContainsMapOfPrimitives].getCanonicalName),
       Types.optionalMap()
-        .key(Types.required(BINARY).as(OriginalType.UTF8).named(MapSchemaDef.KeyName))
-        .value(Types.required(INT32).as(OriginalType.INT_32).named(MapSchemaDef.ValueName))
+        .key(Types.required(BINARY).as(StringType).named(MapSchemaDef.KeyName))
+        .value(Types.required(INT32).as(Int32Type).named(MapSchemaDef.ValueName))
         .named("map")
     ))
   }
@@ -90,8 +89,8 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsMapOfOptionalPrimitives] should be(Message(
       Some(classOf[ContainsMapOfOptionalPrimitives].getCanonicalName),
       Types.optionalMap()
-        .key(Types.required(BINARY).as(OriginalType.UTF8).named(MapSchemaDef.KeyName))
-        .value(Types.optional(INT32).as(OriginalType.INT_32).named(MapSchemaDef.ValueName))
+        .key(Types.required(BINARY).as(StringType).named(MapSchemaDef.KeyName))
+        .value(Types.optional(INT32).as(Int32Type).named(MapSchemaDef.ValueName))
         .named("map")
     ))
   }
@@ -100,10 +99,10 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsMapOfCollectionsOfPrimitives] should be(Message(
       Some(classOf[ContainsMapOfCollectionsOfPrimitives].getCanonicalName),
       Types.optionalMap()
-        .key(Types.required(BINARY).as(OriginalType.UTF8).named(MapSchemaDef.KeyName))
+        .key(Types.required(BINARY).as(StringType).named(MapSchemaDef.KeyName))
         .value(
           Types.optionalList
-            .element(Types.required(INT32).as(OriginalType.INT_32).named(ListSchemaDef.ElementName))
+            .element(Types.required(INT32).as(Int32Type).named(ListSchemaDef.ElementName))
             .named(MapSchemaDef.ValueName)
         ).named("map")
     ))
@@ -113,7 +112,7 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsNestedClass] should be(Message(
       Some(classOf[ContainsNestedClass].getCanonicalName),
       Types.optionalGroup()
-        .addField(Types.required(INT32).as(OriginalType.INT_32).named("int"))
+        .addField(Types.required(INT32).as(Int32Type).named("int"))
         .named("nested")
     ))
   }
@@ -122,14 +121,14 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsOptionalNestedClass] should be(Message(
       Some(classOf[ContainsOptionalNestedClass].getCanonicalName),
       Types.optionalGroup()
-        .addField(Types.required(INT32).as(OriginalType.INT_32).named("int"))
+        .addField(Types.required(INT32).as(Int32Type).named("int"))
         .named("nestedOptional")
     ))
   }
 
   it should "resolve schema for type containing collection of nested class" in {
     val elementType = Types.optionalGroup()
-      .addField(Types.required(INT32).as(OriginalType.INT_32).named("int"))
+      .addField(Types.required(INT32).as(Int32Type).named("int"))
       .named(ListSchemaDef.ElementName)
     resolveSchema[CollectionsOfNestedClass] should be(Message(
       Some(classOf[CollectionsOfNestedClass].getCanonicalName),
@@ -145,10 +144,10 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsMapOfNestedClassAsValue] should be(Message(
       Some(classOf[ContainsMapOfNestedClassAsValue].getCanonicalName),
       Types.optionalMap()
-        .key(Types.required(BINARY).as(OriginalType.UTF8).named(MapSchemaDef.KeyName))
+        .key(Types.required(BINARY).as(StringType).named(MapSchemaDef.KeyName))
         .value(
           Types.optionalGroup()
-            .addField(Types.required(INT32).as(OriginalType.INT_32).named("int"))
+            .addField(Types.required(INT32).as(Int32Type).named("int"))
             .named(MapSchemaDef.ValueName)
         ).named("nested")
     ))
@@ -158,10 +157,10 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsMapOfOptionalNestedClassAsValue] should be(Message(
       Some(classOf[ContainsMapOfOptionalNestedClassAsValue].getCanonicalName),
       Types.optionalMap()
-        .key(Types.required(BINARY).as(OriginalType.UTF8).named(MapSchemaDef.KeyName))
+        .key(Types.required(BINARY).as(StringType).named(MapSchemaDef.KeyName))
         .value(
           Types.optionalGroup()
-            .addField(Types.required(INT32).as(OriginalType.INT_32).named("int"))
+            .addField(Types.required(INT32).as(Int32Type).named("int"))
             .named(MapSchemaDef.ValueName)
         ).named("nested")
     ))
@@ -171,12 +170,12 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[ContainsMapOfCollectionsOfNestedClassAsValue] should be(Message(
       Some(classOf[ContainsMapOfCollectionsOfNestedClassAsValue].getCanonicalName),
       Types.optionalMap()
-        .key(Types.required(BINARY).as(OriginalType.UTF8).named(MapSchemaDef.KeyName))
+        .key(Types.required(BINARY).as(StringType).named(MapSchemaDef.KeyName))
         .value(
           Types.optionalList()
             .element(
               Types.optionalGroup()
-                .addField(Types.required(INT32).as(OriginalType.INT_32).named("int"))
+                .addField(Types.required(INT32).as(Int32Type).named("int"))
                 .named(ListSchemaDef.ElementName)
             ).named(MapSchemaDef.ValueName)
         ).named("nested")

@@ -1,5 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
+import org.apache.parquet.schema.LogicalTypeAnnotation.{DateLogicalTypeAnnotation, DecimalLogicalTypeAnnotation, IntLogicalTypeAnnotation, StringLogicalTypeAnnotation}
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, BOOLEAN, DOUBLE, FIXED_LEN_BYTE_ARRAY, FLOAT, INT32, INT64, INT96}
 import org.apache.parquet.schema.Type.Repetition
 import org.apache.parquet.schema._
 import shapeless._
@@ -28,6 +31,9 @@ trait ParquetSchemaResolver[T] {
 
 object ParquetSchemaResolver
   extends SchemaDefs {
+
+  trait Tag[V]
+  type TypedSchemaDef[V] = SchemaDef with Tag[V]
 
   /**
     * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
@@ -75,16 +81,67 @@ trait SchemaDef {
 
   def withRequired(required: Boolean): Self
 
+  def typed[V]: ParquetSchemaResolver.TypedSchemaDef[V] = ParquetSchemaResolver.typedSchemaDef[V](this)
+
 }
 
-case class PrimitiveSchemaDef(
-                              primitiveType: PrimitiveType.PrimitiveTypeName,
-                              required: Boolean = true,
-                              originalType: Option[OriginalType] = None,
-                              precision: Option[Int] = None,
-                              scale: Option[Int] = None,
-                              length: Option[Int] = None
-                             ) extends SchemaDef {
+object SchemaDef {
+  def primitive(primitiveType: PrimitiveType.PrimitiveTypeName,
+                logicalTypeAnnotation: Option[LogicalTypeAnnotation] = None,
+                required: Boolean = true,
+                length: Option[Int] = None): SchemaDef =
+    PrimitiveSchemaDef(primitiveType, logicalTypeAnnotation, required, length)
+
+  def group(fields: Type*): SchemaDef =
+    GroupSchemaDef(fields, required = false)
+
+  def list(elementSchemaDef: SchemaDef): SchemaDef =
+    ListSchemaDef(elementSchemaDef(ListSchemaDef.ElementName), required = false)
+
+  def map(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): SchemaDef = MapSchemaDef(
+    keySchemaDef(MapSchemaDef.KeyName), valueSchemaDef(MapSchemaDef.ValueName), required = false
+  )
+}
+
+object LogicalTypes {
+  val Int64Type: IntLogicalTypeAnnotation = LogicalTypeAnnotation.intType(64, true)
+  val Int32Type: IntLogicalTypeAnnotation = LogicalTypeAnnotation.intType(32, true)
+  val Int16Type: IntLogicalTypeAnnotation = LogicalTypeAnnotation.intType(16, true)
+  val Int8Type: IntLogicalTypeAnnotation = LogicalTypeAnnotation.intType(8, true)
+  val DecimalType: DecimalLogicalTypeAnnotation = LogicalTypeAnnotation.decimalType(Decimals.Scale, Decimals.Precision)
+  val StringType: StringLogicalTypeAnnotation = LogicalTypeAnnotation.stringType()
+  val DateType: DateLogicalTypeAnnotation = LogicalTypeAnnotation.dateType()
+}
+
+object PrimitiveSchemaDef {
+  @deprecated("Use SchemaDef.primitive", since = "1.9.0")
+  def apply(
+             primitiveType: PrimitiveType.PrimitiveTypeName,
+             required: Boolean = true,
+             originalType: Option[OriginalType] = None,
+             precision: Option[Int] = None,
+             scale: Option[Int] = None,
+             length: Option[Int] = None
+           ): PrimitiveSchemaDef = {
+    val decimalMetaData = (precision, scale) match {
+      case (Some(p), Some(s)) => new DecimalMetadata(p, s)
+      case _ => null
+    }
+    PrimitiveSchemaDef(
+      primitiveType = primitiveType,
+      required = required,
+      logicalTypeAnnotation = originalType.map(ot => LogicalTypeAnnotation.fromOriginalType(ot, decimalMetaData)),
+      length = length
+    )
+  }
+}
+
+case class PrimitiveSchemaDef private(
+                                       primitiveType: PrimitiveType.PrimitiveTypeName,
+                                       logicalTypeAnnotation: Option[LogicalTypeAnnotation],
+                                       required: Boolean,
+                                       length: Option[Int]
+                                     ) extends SchemaDef {
 
   override type Self = PrimitiveSchemaDef
 
@@ -93,11 +150,9 @@ case class PrimitiveSchemaDef(
       primitiveType,
       if (required) Repetition.REQUIRED else Repetition.OPTIONAL
     )
-    val withOriginalType = originalType.foldLeft(builder)(_.as(_))
-    val withPrecision = precision.foldLeft(withOriginalType)(_.precision(_))
-    val withScale = scale.foldLeft(withPrecision)(_.scale(_))
-    val withLength = length.foldLeft(withScale)(_.length(_))
-    
+    val withLogicalMetadata = logicalTypeAnnotation.foldLeft(builder)(_.as(_))
+    val withLength = length.foldLeft(withLogicalMetadata)(_.length(_))
+
     withLength.named(name)
   }
 
@@ -107,7 +162,9 @@ case class PrimitiveSchemaDef(
 
 object GroupSchemaDef {
 
+  @deprecated("Use SchemaDef.group", since = "1.9.0")
   def required(fields: Type*): GroupSchemaDef = GroupSchemaDef(fields, required = true)
+  @deprecated("Use SchemaDef.group", since = "1.9.0")
   def optional(fields: Type*): GroupSchemaDef = GroupSchemaDef(fields, required = false)
 
 }
@@ -129,15 +186,17 @@ object ListSchemaDef {
 
   val ElementName = "element"
 
+  @deprecated("Use SchemaDef.list", since = "1.9.0")
   def required(elementSchemaDef: SchemaDef): ListSchemaDef = ListSchemaDef(elementSchemaDef(ElementName), required = true)
+  @deprecated("Use SchemaDef.list", since = "1.9.0")
   def optional(elementSchemaDef: SchemaDef): ListSchemaDef = ListSchemaDef(elementSchemaDef(ElementName), required = false)
 
 }
 
 case class ListSchemaDef(element: Type, required: Boolean) extends SchemaDef {
-  
+
   override type Self = ListSchemaDef
-  
+
   override def apply(name: String): Type = {
     val builder = if (required) Types.requiredList() else Types.optionalList()
     builder.element(element).named(name)
@@ -152,20 +211,22 @@ object MapSchemaDef {
   val KeyName = "key"
   val ValueName = "value"
 
-  def required(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = new MapSchemaDef(
+  @deprecated("Use SchemaDef.map", since = "1.9.0")
+  def required(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = MapSchemaDef(
     keySchemaDef(KeyName), valueSchemaDef(ValueName), required = true
   )
 
-  def optional(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = new MapSchemaDef(
+  @deprecated("Use SchemaDef.map", since = "1.9.0")
+  def optional(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = MapSchemaDef(
     keySchemaDef(KeyName), valueSchemaDef(ValueName), required = false
   )
 
 }
 
-case class MapSchemaDef(key: Type, value: Type, required: Boolean) extends SchemaDef {
-  
+case class MapSchemaDef (key: Type, value: Type, required: Boolean) extends SchemaDef {
+
   override type Self = MapSchemaDef
-  
+
   override def apply(name: String): Type = {
     val builder = if (required) Types.requiredMap() else Types.optionalMap()
     builder.key(key).value(value).named(name)
@@ -177,125 +238,81 @@ case class MapSchemaDef(key: Type, value: Type, required: Boolean) extends Schem
 
 trait SchemaDefs {
 
-  trait Tag[V]
-  type TypedSchemaDef[V] = SchemaDef with Tag[V]
-
+  @deprecated("Call SchemaDef#typed[V] in order to build TypedSchemaDef[V]")
   def typedSchemaDef[V](schemaDef: SchemaDef): TypedSchemaDef[V] = schemaDef.asInstanceOf[TypedSchemaDef[V]]
 
   implicit val stringSchema: TypedSchemaDef[String] =
-    typedSchemaDef[String](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false, originalType = Some(OriginalType.UTF8))
-    )
+    SchemaDef.primitive(BINARY, required = false, logicalTypeAnnotation = Option(LogicalTypes.StringType)).typed[String]
 
   implicit val charSchema: TypedSchemaDef[Char] =
-    typedSchemaDef[Char](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
-    )
+    SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int32Type)).typed[Char]
 
   implicit val intSchema: TypedSchemaDef[Int] =
-    typedSchemaDef[Int](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_32))
-    )
+    SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int32Type)).typed[Int]
 
   implicit val longSchema: TypedSchemaDef[Long] =
-    typedSchemaDef[Long](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT64, originalType = Some(OriginalType.INT_64))
-    )
+    SchemaDef.primitive(INT64, logicalTypeAnnotation = Option(LogicalTypes.Int64Type)).typed[Long]
 
   implicit val floatSchema: TypedSchemaDef[Float] =
-    typedSchemaDef[Float](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.FLOAT)
-    )
+    SchemaDef.primitive(FLOAT).typed[Float]
 
   implicit val doubleSchema: TypedSchemaDef[Double] =
-    typedSchemaDef[Double](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.DOUBLE)
-    )
+    SchemaDef.primitive(DOUBLE).typed[Double]
 
   implicit val booleanSchema: TypedSchemaDef[Boolean] =
-    typedSchemaDef[Boolean](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BOOLEAN)
-    )
+    SchemaDef.primitive(BOOLEAN).typed[Boolean]
 
   implicit val shortSchema: TypedSchemaDef[Short] =
-    typedSchemaDef[Short](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_16))
-    )
+    SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int16Type)).typed[Short]
 
   implicit val byteSchema: TypedSchemaDef[Byte] =
-    typedSchemaDef[Byte](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, originalType = Some(OriginalType.INT_8))
-    )
-    
+    SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int8Type)).typed[Byte]
+
   implicit val decimalSchema: TypedSchemaDef[BigDecimal] =
-    typedSchemaDef[BigDecimal](
-      PrimitiveSchemaDef(
-        PrimitiveType.PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY,
+      SchemaDef.primitive(
+        FIXED_LEN_BYTE_ARRAY,
         required = false,
-        originalType = Some(OriginalType.DECIMAL),
-        precision = Some(Decimals.Precision),
-        scale = Some(Decimals.Scale),
+        logicalTypeAnnotation = Option(LogicalTypes.DecimalType),
         length = Some(Decimals.ByteArrayLength)
-      )
-    )
+      ).typed[BigDecimal]
 
   implicit val localDateSchema: TypedSchemaDef[java.time.LocalDate] =
-    typedSchemaDef[java.time.LocalDate](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.DATE))
-    )
+    SchemaDef.primitive(INT32, required = false, logicalTypeAnnotation = Option(LogicalTypes.DateType)).typed[java.time.LocalDate]
 
   implicit val sqlDateSchema: TypedSchemaDef[java.sql.Date] =
-    typedSchemaDef[java.sql.Date](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT32, required = false, originalType = Some(OriginalType.DATE))
-    )
+    SchemaDef.primitive(INT32, required = false, logicalTypeAnnotation = Option(LogicalTypes.DateType)).typed[java.sql.Date]
 
   implicit val localDateTimeSchema: TypedSchemaDef[java.time.LocalDateTime] =
-    typedSchemaDef[java.time.LocalDateTime](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT96, required = false)
-    )
+    SchemaDef.primitive(INT96, required = false).typed[java.time.LocalDateTime]
 
   implicit val sqlTimestampSchema: TypedSchemaDef[java.sql.Timestamp] =
-    typedSchemaDef[java.sql.Timestamp](
-      PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.INT96, required = false)
-    )
+    SchemaDef.primitive(INT96, required = false).typed[java.sql.Timestamp]
 
   implicit def productSchema[T](implicit parquetSchemaResolver: ParquetSchemaResolver[T]): TypedSchemaDef[T] =
-    typedSchemaDef[T](
-      GroupSchemaDef.optional(parquetSchemaResolver.resolveSchema:_*)
-    )
+    SchemaDef.group(parquetSchemaResolver.resolveSchema:_*).typed[T]
 
   implicit def optionSchema[T](implicit tSchemaDef: TypedSchemaDef[T]): TypedSchemaDef[Option[T]] =
-    typedSchemaDef[Option[T]](
-      tSchemaDef.withRequired(false)
-    )
+    tSchemaDef.withRequired(false).typed[Option[T]]
 
   implicit def collectionSchema[E, Col[_]](implicit
                                            elementSchema: TypedSchemaDef[E],
                                            ev: Col[E] <:< Iterable[E]): TypedSchemaDef[Col[E]] =
-    typedSchemaDef[Col[E]](
-      ListSchemaDef.optional(elementSchema)
-    )
+     SchemaDef.list(elementSchema).typed[Col[E]]
 
   implicit def arraySchema[E, Col[_]](implicit
                                       elementSchema: TypedSchemaDef[E],
                                       ev: Col[E] =:= Array[E],
                                       classTag: ClassTag[E]): TypedSchemaDef[Col[E]] =
     if (classTag.runtimeClass == classOf[Byte])
-      typedSchemaDef[Col[E]](
-        PrimitiveSchemaDef(PrimitiveType.PrimitiveTypeName.BINARY, required = false)
-      )
+      SchemaDef.primitive(BINARY, required = false).typed[Col[E]]
     else
-      typedSchemaDef[Col[E]](
-        ListSchemaDef.optional(elementSchema)
-      )
+      SchemaDef.list(elementSchema).typed[Col[E]]
 
   implicit def mapSchema[MapKey, MapValue](implicit
                                            keySchema: TypedSchemaDef[MapKey],
                                            valueSchema: TypedSchemaDef[MapValue]
                                           ): TypedSchemaDef[Map[MapKey, MapValue]] =
-    typedSchemaDef[Map[MapKey, MapValue]] {
-      // type of the map key must be required
-      MapSchemaDef.optional(keySchema.withRequired(true), valueSchema)
-    }
+    // type of the map key must be required
+    SchemaDef.map(keySchema.withRequired(true), valueSchema).typed[Map[MapKey, MapValue]]
 
 }
