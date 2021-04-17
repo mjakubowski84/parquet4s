@@ -214,7 +214,7 @@ private class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPr
     partitionedPath.value(columnPath) match {
       case None =>
         false
-      case Some(partitionValue) if filterType == classOf[Binary] =>
+      case Some(partitionValue) if filterType == classOf[Binary]=>
         op(partitionValue)
       case _ =>
         throw new IllegalArgumentException(

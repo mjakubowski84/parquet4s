@@ -65,7 +65,7 @@ lazy val core = (project in file("core"))
     ) ++ {
       val scala = scalaBinaryVersion.value
       scala match {
-        case "2.11" | "2.12" => sparkDeps
+        case "2.12" => sparkDeps
         case _ => Seq.empty
       }
     },
