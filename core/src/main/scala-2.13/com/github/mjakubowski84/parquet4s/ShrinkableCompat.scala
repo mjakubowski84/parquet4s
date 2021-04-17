@@ -14,9 +14,9 @@ trait ShrinkableCompat {
     this
   }
 
-  /** ${Add}s a single element to this map.
+  /** Adds a single element to this map.
    *
-   *  @param elem  the element to $add.
+   *  @param elem  the element to add.
    *  @return the MapParquetRecord itself
    */
   override def addOne(elem: (Value, Value)): This = {

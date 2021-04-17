@@ -38,9 +38,9 @@ object ParquetReader {
 
   /**
     * Configuration settings that are used during decoding or reading Parquet files
-    * @param timeZone set it to [[TimeZone]] which was used to encode time-based data that you want to read; machine's
+    * @param timeZone set it to [[java.util.TimeZone]] which was used to encode time-based data that you want to read; machine's
     *                 time zone is used by default
-    * @param hadoopConf use it to programmatically override Hadoop's [[Configuration]]
+    * @param hadoopConf use it to programmatically override Hadoop's [[org.apache.hadoop.conf.Configuration]]
     */
   case class Options(timeZone: TimeZone = TimeZone.getDefault, hadoopConf: Configuration = new Configuration()) {
     private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
