@@ -17,6 +17,9 @@ ThisBuild / resolvers := Seq(
   Resolver.jcenterRepo
 )
 ThisBuild / makePomConfiguration := makePomConfiguration.value.withConfigurations(Configurations.defaultMavenConfigurations)
+Global / excludeLintKeys += run / cancelable
+Global / excludeLintKeys += IntegrationTest / publishArtifact
+Global / excludeLintKeys += makePomConfiguration
 
 
 lazy val itSettings = Defaults.itSettings ++
