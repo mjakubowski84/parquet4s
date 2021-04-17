@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
+import org.apache.hadoop.fs.Path
 import org.apache.parquet.column.statistics._
 import org.apache.parquet.schema.MessageType
 
@@ -140,7 +140,7 @@ private class LazyDelegateStats(path: Path,
       case status => new FilteredFileStats(status, options, projectionSchemaOpt, filter)
     }
     if (statsArray.length == 1) statsArray.head
-    else new CompoundStats(statsArray)
+    else new CompoundStats(statsArray.toIndexedSeq)
   }
 
   override def recordCount: Long = delegate.recordCount

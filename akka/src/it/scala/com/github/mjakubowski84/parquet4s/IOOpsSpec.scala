@@ -71,7 +71,7 @@ class IOOpsSpec
   "findPartitionedPaths" should "return single path without partitions for empty directory" in {
     fileSystem.mkdirs(tempPath)
 
-    val dir = findPartitionedPaths(tempPath, configuration).right.value
+    val dir = findPartitionedPaths(tempPath, configuration).value
     dir.paths should be(List(PartitionedPath(tempPath, List.empty)))
     dir.schema should be(empty)
   }
@@ -80,7 +80,7 @@ class IOOpsSpec
     val pathX1 = new Path(tempPath, "x=1")
     fileSystem.mkdirs(pathX1)
 
-    val dir = findPartitionedPaths(tempPath, configuration).right.value
+    val dir = findPartitionedPaths(tempPath, configuration).value
     dir.paths should be(List(PartitionedPath(pathX1, ("x" -> "1") :: Nil)))
     dir.schema should be("x" :: Nil)
   }
@@ -95,7 +95,7 @@ class IOOpsSpec
     fileSystem.mkdirs(path3)
     fileSystem.mkdirs(path4)
 
-    val dir = findPartitionedPaths(tempPath, configuration).right.value
+    val dir = findPartitionedPaths(tempPath, configuration).value
     dir.paths should contain theSameElementsAs List(
       PartitionedPath(path1, List("x" -> "1", "y" -> "a", "z" -> "1_1")),
       PartitionedPath(path2, List("x" -> "1", "y" -> "b", "z" -> "1_2")),

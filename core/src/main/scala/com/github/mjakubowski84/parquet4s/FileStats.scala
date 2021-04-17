@@ -7,7 +7,7 @@ import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.schema.MessageType
 
-import scala.collection.GenTraversableOnce
+import scala.collection.compat._
 import scala.jdk.CollectionConverters._
 
 /**
@@ -36,7 +36,7 @@ private[parquet4s] class FileStats(
   private class MinMaxReader[V](columnPath: String, currentExtreme: Option[V])
                             (implicit codec: ValueCodec[V], ordering: Ordering[V]) extends StatsReader {
 
-    private def extreme(statsValue: Statistics[_] => GenTraversableOnce[Value], choose: (V, V) => V) =
+    private def extreme(statsValue: Statistics[_] => IterableOnce[Value], choose: (V, V) => V) =
       reader.getRowGroups.asScala.iterator
         .map(block => block.getColumns.asScala.find(_.getPath.toDotString == columnPath))
         .collect { case Some(column) => column }
