@@ -113,17 +113,6 @@ jobs:
       - cache_dependencies:
           path: workspace/repo
 
-  debug:
-    executor:
-      name: jdk
-    steps:
-      - checkout
-      - run: gpg --version
-      - setup_gpg
-      - download_cached_dependencies:
-          path: .
-      - run: cat /dev/null | sbt +publish
-
 workflows:
   version: 2
 
@@ -151,11 +140,3 @@ workflows:
             branches:
               ignore: /.*/
 
-  debug-and-release:
-    jobs:
-      - debug:
-          filters:
-            tags:
-              only: /^debug.*/
-            branches:
-              ignore: /.*/
