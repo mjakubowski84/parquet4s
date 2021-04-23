@@ -77,7 +77,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
   }
 
   def genericFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T)
-                                                                                             (implicit filterValueConverter: FilterValueConverter[T, V, C]): Unit = {
+                                                                                             (implicit codec: FilterCodec[T, V, C]): Unit = {
     val filterValues = everyOtherDatum.map(field)
     val actual = ParquetReader.read[Data](filePath, filter = Col(columnName) in filterValues)
     try {
@@ -86,7 +86,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
   }
 
   def specificValueFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T, values: Vector[T])
-                                                                                                   (implicit filterValueConverter: FilterValueConverter[T, V, C]): Unit = {
+                                                                                                   (implicit codec: FilterCodec[T, V, C]): Unit = {
     val filteredRecords = ParquetReader.read[Data](filePath, filter = Col(columnName) in values)
     val unfilteredRecords = ParquetReader.read[Data](filePath)
 
@@ -134,7 +134,6 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
   }
 
   it should "reject an empty set of keys" in {
-    a[IllegalArgumentException] should be thrownBy Col("idx").in(Seq.empty:_*)
     a[IllegalArgumentException] should be thrownBy (Col("idx") in Set.empty[Int])
   }
 }
