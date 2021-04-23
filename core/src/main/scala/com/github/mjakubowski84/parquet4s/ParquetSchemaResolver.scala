@@ -238,7 +238,7 @@ case class MapSchemaDef (key: Type, value: Type, required: Boolean) extends Sche
 
 trait SchemaDefs {
 
-  @deprecated("Call SchemaDef#typed[V] in order to build TypedSchemaDef[V]")
+  @deprecated("Call SchemaDef#typed[V] in order to build TypedSchemaDef[V]", since = "1.9.0")
   def typedSchemaDef[V](schemaDef: SchemaDef): TypedSchemaDef[V] = schemaDef.asInstanceOf[TypedSchemaDef[V]]
 
   implicit val stringSchema: TypedSchemaDef[String] =

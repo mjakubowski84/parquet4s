@@ -54,13 +54,13 @@ object Signing {
   private def addSignatureArtifact(configuration: Configuration, packageTask: TaskKey[File]): Def.SettingsDefinition = {
 
     val signTaskDef = Def.task {
-      val (artifact, artifactFile) = packagedArtifact.in(configuration, packageTask).value
+      val (artifact, artifactFile) = (configuration / packageTask / packagedArtifact).value
       streams.value.log.info("Signing: " + artifact)
       createSignatureFile(artifactFile, streams.value.log)
     }
 
     val artifactDef = Def.setting {
-      val sourceArtifact = artifact.in(configuration, packageTask).value
+      val sourceArtifact = (configuration / packageTask / artifact).value
       Artifact(
         name = sourceArtifact.name,
         `type` = SignatureExtension,

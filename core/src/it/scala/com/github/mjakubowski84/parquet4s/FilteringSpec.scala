@@ -66,7 +66,7 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
   }
 
   def ltGtTest[T : Ordering, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnName: String, boundaryValue: T, field: Data => T)
-                                                                                  (implicit filterValueConverter: FilterValueConverter[T, V, C]): Unit = {
+                                                                                  (implicit codec: FilterCodec[T, V, C]): Unit = {
     forExactly(halfSize, read(Col(columnName) < boundaryValue)) { dataRecord =>
       field(dataRecord) should be < boundaryValue
     }
@@ -134,6 +134,25 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
     val filtered = read(Filter.noopFilter)
 
     filtered should have size dataSize
+  }
+
+  it should "filter by udp" in {
+    object IntDividesBy10 extends UDP[Int] {
+      private val Ten = 10
+      override def keep(value: Int): Boolean = value % Ten == 0
+      @inline
+      override def canDrop(statistics: FilterStatistics[Int]): Boolean = {
+        val minMod = statistics.min % Ten
+        val maxMod = statistics.max % Ten
+        (statistics.max - statistics.min < Ten) && maxMod >= minMod
+      }
+      override def inverseCanDrop(statistics: FilterStatistics[Int]): Boolean = !canDrop(statistics)
+      override def name: String = "IntDividesBy10"
+    }
+
+    forExactly((dataSize / 10) + 1, read(Col("idx").udp(IntDividesBy10))) { dataRecord =>
+      dataRecord.idx % 10 should be(0)
+    }
   }
 
 }
