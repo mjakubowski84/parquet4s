@@ -183,7 +183,9 @@ ParquetStreams.fromParquet[Stats]
   .read("file://my/path")
 ```
 
-You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, and `in` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
+You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, `in`  and  `udp` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. For custom filtering by column of type `T` implement `UDP[T]` trait and use `udp` operator.
+
+Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still not allows filtering by `Int96` out of the box.
 
 Check ScalaDoc and code for more!
 
@@ -300,6 +302,8 @@ implicit val customTypeSchema: TypedSchemaDef[CustomType] =
       originalType = Option(LogicalTypeAnnotation.intType(32, true))
     ).typed[CustomType]
 ```
+
+In order to filter by a field of a custom type `T` you have to implement  `FilterCodec[T]` type class. Check existing implementations for the reference.
 
 ## More Examples
 
