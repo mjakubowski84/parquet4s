@@ -2,10 +2,10 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
 import cats.effect.concurrent.Ref
 import cats.effect.{Blocker, Concurrent, ContextShift, Sync, Timer}
 import cats.implicits._
+import com.github.mjakubowski84.parquet4s.Cursor.DotPath
 import com.github.mjakubowski84.parquet4s._
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import fs2.{Pipe, Pull, Stream}
@@ -169,7 +169,7 @@ object rotatingWriter {
                                            options: ParquetWriter.Options,
                                            writersRef: Ref[F, Map[Path, RecordWriter[F]]],
                                            maxCount: Long,
-                                           partitionBy: List[String],
+                                           partitionBy: List[DotPath],
                                            schema: MessageType,
                                            encode: W => F[RowParquetRecord],
                                            logger: Logger[F],
@@ -211,11 +211,11 @@ object rotatingWriter {
         _ <- writer.write(record)
       } yield writers
 
-    private def partition(record: RowParquetRecord)(partitionPath: String): F[(String, String)] =
+    private def partition(record: RowParquetRecord)(partitionPath: DotPath): F[(String, String)] =
       record.remove(partitionPath) match {
         case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' does not exist."))
         case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' is null."))
-        case Some(BinaryValue(binary)) => F.delay(partitionPath -> binary.toStringUsingUTF8)
+        case Some(BinaryValue(binary)) => F.delay(DotPath.toString(partitionPath) -> binary.toStringUsingUTF8)
         case _ => F.raiseError(new IllegalArgumentException("Only String field can be used for partitioning."))
       }
 
@@ -293,7 +293,7 @@ object rotatingWriter {
             options = options,
             writersRef = Ref.unsafe(Map.empty),
             maxCount = maxCount,
-            partitionBy = partitionBy.toList,
+            partitionBy = partitionBy.map(DotPath.apply).toList,
             schema = schema,
             encode = encode,
             logger = logger,
