@@ -136,6 +136,7 @@ object PrimitiveSchemaDef {
   }
 }
 
+@deprecated("Use SchemaDef.primitive", since = "1.9.0")
 case class PrimitiveSchemaDef private(
                                        primitiveType: PrimitiveType.PrimitiveTypeName,
                                        logicalTypeAnnotation: Option[LogicalTypeAnnotation],
@@ -169,6 +170,7 @@ object GroupSchemaDef {
 
 }
 
+@deprecated("Use SchemaDef.group", since = "1.9.0")
 case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends SchemaDef {
 
   override type Self = GroupSchemaDef
@@ -193,6 +195,7 @@ object ListSchemaDef {
 
 }
 
+@deprecated("Use SchemaDef.list", since = "1.9.0")
 case class ListSchemaDef(element: Type, required: Boolean) extends SchemaDef {
 
   override type Self = ListSchemaDef
@@ -223,6 +226,7 @@ object MapSchemaDef {
 
 }
 
+@deprecated("Use SchemaDef.map", since = "1.9.0")
 case class MapSchemaDef (key: Type, value: Type, required: Boolean) extends SchemaDef {
 
   override type Self = MapSchemaDef
