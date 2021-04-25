@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import cats.effect.{Blocker, ContextShift, IO}
+import cats.effect.{Blocker, ContextShift, IO, Timer}
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -10,7 +10,9 @@ import fs2.Stream
 import org.scalameter.api._
 import org.scalameter.picklers.{Pickler, StringPickler}
 
-import java.nio.file.{Files, Paths}
+import java.io.IOException
+import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file._
 import java.util.UUID
 import java.util.concurrent.{ExecutorService, Executors}
 import scala.collection.immutable
@@ -45,6 +47,19 @@ object Benchmark extends Bench.OfflineReport {
 
   private val rootPath = Files.createTempDirectory("benchmark")
 
+  private def deletePath(path: String) = Files.walkFileTree(Paths.get(path), new FileVisitor[Path]() {
+    override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
+    override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+      Files.delete(file)
+      FileVisitResult.CONTINUE
+    }
+    override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+    override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+      Files.delete(dir)
+      FileVisitResult.CONTINUE
+    }
+  })
+
   private val records = (1 to datasetSize).map { i =>
     Record(
       i = i,
@@ -66,7 +81,7 @@ object Benchmark extends Bench.OfflineReport {
   performance of "core" in {
     measure method "write" in {
       using(datasets) setUp {
-        case Dataset(path, _) => Files.deleteIfExists(Paths.get(path))
+        case Dataset(path, _) => deletePath(path)
       } in {
         case Dataset(path, records) => ParquetWriter.writeAndClose(path, records)
       }
@@ -75,7 +90,7 @@ object Benchmark extends Bench.OfflineReport {
       using(datasets) setUp {
         case Dataset(path, records) => ParquetWriter.writeAndClose(path, records)
       } tearDown {
-        case Dataset(path, _) => Files.deleteIfExists(Paths.get(path))
+        case Dataset(path, _) => deletePath(path)
       } in {
         case Dataset(path, _) => ParquetReader.read[RowParquetRecord](path).toVector
       }
@@ -84,6 +99,13 @@ object Benchmark extends Bench.OfflineReport {
 
   private def akkaWrite(path: String, records: immutable.Iterable[Record])(implicit as: ActorSystem) =
     Await.ready(Source(records).runWith(ParquetStreams.toParquetSingleFile(path)), Duration.Inf)
+  private def akkaWritePartitioned(path: String, records: immutable.Iterable[Record])(implicit as: ActorSystem) =
+    Await.ready(
+      Source(records)
+        .via(ParquetStreams.viaParquet[Record](path).withPartitionBy("dict").build())
+        .runWith(Sink.ignore)
+      , Duration.Inf
+    )
   private def akkaRead(path: String)(implicit as: ActorSystem) =
     Await.ready(ParquetStreams.fromParquet[RowParquetRecord].read(path).runWith(Sink.ignore), Duration.Inf)
 
@@ -93,11 +115,23 @@ object Benchmark extends Bench.OfflineReport {
       using(datasets) beforeTests {
         actorSystem = ActorSystem()
       } setUp {
-        case Dataset(path, _) => Files.deleteIfExists(Paths.get(path))
+        case Dataset(path, _) => deletePath(path)
       } afterTests {
         Await.result(actorSystem.terminate(), Duration.Inf)
       } in {
         case Dataset(path, records) => akkaWrite(path, records)
+      }
+    }
+    measure method "writePartitioned" in {
+      implicit var actorSystem: ActorSystem = null
+      using(datasets) beforeTests {
+        actorSystem = ActorSystem()
+      } setUp {
+        case Dataset(path, _) => deletePath(path)
+      } afterTests {
+        Await.result(actorSystem.terminate(), Duration.Inf)
+      } in {
+        case Dataset(path, records) => akkaWritePartitioned(path, records)
       }
     }
     measure method "read" in {
@@ -107,7 +141,7 @@ object Benchmark extends Bench.OfflineReport {
       } setUp {
         case Dataset(path, records) => ParquetWriter.writeAndClose(path, records)
       } tearDown {
-        case Dataset(path, _) => Files.deleteIfExists(Paths.get(path))
+        case Dataset(path, _) => deletePath(path)
       } afterTests {
         Await.result(actorSystem.terminate(), Duration.Inf)
       } in {
@@ -120,9 +154,11 @@ object Benchmark extends Bench.OfflineReport {
     def apply(): Fs2Ctx = {
       val (blocker, closeBlocker) = Blocker[IO].allocated.unsafeRunSync()
       val threadPool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
+      val ec = ExecutionContext.fromExecutor(threadPool)
       Fs2Ctx(
         threadPool = threadPool,
-        contextShift = IO.contextShift(ExecutionContext.fromExecutor(threadPool)),
+        contextShift = IO.contextShift(ec),
+        timer = IO.timer(ec),
         blocker = blocker,
         closeBlocker = closeBlocker
       )
@@ -131,6 +167,7 @@ object Benchmark extends Bench.OfflineReport {
   case class Fs2Ctx(
     threadPool: ExecutorService,
     implicit val contextShift: ContextShift[IO],
+    implicit val timer: Timer[IO],
     blocker: Blocker,
     closeBlocker: IO[Unit]
   ) {
@@ -149,6 +186,15 @@ object Benchmark extends Bench.OfflineReport {
       .drain
   }
 
+  private def fs2WritePartitioned(path: String, records: immutable.Iterable[Record])(implicit ctx: Fs2Ctx): IO[Unit] = {
+    import ctx._
+    Stream
+      .iterable(records)
+      .through(parquet.viaParquet[IO, Record].partitionBy("dict").write(blocker, path))
+      .compile
+      .drain
+  }
+
   private def fs2Read(path: String)(implicit ctx: Fs2Ctx): IO[Unit] = {
     import ctx._
     parquet.fromParquet[IO, Record].read(blocker, path).compile.drain
@@ -162,8 +208,23 @@ object Benchmark extends Bench.OfflineReport {
         ctx = Fs2Ctx()
       } setUp {
         case Dataset(path, records) =>
-          Files.deleteIfExists(Paths.get(path))
+          deletePath(path)
           operation = fs2Write(path, records)
+      } afterTests {
+        ctx.close()
+      } in {
+        _ => operation.unsafeRunSync()
+      }
+    }
+    measure method "writePartitioned" in {
+      implicit var ctx: Fs2Ctx = null
+      var operation: IO[Unit] = null
+      using(datasets) beforeTests {
+        ctx = Fs2Ctx()
+      } setUp {
+        case Dataset(path, records) =>
+          deletePath(path)
+          operation = fs2WritePartitioned(path, records)
       } afterTests {
         ctx.close()
       } in {
@@ -180,7 +241,7 @@ object Benchmark extends Bench.OfflineReport {
           ParquetWriter.writeAndClose(path, records)
           operation = fs2Read(path)
       } tearDown {
-        case Dataset(path, _) => Files.deleteIfExists(Paths.get(path))
+        case Dataset(path, _) => deletePath(path)
       } afterTests {
         ctx.close()
       } in {
