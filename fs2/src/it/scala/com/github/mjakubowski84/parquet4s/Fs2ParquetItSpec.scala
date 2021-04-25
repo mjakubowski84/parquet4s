@@ -70,7 +70,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
     directoryStream[IO](blocker, path)
       .filter(_.toString.endsWith(".parquet"))
       .fold(Vector.empty[Path])(_ :+ _)
-  
+
   it should "write and read single parquet file" in {
     val outputFileName = "data.parquet"
     def write(blocker: Blocker, path: Path): Stream[IO, fs2.INothing] =
@@ -350,6 +350,35 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
       } yield {
         writtenData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure)
         readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure)
+      }
+
+    testStream.compile.drain.as(succeed).unsafeToFuture()
+  }
+
+  it should "flush already processed files on premature completion downstream when using rotating writer" in {
+    val numberOfProcessedElementsBeforeStop = 25
+
+    def write(blocker: Blocker, path: Path): Stream[IO, Vector[Data]] =
+      Stream
+        .iterable(data)
+        .through(parquet.viaParquet[IO, Data]
+          .options(writeOptions)
+          .partitionBy("s")
+          .write(blocker, path.toString)
+        )
+        .take(numberOfProcessedElementsBeforeStop)
+        .handleErrorWith(_ => Stream.empty)
+        .fold(Vector.empty[Data])(_ :+ _)
+
+    val testStream =
+      for {
+        blocker <- Stream.resource(Blocker[IO])
+        path <- tempDirectoryStream[IO](blocker, tmpDir)
+        writtenData <- write(blocker, path)
+        readData <- read[Data](blocker, path)
+      } yield {
+        writtenData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
+        readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
       }
 
     testStream.compile.drain.as(succeed).unsafeToFuture()
