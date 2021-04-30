@@ -3,8 +3,12 @@ import Releasing._
 import bloop.integrations.sbt.BloopDefaults
 
 
-lazy val supportedScalaVersions = Seq("2.11.12", "2.12.13", "2.13.5")
-lazy val fs2ScalaVersions = Seq("2.12.13", "2.13.5")
+lazy val twoEleven = "2.11.12"
+lazy val twoTwelve = "2.12.13"
+lazy val twoThirteen = "2.13.5"
+lazy val supportedScalaVersions = Seq(twoEleven, twoTwelve, twoThirteen)
+lazy val fs2ScalaVersions = Seq(twoTwelve, twoThirteen)
+lazy val akkaScalaVersions = Seq(twoTwelve, twoThirteen)
 
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "2.0.0-SNAPSHOT"
@@ -81,7 +85,7 @@ lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-akka",
-    crossScalaVersions := supportedScalaVersions,
+    crossScalaVersions := akkaScalaVersions,
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided

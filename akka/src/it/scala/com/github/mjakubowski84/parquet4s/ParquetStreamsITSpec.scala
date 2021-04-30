@@ -1,7 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.sql.Timestamp
-
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
@@ -14,6 +12,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Inspectors}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.sql.Timestamp
 import scala.collection.compat.immutable.LazyList
 import scala.collection.immutable
 import scala.concurrent.duration._
@@ -198,91 +197,6 @@ class ParquetStreamsITSpec
     }
   }
 
-  it should "split data into sequential chunks and read it correctly" in {
-    val outputFileNames = List("part-00000.parquet", "part-00001.parquet")
-
-    val write = () => Source(data).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
-      path = tempPathString,
-      maxRecordsPerFile = 2 * writeOptions.rowGroupSize,
-      options = writeOptions
-    ))
-
-    for {
-      _ <- write()
-      files <- filesAtPath(tempPath, configuration)
-      readData <- read[Data](tempPath)
-    } yield {
-      files should contain theSameElementsAs outputFileNames
-      readData should have size count
-      readData should contain theSameElementsAs data
-    }
-  }
-
-  it should "write data in parallel as chunks and read it correctly" in {
-    val write = () => Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
-      path = tempPathString,
-      parallelism = 2,
-      options = writeOptions
-    ))
-
-    for {
-      _ <- write()
-      files <- filesAtPath(tempPath, configuration)
-      readData <- read[Data](tempPath)
-    } yield {
-      files should have size 2
-      readData should have size count
-      readData should contain theSameElementsAs data
-    }
-  }
-
-  it should "split data into sequential chunks using indefinite stream support with default settings" in {
-    val write = () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
-      path = tempPathString,
-      maxChunkSize = writeOptions.rowGroupSize,
-      chunkWriteTimeWindow = 10.seconds,
-      options = writeOptions
-    ))
-
-    for {
-      _ <- write()
-      files <- filesAtPath(tempPath, configuration)
-      readData <- read[Data](tempPath)
-    } yield {
-      files should have size 4
-      readData should have size count
-      readData should contain theSameElementsAs data
-    }
-  }
-
-  it should "split data into sequential chunks using indefinite stream support with custom settings" in {
-    val expectedFileNames = List("0.parquet", "2048.parquet", "4096.parquet", "6144.parquet")
-    val currentTime = new Timestamp(System.currentTimeMillis())
-
-    val write = () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
-      path = tempPathString,
-      maxChunkSize = writeOptions.rowGroupSize,
-      chunkWriteTimeWindow = 10.seconds,
-      buildChunkPath = { case (basePath, chunk) => basePath.suffix(s"/${chunk.head.i}.parquet")},
-      preWriteTransformation = { data => DataTransformed(data, currentTime)},
-      postWriteSink = Sink.fold[Seq[Data], Seq[Data]](Seq.empty[Data])(_ ++ _),
-      options = writeOptions
-    ))
-
-    for {
-      postWriteData <- write()
-      files <- filesAtPath(tempPath, configuration)
-      readData <- read[DataTransformed](tempPath)
-    } yield {
-      postWriteData should have size count
-      postWriteData should contain theSameElementsAs data
-      files should contain theSameElementsAs expectedFileNames
-      readData should have size count
-      forAll(readData) { _.t should be(currentTime) }
-      readData.map(_.toData) should contain theSameElementsAs data
-    }
-  }
-
   it should "write and read partitioned data" in {
 
     case class User(name: String, address: Address)
@@ -359,7 +273,7 @@ class ParquetStreamsITSpec
       writtenData should be(users)
 
       readData should have size users.size
-      readData should contain allElementsOf (users)
+      readData should contain allElementsOf users
 
       files should have size (((usersToWrite / maxCount) * partitions) + 1 + lastToFlushOnDemand) // 9 == ( 33 / 10 ) * 2 + 1[remainder] + 2
 
