@@ -249,4 +249,5 @@ object Benchmark extends Bench.OfflineReport {
       }
     }
   }
+
 }
