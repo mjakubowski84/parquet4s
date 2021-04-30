@@ -204,7 +204,7 @@ private class ParquetPartitioningFlow[T, W](
     }
 
     override def preStart(): Unit =
-      schedulePeriodically(TimerKey, maxDuration)
+      scheduleWithFixedDelay(TimerKey, maxDuration, maxDuration)
 
     override def onTimer(timerKey: Any): Unit =
       if (TimerKey == timerKey) {
