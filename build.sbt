@@ -126,11 +126,11 @@ lazy val examples = (project in file("examples"))
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "2.7.0",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "2.8.0",
       "ch.qos.logback" % "logback-classic" % "1.2.3",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % "2.0.7",
-      "com.github.fd4s" %% "fs2-kafka" % "1.5.0",
+      "com.github.fd4s" %% "fs2-kafka" % "2.0.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(

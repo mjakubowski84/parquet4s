@@ -1,23 +1,21 @@
 package com.github.mjakubowski84.parquet4s.fs2
 
-import java.nio.file.Paths
-import java.sql.Timestamp
-import java.util.UUID
-
 import cats.data.State
-import cats.effect.{Blocker, ExitCode, IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp}
 import com.github.mjakubowski84.parquet4s.ParquetWriter
 import com.github.mjakubowski84.parquet4s.parquet._
-import fs2.io.file.tempDirectoryStream
+import fs2.io.file.Files
 import fs2.kafka._
 import fs2.{INothing, Pipe, Stream}
-import net.manub.embeddedkafka.{EmbeddedK, EmbeddedKafka}
+import net.manub.embeddedkafka.EmbeddedKafka
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
+import java.sql.Timestamp
+import java.util.UUID
 import scala.concurrent.duration._
 import scala.util.Random
 
-object IndefiniteFS2App extends IOApp {
+object IndefiniteFS2App extends IOApp.Simple {
 
   private type KafkaRecord = CommittableConsumerRecord[IO, String, String]
 
@@ -35,7 +33,6 @@ object IndefiniteFS2App extends IOApp {
   private case class Up(delay: FiniteDuration) extends Fluctuation
   private case class Down(delay: FiniteDuration) extends Fluctuation
 
-  private val TmpPath = Paths.get(sys.props("java.io.tmpdir"))
   private val MaxNumberOfRecordPerFile = 128
   private val MaxDurationOfFileWrite = 10.seconds
   private val WriterOptions = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
@@ -63,12 +60,11 @@ object IndefiniteFS2App extends IOApp {
     (nextFluctuation, ())
   }
 
-  override def run(args: List[String]): IO[ExitCode] = {
+  override def run(): IO[Unit] = {
     val stream = for {
-      blocker <- Stream.resource(Blocker[IO])
-      writePath <- tempDirectoryStream[IO](blocker, dir = TmpPath)
+      writePath <- Stream.resource(Files[IO].tempDirectory())
       kafkaPort <- Stream
-        .bracket(blocker.delay[IO, EmbeddedK](EmbeddedKafka.start()))(_ => blocker.delay[IO, Unit](EmbeddedKafka.stop()))
+        .bracket(IO.blocking(EmbeddedKafka.start()))(_ => IO.blocking(EmbeddedKafka.stop()))
         .map(_.config.kafkaPort)
       producerSettings = ProducerSettings[IO, String, String]
         .withBootstrapServers(s"localhost:$kafkaPort")
@@ -78,7 +74,7 @@ object IndefiniteFS2App extends IOApp {
         .withGroupId("group")
       _ <- Stream(
         producer(producerSettings),
-        consumer(blocker, consumerSettings, writePath.toString)
+        consumer(consumerSettings, writePath.toString)
       ).parJoin(maxOpen = 2)
     } yield ()
 
@@ -88,25 +84,24 @@ object IndefiniteFS2App extends IOApp {
   private def producer(producerSettings: ProducerSettings[IO, String, String]): Stream[IO, INothing] =
     Stream
       .iterate(fluctuate.runS(Down(StartDelay)).value)(fluctuation => fluctuate.runS(fluctuation).value)
-      .flatMap(fluctuation => Stream.sleep_(fluctuation.delay) ++ Stream.emit(nextWord()))
+      .flatMap(fluctuation => Stream.sleep_[IO](fluctuation.delay) ++ Stream.emit(nextWord()))
       .map(word => ProducerRecord(topic = Topic, key = UUID.randomUUID().toString, value = word))
       .map(ProducerRecords.one[String, String])
       .through(KafkaProducer.pipe(producerSettings))
       .drain
 
-  private def consumer(blocker: Blocker,
-                       consumerSettings: ConsumerSettings[IO, String, String],
+  private def consumer(consumerSettings: ConsumerSettings[IO, String, String],
                        writePath: String): Stream[IO, INothing] =
     KafkaConsumer[IO]
       .stream(consumerSettings)
       .evalTap(_.subscribeTo(Topic))
       .flatMap(_.stream)
-      .through(write(blocker, writePath))
+      .through(write(writePath))
       .map(_.offset)
       .through(commitBatchWithin(MaxNumberOfRecordPerFile, MaxDurationOfFileWrite))
       .drain
 
-  private def write(blocker: Blocker, path: String): Pipe[IO, KafkaRecord, KafkaRecord] =
+  private def write(path: String): Pipe[IO, KafkaRecord, KafkaRecord] =
     viaParquet[IO, KafkaRecord]
       .options(WriterOptions)
       .maxCount(MaxNumberOfRecordPerFile)
@@ -124,6 +119,6 @@ object IndefiniteFS2App extends IOApp {
         }
       }
       .partitionBy("year", "month", "day")
-      .write(blocker, path)
+      .write(path)
 
 }
