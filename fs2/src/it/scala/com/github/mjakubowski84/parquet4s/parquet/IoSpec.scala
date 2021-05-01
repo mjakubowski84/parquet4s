@@ -1,11 +1,11 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
-import java.nio.file
-import java.nio.file.Paths
-import cats.effect.{Blocker, ContextShift, IO}
-import com.github.mjakubowski84.parquet4s.{ParquetWriter, PartitionTestUtils, PartitionedPath}
+import cats.effect.IO
+import cats.effect.unsafe.implicits.global
+import cats.implicits._
+import com.github.mjakubowski84.parquet4s.{ParquetWriter, PartitionedPath}
 import fs2.Stream
-import fs2.io.file.{exists => fileExists, _}
+import fs2.io.file._
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
@@ -13,33 +13,30 @@ import org.scalatest.Inside
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.nio.file
+import java.nio.file.Paths
 import scala.language.implicitConversions
 
 class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with Inside {
 
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
   private val writeOptions = ParquetWriter.Options()
-  private val tmpDir = Paths.get(sys.props("java.io.tmpdir")).toAbsolutePath
 
   implicit def nioToHadoopPath(nio: java.nio.file.Path): Path = new Path("file", null, nio.toString)
   implicit def hadoopToNioPath(hadoop: Path): java.nio.file.Path = Paths.get(hadoop.toUri)
 
-  private def createTempFileAtPath(blocker: Blocker, path: Path): Stream[IO, file.Path] =
-    Stream.eval(createDirectories[IO](blocker, path))
-      .flatMap(dirPath => tempFileStream[IO](blocker, dirPath, suffix = ".parquet").as(dirPath))
+  private def createTempFileAtPath(path: Path): Stream[IO, file.Path] =
+    Stream.eval(Files[IO].createDirectories(path))
+      .flatMap(dirPath => Stream.resource(Files[IO].tempFile(dir = Option(dirPath), suffix = ".parquet")).as(dirPath))
 
   "validateWritePath" should "fail if path already exists in create mode" in {
     val options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.CREATE)
 
-    val resources = for {
-      blocker <- Blocker[IO]
-      dir <- tempDirectoryResource[IO](blocker, tmpDir)
-    } yield (blocker, new Path(dir.toUri))
+    val dirResource = Files[IO].tempDirectory().map(dir => new Path(dir.toUri))
 
-    val testIO = resources.use { case (blocker, existingDir) =>
+    val testIO = dirResource.use { existingDir =>
       for {
         logger <- logger[IO](getClass)
-        _ <- io.validateWritePath[IO](blocker, existingDir, options, logger)
+        _ <- io.validateWritePath[IO](existingDir, options, logger)
       } yield succeed
     }
 
@@ -49,16 +46,13 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
   it should "delete existing path in overwrite mode" in {
     val options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.OVERWRITE)
 
-    val resources = for {
-      blocker <- Blocker[IO]
-      dir <- tempDirectoryResource[IO](blocker, tmpDir)
-    } yield (blocker, new Path(dir.toUri))
+    val dirResource = Files[IO].tempDirectory().map(dir => new Path(dir.toUri))
 
-    val testIO = resources.use { case (blocker, existingDir) =>
+    val testIO = dirResource.use { existingDir =>
       for {
         logger <- logger[IO](getClass)
-        _ <- io.validateWritePath[IO](blocker, existingDir, options, logger)
-        pathStillExists <- fileExists[IO](blocker, existingDir)
+        _ <- io.validateWritePath[IO](existingDir, options, logger)
+        pathStillExists <- Files[IO].exists(existingDir)
       } yield pathStillExists should be(false)
     }
 
@@ -69,11 +63,13 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
     val createMode = writeOptions.copy(writeMode = ParquetFileWriter.Mode.CREATE)
     val overwriteMode = writeOptions.copy(writeMode = ParquetFileWriter.Mode.OVERWRITE)
 
-    val testIO = Blocker[IO].use { blocker =>
+    val dirResource = Files[IO].tempDirectory().map(dir => new Path(dir.toUri))
+
+    val testIO = dirResource.use { dir =>
       for {
         logger <- logger[IO](getClass)
-        _ <- io.validateWritePath[IO](blocker, tmpDir.suffix("/x"), createMode, logger)
-        _ <- io.validateWritePath[IO](blocker, tmpDir.suffix("/y"), overwriteMode, logger)
+        _ <- io.validateWritePath[IO](dir.suffix("/x"), createMode, logger)
+        _ <- io.validateWritePath[IO](dir.suffix("/y"), overwriteMode, logger)
       } yield succeed
     }
 
@@ -82,9 +78,8 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
 
   "findPartitionedPaths" should "return empty PartitionedDirectory for empty path" in {
     val testStream = for {
-      blocker <- Stream.resource(Blocker[IO])
-      path <- tempDirectoryStream[IO](blocker, tmpDir)
-      dir <- io.findPartitionedPaths[IO](blocker, path, writeOptions.hadoopConf)
+      path <- Stream.resource(Files[IO].tempDirectory())
+      dir <- io.findPartitionedPaths[IO](path, writeOptions.hadoopConf)
     } yield {
       dir.schema should be(empty)
       dir.paths should be(empty)
@@ -93,12 +88,11 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
     testStream.compile.lastOrError.unsafeToFuture()
   }
 
-  it should "return proper PartitionedDirectory for unparitioned path with parquet content" in {
+  it should "return proper PartitionedDirectory for unpartitioned path with parquet content" in {
     val testStream = for {
-      blocker <- Stream.resource(Blocker[IO])
-      basePath <- tempDirectoryStream[IO](blocker, tmpDir)
-      _ <- tempFileStream[IO](blocker, basePath, suffix = ".parquet")
-      dir <- io.findPartitionedPaths[IO](blocker, basePath, writeOptions.hadoopConf)
+      basePath <- Stream.resource(Files[IO].tempDirectory())
+      _ <- Stream.resource(Files[IO].tempFile(dir = Option(basePath), suffix = ".parquet"))
+      dir <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield {
       dir.schema should be(empty)
       dir.paths should be(Vector(PartitionedPath(basePath, List.empty)))
@@ -109,10 +103,9 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
 
   it should "return proper PartitionedDirectory for single partition" in {
     val testStream = for {
-      blocker <- Stream.resource(Blocker[IO])
-      basePath <- tempDirectoryStream[IO](blocker, tmpDir)
-      partitionPath <- createTempFileAtPath(blocker, basePath.resolve("x=1"))
-      dir <- io.findPartitionedPaths[IO](blocker, basePath, writeOptions.hadoopConf)
+      basePath <- Stream.resource(Files[IO].tempDirectory())
+      partitionPath <- createTempFileAtPath(basePath.resolve("x=1"))
+      dir <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield {
       dir.schema should be(List("x"))
       dir.paths should be(Vector(PartitionedPath(partitionPath, List("x" -> "1"))))
@@ -123,13 +116,12 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
 
   it should "return proper PartitionedDirectory for complex partition" in {
     val testStream = for {
-      blocker <- Stream.resource(Blocker[IO])
-      basePath <- tempDirectoryStream[IO](blocker, tmpDir)
-      partition1 <- createTempFileAtPath(blocker, basePath.resolve("x=1/y=a/z=0_9"))
-      partition2 <- createTempFileAtPath(blocker, basePath.resolve("x=1/y=b/z=1_0"))
-      partition3 <- createTempFileAtPath(blocker, basePath.resolve("x=1/y=c/z=1_1"))
-      partition4 <- createTempFileAtPath(blocker, basePath.resolve("x=2/y=b/z=1_2"))
-      dir <- io.findPartitionedPaths[IO](blocker, basePath, writeOptions.hadoopConf)
+      basePath <- Stream.resource(Files[IO].tempDirectory())
+      partition1 <- createTempFileAtPath(basePath.resolve("x=1/y=a/z=0_9"))
+      partition2 <- createTempFileAtPath(basePath.resolve("x=1/y=b/z=1_0"))
+      partition3 <- createTempFileAtPath(basePath.resolve("x=1/y=c/z=1_1"))
+      partition4 <- createTempFileAtPath(basePath.resolve("x=2/y=b/z=1_2"))
+      dir <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield {
       dir.schema should be(List("x", "y", "z"))
       dir.paths should contain theSameElementsAs Vector(
@@ -145,11 +137,10 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
 
   it should "fail in case of inconsistent directory [case 1]" in {
     val testStream = for {
-      blocker <- Stream.resource(Blocker[IO])
-      basePath <- tempDirectoryStream[IO](blocker, tmpDir)
-      _ <- createTempFileAtPath(blocker, basePath.resolve("x=1/y=a"))
-      _ <- createTempFileAtPath(blocker, basePath.resolve("y=b/x=2"))
-      _ <- io.findPartitionedPaths[IO](blocker, basePath, writeOptions.hadoopConf)
+      basePath <- Stream.resource(Files[IO].tempDirectory())
+      _ <- createTempFileAtPath(basePath.resolve("x=1/y=a"))
+      _ <- createTempFileAtPath(basePath.resolve("y=b/x=2"))
+      _ <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield succeed
 
     recoverToSucceededIf[IllegalArgumentException](testStream.compile.lastOrError.unsafeToFuture())
@@ -157,11 +148,10 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
 
   it should "fail in case of inconsistent directory [case 2]" in {
     val testStream = for {
-      blocker <- Stream.resource(Blocker[IO])
-      basePath <- tempDirectoryStream[IO](blocker, tmpDir)
-      _ <- createTempFileAtPath(blocker, basePath.resolve("x=1/y=a"))
-      _ <- createTempFileAtPath(blocker, basePath.resolve("x=1/y=a/z=0_9"))
-      _ <- io.findPartitionedPaths[IO](blocker, basePath, writeOptions.hadoopConf)
+      basePath <- Stream.resource(Files[IO].tempDirectory())
+      _ <- createTempFileAtPath(basePath.resolve("x=1/y=a"))
+      _ <- createTempFileAtPath(basePath.resolve("x=1/y=a/z=0_9"))
+      _ <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield succeed
 
     recoverToSucceededIf[IllegalArgumentException](testStream.compile.lastOrError.unsafeToFuture())
