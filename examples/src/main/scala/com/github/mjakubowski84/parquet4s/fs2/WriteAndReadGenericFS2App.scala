@@ -1,35 +1,32 @@
 package com.github.mjakubowski84.parquet4s.fs2
 
-import java.nio.file.Paths
-import java.time.{LocalDate, ZoneOffset}
-import java.util.TimeZone
 import cats.Show
-import cats.effect.{Blocker, ExitCode, IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp}
 import com.github.mjakubowski84.parquet4s.parquet._
 import com.github.mjakubowski84.parquet4s.{RowParquetRecord, ValueCodecConfiguration}
 import fs2.Stream
-import fs2.io.file.tempDirectoryStream
+import fs2.io.file.Files
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
-import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, OriginalType, Types}
+import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, Types}
 
-object WriteAndReadGenericFS2App extends IOApp {
+import java.time.{LocalDate, ZoneOffset}
+import java.util.TimeZone
 
-  private val ID         = "id"
-  private val Name       = "name"
-  private val Birthday   = "birthday"
+object WriteAndReadGenericFS2App extends IOApp.Simple {
+
+  private val ID = "id"
+  private val Name = "name"
+  private val Birthday = "birthday"
   private val SchemaName = "user_schema"
 
-  implicit val schema: MessageType = Types
-    .buildMessage()
+  implicit val schema: MessageType = Types.buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
-  implicit private val showRecords: Show[RowParquetRecord] = Show.fromToString
-
-  private val TmpPath = Paths.get(sys.props("java.io.tmpdir"))
+  private implicit val showRecords: Show[RowParquetRecord] = Show.fromToString
 
   private val vcc = ValueCodecConfiguration(TimeZone.getTimeZone(ZoneOffset.UTC))
 
@@ -44,14 +41,13 @@ object WriteAndReadGenericFS2App extends IOApp {
       .add(Birthday, birthday, vcc)
   }
 
-  override def run(args: List[String]): IO[ExitCode] = {
+
+  override def run: IO[Unit] = {
     val stream = for {
-      blocker <- Stream.resource(Blocker[IO])
-      path    <- tempDirectoryStream[IO](blocker, dir = TmpPath)
-      _ <- Stream
-        .iterable[IO, RowParquetRecord](users)
-        .through(writeSingleFile(blocker, path.resolve("data.parquet").toString))
-        .append(fromParquet[IO, RowParquetRecord].read(blocker, path.toString).showLinesStdOut.drain)
+      path <- Stream.resource(Files[IO].tempDirectory())
+      _ <- Stream.iterable[IO, RowParquetRecord](users)
+        .through(writeSingleFile(path.resolve("data.parquet").toString))
+        .append(fromParquet[IO, RowParquetRecord].read(path.toString).printlns.drain)
     } yield ()
 
     stream.compile.drain.as(ExitCode.Success)
