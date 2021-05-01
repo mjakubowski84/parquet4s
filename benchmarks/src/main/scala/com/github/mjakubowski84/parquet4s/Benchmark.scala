@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import cats.effect.{Blocker, ContextShift, IO, Timer}
+import cats.effect.IO
 import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -14,10 +14,9 @@ import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
 import java.nio.file._
 import java.util.UUID
-import java.util.concurrent.{ExecutorService, Executors}
 import scala.collection.immutable
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.Await
 import scala.util.Random
 
 object Benchmark extends Bench.OfflineReport {
@@ -150,100 +149,56 @@ object Benchmark extends Bench.OfflineReport {
     }
   }
 
-  object Fs2Ctx {
-    def apply(): Fs2Ctx = {
-      val (blocker, closeBlocker) = Blocker[IO].allocated.unsafeRunSync()
-      val threadPool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
-      val ec = ExecutionContext.fromExecutor(threadPool)
-      Fs2Ctx(
-        threadPool = threadPool,
-        contextShift = IO.contextShift(ec),
-        timer = IO.timer(ec),
-        blocker = blocker,
-        closeBlocker = closeBlocker
-      )
-    }
-  }
-  case class Fs2Ctx(
-    threadPool: ExecutorService,
-    implicit val contextShift: ContextShift[IO],
-    implicit val timer: Timer[IO],
-    blocker: Blocker,
-    closeBlocker: IO[Unit]
-  ) {
-    def close(): Unit = {
-      closeBlocker.unsafeRunSync()
-      threadPool.shutdown()
-    }
-  }
+  import cats.effect.unsafe.implicits.global
 
-  private def fs2Write(path: String, records: immutable.Iterable[Record])(implicit ctx: Fs2Ctx): IO[Unit] = {
-    import ctx._
+  private def fs2Write(path: String, records: immutable.Iterable[Record]): IO[Unit] =
     Stream
       .iterable(records)
-      .through(parquet.writeSingleFile[IO, Record](blocker, path))
+      .through(parquet.writeSingleFile[IO, Record](path))
+      .compile
+      .drain
+
+  private def fs2WritePartitioned(path: String, records: immutable.Iterable[Record]): IO[Unit] = {
+    Stream
+      .iterable(records)
+      .through(parquet.viaParquet[IO, Record].partitionBy("dict").write(path))
       .compile
       .drain
   }
 
-  private def fs2WritePartitioned(path: String, records: immutable.Iterable[Record])(implicit ctx: Fs2Ctx): IO[Unit] = {
-    import ctx._
-    Stream
-      .iterable(records)
-      .through(parquet.viaParquet[IO, Record].partitionBy("dict").write(blocker, path))
-      .compile
-      .drain
-  }
-
-  private def fs2Read(path: String)(implicit ctx: Fs2Ctx): IO[Unit] = {
-    import ctx._
-    parquet.fromParquet[IO, Record].read(blocker, path).compile.drain
+  private def fs2Read(path: String): IO[Unit] = {
+    parquet.fromParquet[IO, Record].read(path).compile.drain
   }
 
   performance of "fs2" in {
     measure method "write" in {
-      implicit var ctx: Fs2Ctx = null
       var operation: IO[Unit] = null
-      using(datasets) beforeTests {
-        ctx = Fs2Ctx()
-      } setUp {
+      using(datasets) setUp {
         case Dataset(path, records) =>
           deletePath(path)
           operation = fs2Write(path, records)
-      } afterTests {
-        ctx.close()
       } in {
         _ => operation.unsafeRunSync()
       }
     }
     measure method "writePartitioned" in {
-      implicit var ctx: Fs2Ctx = null
       var operation: IO[Unit] = null
-      using(datasets) beforeTests {
-        ctx = Fs2Ctx()
-      } setUp {
+      using(datasets) setUp {
         case Dataset(path, records) =>
           deletePath(path)
           operation = fs2WritePartitioned(path, records)
-      } afterTests {
-        ctx.close()
       } in {
         _ => operation.unsafeRunSync()
       }
     }
     measure method "read" in {
-      implicit var ctx: Fs2Ctx = null
       var operation: IO[Unit] = null
-      using(datasets) beforeTests {
-        ctx = Fs2Ctx()
-      } setUp {
+      using(datasets) setUp {
         case Dataset(path, records) =>
           ParquetWriter.writeAndClose(path, records)
           operation = fs2Read(path)
       } tearDown {
         case Dataset(path, _) => deletePath(path)
-      } afterTests {
-        ctx.close()
       } in {
         _ => operation.unsafeRunSync()
       }
