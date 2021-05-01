@@ -11,7 +11,7 @@ private[parquet] object logger {
   class Logger[F[_]](wrapped: org.slf4j.Logger)(implicit F: Sync[F]) {
 
     def debug(msg: => String): F[Unit] =
-      F.delay(wrapped.isDebugEnabled).flatMap {
+      F.catchNonFatal(wrapped.isDebugEnabled).flatMap {
         case true =>
           F.delay(wrapped.debug(msg))
         case false =>

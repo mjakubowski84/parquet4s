@@ -1,9 +1,6 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
-import java.util.UUID
-import java.util.concurrent.TimeUnit
-import cats.effect.concurrent.Ref
-import cats.effect.{Blocker, Concurrent, ContextShift, Sync, Timer}
+import cats.effect._
 import cats.implicits._
 import com.github.mjakubowski84.parquet4s.Cursor.DotPath
 import com.github.mjakubowski84.parquet4s._
@@ -13,6 +10,8 @@ import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.parquet.schema.MessageType
 
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
@@ -91,12 +90,10 @@ object rotatingWriter {
     /**
      * Builds final writer pipe.
      */
-    def write(blocker: Blocker, basePath: String)(implicit
-                                                  schemaResolver: SkippingParquetSchemaResolver[W],
-                                                  encoder: ParquetRecordEncoder[W],
-                                                  timer : Timer[F],
-                                                  concurrent: Concurrent[F],
-                                                  contextShift: ContextShift[F]): Pipe[F, T, T]
+    def write(basePath: String)(implicit
+                                schemaResolver: SkippingParquetSchemaResolver[W],
+                                encoder: ParquetRecordEncoder[W],
+                                async: Async[F]): Pipe[F, T, T]
   }
 
   private case class BuilderImpl[F[_], T, W](
@@ -123,14 +120,12 @@ object rotatingWriter {
       )
     override def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): Builder[F, T, W] =
       copy(postWriteHandlerOpt = Option(postWriteHandler))
-    override def write(blocker: Blocker, basePath: String)(implicit
-                                                           schemaResolver: SkippingParquetSchemaResolver[W],
-                                                           encoder: ParquetRecordEncoder[W],
-                                                           timer : Timer[F],
-                                                           concurrent: Concurrent[F],
-                                                           contextShift: ContextShift[F]): Pipe[F, T, T] =
+    override def write(basePath: String)(implicit
+                                         schemaResolver: SkippingParquetSchemaResolver[W],
+                                         encoder: ParquetRecordEncoder[W],
+                                         async: Async[F]): Pipe[F, T, T] =
       rotatingWriter.write[F, T, W](
-        blocker, basePath, maxCount, maxDuration, partitionBy, preWriteTransformation, postWriteHandlerOpt, writeOptions
+        basePath, maxCount, maxDuration, partitionBy, preWriteTransformation, postWriteHandlerOpt, writeOptions
       )
   }
 
@@ -148,24 +143,22 @@ object rotatingWriter {
   private case class StopEvent[T, W]() extends WriterEvent[T, W]
 
   private object RecordWriter {
-    def apply[F[_]: Sync: ContextShift](blocker: Blocker,
-                                        path: Path,
-                                        schema: MessageType,
-                                        options: ParquetWriter.Options
-                                       ): F[RecordWriter[F]] =
-      blocker.delay(ParquetWriter.internalWriter(path, schema, options)).map(iw => new RecordWriter(blocker, iw))
+    def apply[F[_]](path: Path,
+                          schema: MessageType,
+                          options: ParquetWriter.Options
+                         )(implicit F: Sync[F]): F[RecordWriter[F]] =
+      F.blocking(ParquetWriter.internalWriter(path, schema, options)).map(iw => new RecordWriter(iw))
   }
 
-  private class RecordWriter[F[_]: Sync: ContextShift](blocker: Blocker, internalWriter: ParquetWriter.InternalWriter) {
+  private class RecordWriter[F[_]: Sync](internalWriter: ParquetWriter.InternalWriter)(implicit F: Sync[F]) {
 
-    def write(record: RowParquetRecord): F[Unit] = blocker.delay(internalWriter.write(record))
+    def write(record: RowParquetRecord): F[Unit] = F.blocking(internalWriter.write(record))
 
-    def dispose: F[Unit] = blocker.delay(internalWriter.close())
+    def dispose: F[Unit] = F.blocking(internalWriter.close())
 
   }
 
-  private class RotatingWriter[T, W, F[_]](blocker: Blocker,
-                                           basePath: Path,
+  private class RotatingWriter[T, W, F[_]](basePath: Path,
                                            options: ParquetWriter.Options,
                                            writersRef: Ref[F, Map[Path, RecordWriter[F]]],
                                            maxCount: Long,
@@ -174,7 +167,7 @@ object rotatingWriter {
                                            encode: W => F[RowParquetRecord],
                                            logger: Logger[F],
                                            postWriteHandlerOpt: Option[PostWriteHandler[F, T]]
-                                          )(implicit F: Sync[F], cs: ContextShift[F]) {
+                                          )(implicit F: Sync[F]) {
 
     private type Writers = Map[Path, RecordWriter[F]]
 
@@ -192,7 +185,7 @@ object rotatingWriter {
           F.pure(writer -> writers)
         case None =>
           for {
-            writer <- RecordWriter(blocker, new Path(path, newFileName), schema, options)
+            writer <- RecordWriter(new Path(path, newFileName), schema, options)
             updatedWriters = writers.updated(path, writer)
             _ <- writersRef.set(updatedWriters)
           } yield writer -> updatedWriters
@@ -215,10 +208,11 @@ object rotatingWriter {
       record.remove(partitionPath) match {
         case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' does not exist."))
         case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' is null."))
-        case Some(BinaryValue(binary)) => F.delay(DotPath.toString(partitionPath) -> binary.toStringUsingUTF8)
+        case Some(BinaryValue(binary)) => F.catchNonFatal(DotPath.toString(partitionPath) -> binary.toStringUsingUTF8)
         case _ => F.raiseError(new IllegalArgumentException("Only String field can be used for partitioning."))
       }
 
+    // TODO consider using Hotswap
     private def dispose: F[Unit] =
       for {
         writers <- writersRef.modify(writers => (Map.empty, writers.values))
@@ -270,25 +264,26 @@ object rotatingWriter {
       writeAllPull(in, writers = Map.empty, count = 0).stream.onFinalize(dispose)
   }
 
-  private[parquet4s] def write[F[_] : Timer: ContextShift, T, W: ParquetRecordEncoder : SkippingParquetSchemaResolver](blocker: Blocker,
-                                                                                                                       path: String,
-                                                                                                                       maxCount: Long,
-                                                                                                                       maxDuration: FiniteDuration,
-                                                                                                                       partitionBy: Seq[String],
-                                                                                                                       prewriteTransformation: T => Stream[F, W],
-                                                                                                                       postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
-                                                                                                                       options: ParquetWriter.Options
-                                                                                                                      )(implicit F: Concurrent[F]): Pipe[F, T, T] =
+  private[parquet4s] def write[
+    F[_],
+    T,
+    W: ParquetRecordEncoder : SkippingParquetSchemaResolver](path: String,
+                                                             maxCount: Long,
+                                                             maxDuration: FiniteDuration,
+                                                             partitionBy: Seq[String],
+                                                             prewriteTransformation: T => Stream[F, W],
+                                                             postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
+                                                             options: ParquetWriter.Options
+                                                            )(implicit F: Async[F]): Pipe[F, T, T] =
     in =>
       for {
         hadoopPath <- Stream.eval(io.makePath(path))
-        schema <- Stream.eval(F.delay(SkippingParquetSchemaResolver.resolveSchema[W](partitionBy)))
-        valueCodecConfiguration <- Stream.eval(F.delay(options.toValueCodecConfiguration))
-        encode = { (entity: W) => F.delay(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
+        schema <- Stream.eval(F.catchNonFatal(SkippingParquetSchemaResolver.resolveSchema[W](partitionBy)))
+        valueCodecConfiguration <- Stream.eval(F.catchNonFatal(options.toValueCodecConfiguration))
+        encode = { (entity: W) => F.catchNonFatal(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
         logger <- Stream.eval(logger[F](this.getClass))
         rotatingWriter <- Stream.emit(
           new RotatingWriter[T, W, F](
-            blocker = blocker,
             basePath = hadoopPath,
             options = options,
             writersRef = Ref.unsafe(Map.empty),

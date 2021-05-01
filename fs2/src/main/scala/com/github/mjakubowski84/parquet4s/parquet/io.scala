@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
-import cats.effect.{Blocker, ContextShift, Resource, Sync}
+import cats.effect.{Resource, Sync}
 import com.github.mjakubowski84.parquet4s.{ParquetWriter, PartitionedDirectory, PartitionedPath}
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
@@ -27,34 +27,32 @@ private[parquet] object io {
 
   private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!\-_.*'()]+)""".r
 
-  def makePath[F[_]](path: String)(implicit F: Sync[F]): F[Path] = F.delay(new Path(path))
+  def makePath[F[_]](path: String)(implicit F: Sync[F]): F[Path] = F.catchNonFatal(new Path(path))
 
-  def validateWritePath[F[_]: ContextShift](blocker: Blocker,
-                                            path: Path,
-                                            writeOptions: ParquetWriter.Options,
-                                            logger: Logger[F]
-                                           )(implicit F: Sync[F]): F[Unit] = {
+  def validateWritePath[F[_]](path: Path,
+                              writeOptions: ParquetWriter.Options,
+                              logger: Logger[F]
+                             )(implicit F: Sync[F]): F[Unit] = {
     Resource
-      .fromAutoCloseableBlocking(blocker)(F.delay(path.getFileSystem(writeOptions.hadoopConf)))
+      .fromAutoCloseable(F.blocking(path.getFileSystem(writeOptions.hadoopConf)))
       .use { fs =>
-        blocker.delay(fs.exists(path)).flatMap {
+        F.blocking(fs.exists(path)).flatMap {
           case true if writeOptions.writeMode == ParquetFileWriter.Mode.CREATE =>
             F.raiseError(new AlreadyExistsException(s"File or directory already exists: $path"))
           case true =>
             logger.debug(s"Deleting $path in order to override with new data.") >>
-              blocker.delay(fs.delete(path, true)).void
+              F.blocking(fs.delete(path, true)).void
           case false =>
             F.unit
         }
       }
   }
 
-  def findPartitionedPaths[F[_]: ContextShift](blocker: Blocker,
-                                               path: Path,
-                                               configuration: Configuration)
-                                              (implicit F: Sync[F]): Stream[F, PartitionedDirectory] =
-    Stream.resource(Resource.fromAutoCloseableBlocking(blocker)(F.delay(path.getFileSystem(configuration))))
-      .flatMap(fs => findPartitionedPaths(blocker, fs, path, List.empty))
+  def findPartitionedPaths[F[_]](path: Path,
+                                 configuration: Configuration)
+                                (implicit F: Sync[F]): Stream[F, PartitionedDirectory] =
+    Stream.resource(Resource.fromAutoCloseable(F.blocking(path.getFileSystem(configuration))))
+      .flatMap(fs => findPartitionedPaths(fs, path, List.empty))
       .fold[Either[Seq[Path], Seq[PartitionedPath]]](Right(Vector.empty)) {
         case (Left(invalidPaths), Left(moreInvalidPaths)) =>
           Left(invalidPaths ++ moreInvalidPaths)
@@ -71,12 +69,11 @@ private[parquet] object io {
       }
       .flatMap(Stream.fromEither[F].apply)
 
-  private def findPartitionedPaths[F[_]: ContextShift](blocker: Blocker,
-                                                       fs: FileSystem,
-                                                       path: Path,
-                                                       partitions: List[Partition]
-                                                      )(implicit F: Sync[F]): Stream[F, Either[Seq[Path], Seq[PartitionedPath]]] =
-    Stream.evalSeq(blocker.delay(fs.listStatus(path).toVector))
+  private def findPartitionedPaths[F[_]](fs: FileSystem,
+                                         path: Path,
+                                         partitions: List[Partition]
+                                        )(implicit F: Sync[F]): Stream[F, Either[Seq[Path], Seq[PartitionedPath]]] =
+    Stream.evalSeq(F.blocking(fs.listStatus(path).toVector))
       .fold[StatusAccumulator](Empty) {
         case (Empty, status) if status.isDirectory =>
           matchPartition(status).fold[StatusAccumulator](Empty)(Dirs.apply)
@@ -94,7 +91,7 @@ private[parquet] object io {
       .flatMap {
         case Dirs(partitionPaths) => // node od directory tree
           Stream.emits(partitionPaths).flatMap {
-            case (subPath, partition) => findPartitionedPaths(blocker, fs, subPath, partitions :+ partition)
+            case (subPath, partition) => findPartitionedPaths(fs, subPath, partitions :+ partition)
           }
         case Files => // leaf of directory tree
           Stream.emit(Right(Vector(PartitionedPath(path, partitions))))
