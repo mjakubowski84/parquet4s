@@ -1,12 +1,12 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.nio.file.{Path, Paths}
+import cats.effect.testing.scalatest.AsyncIOSpec
 
-import cats.effect.concurrent.Ref
-import cats.effect.{Blocker, ContextShift, IO, Timer}
+import java.nio.file.Path
+import cats.effect.{IO, Ref}
 import cats.implicits._
 import fs2.Stream
-import fs2.io.file.{directoryStream, tempDirectoryStream, walk}
+import fs2.io.file.Files
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64
 import org.apache.parquet.schema.Type._
@@ -32,19 +32,15 @@ object Fs2ParquetItSpec {
 
 }
 
-class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
+class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with Inspectors {
 
   import Fs2ParquetItSpec._
-
-  implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-  implicit val timer: Timer[IO] = IO.timer(executionContext)
 
   val writeOptions: ParquetWriter.Options = ParquetWriter.Options(
     compressionCodecName = CompressionCodecName.SNAPPY,
     pageSize = 512,
     rowGroupSize = 4 * 512
   )
-  val tmpDir: Path = Paths.get(sys.props("java.io.tmpdir"))
   val RowGroupsPerFile: Int = 4
   val count: Int = RowGroupsPerFile * writeOptions.rowGroupSize
   val dictS: Seq[String] = Vector("a", "b", "c", "d")
@@ -63,141 +59,136 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
     ))
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration.default
 
-  def read[T: ParquetRecordDecoder](blocker: Blocker, path: Path): Stream[IO, Vector[T]] =
-    parquet.fromParquet[IO, T].read(blocker, path.toString).fold(Vector.empty[T])(_ :+ _)
+  def read[T: ParquetRecordDecoder](path: Path): Stream[IO, Vector[T]] =
+    parquet.fromParquet[IO, T].read(path.toString).fold(Vector.empty[T])(_ :+ _)
 
-  def listParquetFiles(blocker: Blocker, path: Path): Stream[IO, Vector[Path]] =
-    directoryStream[IO](blocker, path)
+  def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
+    Files[IO].directoryStream(path)
       .filter(_.toString.endsWith(".parquet"))
       .fold(Vector.empty[Path])(_ :+ _)
 
   it should "write and read single parquet file" in {
     val outputFileName = "data.parquet"
-    def write(blocker: Blocker, path: Path): Stream[IO, fs2.INothing] =
+    def write(path: Path): Stream[IO, fs2.INothing] =
       Stream
         .iterable(data)
-        .through(parquet.writeSingleFile[IO, Data](blocker, path.resolve(outputFileName).toString, writeOptions))
+        .through(parquet.writeSingleFile[IO, Data](path.resolve(outputFileName).toString, writeOptions))
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        readData <- write(blocker, path) ++ read[Data](blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        readData <- write(path) ++ read[Data](path)
       } yield readData should contain theSameElementsInOrderAs data
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "write and read single parquet file using projection" in {
     val outputFileName = "data.parquet"
-    def write(blocker: Blocker, path: Path): Stream[IO, fs2.INothing] =
+    def write(path: Path): Stream[IO, fs2.INothing] =
       Stream
         .iterable(data)
-        .through(parquet.writeSingleFile[IO, Data](blocker, path.resolve(outputFileName).toString, writeOptions))
+        .through(parquet.writeSingleFile[IO, Data](path.resolve(outputFileName).toString, writeOptions))
 
     implicit val projectedSchema: MessageType = Types.buildMessage().addField(
       Types.primitive(INT64, Repetition.REQUIRED).named("i")
     ).named("projected-schema")
 
-    def readProjected[T: ParquetRecordDecoder: SkippingParquetSchemaResolver](blocker: Blocker, path: Path): Stream[IO, Vector[T]] =
+    def readProjected[T: ParquetRecordDecoder: SkippingParquetSchemaResolver](path: Path): Stream[IO, Vector[T]] =
       parquet.fromParquet[IO, T].projection.read(blocker, path.toString).fold(Vector.empty[T])(_ :+ _)
 
     val expectedRecords = data.map(d => RowParquetRecord.empty.add("i", d.i, vcc))
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        readData <- write(blocker, path) ++ readProjected[RowParquetRecord](blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        readData <- write(path) ++ readProjected[RowParquetRecord](path)
       } yield readData should contain theSameElementsInOrderAs expectedRecords
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "flush already processed data to file on failure" in {
     val numberOfProcessedElementsBeforeFailure = 5
     val outputFileName = "data.parquet"
-    def write(blocker: Blocker, path: Path): Stream[IO, fs2.INothing] =
+    def write(path: Path): Stream[IO, fs2.INothing] =
       Stream
         .iterable(data)
         .take(numberOfProcessedElementsBeforeFailure)
         .append(Stream.raiseError[IO](new RuntimeException("test exception")))
-        .through(parquet.writeSingleFile[IO, Data](blocker, path.resolve(outputFileName).toString, writeOptions))
+        .through(parquet.writeSingleFile[IO, Data](path.resolve(outputFileName).toString, writeOptions))
         .handleErrorWith(_ => Stream.empty)
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        readData <- write(blocker, path) ++ read[Data](blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        readData <- write(path) ++ read[Data](path)
       } yield readData should contain theSameElementsInOrderAs data.take(numberOfProcessedElementsBeforeFailure)
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "write files and rotate by max file size" in {
     val maxCount = writeOptions.rowGroupSize
     val expectedNumberOfFiles = RowGroupsPerFile
 
-    def write(blocker: Blocker, path: Path): Stream[IO, Vector[Data]] =
+    def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
         .iterable(data)
         .through(parquet.viaParquet[IO, Data]
           .maxCount(maxCount)
           .options(writeOptions)
-          .write(blocker, path.toString)
+          .write(path.toString)
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        writtenData <- write(blocker, path)
-        readData <- read[Data](blocker, path)
-        parquetFiles <- listParquetFiles(blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        writtenData <- write(path)
+        readData <- read[Data](path)
+        parquetFiles <- listParquetFiles(path)
       } yield {
         writtenData should contain theSameElementsAs data
         readData should contain theSameElementsAs data
         parquetFiles should have size expectedNumberOfFiles
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "write files and rotate by max write duration" in {
-    def write(blocker: Blocker, path: Path): Stream[IO, Vector[Data]] =
+    def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
         .iterable(data)
         .through(parquet.viaParquet[IO, Data]
           .maxDuration(25.millis)
           .maxCount(count)
           .options(writeOptions)
-          .write(blocker, path.toString)
+          .write(path.toString)
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        writtenData <- write(blocker, path)
-        readData <- read[Data](blocker, path)
-        parquetFiles <- listParquetFiles(blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        writtenData <- write(path)
+        readData <- read[Data](path)
+        parquetFiles <- listParquetFiles(path)
       } yield {
         writtenData should contain theSameElementsAs data
         readData should contain theSameElementsAs data
         parquetFiles.size should be > 1
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "apply postWriteHandlerWhenWriting" in {
     val expectedNumberOfFiles = 8
     val countOverride = count / expectedNumberOfFiles
 
-    def write(blocker: Blocker, path: Path, gaugeRef: Ref[IO, Vector[Long]]): Stream[IO, Vector[Data]] =
+    def write(path: Path, gaugeRef: Ref[IO, Vector[Long]]): Stream[IO, Vector[Data]] =
       Stream
         .iterable(data)
         .through(parquet.viaParquet[IO, Data]
@@ -208,18 +199,17 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
             case _ => IO.unit
           }
           .options(writeOptions)
-          .write(blocker, path.toString)
+          .write(path.toString)
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
+        path <- Stream.resource(Files[IO].tempDirectory())
         gaugeRef <- Stream.eval(Ref.of[IO, Vector[Long]](Vector.empty))
-        writtenData <- write(blocker, path, gaugeRef)
-        readData <- read[Data](blocker, path)
-        parquetFiles <- listParquetFiles(blocker, path)
+        writtenData <- write(path, gaugeRef)
+        readData <- read[Data](path)
+        parquetFiles <- listParquetFiles(path)
         gaugeValue <- Stream.eval(gaugeRef.get)
       } yield {
         writtenData should contain theSameElementsAs data
@@ -228,23 +218,23 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         gaugeValue should be(Vector.fill(expectedNumberOfFiles)(countOverride))
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "write and read partitioned files" in {
-    def write(blocker: Blocker, path: Path): Stream[IO, Vector[DataPartitioned]] =
+    def write(path: Path): Stream[IO, Vector[DataPartitioned]] =
       Stream
         .iterable(dataPartitioned)
         .through(parquet.viaParquet[IO, DataPartitioned]
           .maxCount(count)
           .partitionBy("a", "b")
           .options(writeOptions)
-          .write(blocker, path.toString)
+          .write(path.toString)
         )
         .fold(Vector.empty[DataPartitioned])(_ :+ _)
 
-    def listParquetFiles(blocker: Blocker, path: Path): Stream[IO, Vector[Path]] =
-      walk[IO](blocker, path)
+    def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
+      Files[IO].walk(path)
         .filter(_.toString.endsWith(".parquet"))
         .fold(Vector.empty[Path])(_ :+ _)
 
@@ -255,11 +245,10 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        writtenData <- write(blocker, path)
-        parquetFiles <- listParquetFiles(blocker, path)
-        readData <- read[DataPartitioned](blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        writtenData <- write(path)
+        parquetFiles <- listParquetFiles(path)
+        readData <- read[DataPartitioned](path)
       } yield {
         writtenData should contain theSameElementsAs dataPartitioned
         parquetFiles.size should be > 1
@@ -273,7 +262,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         readData should contain theSameElementsAs dataPartitioned
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "transform data before writing" in {
@@ -281,7 +270,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
     val partitionSize = count / partitions.size
     val partitionData = data.take(partitionSize)
 
-    def write(blocker: Blocker, path: Path): Stream[IO, Vector[Data]] =
+    def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
         .iterable(partitionData)
         .through(parquet.viaParquet[IO, Data]
@@ -291,23 +280,22 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
           }
           .partitionBy("partition")
           .options(writeOptions)
-          .write(blocker, path.toString)
+          .write(path.toString)
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
-    def read(blocker: Blocker, path: Path): Stream[IO, Map[String, Vector[Data]]] =
+    def read(path: Path): Stream[IO, Map[String, Vector[Data]]] =
       parquet
-        .fromParquet[IO, DataTransformed].projection.read(blocker, path.toString)
+        .fromParquet[IO, DataTransformed].projection.read(path.toString)
         .map { case DataTransformed(i, s, partition) => Map(partition -> Vector(Data(i, s))) }
         .reduceSemigroup
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        writtenData <- write(blocker, path)
-        partitionPaths <- directoryStream[IO](blocker, path).fold(Vector.empty[Path])(_ :+ _)
-        partitionedData <- read(blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        writtenData <- write(path)
+        partitionPaths <- Files[IO].directoryStream(path).fold(Vector.empty[Path])(_ :+ _)
+        partitionedData <- read(path)
       } yield {
         writtenData should contain theSameElementsAs partitionData
         partitionPaths should have size partitions.size
@@ -318,13 +306,13 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         }
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "flush already processed files on failure when using rotating writer" in {
     val numberOfProcessedElementsBeforeFailure = 25
 
-    def write(blocker: Blocker, path: Path): Stream[IO, Vector[Data]] =
+    def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
         .iterable(data)
         .through(parquet.viaParquet[IO, Data]
@@ -336,35 +324,34 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
             case _ =>
               IO.unit
           }
-          .write(blocker, path.toString)
+          .write(path.toString)
         )
         .handleErrorWith(_ => Stream.empty)
         .fold(Vector.empty[Data])(_ :+ _)
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        writtenData <- write(blocker, path)
-        readData <- read[Data](blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        writtenData <- write(path)
+        readData <- read[Data](path)
       } yield {
         writtenData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure)
         readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure)
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "flush already processed files on premature completion downstream when using rotating writer" in {
     val numberOfProcessedElementsBeforeStop = 25
 
-    def write(blocker: Blocker, path: Path): Stream[IO, Vector[Data]] =
+    def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
         .iterable(data)
         .through(parquet.viaParquet[IO, Data]
           .options(writeOptions)
           .partitionBy("s")
-          .write(blocker, path.toString)
+          .write(path.toString)
         )
         .take(numberOfProcessedElementsBeforeStop)
         .handleErrorWith(_ => Stream.empty)
@@ -372,16 +359,15 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
 
     val testStream =
       for {
-        blocker <- Stream.resource(Blocker[IO])
-        path <- tempDirectoryStream[IO](blocker, tmpDir)
-        writtenData <- write(blocker, path)
-        readData <- read[Data](blocker, path)
+        path <- Stream.resource(Files[IO].tempDirectory())
+        writtenData <- write(path)
+        readData <- read[Data](path)
       } yield {
         writtenData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
         readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
 }
