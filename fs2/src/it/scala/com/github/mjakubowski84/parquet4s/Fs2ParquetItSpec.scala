@@ -1,5 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
+import cats.effect.testing.scalatest.AsyncIOSpec
+
 import java.nio.file.Path
 import cats.effect.{IO, Ref}
 import cats.implicits._
@@ -16,7 +18,6 @@ import org.scalatest.matchers.should.Matchers
 import scala.collection.compat.immutable.LazyList
 import scala.concurrent.duration._
 import scala.util.Random
-import cats.effect.unsafe.implicits.global
 
 object Fs2ParquetItSpec {
 
@@ -31,7 +32,7 @@ object Fs2ParquetItSpec {
 
 }
 
-class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
+class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with Inspectors {
 
   import Fs2ParquetItSpec._
 
@@ -79,7 +80,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         readData <- write(path) ++ read[Data](path)
       } yield readData should contain theSameElementsInOrderAs data
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "write and read single parquet file using projection" in {
@@ -104,7 +105,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         readData <- write(path) ++ readProjected[RowParquetRecord](path)
       } yield readData should contain theSameElementsInOrderAs expectedRecords
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "flush already processed data to file on failure" in {
@@ -124,7 +125,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         readData <- write(path) ++ read[Data](path)
       } yield readData should contain theSameElementsInOrderAs data.take(numberOfProcessedElementsBeforeFailure)
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "write files and rotate by max file size" in {
@@ -153,7 +154,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         parquetFiles should have size expectedNumberOfFiles
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "write files and rotate by max write duration" in {
@@ -180,7 +181,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         parquetFiles.size should be > 1
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "apply postWriteHandlerWhenWriting" in {
@@ -217,7 +218,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         gaugeValue should be(Vector.fill(expectedNumberOfFiles)(countOverride))
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "write and read partitioned files" in {
@@ -261,7 +262,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         readData should contain theSameElementsAs dataPartitioned
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "transform data before writing" in {
@@ -305,7 +306,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         }
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "flush already processed files on failure when using rotating writer" in {
@@ -338,7 +339,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure)
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "flush already processed files on premature completion downstream when using rotating writer" in {
@@ -366,7 +367,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
         readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
       }
 
-    testStream.compile.drain.as(succeed).unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
 }
