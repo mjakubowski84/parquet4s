@@ -1,8 +1,7 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.IO
-import cats.effect.unsafe.implicits.global
-import cats.implicits._
+import cats.effect.testing.scalatest.AsyncIOSpec
 import com.github.mjakubowski84.parquet4s.{ParquetWriter, PartitionedPath}
 import fs2.Stream
 import fs2.io.file._
@@ -17,7 +16,7 @@ import java.nio.file
 import java.nio.file.Paths
 import scala.language.implicitConversions
 
-class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with Inside {
+class IoSpec extends AsyncFlatSpec with AsyncIOSpec with  Matchers with PartitionTestUtils with Inside {
 
   private val writeOptions = ParquetWriter.Options()
 
@@ -40,7 +39,7 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
       } yield succeed
     }
 
-    recoverToSucceededIf[AlreadyExistsException](testIO.unsafeToFuture())
+    testIO.assertThrows[AlreadyExistsException]
   }
 
   it should "delete existing path in overwrite mode" in {
@@ -48,15 +47,13 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
 
     val dirResource = Files[IO].tempDirectory().map(dir => new Path(dir.toUri))
 
-    val testIO = dirResource.use { existingDir =>
+    dirResource.use { existingDir =>
       for {
         logger <- logger[IO](getClass)
         _ <- io.validateWritePath[IO](existingDir, options, logger)
         pathStillExists <- Files[IO].exists(existingDir)
       } yield pathStillExists should be(false)
     }
-
-    testIO.unsafeToFuture()
   }
 
   it should "pass if path does not exist in any mode" in {
@@ -65,15 +62,13 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
 
     val dirResource = Files[IO].tempDirectory().map(dir => new Path(dir.toUri))
 
-    val testIO = dirResource.use { dir =>
+    dirResource.use { dir =>
       for {
         logger <- logger[IO](getClass)
         _ <- io.validateWritePath[IO](dir.suffix("/x"), createMode, logger)
         _ <- io.validateWritePath[IO](dir.suffix("/y"), overwriteMode, logger)
       } yield succeed
     }
-
-    testIO.unsafeToFuture()
   }
 
   "findPartitionedPaths" should "return empty PartitionedDirectory for empty path" in {
@@ -85,7 +80,7 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
       dir.paths should be(empty)
     }
 
-    testStream.compile.lastOrError.unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "return proper PartitionedDirectory for unpartitioned path with parquet content" in {
@@ -98,7 +93,7 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
       dir.paths should be(Vector(PartitionedPath(basePath, List.empty)))
     }
 
-    testStream.compile.lastOrError.unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "return proper PartitionedDirectory for single partition" in {
@@ -111,7 +106,7 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
       dir.paths should be(Vector(PartitionedPath(partitionPath, List("x" -> "1"))))
     }
 
-    testStream.compile.lastOrError.unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "return proper PartitionedDirectory for complex partition" in {
@@ -132,7 +127,7 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
       )
     }
 
-    testStream.compile.lastOrError.unsafeToFuture()
+    testStream.compile.lastOrError
   }
 
   it should "fail in case of inconsistent directory [case 1]" in {
@@ -143,7 +138,7 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
       _ <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield succeed
 
-    recoverToSucceededIf[IllegalArgumentException](testStream.compile.lastOrError.unsafeToFuture())
+    testStream.compile.lastOrError.assertThrows[IllegalArgumentException]
   }
 
   it should "fail in case of inconsistent directory [case 2]" in {
@@ -154,7 +149,7 @@ class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils with In
       _ <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield succeed
 
-    recoverToSucceededIf[IllegalArgumentException](testStream.compile.lastOrError.unsafeToFuture())
+    testStream.compile.lastOrError.assertThrows[IllegalArgumentException]
   }
 
   "PartitionRegexp" should "match valid partition names and values" in {
