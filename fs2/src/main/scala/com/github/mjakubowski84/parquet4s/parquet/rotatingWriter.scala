@@ -91,7 +91,7 @@ object rotatingWriter {
      * Builds final writer pipe.
      */
     def write(basePath: String)(implicit
-                                schemaResolver: SkippingParquetSchemaResolver[W],
+                                schemaResolver: ParquetSchemaResolver[W],
                                 encoder: ParquetRecordEncoder[W],
                                 async: Async[F]): Pipe[F, T, T]
   }
@@ -121,7 +121,7 @@ object rotatingWriter {
     override def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): Builder[F, T, W] =
       copy(postWriteHandlerOpt = Option(postWriteHandler))
     override def write(basePath: String)(implicit
-                                         schemaResolver: SkippingParquetSchemaResolver[W],
+                                         schemaResolver: ParquetSchemaResolver[W],
                                          encoder: ParquetRecordEncoder[W],
                                          async: Async[F]): Pipe[F, T, T] =
       rotatingWriter.write[F, T, W](
@@ -269,18 +269,18 @@ object rotatingWriter {
   private[parquet4s] def write[
     F[_],
     T,
-    W: ParquetRecordEncoder : SkippingParquetSchemaResolver](path: String,
-                                                             maxCount: Long,
-                                                             maxDuration: FiniteDuration,
-                                                             partitionBy: Seq[String],
-                                                             prewriteTransformation: T => Stream[F, W],
-                                                             postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
-                                                             options: ParquetWriter.Options
-                                                            )(implicit F: Async[F]): Pipe[F, T, T] =
+    W: ParquetRecordEncoder : ParquetSchemaResolver](path: String,
+                                                     maxCount: Long,
+                                                     maxDuration: FiniteDuration,
+                                                     partitionBy: Seq[String],
+                                                     prewriteTransformation: T => Stream[F, W],
+                                                     postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
+                                                     options: ParquetWriter.Options
+                                                    )(implicit F: Async[F]): Pipe[F, T, T] =
     in =>
       for {
         hadoopPath <- Stream.eval(io.makePath(path))
-        schema <- Stream.eval(F.catchNonFatal(SkippingParquetSchemaResolver.resolveSchema[W](partitionBy)))
+        schema <- Stream.eval(F.catchNonFatal(ParquetSchemaResolver.resolveSchema[W](partitionBy)))
         valueCodecConfiguration <- Stream.eval(F.catchNonFatal(options.toValueCodecConfiguration))
         encode = { (entity: W) => F.catchNonFatal(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
         logger <- Stream.eval(logger[F](this.getClass))

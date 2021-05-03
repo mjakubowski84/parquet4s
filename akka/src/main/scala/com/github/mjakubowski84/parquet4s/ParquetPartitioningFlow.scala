@@ -93,7 +93,7 @@ object ParquetPartitioningFlow {
      * Builds final flow
      */
     def build()(implicit
-                schemaResolver: SkippingParquetSchemaResolver[W],
+                schemaResolver: ParquetSchemaResolver[W],
                 encoder: ParquetRecordEncoder[W]): GraphStage[FlowShape[T, T]]
   }
 
@@ -112,11 +112,11 @@ object ParquetPartitioningFlow {
     def withWriteOptions(writeOptions: ParquetWriter.Options): Builder[T, W] = copy(writeOptions = writeOptions)
     def withPartitionBy(partitionBy: String*): Builder[T, W] = copy(partitionBy = partitionBy)
     def build()(implicit
-                schemaResolver: SkippingParquetSchemaResolver[W],
+                schemaResolver: ParquetSchemaResolver[W],
                 encoder: ParquetRecordEncoder[W]
     ): GraphStage[FlowShape[T, T]] = {
       val partitionPaths = partitionBy.map(DotPath.apply)
-      val schema = SkippingParquetSchemaResolver.resolveSchema[W](toSkip = partitionBy)
+      val schema = ParquetSchemaResolver.resolveSchema[W](toSkip = partitionBy)
       val encode = (obj: W, vcc: ValueCodecConfiguration) => ParquetRecordEncoder.encode(obj, vcc)
       new ParquetPartitioningFlow[T, W](basePath, maxCount, maxDuration, preWriteTransformation,
         partitionPaths, encode, schema, writeOptions, postWriteHandler)

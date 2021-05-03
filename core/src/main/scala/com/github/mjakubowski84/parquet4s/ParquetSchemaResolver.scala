@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
 import org.apache.parquet.schema.LogicalTypeAnnotation.{DateLogicalTypeAnnotation, DecimalLogicalTypeAnnotation, IntLogicalTypeAnnotation, StringLogicalTypeAnnotation}
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, BOOLEAN, DOUBLE, FIXED_LEN_BYTE_ARRAY, FLOAT, INT32, INT64, INT96}
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
 import org.apache.parquet.schema.Type.Repetition
 import org.apache.parquet.schema._
 import shapeless._
@@ -18,9 +18,10 @@ import scala.reflect.ClassTag
 trait ParquetSchemaResolver[T] {
 
   /**
-    * @return list of [[org.apache.parquet.schema.Type]] for each product element that <i>T</i> contains.
-    */
-  def resolveSchema: List[Type]
+   * @param cursor facilitates traversal over T
+   * @return list of [[org.apache.parquet.schema.Type]] for each product element that <i>T</i> contains.
+   */
+  def resolveSchema(cursor: Cursor): List[Type]
 
   /**
     * @return a name to be given to schema
@@ -35,23 +36,45 @@ object ParquetSchemaResolver
   trait Tag[V]
   type TypedSchemaDef[V] = SchemaDef with Tag[V]
 
+  class TypedSchemaDefInvoker[K <: Symbol : Witness.Aux, V](schemaDef: TypedSchemaDef[V]) {
+    private def fieldName = implicitly[Witness.Aux[K]].value.name
+    def `type`: Type = schemaDef(fieldName)
+    def productType(productSchemaDef: TypedSchemaDef[V]): Type = productSchemaDef(fieldName)
+  }
+
   /**
-    * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
-    */
+   * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
+   * @param toSkip iterable of columns or dot-separated column paths that should be skipped when generating the schema
+   */
+  def resolveSchema[T](toSkip: Iterable[String])(implicit g: ParquetSchemaResolver[T]): MessageType =
+    Message(g.schemaName, g.resolveSchema(Cursor.skipping(toSkip)):_*)
+
+  /**
+   * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
+   */
   def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType =
-    Message(g.schemaName, g.resolveSchema:_*)
+    Message(g.schemaName, g.resolveSchema(Cursor.simple):_*)
 
   implicit val hnil: ParquetSchemaResolver[HNil] = new ParquetSchemaResolver[HNil] {
-    override def resolveSchema: List[Type] = List.empty
+    def resolveSchema(cursor: Cursor): List[Type] = List.empty
   }
 
   implicit def hcons[K <: Symbol, V, T <: HList](implicit
                                                  witness: Witness.Aux[K],
                                                  schemaDef: TypedSchemaDef[V],
+                                                 visitor: SchemaVisitor[K, V] = defaultSchemaVisitor[K, V],
                                                  rest: ParquetSchemaResolver[T]
                                                 ): ParquetSchemaResolver[FieldType[K, V] :: T] =
     new ParquetSchemaResolver[FieldType[K, V] :: T] {
-      override def resolveSchema: List[Type] = schemaDef(witness.value.name) +: rest.resolveSchema
+      override def resolveSchema(cursor: Cursor): List[Type] =
+        cursor
+          .advance[K]
+          .flatMap(newCursor => newCursor.accept(new TypedSchemaDefInvoker(schemaDef), visitor)) match {
+          case Some(head) =>
+            head +: rest.resolveSchema(cursor)
+          case None =>
+            rest.resolveSchema(cursor)
+        }
     }
 
   implicit def generic[T, G](implicit
@@ -59,9 +82,32 @@ object ParquetSchemaResolver
                              rest: Lazy[ParquetSchemaResolver[G]],
                              classTag: ClassTag[T]
                             ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
-    override def resolveSchema: List[Type] = rest.value.resolveSchema
+    override def resolveSchema(cursor: Cursor): List[Type] = rest.value.resolveSchema(cursor)
     override def schemaName: Option[String] = Option(classTag.runtimeClass.getCanonicalName)
   }
+
+  trait SchemaVisitor[K <: Symbol, V] extends Cursor.Visitor[TypedSchemaDefInvoker[K, V], Option[Type]] {
+    override def onCompleted(cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]): Option[Type] =
+      throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
+  }
+
+  def defaultSchemaVisitor[K <: Symbol, V]: SchemaVisitor[K, V] = new SchemaVisitor[K, V] {
+    override def onActive(cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]): Option[Type] =
+      Option(invoker.`type`)
+  }
+
+  implicit def productSchemaVisitor[K <: Symbol, V](implicit resolver: ParquetSchemaResolver[V]): SchemaVisitor[K, V] =
+    new SchemaVisitor[K, V] {
+      override def onActive(cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]): Option[Type] =
+        resolver.resolveSchema(cursor) match {
+          case Nil =>
+            None
+          case fieldTypes =>
+            Option(invoker.productType(SchemaDef.group(fieldTypes:_*).typed[V]))
+        }
+    }
+
+
 }
 
 object Message {
@@ -81,7 +127,7 @@ trait SchemaDef {
 
   def withRequired(required: Boolean): Self
 
-  def typed[V]: ParquetSchemaResolver.TypedSchemaDef[V] = ParquetSchemaResolver.typedSchemaDef[V](this)
+  def typed[V]: ParquetSchemaResolver.TypedSchemaDef[V] = this.asInstanceOf[TypedSchemaDef[V]]
 
 }
 
@@ -113,32 +159,8 @@ object LogicalTypes {
   val DateType: DateLogicalTypeAnnotation = LogicalTypeAnnotation.dateType()
 }
 
-object PrimitiveSchemaDef {
-  @deprecated("Use SchemaDef.primitive", since = "1.9.0")
-  def apply(
-             primitiveType: PrimitiveType.PrimitiveTypeName,
-             required: Boolean = true,
-             originalType: Option[OriginalType] = None,
-             precision: Option[Int] = None,
-             scale: Option[Int] = None,
-             length: Option[Int] = None
-           ): PrimitiveSchemaDef = {
-    val decimalMetaData = (precision, scale) match {
-      case (Some(p), Some(s)) => new DecimalMetadata(p, s)
-      case _ => null
-    }
-    PrimitiveSchemaDef(
-      primitiveType = primitiveType,
-      required = required,
-      logicalTypeAnnotation = originalType.map(ot => LogicalTypeAnnotation.fromOriginalType(ot, decimalMetaData)),
-      length = length
-    )
-  }
-}
 
-@deprecated("Use SchemaDef.primitive", since = "1.9.0")
-case class PrimitiveSchemaDef private(
-                                       primitiveType: PrimitiveType.PrimitiveTypeName,
+private case class PrimitiveSchemaDef (primitiveType: PrimitiveType.PrimitiveTypeName,
                                        logicalTypeAnnotation: Option[LogicalTypeAnnotation],
                                        required: Boolean,
                                        length: Option[Int]
@@ -161,17 +183,7 @@ case class PrimitiveSchemaDef private(
 
 }
 
-object GroupSchemaDef {
-
-  @deprecated("Use SchemaDef.group", since = "1.9.0")
-  def required(fields: Type*): GroupSchemaDef = GroupSchemaDef(fields, required = true)
-  @deprecated("Use SchemaDef.group", since = "1.9.0")
-  def optional(fields: Type*): GroupSchemaDef = GroupSchemaDef(fields, required = false)
-
-}
-
-@deprecated("Use SchemaDef.group", since = "1.9.0")
-case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends SchemaDef {
+private case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends SchemaDef {
 
   override type Self = GroupSchemaDef
 
@@ -184,19 +196,11 @@ case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends SchemaDe
 
 }
 
-object ListSchemaDef {
-
+private object ListSchemaDef {
   val ElementName = "element"
-
-  @deprecated("Use SchemaDef.list", since = "1.9.0")
-  def required(elementSchemaDef: SchemaDef): ListSchemaDef = ListSchemaDef(elementSchemaDef(ElementName), required = true)
-  @deprecated("Use SchemaDef.list", since = "1.9.0")
-  def optional(elementSchemaDef: SchemaDef): ListSchemaDef = ListSchemaDef(elementSchemaDef(ElementName), required = false)
-
 }
 
-@deprecated("Use SchemaDef.list", since = "1.9.0")
-case class ListSchemaDef(element: Type, required: Boolean) extends SchemaDef {
+private case class ListSchemaDef(element: Type, required: Boolean) extends SchemaDef {
 
   override type Self = ListSchemaDef
 
@@ -209,25 +213,12 @@ case class ListSchemaDef(element: Type, required: Boolean) extends SchemaDef {
 
 }
 
-object MapSchemaDef {
-
+private object MapSchemaDef {
   val KeyName = "key"
   val ValueName = "value"
-
-  @deprecated("Use SchemaDef.map", since = "1.9.0")
-  def required(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = MapSchemaDef(
-    keySchemaDef(KeyName), valueSchemaDef(ValueName), required = true
-  )
-
-  @deprecated("Use SchemaDef.map", since = "1.9.0")
-  def optional(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): MapSchemaDef = MapSchemaDef(
-    keySchemaDef(KeyName), valueSchemaDef(ValueName), required = false
-  )
-
 }
 
-@deprecated("Use SchemaDef.map", since = "1.9.0")
-case class MapSchemaDef (key: Type, value: Type, required: Boolean) extends SchemaDef {
+private case class MapSchemaDef (key: Type, value: Type, required: Boolean) extends SchemaDef {
 
   override type Self = MapSchemaDef
 
@@ -241,9 +232,6 @@ case class MapSchemaDef (key: Type, value: Type, required: Boolean) extends Sche
 }
 
 trait SchemaDefs {
-
-  @deprecated("Call SchemaDef#typed[V] in order to build TypedSchemaDef[V]", since = "1.9.0")
-  def typedSchemaDef[V](schemaDef: SchemaDef): TypedSchemaDef[V] = schemaDef.asInstanceOf[TypedSchemaDef[V]]
 
   implicit val stringSchema: TypedSchemaDef[String] =
     SchemaDef.primitive(BINARY, required = false, logicalTypeAnnotation = Option(LogicalTypes.StringType)).typed[String]
@@ -293,7 +281,7 @@ trait SchemaDefs {
     SchemaDef.primitive(INT96, required = false).typed[java.sql.Timestamp]
 
   implicit def productSchema[T](implicit parquetSchemaResolver: ParquetSchemaResolver[T]): TypedSchemaDef[T] =
-    SchemaDef.group(parquetSchemaResolver.resolveSchema:_*).typed[T]
+    SchemaDef.group(parquetSchemaResolver.resolveSchema(Cursor.simple):_*).typed[T]
 
   implicit def optionSchema[T](implicit tSchemaDef: TypedSchemaDef[T]): TypedSchemaDef[Option[T]] =
     tSchemaDef.withRequired(false).typed[Option[T]]
