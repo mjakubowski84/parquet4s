@@ -4,8 +4,8 @@ import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.Type.Repetition
 import org.apache.parquet.schema.{GroupType, MessageType, Type}
 
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 
 /**
   * Special type of [[Value]] that represents a record in Parquet file.
@@ -44,12 +44,6 @@ object RowParquetRecord {
     */
   def empty: RowParquetRecord = new RowParquetRecord()
 
-  implicit def genericParquetSchemaResolver(implicit message: MessageType): ParquetSchemaResolver[RowParquetRecord] =
-    new ParquetSchemaResolver[RowParquetRecord] {
-      override def resolveSchema: List[Type] = message.getFields.iterator().asScala.toList
-      override def schemaName: Option[String] = Option(message.getName)
-    }
-
   implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] =
     new ParquetRecordEncoder[RowParquetRecord] {
       override def encode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
@@ -60,8 +54,8 @@ object RowParquetRecord {
       override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
     }
 
-  implicit def genericSkippingParquetSchemaResolver(implicit message: MessageType): SkippingParquetSchemaResolver[RowParquetRecord] =
-    new SkippingParquetSchemaResolver[RowParquetRecord] {
+  implicit def genericParquetSchemaResolver(implicit message: MessageType): ParquetSchemaResolver[RowParquetRecord] =
+    new ParquetSchemaResolver[RowParquetRecord] {
       override def schemaName: Option[String] = Option(message.getName)
       override def resolveSchema(cursor: Cursor): List[Type] = skipFields(cursor, message.getFields.asScala.toList)
 

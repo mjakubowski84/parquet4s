@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s.fs2
 
 import cats.Show
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{IO, IOApp}
 import com.github.mjakubowski84.parquet4s.parquet._
 import com.github.mjakubowski84.parquet4s.{RowParquetRecord, ValueCodecConfiguration}
 import fs2.Stream
@@ -50,6 +50,6 @@ object WriteAndReadGenericFS2App extends IOApp.Simple {
         .append(fromParquet[IO, RowParquetRecord].read(path.toString).printlns.drain)
     } yield ()
 
-    stream.compile.drain.as(ExitCode.Success)
+    stream.compile.drain
   }
 }
