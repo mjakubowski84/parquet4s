@@ -2,9 +2,9 @@ package com.github.mjakubowski84.parquet4s
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
 import akka.stream.stage._
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+import com.github.mjakubowski84.parquet4s.Cursor.DotPath
 import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow._
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
@@ -93,9 +93,8 @@ object ParquetPartitioningFlow {
      * Builds final flow
      */
     def build()(implicit
-                partitionLens: PartitionLens[W],
                 schemaResolver: SkippingParquetSchemaResolver[W],
-                encoder: SkippingParquetRecordEncoder[W]): GraphStage[FlowShape[T, T]]
+                encoder: ParquetRecordEncoder[W]): GraphStage[FlowShape[T, T]]
   }
 
   private case class BuilderImpl[T, W](
@@ -113,15 +112,14 @@ object ParquetPartitioningFlow {
     def withWriteOptions(writeOptions: ParquetWriter.Options): Builder[T, W] = copy(writeOptions = writeOptions)
     def withPartitionBy(partitionBy: String*): Builder[T, W] = copy(partitionBy = partitionBy)
     def build()(implicit
-                partitionLens: PartitionLens[W],
                 schemaResolver: SkippingParquetSchemaResolver[W],
-                encoder: SkippingParquetRecordEncoder[W]
+                encoder: ParquetRecordEncoder[W]
     ): GraphStage[FlowShape[T, T]] = {
-      val lenses = partitionBy.map(lensPath => (obj: W) => PartitionLens(obj, lensPath))
+      val partitionPaths = partitionBy.map(DotPath.apply)
       val schema = SkippingParquetSchemaResolver.resolveSchema[W](toSkip = partitionBy)
-      val encode = (obj: W, vcc: ValueCodecConfiguration) => SkippingParquetRecordEncoder.encode(partitionBy, obj, vcc)
+      val encode = (obj: W, vcc: ValueCodecConfiguration) => ParquetRecordEncoder.encode(obj, vcc)
       new ParquetPartitioningFlow[T, W](basePath, maxCount, maxDuration, preWriteTransformation,
-        lenses, encode, schema, writeOptions, postWriteHandler)
+        partitionPaths, encode, schema, writeOptions, postWriteHandler)
     }
 
     override def withPreWriteTransformation[X](transformation: T => X): Builder[T, X] =
@@ -151,7 +149,7 @@ private class ParquetPartitioningFlow[T, W](
                                              maxCount: Long,
                                              maxDuration: FiniteDuration,
                                              preWriteTransformation: T => W,
-                                             partitionBy: Seq[W => (String, String)],
+                                             partitionBy: Seq[DotPath],
                                              encode: (W, ValueCodecConfiguration) => RowParquetRecord,
                                              schema: MessageType,
                                              writeOptions: ParquetWriter.Options,
@@ -170,18 +168,25 @@ private class ParquetPartitioningFlow[T, W](
 
     setHandlers(in, out, this)
 
-    private def partitionPath(obj: W): Path = partitionBy.foldLeft(basePath) {
-      case (path, partitionBy) =>
-        val (key, value) = partitionBy(obj)
-        new Path(path, s"$key=$value")
-    }
-
     private def compressionExtension: String = writeOptions.compressionCodecName.getExtension
     private def newFileName: String = UUID.randomUUID().toString + compressionExtension + ".parquet"
 
+    private def partition(record: RowParquetRecord): Path =
+      partitionBy.foldLeft(basePath) {
+        (path, partitionPath) =>
+          val partitionName = DotPath.toString(partitionPath)
+          record.remove(partitionPath) match {
+            case Some(BinaryValue(binary)) => new Path(path, s"$partitionName=${binary.toStringUsingUTF8}")
+            case None => throw new IllegalArgumentException(s"Field '$partitionName' does not exist.")
+            case Some(NullValue) => throw new IllegalArgumentException(s"Field '$partitionName' is null.")
+            case _ => throw new IllegalArgumentException(s"Non-string field '$partitionName' used for partitioning.")
+          }
+      }
+
     private def write(msg: T): Unit = {
       val valueToWrite = preWriteTransformation(msg)
-      val writerPath = partitionPath(valueToWrite)
+      val record = encode(valueToWrite, vcc)
+      val writerPath = partition(record)
       val writer = writers.get(writerPath) match {
         case Some(writer) =>
           writer
@@ -195,7 +200,7 @@ private class ParquetPartitioningFlow[T, W](
           writers = writers.updated(writerPath, writer)
           writer
       }
-      writer.write(encode(valueToWrite, vcc))
+      writer.write(record)
     }
 
     private def close(): Unit = {
