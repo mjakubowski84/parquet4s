@@ -1,6 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.PartitionLens.LensError
 import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.Type.Repetition
 import org.apache.parquet.schema.{GroupType, MessageType, Type}
@@ -53,23 +52,12 @@ object RowParquetRecord {
 
   implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] =
     new ParquetRecordEncoder[RowParquetRecord] {
-      override def encode(entity: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = entity
+      override def encode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
     }
   
   implicit val genericParquetRecordDecoder: ParquetRecordDecoder[RowParquetRecord] =
     new ParquetRecordDecoder[RowParquetRecord] {
       override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
-    }
-
-  implicit val genericSkippingParquetRecordEncoder: SkippingParquetRecordEncoder[RowParquetRecord] =
-    new SkippingParquetRecordEncoder[RowParquetRecord] {
-      private val cursorDothPathSet = shapeless.TypeCase[Set[Cursor.DotPath]]
-      override def encode(cursor: Cursor, entity: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = {
-        cursor.objective match {
-          case cursorDothPathSet(paths) => paths.foreach(entity.remove)
-        }
-        entity
-      }
     }
 
   implicit def genericSkippingParquetSchemaResolver(implicit message: MessageType): SkippingParquetSchemaResolver[RowParquetRecord] =
@@ -92,19 +80,6 @@ object RowParquetRecord {
         }
     }
 
-  implicit val genericPartitionLens: PartitionLens[RowParquetRecord] = new PartitionLens[RowParquetRecord] {
-    private val cursorDothPath = shapeless.TypeCase[Cursor.DotPath]
-    override def apply(cursor: Cursor, obj: RowParquetRecord): Either[PartitionLens.LensError, String] = {
-      cursor.objective match {
-        case cursorDothPath(path) =>
-          obj.get(path) match {
-            case NullValue => Left(LensError(cursor, s"Field '${cursor.objectiveAsString}' does not exist."))
-            case BinaryValue(binary) => Right(binary.toStringUsingUTF8)
-            case _ => Left(LensError(cursor, "Only String field can be used for partitioning."))
-          }
-      }
-    }
-  }
 }
 
 /**
