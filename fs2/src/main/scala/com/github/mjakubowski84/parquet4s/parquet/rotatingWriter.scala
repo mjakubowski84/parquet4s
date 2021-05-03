@@ -204,13 +204,15 @@ object rotatingWriter {
         _ <- writer.write(record)
       } yield writers
 
-    private def partition(record: RowParquetRecord)(partitionPath: DotPath): F[(String, String)] =
+    private def partition(record: RowParquetRecord)(partitionPath: DotPath): F[(String, String)] = {
+      val partitionName = DotPath.toString(partitionPath)
       record.remove(partitionPath) match {
-        case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' does not exist."))
-        case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' is null."))
-        case Some(BinaryValue(binary)) => F.catchNonFatal(DotPath.toString(partitionPath) -> binary.toStringUsingUTF8)
-        case _ => F.raiseError(new IllegalArgumentException("Only String field can be used for partitioning."))
+        case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionName' does not exist."))
+        case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionName' is null."))
+        case Some(BinaryValue(binary)) => F.catchNonFatal(partitionName -> binary.toStringUsingUTF8)
+        case _ => F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionName' used for partitioning."))
       }
+    }
 
     // TODO consider using Hotswap
     private def dispose: F[Unit] =
