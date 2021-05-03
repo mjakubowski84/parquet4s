@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.LogicalTypes._
-import com.github.mjakubowski84.parquet4s.SkippingParquetSchemaResolver.resolveSchema
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.resolveSchema
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
 import org.apache.parquet.schema.{MessageType, Types}
@@ -150,14 +150,14 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
       Some("Simple"),
       Types.primitive(BINARY, OPTIONAL).as(StringType).named("field")
     )
-    implicit val resolver: SkippingParquetSchemaResolver[RowParquetRecord] =
-      RowParquetRecord.genericSkippingParquetSchemaResolver(simpleMessage)
+    implicit val resolver: ParquetSchemaResolver[RowParquetRecord] =
+      RowParquetRecord.genericParquetSchemaResolver(simpleMessage)
     resolveSchema[RowParquetRecord](Set("field")) should be(Message(Some("Simple")))
   }
 
   it should "process empty class" in {
-    implicit val resolver: SkippingParquetSchemaResolver[RowParquetRecord] =
-      RowParquetRecord.genericSkippingParquetSchemaResolver(Message(Some("Empty")))
+    implicit val resolver: ParquetSchemaResolver[RowParquetRecord] =
+      RowParquetRecord.genericParquetSchemaResolver(Message(Some("Empty")))
     resolveSchema[RowParquetRecord](Set("field")) should be(Message(Some("Empty")))
   }
 
