@@ -1,13 +1,13 @@
 package com.github.mjakubowski84.parquet4s.fs2
 
 import cats.data.State
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{IO, IOApp}
 import com.github.mjakubowski84.parquet4s.ParquetWriter
-import com.github.mjakubowski84.parquet4s.parquet._
+import com.github.mjakubowski84.parquet4s.parquet.viaParquet
 import fs2.io.file.Files
 import fs2.kafka._
 import fs2.{INothing, Pipe, Stream}
-import net.manub.embeddedkafka.EmbeddedKafka
+import io.github.embeddedkafka.EmbeddedKafka
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
 import java.sql.Timestamp
@@ -60,7 +60,7 @@ object IndefiniteFS2App extends IOApp.Simple {
     (nextFluctuation, ())
   }
 
-  override def run(): IO[Unit] = {
+  override def run: IO[Unit] = {
     val stream = for {
       writePath <- Stream.resource(Files[IO].tempDirectory())
       kafkaPort <- Stream
@@ -78,7 +78,7 @@ object IndefiniteFS2App extends IOApp.Simple {
       ).parJoin(maxOpen = 2)
     } yield ()
 
-    stream.compile.drain.as(ExitCode.Success)
+    stream.compile.drain
   }
 
   private def producer(producerSettings: ProducerSettings[IO, String, String]): Stream[IO, INothing] =
@@ -115,7 +115,7 @@ object IndefiniteFS2App extends IOApp.Simple {
             day = dateTime.getDayOfMonth.toString,
             timestamp = timestamp,
             word = kafkaRecord.record.value
-          )).evalTap(data => IO(println(data)))
+          )).evalTap(data => IO.println(data))
         }
       }
       .partitionBy("year", "month", "day")

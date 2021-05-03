@@ -57,7 +57,7 @@ lazy val core = (project in file("core"))
     libraryDependencies ++= Seq(
       "org.apache.parquet" % "parquet-hadoop" % parquetVersion
         exclude(org = "org.slf4j", name = "slf4j-api"),
-      "com.chuusai" %% "shapeless" % "2.3.4",
+      "com.chuusai" %% "shapeless" % shapelessVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.3",
