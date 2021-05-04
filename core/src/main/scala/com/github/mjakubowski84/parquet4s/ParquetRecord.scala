@@ -53,7 +53,7 @@ object RowParquetRecord {
 
   implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] =
     new ParquetRecordEncoder[RowParquetRecord] {
-      override def encode(entity: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = entity
+      override def encode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
     }
   
   implicit val genericParquetRecordDecoder: ParquetRecordDecoder[RowParquetRecord] =
@@ -79,12 +79,16 @@ object RowParquetRecord {
 
       private def skipFields(cursor: Cursor, fields: List[Type]): List[Type] =
         fields.flatMap {
-          case groupField: GroupType =>
+          case groupField: GroupType if groupField.getLogicalTypeAnnotation == null =>
             val fieldSymbol = Symbol(groupField.getName)
             cursor.advance[fieldSymbol.type].flatMap { newCursor =>
               val fields = skipFields(newCursor, groupField.getFields.asScala.toList)
               if (fields.isEmpty) None
-              else Some(GroupSchemaDef(fields, required = groupField.getRepetition == Repetition.REQUIRED)(groupField.getName))
+              else Some(
+                SchemaDef
+                  .group(fields:_*)
+                  .withRequired(groupField.getRepetition == Repetition.REQUIRED)(groupField.getName)
+              )
             }
           case field =>
             val fieldSymbol = Symbol(field.getName)
