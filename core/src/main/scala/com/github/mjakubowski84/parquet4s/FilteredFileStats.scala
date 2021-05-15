@@ -56,9 +56,9 @@ private[parquet4s] class FilteredFileStats(
         }.sum
   }
 
-  private class MinMaxReader[V](columnPath: String, startExtremeOpt: Option[V])
+  private class MinMaxReader[V](columnPath: ColumnPath, startExtremeOpt: Option[V])
                                (implicit codec: ValueCodec[V], ordering: Ordering[V]) extends StatsReader {
-    private val fieldName = columnPath.split('.').toList
+    private val dotString = columnPath.toString
     private lazy val currentBlockField = {
       val f = reader.getClass.getDeclaredField("currentBlock")
       f.setAccessible(true)
@@ -67,7 +67,7 @@ private[parquet4s] class FilteredFileStats(
     private lazy val numOfBlocks = reader.getRowGroups.size()
     private def currentBlock = currentBlockField.getInt(reader).intValue()
     private def currentRowGroupStatistics =
-      reader.getRowGroups.get(currentBlock).getColumns.asScala.find(_.getPath.toDotString == columnPath).map(_.getStatistics)
+      reader.getRowGroups.get(currentBlock).getColumns.asScala.find(_.getPath.toDotString == dotString).map(_.getStatistics)
 
     private def currentRowGroupStatisticsMin =
       currentRowGroupStatistics.flatMap(statsMinValue).map(value => codec.decode(value, vcc))
@@ -82,7 +82,7 @@ private[parquet4s] class FilteredFileStats(
         .iterator
         .map(_ => Option(recordReader.read()))
         .collect {
-          case Some(record) => record.get(fieldName)
+          case Some(record) => record.get(columnPath)
         }
         .collect {
           case value if value != NullValue => codec.decode(value, vcc)
@@ -145,7 +145,7 @@ private[parquet4s] class FilteredFileStats(
     }
   }
 
-  override def min[V](columnPath: String, currentMin: Option[V])
+  override def min[V](columnPath: ColumnPath, currentMin: Option[V])
                      (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMin)
     try {
@@ -155,7 +155,7 @@ private[parquet4s] class FilteredFileStats(
     }
   }
 
-  override def max[V](columnPath: String, currentMax: Option[V])
+  override def max[V](columnPath: ColumnPath, currentMax: Option[V])
                      (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMax)
     try {

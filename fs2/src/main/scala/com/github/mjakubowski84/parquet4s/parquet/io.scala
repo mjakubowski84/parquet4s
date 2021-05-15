@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.{Resource, Sync}
-import com.github.mjakubowski84.parquet4s.{ParquetWriter, PartitionedDirectory, PartitionedPath}
+import com.github.mjakubowski84.parquet4s.{ColumnPath, ParquetWriter, PartitionedDirectory, PartitionedPath}
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
@@ -15,7 +15,7 @@ import scala.util.matching.Regex
 
 private[parquet] object io {
 
-  private type Partition = (String, String)
+  private type Partition = (ColumnPath, String)
 
   private trait StatusAccumulator
   private case object Empty extends StatusAccumulator
@@ -103,7 +103,7 @@ private[parquet] object io {
   private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
     val path = fileStatus.getPath
     path.getName match {
-      case PartitionRegexp(name, value) => Some(path, (name, value))
+      case PartitionRegexp(name, value) => Some(path, (ColumnPath(name), value))
       case _                            => None
     }
   }

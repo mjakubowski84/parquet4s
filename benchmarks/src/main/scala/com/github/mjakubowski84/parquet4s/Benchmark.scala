@@ -101,7 +101,7 @@ object Benchmark extends Bench.OfflineReport {
   private def akkaWritePartitioned(path: String, records: immutable.Iterable[Record])(implicit as: ActorSystem) =
     Await.ready(
       Source(records)
-        .via(ParquetStreams.viaParquet[Record](path).withPartitionBy("dict").build())
+        .via(ParquetStreams.viaParquet[Record](path).withPartitionBy(Col( "dict")).build())
         .runWith(Sink.ignore)
       , Duration.Inf
     )
@@ -161,7 +161,7 @@ object Benchmark extends Bench.OfflineReport {
   private def fs2WritePartitioned(path: String, records: immutable.Iterable[Record]): IO[Unit] = {
     Stream
       .iterable(records)
-      .through(parquet.viaParquet[IO, Record].partitionBy("dict").write(path))
+      .through(parquet.viaParquet[IO, Record].partitionBy(Col("dict")).write(path))
       .compile
       .drain
   }
