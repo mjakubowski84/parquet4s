@@ -80,8 +80,8 @@ object reader {
       reader <- Stream.resource(readerResource(partitionedPath.path, options, partitionFilter, projectedSchemaOpt))
       entity <- readerStream(reader)
         .evalTap { record =>
-          partitionedPath.partitions.traverse_ { case (name, value) =>
-            F.catchNonFatal(record.add(name.split('.').toList, BinaryValue(value)))
+          partitionedPath.partitions.traverse_ { case (columnPath, value) =>
+            F.catchNonFatal(record.add(columnPath, BinaryValue(value)))
           }
         }
         .evalMap(decode)

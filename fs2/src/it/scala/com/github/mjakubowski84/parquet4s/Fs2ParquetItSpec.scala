@@ -227,7 +227,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         .iterable(dataPartitioned)
         .through(parquet.viaParquet[IO, DataPartitioned]
           .maxCount(count)
-          .partitionBy("a", "b")
+          .partitionBy(Col("a"), Col("b"))
           .options(writeOptions)
           .write(path.toString)
         )
@@ -278,7 +278,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
           .preWriteTransformation[DataTransformed] { data =>
             Stream.iterable(partitions).map(partition => DataTransformed(data, partition))
           }
-          .partitionBy("partition")
+          .partitionBy(Col("partition"))
           .options(writeOptions)
           .write(path.toString)
         )
@@ -317,7 +317,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         .iterable(data)
         .through(parquet.viaParquet[IO, Data]
           .options(writeOptions)
-          .partitionBy("s")
+          .partitionBy(Col("s"))
           .postWriteHandler {
             case state if state.count >= numberOfProcessedElementsBeforeFailure =>
               IO.raiseError(new RuntimeException("test exception"))
@@ -350,7 +350,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         .iterable(data)
         .through(parquet.viaParquet[IO, Data]
           .options(writeOptions)
-          .partitionBy("s")
+          .partitionBy(Col("s"))
           .write(path.toString)
         )
         .take(numberOfProcessedElementsBeforeStop)

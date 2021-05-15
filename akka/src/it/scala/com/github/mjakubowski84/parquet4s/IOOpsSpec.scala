@@ -83,8 +83,8 @@ class IOOpsSpec
     fileSystem.mkdirs(pathX1)
 
     val dir = findPartitionedPaths(tempPath, configuration).value
-    dir.paths should be(List(PartitionedPath(pathX1, ("x" -> "1") :: Nil)))
-    dir.schema should be("x" :: Nil)
+    dir.paths should be(List(PartitionedPath(pathX1, (Col("x") -> "1") :: Nil)))
+    dir.schema should be(Col("x") :: Nil)
   }
 
   it should "create proper partitions for complex tree" in {
@@ -99,12 +99,12 @@ class IOOpsSpec
 
     val dir = findPartitionedPaths(tempPath, configuration).value
     dir.paths should contain theSameElementsAs List(
-      PartitionedPath(path1, List("x" -> "1", "y" -> "a", "z" -> "1_1")),
-      PartitionedPath(path2, List("x" -> "1", "y" -> "b", "z" -> "1_2")),
-      PartitionedPath(path3, List("x" -> "1", "y" -> "c", "z" -> "1_3")),
-      PartitionedPath(path4, List("x" -> "2", "y" -> "b", "z" -> "0_9"))
+      PartitionedPath(path1, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "1_1")),
+      PartitionedPath(path2, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_2")),
+      PartitionedPath(path3, List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_3")),
+      PartitionedPath(path4, List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "0_9"))
     )
-    dir.schema should be(List("x", "y", "z"))
+    dir.schema should be(List(Col("x"), Col("y"), Col("z")))
   }
 
   it should "fail to create partitions from inconsistent directory [case1]" in {
