@@ -32,7 +32,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "skip a field at a long path" in {
-    resolveSchema[Person](Set("address.street.name")) should be(Message(
+    resolveSchema[Person](Set(Col("address.street.name"))) should be(Message(
       Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
       Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
@@ -46,7 +46,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "skip a mid path" in {
-    resolveSchema[Person](Set("address.street")) should be(Message(
+    resolveSchema[Person](Set(Col("address.street"))) should be(Message(
       Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
       Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
@@ -57,7 +57,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "skip all fields of case class" in {
-    resolveSchema[Person](Set("address.street.name", "address.street.more")) should be(Message(
+    resolveSchema[Person](Set(Col("address.street.name"), Col("address.street.more"))) should be(Message(
       Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
       Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
@@ -69,12 +69,12 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
 
   it should "skip the only field from a simple case class" in {
     case class Simple(field: String)
-    resolveSchema[Simple](Set("field")) should be(Message(None))
+    resolveSchema[Simple](Set(Col("field"))) should be(Message(None))
   }
 
   it should "process empty class" in {
     case class Empty()
-    resolveSchema[Empty](Set("field")) should be(Message(None))
+    resolveSchema[Empty](Set(Col("field"))) should be(Message(None))
   }
 
   "Generic SkippingParquetSchemaResolver" should "create unpartitioned schema" in {
@@ -82,7 +82,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "skip a field at a long path" in {
-    resolveSchema[RowParquetRecord](Set("address.street.name")) should be(Message(
+    resolveSchema[RowParquetRecord](Set(Col("address.street.name"))) should be(Message(
       Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
       Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
@@ -96,7 +96,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "skip a mid path" in {
-    resolveSchema[RowParquetRecord](Set("address.street")) should be(Message(
+    resolveSchema[RowParquetRecord](Set(Col("address.street"))) should be(Message(
       Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
       Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
@@ -107,7 +107,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "skip all fields of case class" in {
-    resolveSchema[RowParquetRecord](Set("address.street.name", "address.street.more")) should be(Message(
+    resolveSchema[RowParquetRecord](Set(Col("address.street.name"), Col("address.street.more"))) should be(Message(
       Some(classOf[Person].getCanonicalName),
       Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
       Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
@@ -124,13 +124,13 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     )
     implicit val resolver: ParquetSchemaResolver[RowParquetRecord] =
       RowParquetRecord.genericParquetSchemaResolver(simpleMessage)
-    resolveSchema[RowParquetRecord](Set("field")) should be(Message(Some("Simple")))
+    resolveSchema[RowParquetRecord](Set(Col("field"))) should be(Message(Some("Simple")))
   }
 
   it should "process empty class" in {
     implicit val resolver: ParquetSchemaResolver[RowParquetRecord] =
       RowParquetRecord.genericParquetSchemaResolver(Message(Some("Empty")))
-    resolveSchema[RowParquetRecord](Set("field")) should be(Message(Some("Empty")))
+    resolveSchema[RowParquetRecord](Set(Col("field"))) should be(Message(Some("Empty")))
   }
 
 }

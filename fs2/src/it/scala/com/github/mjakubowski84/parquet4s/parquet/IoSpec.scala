@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
-import com.github.mjakubowski84.parquet4s.{ParquetWriter, PartitionedPath}
+import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, PartitionedPath}
 import fs2.Stream
 import fs2.io.file._
 import org.apache.hadoop.fs.Path
@@ -101,8 +101,8 @@ class IoSpec extends AsyncFlatSpec with AsyncIOSpec with  Matchers {
       partitionPath <- createTempFileAtPath(basePath.resolve("x=1"))
       dir <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield {
-      dir.schema should be(List("x"))
-      dir.paths should be(Vector(PartitionedPath(partitionPath, List("x" -> "1"))))
+      dir.schema should be(List(Col("x")))
+      dir.paths should be(Vector(PartitionedPath(partitionPath, List(Col("x") -> "1"))))
     }
 
     testStream.compile.lastOrError
@@ -117,12 +117,12 @@ class IoSpec extends AsyncFlatSpec with AsyncIOSpec with  Matchers {
       partition4 <- createTempFileAtPath(basePath.resolve("x=2/y=b/z=1_2"))
       dir <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield {
-      dir.schema should be(List("x", "y", "z"))
+      dir.schema should be(List(Col("x"), Col("y"), Col("z")))
       dir.paths should contain theSameElementsAs Vector(
-        PartitionedPath(partition1, List("x" -> "1", "y" -> "a", "z" -> "0_9")),
-        PartitionedPath(partition2, List("x" -> "1", "y" -> "b", "z" -> "1_0")),
-        PartitionedPath(partition3, List("x" -> "1", "y" -> "c", "z" -> "1_1")),
-        PartitionedPath(partition4, List("x" -> "2", "y" -> "b", "z" -> "1_2"))
+        PartitionedPath(partition1, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "0_9")),
+        PartitionedPath(partition2, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_0")),
+        PartitionedPath(partition3, List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_1")),
+        PartitionedPath(partition4, List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "1_2"))
       )
     }
 

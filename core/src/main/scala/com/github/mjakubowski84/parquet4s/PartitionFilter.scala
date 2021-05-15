@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory
 
 object PartitionedPath {
 
-  def apply(path: Path, partitions: List[(String, String)]): PartitionedPath =
+  def apply(path: Path, partitions: List[(ColumnPath, String)]): PartitionedPath =
     new PartitionedPathImpl(path, partitions.map { case (name, value) => (name, Binary.fromString(value))})
 
 }
@@ -34,25 +34,25 @@ trait PartitionedPath {
   /**
     * @return value of given partition or None if there is no such partition in that path
     */
-  def value(partitionName: String): Option[Binary]
+  def value(columnPath: ColumnPath): Option[Binary]
   /**
     * @return list of all partitions and their values in that path
     */
-  def partitions: List[(String, Binary)]
+  def partitions: List[(ColumnPath, Binary)]
 
 }
 
 private class PartitionedPathImpl(
                                    override val path: Path,
-                                   override val partitions: List[(String, Binary)]
+                                   override val partitions: List[(ColumnPath, Binary)]
                                  ) extends PartitionedPath {
 
-  private val partitionMap: Map[String, Binary] = partitions
-    .foldLeft(Map.newBuilder[String, Binary])(_ += _).result()
+  private val partitionMap: Map[ColumnPath, Binary] = partitions
+    .foldLeft(Map.newBuilder[ColumnPath, Binary])(_ += _).result()
 
   override val schema: PartitioningSchema = partitions.map(_._1)
 
-  override def value(partitionName: String): Option[Binary] = partitionMap.get(partitionName)
+  override def value(columnPath: ColumnPath): Option[Binary] = partitionMap.get(columnPath)
 
   override lazy val toString: String = path.toString
 
@@ -74,7 +74,7 @@ private class PartitionedPathImpl(
 
 object PartitionedDirectory {
 
-  type PartitioningSchema = List[String]
+  type PartitioningSchema = List[ColumnPath]
 
   private[parquet4s] def failed(invalidPaths: Iterable[Path]): Left[Exception, PartitionedDirectory] =
     Left(new IllegalArgumentException(
@@ -209,7 +209,7 @@ private class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPr
     }
 
   private def applyOperator[T <: Comparable[T]](column: Column[T])(op: Binary => Boolean): Boolean = {
-    val columnPath = column.getColumnPath.toDotString
+    val columnPath = ColumnPath(column.getColumnPath)
     val filterType = column.getColumnType
     partitionedPath.value(columnPath) match {
       case None =>
@@ -256,7 +256,7 @@ private class PartitionFilterRewriter(schema: PartitioningSchema)
   import PartitionFilterRewriter._
 
   private def isPartitionFilter(column: Column[_]): Boolean =
-    schema.contains(column.getColumnPath.toDotString)
+    schema.contains(ColumnPath(column.getColumnPath))
 
   override def visit[T <: Comparable[T]](eq: Operators.Eq[T]): FilterPredicate = {
     if (isPartitionFilter(eq.getColumn)) eq
@@ -342,7 +342,7 @@ private class FilterRewriter(partitionedPath: PartitionedPath)
   import FilterRewriter._
 
   private def isPartitionFilter(column: Column[_]): Boolean =
-    partitionedPath.schema.contains(column.getColumnPath.toDotString)
+    partitionedPath.schema.contains(ColumnPath(column.getColumnPath))
 
   private def evaluate(filterPredicate: FilterPredicate): FilterPredicate =
     if (filterPredicate.accept(new PartitionFilter(partitionedPath))) IsTrue

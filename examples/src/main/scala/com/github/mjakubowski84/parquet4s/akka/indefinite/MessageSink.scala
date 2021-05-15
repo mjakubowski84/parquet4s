@@ -1,6 +1,5 @@
 package com.github.mjakubowski84.parquet4s.akka.indefinite
 
-import java.sql.Timestamp
 import akka.Done
 import akka.kafka.CommitterSettings
 import akka.kafka.ConsumerMessage.CommittableOffsetBatch
@@ -8,11 +7,12 @@ import akka.kafka.scaladsl.Committer
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.stream.stage.GraphStage
-import com.github.mjakubowski84.parquet4s.{ParquetStreams, ParquetWriter}
+import com.github.mjakubowski84.parquet4s.{Col, ParquetStreams, ParquetWriter}
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
 import java.nio.file.Files
+import java.sql.Timestamp
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
@@ -65,7 +65,7 @@ trait MessageSink {
           word = message.record.value()
         )
       }
-      .withPartitionBy("year", "month", "day")
+      .withPartitionBy(Col("year"), Col("month"), Col("day"))
       .withMaxCount(MaxChunkSize)
       .withMaxDuration(ChunkWriteTimeWindow)
       .withWriteOptions(writerOptions)

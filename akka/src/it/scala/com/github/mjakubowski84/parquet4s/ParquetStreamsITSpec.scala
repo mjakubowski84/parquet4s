@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import com.github.mjakubowski84.parquet4s.Cursor.DotPath
 import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.schema.MessageType
@@ -207,7 +206,7 @@ class ParquetStreamsITSpec
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
-      .withPartitionBy("address.country", "address.postCode")
+      .withPartitionBy(Col("address.country"), Col("address.postCode"))
       .build()
 
     val users = Seq(
@@ -249,7 +248,7 @@ class ParquetStreamsITSpec
     val flow = ParquetStreams.viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(maxCount)
-      .withPartitionBy("id_part")
+      .withPartitionBy(Col("id_part"))
       .withPostWriteHandler { state =>
         gauge(state.count)                                               // use-case 1 : monitoring internal counter
         if (state.lastProcessed.id > usersToWrite - lastToFlushOnDemand) // use-case 2 : on demand flush. e.g: the last two records must be in separate files
@@ -295,7 +294,7 @@ class ParquetStreamsITSpec
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
-      .withPartitionBy("address.country", "address.postcode")
+      .withPartitionBy(Col("address.country"), Col("address.postcode"))
       .build()
 
     val users = Seq(
@@ -319,7 +318,7 @@ class ParquetStreamsITSpec
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
-      .withPartitionBy("name")
+      .withPartitionBy(Col("name"))
       .build()
 
     val users = Seq(User(name = "John")).toList
@@ -367,16 +366,16 @@ class ParquetStreamsITSpec
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
-      .withPartitionBy("address.country", "address.postCode")
+      .withPartitionBy(Col("address.country"), Col("address.postCode"))
       .build()
 
     val genericUsers = Seq(
       RowParquetRecord.empty
           .add("name", "John")
-          .add(DotPath("address.street.name"), "Broad St")
-          .add(DotPath("address.street.more"), "12")
-          .add(DotPath("address.country"), "ABC")
-          .add(DotPath("address.postCode"), "123456")
+          .add(Col("address.street.name"), "Broad St")
+          .add(Col("address.street.more"), "12")
+          .add(Col("address.country"), "ABC")
+          .add(Col("address.postCode"), "123456")
     ).toList
 
     val expectedUsers = Seq(

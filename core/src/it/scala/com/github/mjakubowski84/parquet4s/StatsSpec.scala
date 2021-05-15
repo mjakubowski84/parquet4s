@@ -95,16 +95,16 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
 
   "min & max" should "should provide proper value for a single file" in {
     val stats = Stats(s"$path/0.parquet")
-    stats.min[Int]("idx") should be(Some(0))
-    stats.max[Int]("idx") should be(Some((dataSize / 4) - 1))
+    stats.min[Int](Col("idx")) should be(Some(0))
+    stats.max[Int](Col("idx")) should be(Some((dataSize / 4) - 1))
   }
 
   it should "should provide proper value for a single file when filtering" in {
     val expectedMin = 16
     val expectedMax = 128
     val stats = Stats(s"$path/0.parquet", filter = Col("idx") >= expectedMin && Col("idx") <= expectedMax)
-    stats.min[Int]("idx") should be(Some(expectedMin))
-    stats.max[Int]("idx") should be(Some(expectedMax))
+    stats.min[Int](Col("idx")) should be(Some(expectedMin))
+    stats.max[Int](Col("idx")) should be(Some(expectedMax))
   }
 
   it should "be valid when filtering over random data" in {
@@ -112,43 +112,43 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
     val expectedMin = Option(filteredByRandom.minBy(_.random).random)
 
     val stats = Stats(path, filter = filterByRandom)
-    stats.max[String]("random") should be(expectedMax)
-    stats.min[String]("random") should be(expectedMin)
+    stats.max[String](Col("random")) should be(expectedMax)
+    stats.min[String](Col("random")) should be(expectedMin)
   }
 
   it should "should provide proper value for each column" in {
     val maxIdx = dataSize - 1
     val stats = Stats(path)
 
-    stats.min[Int]("idx") should be(Some(0))
-    stats.max[Int]("idx") should be(Some(maxIdx))
+    stats.min[Int](Col("idx")) should be(Some(0))
+    stats.max[Int](Col("idx")) should be(Some(maxIdx))
 
-    stats.min[Float]("float") should be(Some(0.0f))
-    stats.max[Float]("float") should be(Some(maxIdx * 0.01f))
+    stats.min[Float](Col("float")) should be(Some(0.0f))
+    stats.max[Float](Col("float")) should be(Some(maxIdx * 0.01f))
 
-    stats.min[Double]("double") should be(Some(0.0d))
-    stats.max[Double]("double") should be(Some(maxIdx * 0.00000001d))
+    stats.min[Double](Col("double")) should be(Some(0.0d))
+    stats.max[Double](Col("double")) should be(Some(maxIdx * 0.00000001d))
 
-    stats.min[String]("enum") should be(Some("a"))
-    stats.max[String]("enum") should be(Some("d"))
+    stats.min[String](Col("enum")) should be(Some("a"))
+    stats.max[String](Col("enum")) should be(Some("d"))
 
-    stats.min[Boolean]("bool") should be(Some(false))
-    stats.max[Boolean]("bool") should be(Some(true))
+    stats.min[Boolean](Col("bool")) should be(Some(false))
+    stats.max[Boolean](Col("bool")) should be(Some(true))
 
-    stats.min[LocalDate]("date") should be(Some(zeroDate))
-    stats.max[LocalDate]("date") should be(Some(zeroDate.plusDays(maxIdx)))
+    stats.min[LocalDate](Col("date")) should be(Some(zeroDate))
+    stats.max[LocalDate](Col("date")) should be(Some(zeroDate.plusDays(maxIdx)))
 
-    stats.min[BigDecimal]("decimal") should be(Some(decimal(0)))
-    stats.max[BigDecimal]("decimal") should be(Some(decimal(maxIdx)))
+    stats.min[BigDecimal](Col("decimal")) should be(Some(decimal(0)))
+    stats.max[BigDecimal](Col("decimal")) should be(Some(decimal(maxIdx)))
 
-    stats.min[Int]("embedded.x") should be(Some(0))
-    stats.max[Int]("embedded.x") should be(Some(maxIdx))
+    stats.min[Int](Col("embedded.x")) should be(Some(0))
+    stats.max[Int](Col("embedded.x")) should be(Some(maxIdx))
 
-    stats.min[Int]("optional") should be(Some(1))
-    stats.max[Int]("optional") should be(Some(maxIdx))
+    stats.min[Int](Col("optional")) should be(Some(1))
+    stats.max[Int](Col("optional")) should be(Some(maxIdx))
 
-    stats.min[Int]("invalid") should be(None)
-    stats.max[Int]("invalid") should be(None)
+    stats.min[Int](Col("invalid")) should be(None)
+    stats.max[Int](Col("invalid")) should be(None)
   }
 
 }
