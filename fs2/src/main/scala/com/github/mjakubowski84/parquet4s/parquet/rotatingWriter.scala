@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect._
 import cats.implicits._
-import com.github.mjakubowski84.parquet4s.Cursor.DotPath
 import com.github.mjakubowski84.parquet4s._
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import fs2.{Pipe, Pull, Stream}
@@ -48,7 +47,7 @@ object rotatingWriter {
     def options(writeOptions: ParquetWriter.Options): Builder[F, T, W]
     /**
      * Sets partition paths that stream partitions data by. Can be empty.
-     * Partition path can be a simple string column (e.g. "color") or a dot-separated path pointing nested string field
+     * Partition path can be a simple string column (e.g. "color") or a path pointing nested string field
      * (e.g. "user.address.postcode"). Partition path is used to extract data from the entity and to create
      * a tree of subdirectories for partitioned files. Using aforementioned partitions effects in creation
      * of (example) following tree:
@@ -70,9 +69,10 @@ object rotatingWriter {
      *       get an error.</li>
      *   <li>Partitioned directories can be filtered effectively during reading.</li>
      * </ol>
-     * @param partitionBy partition paths
+     *
+     * @param partitionBy [[ColumnPath]]s to partition by
      */
-    def partitionBy(partitionBy: String*): Builder[F, T, W]
+    def partitionBy(partitionBy: ColumnPath*): Builder[F, T, W]
     /**
      * @param transformation function that is called by stream in order to obtain Parquet schema. Identity by default.
      * @tparam X Schema type
@@ -100,7 +100,7 @@ object rotatingWriter {
                                               maxCount: Long,
                                               maxDuration: FiniteDuration,
                                               preWriteTransformation: T => Stream[F, W],
-                                              partitionBy: Seq[String],
+                                              partitionBy: Seq[ColumnPath],
                                               postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
                                               writeOptions: ParquetWriter.Options,
                                             ) extends Builder[F, T, W] {
@@ -108,7 +108,7 @@ object rotatingWriter {
     override def maxCount(maxCount: Long): Builder[F, T, W] = copy(maxCount = maxCount)
     override def maxDuration(maxDuration: FiniteDuration): Builder[F, T, W] = copy(maxDuration = maxDuration)
     override def options(writeOptions: ParquetWriter.Options): Builder[F, T, W] = copy(writeOptions = writeOptions)
-    override def partitionBy(partitionBy: String*): Builder[F, T, W] = copy(partitionBy = partitionBy)
+    override def partitionBy(partitionBy: ColumnPath*): Builder[F, T, W] = copy(partitionBy = partitionBy)
     override def preWriteTransformation[X](transformation: T => Stream[F, X]): Builder[F, T, X] =
       BuilderImpl(
         maxCount = maxCount,
@@ -162,7 +162,7 @@ object rotatingWriter {
                                            options: ParquetWriter.Options,
                                            writersRef: Ref[F, Map[Path, RecordWriter[F]]],
                                            maxCount: Long,
-                                           partitionBy: List[DotPath],
+                                           partitionBy: List[ColumnPath],
                                            schema: MessageType,
                                            encode: W => F[RowParquetRecord],
                                            logger: Logger[F],
@@ -204,13 +204,12 @@ object rotatingWriter {
         _ <- writer.write(record)
       } yield writers
 
-    private def partition(record: RowParquetRecord)(partitionPath: DotPath): F[(String, String)] = {
-      val partitionName = DotPath.toString(partitionPath)
+    private def partition(record: RowParquetRecord)(partitionPath: ColumnPath): F[(ColumnPath, String)] = {
       record.remove(partitionPath) match {
-        case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionName' does not exist."))
-        case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionName' is null."))
-        case Some(BinaryValue(binary)) => F.catchNonFatal(partitionName -> binary.toStringUsingUTF8)
-        case _ => F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionName' used for partitioning."))
+        case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' does not exist."))
+        case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' is null."))
+        case Some(BinaryValue(binary)) => F.catchNonFatal(partitionPath -> binary.toStringUsingUTF8)
+        case _ => F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning."))
       }
     }
 
@@ -272,7 +271,7 @@ object rotatingWriter {
     W: ParquetRecordEncoder : ParquetSchemaResolver](path: String,
                                                      maxCount: Long,
                                                      maxDuration: FiniteDuration,
-                                                     partitionBy: Seq[String],
+                                                     partitionBy: Seq[ColumnPath],
                                                      prewriteTransformation: T => Stream[F, W],
                                                      postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
                                                      options: ParquetWriter.Options
@@ -290,7 +289,7 @@ object rotatingWriter {
             options = options,
             writersRef = Ref.unsafe(Map.empty),
             maxCount = maxCount,
-            partitionBy = partitionBy.map(DotPath.apply).toList,
+            partitionBy = partitionBy.toList,
             schema = schema,
             encode = encode,
             logger = logger,

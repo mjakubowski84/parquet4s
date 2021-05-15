@@ -2,8 +2,8 @@ package com.github.mjakubowski84.parquet4s.fs2
 
 import cats.data.State
 import cats.effect.{IO, IOApp}
-import com.github.mjakubowski84.parquet4s.ParquetWriter
 import com.github.mjakubowski84.parquet4s.parquet.viaParquet
+import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter}
 import fs2.io.file.Files
 import fs2.kafka._
 import fs2.{INothing, Pipe, Stream}
@@ -118,7 +118,7 @@ object IndefiniteFS2App extends IOApp.Simple {
           )).evalTap(data => IO.println(data))
         }
       }
-      .partitionBy("year", "month", "day")
+      .partitionBy(Col("year"), Col("month"), Col("day"))
       .write(path)
 
 }

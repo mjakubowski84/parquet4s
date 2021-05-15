@@ -44,9 +44,10 @@ object ParquetSchemaResolver
 
   /**
    * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
-   * @param toSkip iterable of columns or dot-separated column paths that should be skipped when generating the schema
+   *
+   * @param toSkip iterable of [[ColumnPath]]s that should be skipped when generating the schema
    */
-  def resolveSchema[T](toSkip: Iterable[String])(implicit g: ParquetSchemaResolver[T]): MessageType =
+  def resolveSchema[T](toSkip: Iterable[ColumnPath])(implicit g: ParquetSchemaResolver[T]): MessageType =
     Message(g.schemaName, g.resolveSchema(Cursor.skipping(toSkip)):_*)
 
   /**

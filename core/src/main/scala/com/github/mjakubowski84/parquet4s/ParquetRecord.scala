@@ -109,17 +109,16 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
 
   /**
    * Adds a value at the given path. Creates intermediate records at the path if missing.
-   * @param path list of field names that form the path
+ *
+   * @param path  [[ColumnPath]]
    * @param value value to be added at the end of path
    * @return this record with value added
    */
-  def add(path: List[String], value: Value): This = {
+  def add(path: ColumnPath, value: Value): This = {
     path match {
-      case Nil =>
-        this
-      case name :: Nil =>
+      case ColumnPath(name, ColumnPath.Empty) =>
         this.add(name, value)
-      case name :: tail =>
+      case ColumnPath(name, tail) =>
         val subRecord = this.get(name) match {
           case NullValue =>
             val newRecord = RowParquetRecord.empty
@@ -132,14 +131,10 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
         }
         subRecord.add(tail, value)
         this
+      case _ =>
+        this
     }
   }
-
-  /**
-    * @return fields held in record
-    */
-  @deprecated("1.1", "Use iterator to iterate or other functions to access or modify record elements.")
-  def fields: Map[String, Value] = values.toMap
 
   /**
    *
@@ -161,20 +156,20 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
 
   /**
    *
-   * @param path list of field names that form a path
+   * @param path [[ColumnPath]]
    * @return value associated with given path or [[NullValue]] if no value is found
    */
-  def get(path: List[String]): Value =
+  def get(path: ColumnPath): Value =
     path match {
-      case Nil =>
-        NullValue
-      case fieldName :: Nil =>
+      case ColumnPath(fieldName, ColumnPath.Empty) =>
         get(fieldName)
-      case fieldName :: tail =>
+      case ColumnPath(fieldName, tail) =>
         get(fieldName) match {
           case subRecord : RowParquetRecord => subRecord.get(tail)
           case _ => NullValue
         }
+      case _ =>
+        this
     }
 
   override def iterator: Iterator[(String, Value)] = values.iterator
@@ -232,16 +227,15 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
 
   /**
    * Removes field at given path
-   * @param path list of field names that form the path
+   *
+   * @param path [[ColumnPath]]
    * @return Some value of the removed field ir None if path is invalid
    */
-  def remove(path: List[String]): Option[Value] =
+  def remove(path: ColumnPath): Option[Value] =
     path match {
-      case Nil =>
-        None
-      case fieldName :: Nil =>
+      case ColumnPath(fieldName, ColumnPath.Empty) =>
         remove(fieldName)
-      case fieldName :: tail =>
+      case ColumnPath(fieldName, tail) =>
         get(fieldName) match {
           case subRecord: RowParquetRecord =>
             val valueOpt = subRecord.remove(tail)
@@ -250,6 +244,8 @@ class RowParquetRecord private extends ParquetRecord[(String, Value)] with mutab
           case _ =>
             None
         }
+      case _ =>
+        None
     }
 
   /**
@@ -360,12 +356,6 @@ class ListParquetRecord private extends ParquetRecord[Value] with mutable.Seq[Va
     */
   def add[T](value: T, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueCodec: ValueCodec[T]): This =
     this.add(valueCodec.encode(value, valueCodecConfiguration))
-
-  /**
-    * @return collection of elements held in record
-    */
-  @deprecated("1.1", "Use iterator to iterate or other functions to access or modify record elements.")
-  def elements: List[Value] = values.toList
 
   /** Get the value at the specified index.
     *
@@ -478,12 +468,6 @@ class MapParquetRecord private extends ParquetRecord[(Value, Value)]
   def add[K, V](key: K, newVal: V, valueCodecConfiguration: ValueCodecConfiguration)
                   (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): This =
     this.add(kCodec.encode(key, valueCodecConfiguration), vCodec.encode(newVal, valueCodecConfiguration))
-
-  /**
-    * @return map of values held by record
-    */
-  @deprecated("1.1", "Use iterator to iterate or other functions to access or modify record elements.")
-  def getMap: Map[Value, Value] = entries.toMap
 
   /** Retrieves the value which is associated with the given key.
     *

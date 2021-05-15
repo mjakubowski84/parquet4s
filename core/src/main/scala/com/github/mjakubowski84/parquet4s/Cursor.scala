@@ -1,9 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.Cursor.DotPath
 import shapeless.Witness
-
-import java.util.Calendar
 
 /**
   * Auxiliary construct that facilitates traversal over tree of case classes.
@@ -15,7 +12,7 @@ trait Cursor {
   /**
     * @return current path of the cursor
     */
-  def path: Cursor.DotPath
+  def path: ColumnPath
 
   /**
     * @tparam FieldName symbol of the field that cursor shall advance
@@ -37,22 +34,12 @@ trait Cursor {
 
 object Cursor {
 
-  Calendar.getInstance.getTime
-
-  type DotPath = List[String]
-  object DotPath {
-    val empty: DotPath = List.empty
-    def apply(str: String): DotPath = str.split("\\.").toList
-    def unapply(path: DotPath): Option[String] = Some(toString(path))
-    def toString(path: DotPath): String = path.mkString(".")
-  }
-
   /**
     * Creates an instance of [[Cursor]] that indicates which fields of case class tree should be skipped by the program.
     * @param toSkip iterable of columns/fields that shall be skipped
     * @return a new instance of the cursor
     */
-  def skipping(toSkip: Iterable[String]): Cursor = SkippingCursor(toSkip.map(DotPath.apply).toSet)
+  def skipping(toSkip: Iterable[ColumnPath]): Cursor = SkippingCursor(toSkip.toSet)
 
   /**
     * Creates an instance of [[Cursor]] that guides the program across the tree of case classes. Indicates if the
@@ -60,14 +47,14 @@ object Cursor {
     * @param path column path that the program shall follow
     * @return a new instance of the cursor
     */
-  def following(path: String): Cursor = FollowingCursor(DotPath(path))
+  def following(path: ColumnPath): Cursor = FollowingCursor(path)
 
   /**
    * Creates an instance of [[Cursor]] that traverses case class without application of any specific logic.
    */
   def simple: Cursor = SimpleCursor()
 
-  final class Completed(val path: DotPath) extends Cursor {
+  final class Completed(val path: ColumnPath) extends Cursor {
     override def accept[T, R](obj: T, visitor: Visitor[T, R]): R = visitor.onCompleted(this, obj)
     override def advance[FieldName <: Symbol : Witness.Aux]: Option[Cursor] = None
   }
@@ -96,13 +83,13 @@ object Cursor {
 }
 
 private object SkippingCursor {
-  def apply(toSkip: Set[Cursor.DotPath]): SkippingCursor = new SkippingCursor(Cursor.DotPath.empty, toSkip)
+  def apply(toSkip: Set[ColumnPath]): SkippingCursor = new SkippingCursor(ColumnPath.Empty, toSkip)
 }
 
-private class SkippingCursor private (val path: Cursor.DotPath, toSkip: Set[Cursor.DotPath]) extends Cursor with Cursor.Active {
+private class SkippingCursor private (val path: ColumnPath, toSkip: Set[ColumnPath]) extends Cursor with Cursor.Active {
 
   override def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor] = {
-    val newPath = path :+ implicitly[Witness.Aux[FieldName]].value.name
+    val newPath = path.appendElement(implicitly[Witness.Aux[FieldName]].value.name)
     if (toSkip.contains(newPath)) None
     else Some(new SkippingCursor(newPath, toSkip))
   }
@@ -110,15 +97,15 @@ private class SkippingCursor private (val path: Cursor.DotPath, toSkip: Set[Curs
 }
 
 private object FollowingCursor {
-  def apply(toFollow: Cursor.DotPath): Cursor =
-    if (toFollow.isEmpty) new Cursor.Completed(Cursor.DotPath.empty)
-    else new FollowingCursor(Cursor.DotPath.empty, toFollow)
+  def apply(toFollow: ColumnPath): Cursor =
+    if (toFollow.isEmpty) new Cursor.Completed(toFollow)
+    else new FollowingCursor(ColumnPath.Empty, toFollow)
 }
 
-private class FollowingCursor private(val path: Cursor.DotPath, toFollow: Cursor.DotPath) extends Cursor with Cursor.Active {
+private class FollowingCursor private(val path: ColumnPath, toFollow: ColumnPath) extends Cursor with Cursor.Active {
 
   override def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor] = {
-    val newPath = path :+ implicitly[Witness.Aux[FieldName]].value.name
+    val newPath = path.appendElement(implicitly[Witness.Aux[FieldName]].value.name)
     if (toFollow == newPath)
       Some(new Cursor.Completed(newPath))
     else if (toFollow.startsWith(newPath))
@@ -129,13 +116,13 @@ private class FollowingCursor private(val path: Cursor.DotPath, toFollow: Cursor
 }
 
 private object SimpleCursor {
-  def apply(): Cursor = new SimpleCursor(DotPath.empty)
+  def apply(): Cursor = new SimpleCursor(ColumnPath.Empty)
 }
 
-private class SimpleCursor private(val path: Cursor.DotPath) extends Cursor with Cursor.Active {
+private class SimpleCursor private(val path: ColumnPath) extends Cursor with Cursor.Active {
 
   override def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor] = {
-    val newPath = path :+ implicitly[Witness.Aux[FieldName]].value.name
+    val newPath = path.appendElement(implicitly[Witness.Aux[FieldName]].value.name)
     Some(new SimpleCursor(newPath))
   }
 

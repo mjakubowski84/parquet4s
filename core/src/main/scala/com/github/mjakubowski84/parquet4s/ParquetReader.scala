@@ -117,9 +117,23 @@ object ParquetReader {
   */
 trait ParquetIterable[T] extends Iterable[T] with Closeable {
 
-  def min[V: Ordering: ValueCodec](columnPath: String): Option[V]
+  /**
+   * Returns min value of underlying dataset at given path
+   *
+   * @param columnPath [[ColumnPath]]
+   * @tparam V type of data at given path
+   * @return min value or [[scala.None]] if there is no matching data or path is invalid
+   */
+  def min[V: Ordering: ValueCodec](columnPath: ColumnPath): Option[V]
 
-  def max[V: Ordering: ValueCodec](columnPath: String): Option[V]
+  /**
+   * Returns max value of underlying dataset at given path
+   *
+   * @param columnPath [[ColumnPath]]
+   * @tparam V type of data at given path
+   * @return max value or [[scala.None]] if there is no matching data or path is invalid
+   */
+  def max[V: Ordering: ValueCodec](columnPath: ColumnPath): Option[V]
 
 }
 
@@ -171,9 +185,9 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](
     }
   }
 
-  override def min[V: Ordering : ValueCodec](columnPath: String): Option[V] = stats.min(columnPath)
+  override def min[V: Ordering : ValueCodec](columnPath: ColumnPath): Option[V] = stats.min(columnPath)
 
-  override def max[V: Ordering : ValueCodec](columnPath: String): Option[V] = stats.max(columnPath)
+  override def max[V: Ordering : ValueCodec](columnPath: ColumnPath): Option[V] = stats.max(columnPath)
 
   override def size: Int = stats.recordCount.toInt
 

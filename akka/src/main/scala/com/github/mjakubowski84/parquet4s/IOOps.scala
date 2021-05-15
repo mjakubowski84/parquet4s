@@ -17,7 +17,7 @@ private[parquet4s] object IOOps {
     override def next(): T = wrapped.next()
   }
 
-  private type Partition = (String, String)
+  private type Partition = (ColumnPath, String)
 
   private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!\-_.*'()]+)""".r
 
@@ -109,7 +109,7 @@ trait IOOps {
   private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
     val path = fileStatus.getPath
     path.getName match {
-      case PartitionRegexp(name, value) => Some(path, (name, value))
+      case PartitionRegexp(name, value) => Some(path, (ColumnPath(name), value))
       case _                            => None
     }
   }

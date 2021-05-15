@@ -36,13 +36,13 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   it should "succeed to add and retrieve a field using a path" in {
     val record = RowParquetRecord.empty
       .add("a", "a", vcc)
-      .add(List("x", "y", "z"), BinaryValue("xyz".getBytes))
-    record.get(List("a")) should be(BinaryValue("a".getBytes))
-    record.get(List("a", "b")) should be(NullValue)
-    record.get(List("k")) should be(NullValue)
-    record.get(List("x")) should be(RowParquetRecord.empty.add(List("y", "z"), BinaryValue("xyz".getBytes)))
-    record.get(List("x", "y")) should be(RowParquetRecord.empty.add("z", BinaryValue("xyz".getBytes)))
-    record.get(List("x", "y", "z")) should be(BinaryValue("xyz".getBytes))
+      .add(Col("x.y.z"), BinaryValue("xyz".getBytes))
+    record.get(Col("a")) should be(BinaryValue("a".getBytes))
+    record.get(Col("a.b")) should be(NullValue)
+    record.get(Col("k")) should be(NullValue)
+    record.get(Col("x")) should be(RowParquetRecord.empty.add(Col("y.z"), BinaryValue("xyz".getBytes)))
+    record.get(Col("x.y")) should be(RowParquetRecord.empty.add("z", BinaryValue("xyz".getBytes)))
+    record.get(Col("x.y.z")) should be(BinaryValue("xyz".getBytes))
     record.length should be(2)
   }
 
@@ -77,23 +77,23 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   it should "allow to remove fields by path" in {
     def createRecord() = RowParquetRecord.empty
       .add("a", "a", vcc)
-      .add(List("x", "y", "z"), BinaryValue("xyz".getBytes))
+      .add(Col("x.y.z"), BinaryValue("xyz".getBytes))
 
     val r1 = createRecord()
     val r2 = createRecord()
     val r3 = createRecord()
     val r4 = createRecord()
 
-    r1.remove(List("a")) should be(Some(BinaryValue("a".getBytes)))
-    r1 should be(RowParquetRecord.empty.add(List("x", "y", "z"), BinaryValue("xyz".getBytes)))
+    r1.remove(Col("a")) should be(Some(BinaryValue("a".getBytes)))
+    r1 should be(RowParquetRecord.empty.add(Col("x.y.z"), BinaryValue("xyz".getBytes)))
 
-    r2.remove(List("x")) should be(Some(RowParquetRecord.empty.add(List("y", "z"), BinaryValue("xyz".getBytes))))
+    r2.remove(Col("x")) should be(Some(RowParquetRecord.empty.add(Col("y.z"), BinaryValue("xyz".getBytes))))
     r2 should be(RowParquetRecord.empty.add("a", "a", vcc))
 
-    r3.remove(List("x", "y")) should be(Some(RowParquetRecord.empty.add(List("z"), BinaryValue("xyz".getBytes))))
+    r3.remove(Col("x.y")) should be(Some(RowParquetRecord.empty.add(Col("z"), BinaryValue("xyz".getBytes))))
     r3 should be(RowParquetRecord.empty.add("a", "a", vcc))
 
-    r4.remove(List("x", "y", "z")) should be(Some(BinaryValue("xyz".getBytes)))
+    r4.remove(Col("x.y.z")) should be(Some(BinaryValue("xyz".getBytes)))
     r4 should be(RowParquetRecord.empty.add("a", "a", vcc))
   }
 
