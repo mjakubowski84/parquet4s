@@ -33,12 +33,13 @@ private[parquet4s] class FileStats(
     def recordCount: Long = reader.getRecordCount
   }
 
-  private class MinMaxReader[V](columnPath: String, currentExtreme: Option[V])
+  private class MinMaxReader[V](columnPath: ColumnPath, currentExtreme: Option[V])
                             (implicit codec: ValueCodec[V], ordering: Ordering[V]) extends StatsReader {
+    private val dotString = columnPath.toString
 
     private def extreme(statsValue: Statistics[_] => IterableOnce[Value], choose: (V, V) => V) =
       reader.getRowGroups.asScala.iterator
-        .map(block => block.getColumns.asScala.find(_.getPath.toDotString == columnPath))
+        .map(block => block.getColumns.asScala.find(_.getPath.toDotString == dotString))
         .collect { case Some(column) => column }
         .map(_.getStatistics)
         .flatMap(statsValue)
@@ -62,7 +63,7 @@ private[parquet4s] class FileStats(
     }
   }
 
-  override def min[V](columnPath: String, currentMin: Option[V])
+  override def min[V](columnPath: ColumnPath, currentMin: Option[V])
                      (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMin)
     try {
@@ -72,7 +73,7 @@ private[parquet4s] class FileStats(
     }
   }
 
-  override def max[V](columnPath: String, currentMax: Option[V])
+  override def max[V](columnPath: ColumnPath, currentMax: Option[V])
                      (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMax)
     try {
