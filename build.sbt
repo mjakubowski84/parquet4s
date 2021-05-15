@@ -60,7 +60,7 @@ lazy val core = (project in file("core"))
       "com.chuusai" %% "shapeless" % shapelessVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.3",
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.4",
 
       // tests
       "org.mockito" %% "mockito-scala-scalatest" % "1.16.37" % "test",

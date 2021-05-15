@@ -1,6 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.column.statistics._
 import org.apache.parquet.schema.MessageType
 
@@ -17,26 +16,26 @@ trait Stats {
   def recordCount: Long
 
   /**
-   * @param columnPath dot-separated path to requested column
+   * @param columnPath [[ColumnPath]]
    * @param codec [[ValueCodec]] required to decode the value
    * @param ordering required to sort filtered values
    * @tparam V type of value stored in the column
    * @return Minimum value across Parquet data. [[Filter]] is considered during calculation.
    */
-  def min[V](columnPath: String)(implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = min(columnPath, None)
+  def min[V](columnPath: ColumnPath)(implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = min(columnPath, None)
 
   /**
-   * @param columnPath dot-separated path to requested column
+   * @param columnPath [[ColumnPath]]
    * @param codec [[ValueCodec]] required to decode the value
    * @param ordering required to sort filtered values
    * @tparam V type of value stored in the column
    * @return Maximum value across Parquet data. [[Filter]] is considered during calculation.
    */
-  def max[V](columnPath: String)(implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = max(columnPath, None)
+  def max[V](columnPath: ColumnPath)(implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = max(columnPath, None)
 
-  protected[parquet4s] def min[V](columnPath: String, currentMin: Option[V])
+  protected[parquet4s] def min[V](columnPath: ColumnPath, currentMin: Option[V])
                                  (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V]
-  protected[parquet4s] def max[V](columnPath: String, currentMax: Option[V])
+  protected[parquet4s] def max[V](columnPath: ColumnPath, currentMax: Option[V])
                                  (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V]
 
   protected def statsMinValue(statistics: Statistics[_]): Option[Value] =
@@ -66,35 +65,35 @@ trait Stats {
 object Stats {
 
   /**
-   * @param path URI to location of files
+   * @param path [[Path]] to Parquet files
    * @param options [[ParquetReader.Options]]
    * @param filter optional [[Filter]] that is considered during calculation of [[Stats]]
    * @return [[Stats]] of Parquet files
    */
   def apply(
-             path: String,
+             path: Path,
              options: ParquetReader.Options = ParquetReader.Options(),
              filter: Filter = Filter.noopFilter
            ): Stats =
-    this.apply(path = new Path(path), options = options, projectionSchemaOpt = None, filter = filter)
+    this.apply(path = path, options = options, projectionSchemaOpt = None, filter = filter)
 
   /**
    * If you are not interested in Stats of all columns then consider using projection to make the operation faster.
    * If you are going to use a filter mind that your projection has to contain columns that filter refers to.
    *
-   * @param path URI to location of files
+   * @param path [[Path]] to Parquet files
    * @param options [[ParquetReader.Options]]
    * @param filter optional [[Filter]] that is considered during calculation of [[Stats]]
    * @tparam T projected type
    * @return [[Stats]] of Parquet files
    */
   def withProjection[T: ParquetSchemaResolver](
-                                                path: String,
+                                                path: Path,
                                                 options: ParquetReader.Options = ParquetReader.Options(),
                                                 filter: Filter = Filter.noopFilter
                                               ): Stats =
     this.apply(
-      path = new Path(path),
+      path = path,
       options = options,
       projectionSchemaOpt = Option(ParquetSchemaResolver.resolveSchema[T]),
       filter = filter
@@ -115,13 +114,13 @@ object Stats {
 private class CompoundStats(statsSeq: Seq[Stats]) extends Stats {
   override lazy val recordCount: Long = statsSeq.map(_.recordCount).sum
 
-  override def min[V](columnPath: String, currentMin: Option[V])
+  override def min[V](columnPath: ColumnPath, currentMin: Option[V])
                      (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
     statsSeq.foldLeft(currentMin) {
       case (acc, stats) => stats.min(columnPath, acc)
     }
 
-  override def max[V](columnPath: String, currentMax: Option[V])
+  override def max[V](columnPath: ColumnPath, currentMax: Option[V])
                      (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
     statsSeq.foldLeft(currentMax) {
       case (acc, stats) => stats.max(columnPath, acc)
@@ -134,8 +133,8 @@ private class LazyDelegateStats(path: Path,
                                 projectionSchemaOpt: Option[MessageType],
                                 filter: Filter) extends Stats {
   private lazy val delegate: Stats = {
-    val fs = path.getFileSystem(options.hadoopConf)
-    val statsArray = fs.listStatus(path).map {
+    val fs = path.toHadoop.getFileSystem(options.hadoopConf)
+    val statsArray = fs.listStatus(path.toHadoop).map {
       case status if filter == Filter.noopFilter => new FileStats(status, options, projectionSchemaOpt)
       case status => new FilteredFileStats(status, options, projectionSchemaOpt, filter)
     }
@@ -145,11 +144,11 @@ private class LazyDelegateStats(path: Path,
 
   override def recordCount: Long = delegate.recordCount
 
-  override protected[parquet4s] def min[V](columnPath: String, currentMin: Option[V])
+  override protected[parquet4s] def min[V](columnPath: ColumnPath, currentMin: Option[V])
                                           (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
     delegate.min(columnPath, currentMin)
 
-  override protected[parquet4s] def max[V](columnPath: String, currentMax: Option[V])
+  override protected[parquet4s] def max[V](columnPath: ColumnPath, currentMax: Option[V])
                                           (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
     delegate.max(columnPath, currentMax)
 }

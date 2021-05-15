@@ -6,7 +6,6 @@ import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
 import com.github.mjakubowski84.parquet4s.PartitionFilterRewriter.AssumeTrue
 import com.github.mjakubowski84.parquet4s.PartitionFilterSpec.IsUppercase
 import org.apache.commons.lang3.StringUtils
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.compat.FilterCompat.FilterPredicateCompat
 import org.apache.parquet.filter2.predicate.FilterApi.{and => AND, eq => EQ, gt => GT, gtEq => GTE, lt => LT, ltEq => LTE, not => NOT, notEq => NEQ, or => OR, userDefined => UDP, _}
@@ -29,8 +28,8 @@ object PartitionFilterSpec {
 
 class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with EitherValues {
 
-  val (i, j, k, l, other) = ("i", "j", "k", "l", "other")
-  val (colI, colJ, colK, colL) = (binaryColumn(i), binaryColumn(j), binaryColumn(k), binaryColumn(l))
+  val (i, j, k, l, other) = (Col("i"), Col("j"), Col("k"), Col("l"), Col("other"))
+  val (colI, colJ, colK, colL) = (binaryColumn(i.toString), binaryColumn(j.toString), binaryColumn(k.toString), binaryColumn(l.toString))
 
   val eqi: Operators.Eq[Binary] = EQ(colI, Binary.fromString("I"))
   val neqj: Operators.NotEq[Binary] = NEQ(colJ, Binary.fromString("J"))
@@ -47,8 +46,8 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
 
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration(TimeZone.getDefault)
 
-  def partitionedPath(partitions: (String, String)*): PartitionedPath =
-    PartitionedPath(new Path("/"), partitions.toList)
+  def partitionedPath(partitions: (ColumnPath, String)*): PartitionedPath =
+    PartitionedPath(Path("/"), partitions.toList)
 
   def partitionedDirectory(partitionedPaths: PartitionedPath*): PartitionedDirectory =
     PartitionedDirectory(partitionedPaths).value
@@ -67,24 +66,24 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
   }
 
   it should "accept single partitioned path" in {
-    val dir = partitionedDirectory(partitionedPath("x" -> "4", "y" -> "2"))
-    dir.schema should be (List("x", "y"))
+    val dir = partitionedDirectory(partitionedPath(i -> "4", j -> "2"))
+    dir.schema should be (List(i, j))
     dir.paths should have size 1
   }
 
   it should "rise exception if number of partitions is inconsistent among paths" in {
     PartitionedDirectory(Seq(
-      partitionedPath("x" -> "1", "y" -> "A"),
-      partitionedPath("x" -> "2"),
-      partitionedPath("x" -> "3", "y" -> "C")
+      partitionedPath(i -> "1", j -> "A"),
+      partitionedPath(i -> "2"),
+      partitionedPath(i -> "3", j -> "C")
     )).left.value should be(an[IllegalArgumentException])
   }
 
   it should "rise exception if order of partitions is inconsistent among paths" in {
     PartitionedDirectory(Seq(
-      partitionedPath("x" -> "1", "y" -> "A"),
-      partitionedPath("y" -> "B", "x" -> "2"),
-      partitionedPath("x" -> "3", "y" -> "C")
+      partitionedPath(i -> "1", j -> "A"),
+      partitionedPath(j -> "B", i -> "2"),
+      partitionedPath(i -> "3", j -> "C")
     )).left.value should be(an[IllegalArgumentException])
   }
 
