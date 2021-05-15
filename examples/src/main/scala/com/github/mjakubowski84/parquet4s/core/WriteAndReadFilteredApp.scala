@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s.core
 
-import com.github.mjakubowski84.parquet4s.{Col, ParquetReader, ParquetWriter}
+import com.github.mjakubowski84.parquet4s.{Col, ParquetReader, ParquetWriter, Path}
 
 import java.nio.file.Files
 import scala.util.Random
@@ -14,27 +14,29 @@ object WriteAndReadFilteredApp extends App {
     val D = "D"
 
     val values: List[String] = List(A, B, C, D)
-    def random: String       = values(Random.nextInt(values.length))
+    def random: String = values(Random.nextInt(values.length))
   }
 
   case class Data(id: Int, dict: String)
 
   val count = 100
-  val data  = (1 to count).map(i => Data(id = i, dict = Dict.random))
-  val path  = Files.createTempDirectory("example").toString
+  val data = (1 to count).map { i => Data(id = i, dict = Dict.random) }
+  val path = Path(Files.createTempDirectory("example"))
 
   // write
-  ParquetWriter.writeAndClose(s"$path/data.parquet", data)
+  ParquetWriter.writeAndClose(path.append("data.parquet"), data)
 
   //read filtered
   println("""dict == "A"""")
   val dictIsOnlyA = ParquetReader.read[Data](path, filter = Col("dict") === Dict.A)
-  try dictIsOnlyA.foreach(println)
-  finally dictIsOnlyA.close()
+  try {
+    dictIsOnlyA.foreach(println)
+  } finally dictIsOnlyA.close()
 
   println("""id >= 20 && id < 40""")
   val idIsBetween10And90 = ParquetReader.read[Data](path, filter = Col("id") >= 20 && Col("id") < 40)
-  try idIsBetween10And90.foreach(println)
-  finally idIsBetween10And90.close()
+  try {
+    idIsBetween10And90.foreach(println)
+  } finally idIsBetween10And90.close()
 
 }

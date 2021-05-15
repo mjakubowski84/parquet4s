@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.core
 
 import com.github.mjakubowski84.parquet4s.CustomType._
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver._
-import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter}
+import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path}
 
 import java.nio.file.Files
 
@@ -14,10 +14,10 @@ object WriteAndReadCustomTypeApp extends App {
   case class Data(id: Long, dict: Dict.Type)
 
   val data = Data.generate(count = 100)
-  val path = Files.createTempDirectory("example").toString
+  val path = Path(Files.createTempDirectory("example"))
 
   // write
-  ParquetWriter.writeAndClose(s"$path/data.parquet", data)
+  ParquetWriter.writeAndClose(path.append("data.parquet"), data)
 
   //read
   val readData = ParquetReader.read[Data](path)

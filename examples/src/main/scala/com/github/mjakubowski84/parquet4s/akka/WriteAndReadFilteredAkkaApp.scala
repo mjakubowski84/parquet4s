@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.akka
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import com.github.mjakubowski84.parquet4s.{Col, ParquetStreams}
+import com.github.mjakubowski84.parquet4s.{Col, ParquetStreams, Path}
 
 import java.nio.file.Files
 import scala.concurrent.Future
@@ -17,14 +17,14 @@ object WriteAndReadFilteredAkkaApp extends App {
     val D = "D"
 
     val values: List[String] = List(A, B, C, D)
-    def random: String       = values(Random.nextInt(values.length))
+    def random: String = values(Random.nextInt(values.length))
   }
 
   case class Data(id: Int, dict: String)
 
   val count = 100
-  val data  = (1 to count).map(i => Data(id = i, dict = Dict.random))
-  val path  = Files.createTempDirectory("example").toString
+  val data = (1 to count).map { i => Data(id = i, dict = Dict.random) }
+  val path = Path(Files.createTempDirectory("example"))
 
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher
@@ -33,7 +33,7 @@ object WriteAndReadFilteredAkkaApp extends App {
 
   for {
     // write
-    _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile(s"$path/data.parquet"))
+    _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile(path.append("data.parquet")))
     // read filtered
     _ <- Future(println("""dict == "A""""))
     _ <- ParquetStreams.fromParquet[Data].withFilter(Col("dict") === Dict.A).read(path).runWith(printingSink)

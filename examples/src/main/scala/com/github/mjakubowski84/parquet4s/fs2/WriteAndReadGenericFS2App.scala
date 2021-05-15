@@ -3,7 +3,7 @@ package com.github.mjakubowski84.parquet4s.fs2
 import cats.Show
 import cats.effect.{IO, IOApp}
 import com.github.mjakubowski84.parquet4s.parquet._
-import com.github.mjakubowski84.parquet4s.{RowParquetRecord, ValueCodecConfiguration}
+import com.github.mjakubowski84.parquet4s.{Path, RowParquetRecord, ValueCodecConfiguration}
 import fs2.Stream
 import fs2.io.file.Files
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
@@ -44,10 +44,10 @@ object WriteAndReadGenericFS2App extends IOApp.Simple {
 
   override def run: IO[Unit] = {
     val stream = for {
-      path <- Stream.resource(Files[IO].tempDirectory())
+      path <- Stream.resource(Files[IO].tempDirectory()).map(Path.apply)
       _ <- Stream.iterable[IO, RowParquetRecord](users)
-        .through(writeSingleFile(path.resolve("data.parquet").toString))
-        .append(fromParquet[IO, RowParquetRecord].read(path.toString).printlns.drain)
+        .through(writeSingleFile(path.append("data.parquet")))
+        .append(fromParquet[IO, RowParquetRecord].read(path).printlns.drain)
     } yield ()
 
     stream.compile.drain

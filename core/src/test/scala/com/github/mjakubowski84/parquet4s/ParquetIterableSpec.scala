@@ -216,8 +216,8 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
       mock[HadoopParquetReader.Builder[RowParquetRecord]],
       vcc,
       stats
-    ).min[Int]("int")
-    stats.min("int")(any[ValueCodec[Int]], any[Ordering[Int]]) was called
+    ).min[Int](Col("int"))
+    stats.min(Col("int"))(any[ValueCodec[Int]], any[Ordering[Int]]) was called
   }
 
   "max" should "use stats for returning record count" in {
@@ -226,8 +226,8 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
       mock[HadoopParquetReader.Builder[RowParquetRecord]],
       vcc,
       stats
-    ).max[Int]("int")
-    stats.max("int")(any[ValueCodec[Int]], any[Ordering[Int]]) was called
+    ).max[Int](Col("int"))
+    stats.max(Col("int"))(any[ValueCodec[Int]], any[Ordering[Int]]) was called
   }
 
 }
