@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.akka
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import com.github.mjakubowski84.parquet4s.{ParquetStreams, RowParquetRecord, ValueCodecConfiguration}
+import com.github.mjakubowski84.parquet4s.{ParquetStreams, Path, RowParquetRecord, ValueCodecConfiguration}
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
 import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, Types}
@@ -38,14 +38,14 @@ object WriteAndReadGenericAkkaApp extends App {
       .add(Birthday, birthday, vcc)
   }
 
-  val path = Files.createTempDirectory("example").toString
+  val path = Path(Files.createTempDirectory("example"))
 
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher
 
   for {
     // write
-    _ <- Source(users).runWith(ParquetStreams.toParquetSingleFile(s"$path/data.parquet"))
+    _ <- Source(users).runWith(ParquetStreams.toParquetSingleFile(path.append("data.parquet")))
     // read
     _ <- ParquetStreams.fromParquet[RowParquetRecord].read(path).runWith(Sink.foreach(println))
     // finish

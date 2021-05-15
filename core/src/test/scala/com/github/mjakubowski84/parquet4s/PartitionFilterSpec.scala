@@ -6,22 +6,9 @@ import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
 import com.github.mjakubowski84.parquet4s.PartitionFilterRewriter.AssumeTrue
 import com.github.mjakubowski84.parquet4s.PartitionFilterSpec.IsUppercase
 import org.apache.commons.lang3.StringUtils
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.compat.FilterCompat.FilterPredicateCompat
-import org.apache.parquet.filter2.predicate.FilterApi.{
-  and         => AND,
-  eq          => EQ,
-  gt          => GT,
-  gtEq        => GTE,
-  lt          => LT,
-  ltEq        => LTE,
-  not         => NOT,
-  notEq       => NEQ,
-  or          => OR,
-  userDefined => UDP,
-  _
-}
+import org.apache.parquet.filter2.predicate.FilterApi.{and => AND, eq => EQ, gt => GT, gtEq => GTE, lt => LT, ltEq => LTE, not => NOT, notEq => NEQ, or => OR, userDefined => UDP, _}
 import org.apache.parquet.filter2.predicate.{FilterPredicate, Operators, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
 import org.scalatest.{EitherValues, Inside}
@@ -31,25 +18,25 @@ import org.scalatest.matchers.should.Matchers
 object PartitionFilterSpec {
 
   class IsUppercase extends UserDefinedPredicate[Binary] with Serializable {
-    override def keep(value: Binary): Boolean                     = StringUtils.isAllUpperCase(value.toStringUsingUTF8)
+    override def keep(value: Binary): Boolean = StringUtils.isAllUpperCase(value.toStringUsingUTF8)
     override def canDrop(statistics: Statistics[Binary]): Boolean = false
     override def inverseCanDrop(statistics: Statistics[Binary]): Boolean = false
-    override val toString: String                                        = "is_uppercase"
+    override val toString: String = "is_uppercase"
   }
 
 }
 
 class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with EitherValues {
 
-  val (i, j, k, l, other)      = ("i", "j", "k", "l", "other")
-  val (colI, colJ, colK, colL) = (binaryColumn(i), binaryColumn(j), binaryColumn(k), binaryColumn(l))
+  val (i, j, k, l, other) = (Col("i"), Col("j"), Col("k"), Col("l"), Col("other"))
+  val (colI, colJ, colK, colL) = (binaryColumn(i.toString), binaryColumn(j.toString), binaryColumn(k.toString), binaryColumn(l.toString))
 
-  val eqi: Operators.Eq[Binary]                        = EQ(colI, Binary.fromString("I"))
-  val neqj: Operators.NotEq[Binary]                    = NEQ(colJ, Binary.fromString("J"))
-  val gtk: Operators.Gt[Binary]                        = GT(colK, Binary.fromString("a"))
-  val ltl: Operators.Lt[Binary]                        = LT(colL, Binary.fromString("z"))
-  val gtek: Operators.GtEq[Binary]                     = GTE(colK, Binary.fromString("a"))
-  val ltel: Operators.LtEq[Binary]                     = LTE(colL, Binary.fromString("z"))
+  val eqi: Operators.Eq[Binary] = EQ(colI, Binary.fromString("I"))
+  val neqj: Operators.NotEq[Binary] = NEQ(colJ, Binary.fromString("J"))
+  val gtk: Operators.Gt[Binary] = GT(colK, Binary.fromString("a"))
+  val ltl: Operators.Lt[Binary] = LT(colL, Binary.fromString("z"))
+  val gtek: Operators.GtEq[Binary] = GTE(colK, Binary.fromString("a"))
+  val ltel: Operators.LtEq[Binary] = LTE(colL, Binary.fromString("z"))
   val udpi: Operators.UserDefined[Binary, IsUppercase] = UDP(colI, new IsUppercase)
 
   val case1: FilterPredicate = OR(AND(eqi, neqj), AND(gtk, ltl))
@@ -59,11 +46,12 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
 
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration(TimeZone.getDefault)
 
-  def partitionedPath(partitions: (String, String)*): PartitionedPath =
-    PartitionedPath(new Path("/"), partitions.toList)
+  def partitionedPath(partitions: (ColumnPath, String)*): PartitionedPath =
+    PartitionedPath(Path("/"), partitions.toList)
 
   def partitionedDirectory(partitionedPaths: PartitionedPath*): PartitionedDirectory =
     PartitionedDirectory(partitionedPaths).value
+
 
   "PartitionedDirectory" should "accept empty input" in {
     val dir = partitionedDirectory()
@@ -73,34 +61,30 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
 
   it should "accept paths without partitions" in {
     val dir = partitionedDirectory(partitionedPath(), partitionedPath(), partitionedPath())
-    dir.schema should be(empty)
+    dir.schema should be (empty)
     dir.paths should have size 3
   }
 
   it should "accept single partitioned path" in {
-    val dir = partitionedDirectory(partitionedPath("x" -> "4", "y" -> "2"))
-    dir.schema should be(List("x", "y"))
+    val dir = partitionedDirectory(partitionedPath(i -> "4", j -> "2"))
+    dir.schema should be (List(i, j))
     dir.paths should have size 1
   }
 
   it should "rise exception if number of partitions is inconsistent among paths" in {
-    PartitionedDirectory(
-      Seq(
-        partitionedPath("x" -> "1", "y" -> "A"),
-        partitionedPath("x" -> "2"),
-        partitionedPath("x" -> "3", "y" -> "C")
-      )
-    ).left.value should be(an[IllegalArgumentException])
+    PartitionedDirectory(Seq(
+      partitionedPath(i -> "1", j -> "A"),
+      partitionedPath(i -> "2"),
+      partitionedPath(i -> "3", j -> "C")
+    )).left.value should be(an[IllegalArgumentException])
   }
 
   it should "rise exception if order of partitions is inconsistent among paths" in {
-    PartitionedDirectory(
-      Seq(
-        partitionedPath("x" -> "1", "y" -> "A"),
-        partitionedPath("y" -> "B", "x" -> "2"),
-        partitionedPath("x" -> "3", "y" -> "C")
-      )
-    ).left.value should be(an[IllegalArgumentException])
+    PartitionedDirectory(Seq(
+      partitionedPath(i -> "1", j -> "A"),
+      partitionedPath(j -> "B", i -> "2"),
+      partitionedPath(i -> "3", j -> "C")
+    )).left.value should be(an[IllegalArgumentException])
   }
 
   "PartitionFilter visitor" should "handle case when there predicate does not match any column" in {
@@ -254,7 +238,7 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
 
   "PartitionFilter" should "apply no filter if predicate is empty" in {
     val path = partitionedPath(i -> "I")
-    val dir  = partitionedDirectory(path)
+    val dir = partitionedDirectory(path)
 
     PartitionFilter.filter(Filter.noopFilter, vcc, dir) should be(Seq((FilterCompat.NOOP, path)))
   }
@@ -268,10 +252,10 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
   }
 
   it should "apply filter that does not match partitions" in {
-    val path            = partitionedPath(i -> "I")
-    val dir             = partitionedDirectory(path)
-    val filter          = Col("x") === 42
-    val filterPredicate = filter.toPredicate(vcc)
+    val path = partitionedPath(i -> "I")
+    val dir = partitionedDirectory(path)
+    val filter = Col("x") === 42
+    val filterPredicate  = filter.toPredicate(vcc)
 
     inside(PartitionFilter.filter(filter, vcc, dir).toList) {
       case (filterCompat: FilterPredicateCompat, `path`) :: Nil =>
@@ -280,26 +264,26 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
   }
 
   it should "apply filter that is always true due to partition value" in {
-    val path   = partitionedPath(i -> "I")
-    val dir    = partitionedDirectory(path)
+    val path = partitionedPath(i -> "I")
+    val dir = partitionedDirectory(path)
     val filter = Col("i") === "I" || Col("x") === 42
 
     PartitionFilter.filter(filter, vcc, dir) should be(Seq((FilterCompat.NOOP, path)))
   }
 
   it should "apply filter that is always false due to partition value" in {
-    val path   = partitionedPath(i -> "I")
-    val dir    = partitionedDirectory(path)
+    val path = partitionedPath(i -> "I")
+    val dir = partitionedDirectory(path)
     val filter = (Col("i") !== "I") && Col("x") === 42
 
     PartitionFilter.filter(filter, vcc, dir) should be(empty)
   }
 
   it should "apply rewrite filter due to partition value" in {
-    val path                    = partitionedPath(i -> "I")
-    val dir                     = partitionedDirectory(path)
-    val filter                  = Col("x") === 42 && Col("i") === "I"
-    val expectedFilterPredicate = (Col("x") === 42).toPredicate(vcc)
+    val path = partitionedPath(i -> "I")
+    val dir = partitionedDirectory(path)
+    val filter = Col("x") === 42 && Col("i") === "I"
+    val expectedFilterPredicate  = (Col("x") === 42).toPredicate(vcc)
 
     inside(PartitionFilter.filter(filter, vcc, dir).toList) {
       case (filterCompat: FilterPredicateCompat, `path`) :: Nil =>

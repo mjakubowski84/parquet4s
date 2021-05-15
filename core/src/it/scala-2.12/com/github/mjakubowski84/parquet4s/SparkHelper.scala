@@ -23,12 +23,12 @@ trait SparkHelper extends BeforeAndAfterAll with TestUtils {
 
   def writeToTemp[T <: Product: TypeTag](data: Seq[T]): Unit = {
     import sparkSession.implicits._
-    data.toDS().write.parquet(tempPathString)
+    data.toDS().write.parquet(tempPath.toString)
   }
 
   def readFromTemp[T <: Product: TypeTag]: Seq[T] = {
     import sparkSession.implicits._
-    sparkSession.read.parquet(tempPathString).as[T].collect().toSeq
+    sparkSession.read.parquet(tempPath.toString).as[T].collect().toSeq
   }
 
 }

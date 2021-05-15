@@ -2,11 +2,9 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect._
 import cats.implicits._
-import com.github.mjakubowski84.parquet4s.Cursor.DotPath
 import com.github.mjakubowski84.parquet4s._
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import fs2.{Pipe, Pull, Stream}
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.parquet.schema.MessageType
 
@@ -48,7 +46,7 @@ object rotatingWriter {
     def options(writeOptions: ParquetWriter.Options): Builder[F, T, W]
     /**
      * Sets partition paths that stream partitions data by. Can be empty.
-     * Partition path can be a simple string column (e.g. "color") or a dot-separated path pointing nested string field
+     * Partition path can be a simple string column (e.g. "color") or a path pointing nested string field
      * (e.g. "user.address.postcode"). Partition path is used to extract data from the entity and to create
      * a tree of subdirectories for partitioned files. Using aforementioned partitions effects in creation
      * of (example) following tree:
@@ -70,9 +68,10 @@ object rotatingWriter {
      *       get an error.</li>
      *   <li>Partitioned directories can be filtered effectively during reading.</li>
      * </ol>
-     * @param partitionBy partition paths
+     *
+     * @param partitionBy [[ColumnPath]]s to partition by
      */
-    def partitionBy(partitionBy: String*): Builder[F, T, W]
+    def partitionBy(partitionBy: ColumnPath*): Builder[F, T, W]
     /**
      * @param transformation function that is called by stream in order to obtain Parquet schema. Identity by default.
      * @tparam X Schema type
@@ -90,17 +89,17 @@ object rotatingWriter {
     /**
      * Builds final writer pipe.
      */
-    def write(basePath: String)(implicit
-                                schemaResolver: ParquetSchemaResolver[W],
-                                encoder: ParquetRecordEncoder[W],
-                                async: Async[F]): Pipe[F, T, T]
+    def write(basePath: Path)(implicit
+                              schemaResolver: ParquetSchemaResolver[W],
+                              encoder: ParquetRecordEncoder[W],
+                              async: Async[F]): Pipe[F, T, T]
   }
 
   private case class BuilderImpl[F[_], T, W](
                                               maxCount: Long,
                                               maxDuration: FiniteDuration,
                                               preWriteTransformation: T => Stream[F, W],
-                                              partitionBy: Seq[String],
+                                              partitionBy: Seq[ColumnPath],
                                               postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
                                               writeOptions: ParquetWriter.Options,
                                             ) extends Builder[F, T, W] {
@@ -108,7 +107,7 @@ object rotatingWriter {
     override def maxCount(maxCount: Long): Builder[F, T, W] = copy(maxCount = maxCount)
     override def maxDuration(maxDuration: FiniteDuration): Builder[F, T, W] = copy(maxDuration = maxDuration)
     override def options(writeOptions: ParquetWriter.Options): Builder[F, T, W] = copy(writeOptions = writeOptions)
-    override def partitionBy(partitionBy: String*): Builder[F, T, W] = copy(partitionBy = partitionBy)
+    override def partitionBy(partitionBy: ColumnPath*): Builder[F, T, W] = copy(partitionBy = partitionBy)
     override def preWriteTransformation[X](transformation: T => Stream[F, X]): Builder[F, T, X] =
       BuilderImpl(
         maxCount = maxCount,
@@ -120,10 +119,10 @@ object rotatingWriter {
       )
     override def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): Builder[F, T, W] =
       copy(postWriteHandlerOpt = Option(postWriteHandler))
-    override def write(basePath: String)(implicit
-                                         schemaResolver: ParquetSchemaResolver[W],
-                                         encoder: ParquetRecordEncoder[W],
-                                         async: Async[F]): Pipe[F, T, T] =
+    override def write(basePath: Path)(implicit
+                                       schemaResolver: ParquetSchemaResolver[W],
+                                       encoder: ParquetRecordEncoder[W],
+                                       async: Async[F]): Pipe[F, T, T] =
       rotatingWriter.write[F, T, W](
         basePath, maxCount, maxDuration, partitionBy, preWriteTransformation, postWriteHandlerOpt, writeOptions
       )
@@ -162,7 +161,7 @@ object rotatingWriter {
                                            options: ParquetWriter.Options,
                                            writersRef: Ref[F, Map[Path, RecordWriter[F]]],
                                            maxCount: Long,
-                                           partitionBy: List[DotPath],
+                                           partitionBy: List[ColumnPath],
                                            schema: MessageType,
                                            encode: W => F[RowParquetRecord],
                                            logger: Logger[F],
@@ -179,14 +178,14 @@ object rotatingWriter {
       UUID.randomUUID().toString + compressionExtension + ".parquet"
     }
 
-    private def getOrCreateWriter(path: Path, writers: Writers): F[(RecordWriter[F], Writers)] =
-      writers.get(path) match {
+    private def getOrCreateWriter(basePath: Path, writers: Writers): F[(RecordWriter[F], Writers)] =
+      writers.get(basePath) match {
         case Some(writer) =>
           F.pure(writer -> writers)
         case None =>
           for {
-            writer <- RecordWriter(new Path(path, newFileName), schema, options)
-            updatedWriters = writers.updated(path, writer)
+            writer <- RecordWriter(basePath.append(newFileName), schema, options)
+            updatedWriters = writers.updated(basePath, writer)
             _ <- writersRef.set(updatedWriters)
           } yield writer -> updatedWriters
       }
@@ -196,7 +195,7 @@ object rotatingWriter {
         record <- encode(entity)
         path <- partitionBy.traverse(partition(record)).map {
           partitions => partitions.foldLeft(basePath) {
-            case (path, (partitionName, partitionValue)) => new Path(path, s"$partitionName=$partitionValue")
+            case (path, (partitionName, partitionValue)) => path.append(s"$partitionName=$partitionValue")
           }
         }
         getResult <- getOrCreateWriter(path, writers)
@@ -204,13 +203,12 @@ object rotatingWriter {
         _ <- writer.write(record)
       } yield writers
 
-    private def partition(record: RowParquetRecord)(partitionPath: DotPath): F[(String, String)] = {
-      val partitionName = DotPath.toString(partitionPath)
+    private def partition(record: RowParquetRecord)(partitionPath: ColumnPath): F[(ColumnPath, String)] = {
       record.remove(partitionPath) match {
-        case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionName' does not exist."))
-        case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionName' is null."))
-        case Some(BinaryValue(binary)) => F.catchNonFatal(partitionName -> binary.toStringUsingUTF8)
-        case _ => F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionName' used for partitioning."))
+        case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' does not exist."))
+        case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' is null."))
+        case Some(BinaryValue(binary)) => F.catchNonFatal(partitionPath -> binary.toStringUsingUTF8)
+        case _ => F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning."))
       }
     }
 
@@ -269,28 +267,27 @@ object rotatingWriter {
   private[parquet4s] def write[
     F[_],
     T,
-    W: ParquetRecordEncoder : ParquetSchemaResolver](path: String,
+    W: ParquetRecordEncoder : ParquetSchemaResolver](basePath: Path,
                                                      maxCount: Long,
                                                      maxDuration: FiniteDuration,
-                                                     partitionBy: Seq[String],
+                                                     partitionBy: Seq[ColumnPath],
                                                      prewriteTransformation: T => Stream[F, W],
                                                      postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
                                                      options: ParquetWriter.Options
                                                     )(implicit F: Async[F]): Pipe[F, T, T] =
     in =>
       for {
-        hadoopPath <- Stream.eval(io.makePath(path))
         schema <- Stream.eval(F.catchNonFatal(ParquetSchemaResolver.resolveSchema[W](partitionBy)))
         valueCodecConfiguration <- Stream.eval(F.catchNonFatal(options.toValueCodecConfiguration))
         encode = { (entity: W) => F.catchNonFatal(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
         logger <- Stream.eval(logger[F](this.getClass))
         rotatingWriter <- Stream.emit(
           new RotatingWriter[T, W, F](
-            basePath = hadoopPath,
+            basePath = basePath,
             options = options,
             writersRef = Ref.unsafe(Map.empty),
             maxCount = maxCount,
-            partitionBy = partitionBy.map(DotPath.apply).toList,
+            partitionBy = partitionBy.toList,
             schema = schema,
             encode = encode,
             logger = logger,

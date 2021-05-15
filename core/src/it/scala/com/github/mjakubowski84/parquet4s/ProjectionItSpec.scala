@@ -5,7 +5,7 @@ import org.apache.parquet.schema.MessageType
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import java.nio.file.{Files, Path}
+import java.nio.file.Files
 
 class ProjectionItSpec extends AnyFlatSpec with Matchers {
 
@@ -20,10 +20,10 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
   case class PartialNested(b: List[PartialElem])
   case class PartialComplex(nested: PartialNested)
 
-  val tempPath: Path = Files.createTempDirectory("example").toAbsolutePath
+  val tempPath: Path = Path(Files.createTempDirectory("example"))
 
   "Parquet reader with partial projection" should "read the subset of fields from written simple file" in {
-    val filePath = tempPath.resolve("simple.parquet").toString
+    val filePath = tempPath.append("simple.parquet")
     val in = List(
       Full(a = "x", b = 1, c = 1.0),
       Full(a = "y", b = 2, c = 1.1),
@@ -43,7 +43,7 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "read the subset of fields from written complex file" in {
-    val filePath = tempPath.resolve("complex.parquet").toString
+    val filePath = tempPath.append("complex.parquet")
     val in = List(
       FullComplex(
         a      = "A",
