@@ -4,7 +4,6 @@ import cats.effect.{Resource, Sync}
 import cats.implicits._
 import com.github.mjakubowski84.parquet4s._
 import fs2.Stream
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.apache.parquet.schema.MessageType
@@ -35,12 +34,12 @@ object reader {
      */
     def projection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[F, T]
     /**
-     * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
+     * @param path [[Path]] to Parquet files, e.g.: {{{ Path("file:///data/users") }}}
      * @param decoder decodes [[RowParquetRecord]] to your data type
      * @param F [[cats.effect.Sync!]] monad
      * @return final [[fs2.Stream!]]
      */
-    def read(path: String)
+    def read(path: Path)
             (implicit decoder: ParquetRecordDecoder[T], F: Sync[F]): Stream[F, T]
   }
 
@@ -57,7 +56,7 @@ object reader {
     override def projection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[F, T] =
       this.copy(schemaResolverOpt = Option(schemaResolver))
 
-    override def read(path: String)
+    override def read(path: Path)
                      (implicit decoder: ParquetRecordDecoder[T], F: Sync[F]): Stream[F, T] = {
       for {
         projectionSchemaOpt <- Stream.eval(schemaResolverOpt.traverse(implicit resolver => F.catchNonFatal(ParquetSchemaResolver.resolveSchema)))
@@ -66,14 +65,13 @@ object reader {
     }
   }
 
-  private[parquet4s] def read[F[_], T: ParquetRecordDecoder](path: String,
+  private[parquet4s] def read[F[_], T: ParquetRecordDecoder](basePath: Path,
                                                              options: ParquetReader.Options,
                                                              filter: Filter,
                                                              projectionSchemaOpt: Option[MessageType]
                                                             )(implicit F: Sync[F]): Stream[F, T] = {
 
     for {
-      basePath <- Stream.eval(io.makePath(path))
       vcc      <- Stream.eval(F.pure(options.toValueCodecConfiguration))
       decode = (record: RowParquetRecord) => F.catchNonFatal(ParquetRecordDecoder.decode(record, vcc))
       partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf)
@@ -103,7 +101,7 @@ object reader {
                                         ): Resource[F, HadoopParquetReader[RowParquetRecord]] =
     Resource.fromAutoCloseable(
       Sync[F].blocking(
-        HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(projectionSchemaOpt), path)
+        HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(projectionSchemaOpt), path.toHadoop)
           .withConf(options.hadoopConf)
           .withFilter(filter)
           .build()

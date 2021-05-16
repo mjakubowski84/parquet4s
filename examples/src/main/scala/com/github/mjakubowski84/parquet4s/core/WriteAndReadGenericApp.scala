@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.core
 
 import java.time.{LocalDate, ZoneOffset}
 import java.util.TimeZone
-import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, RowParquetRecord, ValueCodecConfiguration}
+import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path, RowParquetRecord, ValueCodecConfiguration}
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
 import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, OriginalType, Types}
@@ -16,7 +16,7 @@ object WriteAndReadGenericApp extends App {
   val Birthday = "birthday"
   val SchemaName = "user_schema"
 
-  val path = Files.createTempDirectory("example").toString
+  val path = Path(Files.createTempDirectory("example"))
   val vcc = ValueCodecConfiguration(TimeZone.getTimeZone(ZoneOffset.UTC))
 
   val users = List(
@@ -37,7 +37,7 @@ object WriteAndReadGenericApp extends App {
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
-  ParquetWriter.writeAndClose(s"$path/users.parquet", users)
+  ParquetWriter.writeAndClose(path.append("users.parquet"), users)
 
   //read
   val readData = ParquetReader.read[RowParquetRecord](path)
