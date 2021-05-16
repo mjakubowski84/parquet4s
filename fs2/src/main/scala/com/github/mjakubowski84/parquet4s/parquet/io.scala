@@ -1,8 +1,8 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.{Resource, Sync}
-import com.github.mjakubowski84.parquet4s.{ColumnPath, ParquetWriter, PartitionedDirectory, PartitionedPath}
-import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
+import com.github.mjakubowski84.parquet4s.{ColumnPath, ParquetWriter, PartitionedDirectory, PartitionedPath, Path}
+import org.apache.hadoop.fs.{FileStatus, FileSystem}
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
 import cats.implicits._
@@ -27,21 +27,19 @@ private[parquet] object io {
 
   private val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9._]+)""".r
 
-  def makePath[F[_]](path: String)(implicit F: Sync[F]): F[Path] = F.catchNonFatal(new Path(path))
-
   def validateWritePath[F[_]](path: Path,
                               writeOptions: ParquetWriter.Options,
                               logger: Logger[F]
                              )(implicit F: Sync[F]): F[Unit] = {
     Resource
-      .fromAutoCloseable(F.blocking(path.getFileSystem(writeOptions.hadoopConf)))
+      .fromAutoCloseable(F.blocking(path.toHadoop.getFileSystem(writeOptions.hadoopConf)))
       .use { fs =>
-        F.blocking(fs.exists(path)).flatMap {
+        F.blocking(fs.exists(path.toHadoop)).flatMap {
           case true if writeOptions.writeMode == ParquetFileWriter.Mode.CREATE =>
             F.raiseError(new AlreadyExistsException(s"File or directory already exists: $path"))
           case true =>
             logger.debug(s"Deleting $path in order to override with new data.") >>
-              F.blocking(fs.delete(path, true)).void
+              F.blocking(fs.delete(path.toHadoop, true)).void
           case false =>
             F.unit
         }
@@ -51,7 +49,7 @@ private[parquet] object io {
   def findPartitionedPaths[F[_]](path: Path,
                                  configuration: Configuration)
                                 (implicit F: Sync[F]): Stream[F, PartitionedDirectory] =
-    Stream.resource(Resource.fromAutoCloseable(F.blocking(path.getFileSystem(configuration))))
+    Stream.resource(Resource.fromAutoCloseable(F.blocking(path.toHadoop.getFileSystem(configuration))))
       .flatMap(fs => findPartitionedPaths(fs, path, List.empty))
       .fold[Either[Seq[Path], Seq[PartitionedPath]]](Right(Vector.empty)) {
         case (Left(invalidPaths), Left(moreInvalidPaths)) =>
@@ -73,7 +71,7 @@ private[parquet] object io {
                                          path: Path,
                                          partitions: List[Partition]
                                         )(implicit F: Sync[F]): Stream[F, Either[Seq[Path], Seq[PartitionedPath]]] =
-    Stream.evalSeq(F.blocking(fs.listStatus(path).toVector))
+    Stream.evalSeq(F.blocking(fs.listStatus(path.toHadoop).toVector))
       .fold[StatusAccumulator](Empty) {
         case (Empty, status) if status.isDirectory =>
           matchPartition(status).fold[StatusAccumulator](Empty)(Dirs.apply)
@@ -101,8 +99,8 @@ private[parquet] object io {
       .handleErrorWith(_ => Stream.emit(Left(Vector(path)))) // mixture of dirs and files
 
   private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
-    val path = fileStatus.getPath
-    path.getName match {
+    val path = Path(fileStatus.getPath)
+    path.name match {
       case PartitionRegexp(name, value) => Some(path, (ColumnPath(name), value))
       case _                            => None
     }

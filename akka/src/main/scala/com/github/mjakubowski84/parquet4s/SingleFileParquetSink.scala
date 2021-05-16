@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import akka.Done
 import akka.stream.scaladsl.{Flow, Keep, Sink}
-import org.apache.hadoop.fs.Path
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.Future

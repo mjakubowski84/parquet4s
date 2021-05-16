@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.apache.parquet.schema.MessageType
 
@@ -20,12 +19,12 @@ trait ParquetReader[T] {
 
   /**
     * Reads data from give path.
-    * @param path URI to location of files
+    * @param path [[Path]] to Parquet files
     * @param options configuration of how Parquet files should be read
     * @param filter optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
     * @return iterable collection of data read from path
     */
-  def read(path: String,
+  def read(path: Path,
            options: ParquetReader.Options = ParquetReader.Options(),
            filter: Filter = Filter.noopFilter
           ): ParquetIterable[T]
@@ -47,21 +46,20 @@ object ParquetReader {
   }
 
   private def newParquetIterable[T : ParquetRecordDecoder](
-                                                            path: String,
+                                                            path: Path,
                                                             options: Options,
                                                             filter: Filter,
                                                             projectedSchemaOpt: Option[MessageType]
                                                           ): ParquetIterable[T] = {
     val valueCodecConfiguration = options.toValueCodecConfiguration
-    val hadoopPath = new Path(path)
     newParquetIterable(
       builder = HadoopParquetReader
-        .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), hadoopPath)
+        .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), path.toHadoop)
         .withConf(options.hadoopConf)
         .withFilter(filter.toFilterCompat(valueCodecConfiguration))
       ,
       valueCodecConfiguration = valueCodecConfiguration,
-      stats = Stats(hadoopPath, options, projectedSchemaOpt, filter)
+      stats = Stats(path, options, projectedSchemaOpt, filter)
     )
   }
 
@@ -80,14 +78,14 @@ object ParquetReader {
     *
     * @note Remember to call `close()` on iterable in order to free resources!
     *
-    * @param path URI to Parquet files, e.g.:
-    *             {{{ "file:///data/users" }}}
+    * @param path [[Path]] to Parquet files, e.g.:
+    *             {{{ Path("file:///data/users") }}}
     * @param options configuration of how Parquet files should be read
     * @param filter optional before-read filtering; no filtering is applied by default; check [[Filter]] for more details
     * @tparam T type of data that represents the schema of the Parquet file, e.g.:
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     */
-  def read[T](path: String, options: Options = Options(), filter: Filter = Filter.noopFilter)
+  def read[T](path: Path, options: Options = Options(), filter: Filter = Filter.noopFilter)
              (implicit reader: ParquetReader[T]): ParquetIterable[T] =
     reader.read(path, options, filter)
 
@@ -95,12 +93,12 @@ object ParquetReader {
     * Default implementation of [[ParquetReader]].
     */
   implicit def reader[T : ParquetRecordDecoder]: ParquetReader[T] = new ParquetReader[T] {
-    override def read(path: String, options: Options, filter: Filter): ParquetIterable[T] =
+    override def read(path: Path, options: Options, filter: Filter): ParquetIterable[T] =
       newParquetIterable(path = path, options = options, filter = filter, projectedSchemaOpt = None)
   }
 
   def withProjection[T : ParquetRecordDecoder: ParquetSchemaResolver]: ParquetReader[T] = new ParquetReader[T] {
-    override def read(path: String, options: Options, filter: Filter): ParquetIterable[T] =
+    override def read(path: Path, options: Options, filter: Filter): ParquetIterable[T] =
       newParquetIterable(
         path = path,
         options = options,
