@@ -18,8 +18,8 @@ class ParquetWriterAndParquetReaderCompatibilityItSpec extends
 
   private def runTestCase(testCase: CaseDef): Unit = {
     testCase.description in {
-      ParquetWriter.writeAndClose(tempPathString, testCase.data)(testCase.writerFactory)
-      val parquetIterable = ParquetReader.read(tempPathString)(testCase.reader)
+      ParquetWriter.writeAndClose(tempPath, testCase.data)(testCase.writerFactory)
+      val parquetIterable = ParquetReader.read(tempPath)(testCase.reader)
       try {
         parquetIterable should contain theSameElementsAs testCase.data
       } finally {
