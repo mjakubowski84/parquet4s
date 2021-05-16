@@ -5,7 +5,6 @@ import java.util.concurrent.TimeUnit
 import akka.stream.stage._
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow._
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.parquet.schema.MessageType
 import org.slf4j.LoggerFactory
@@ -173,7 +172,7 @@ private class ParquetPartitioningFlow[T, W](
       partitionBy.foldLeft(basePath) {
         (path, partitionPath) =>
           record.remove(partitionPath) match {
-            case Some(BinaryValue(binary)) => new Path(path, s"$partitionPath=${binary.toStringUsingUTF8}")
+            case Some(BinaryValue(binary)) => Path(path, s"$partitionPath=${binary.toStringUsingUTF8}")
             case None => throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
             case Some(NullValue) => throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
             case _ => throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
@@ -190,7 +189,7 @@ private class ParquetPartitioningFlow[T, W](
         case None =>
           if (logger.isDebugEnabled()) logger.debug(s"Creating writer to write to: " + writerPath)
           val writer = ParquetWriter.internalWriter(
-            path = new Path(writerPath, newFileName),
+            path = Path(writerPath, newFileName),
             schema = schema,
             options = writeOptions
           )
