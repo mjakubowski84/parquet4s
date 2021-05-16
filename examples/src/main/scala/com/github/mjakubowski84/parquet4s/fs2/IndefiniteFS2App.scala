@@ -3,7 +3,7 @@ package com.github.mjakubowski84.parquet4s.fs2
 import cats.data.State
 import cats.effect.{IO, IOApp}
 import com.github.mjakubowski84.parquet4s.parquet.viaParquet
-import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter}
+import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, Path}
 import fs2.io.file.Files
 import fs2.kafka._
 import fs2.{INothing, Pipe, Stream}
@@ -74,7 +74,7 @@ object IndefiniteFS2App extends IOApp.Simple {
         .withGroupId("group")
       _ <- Stream(
         producer(producerSettings),
-        consumer(consumerSettings, writePath.toString)
+        consumer(consumerSettings, Path(writePath))
       ).parJoin(maxOpen = 2)
     } yield ()
 
@@ -91,7 +91,7 @@ object IndefiniteFS2App extends IOApp.Simple {
       .drain
 
   private def consumer(consumerSettings: ConsumerSettings[IO, String, String],
-                       writePath: String): Stream[IO, INothing] =
+                       writePath: Path): Stream[IO, INothing] =
     KafkaConsumer[IO]
       .stream(consumerSettings)
       .evalTap(_.subscribeTo(Topic))
@@ -101,7 +101,7 @@ object IndefiniteFS2App extends IOApp.Simple {
       .through(commitBatchWithin(MaxNumberOfRecordPerFile, MaxDurationOfFileWrite))
       .drain
 
-  private def write(path: String): Pipe[IO, KafkaRecord, KafkaRecord] =
+  private def write(path: Path): Pipe[IO, KafkaRecord, KafkaRecord] =
     viaParquet[IO, KafkaRecord]
       .options(WriterOptions)
       .maxCount(MaxNumberOfRecordPerFile)

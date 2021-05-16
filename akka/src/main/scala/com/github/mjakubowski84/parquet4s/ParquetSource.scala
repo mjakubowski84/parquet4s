@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
 import org.apache.parquet.schema.MessageType
@@ -29,11 +28,11 @@ object ParquetSource extends IOOps {
      */
     def withProjection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[T]
     /**
-     * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
+     * @param path [[Path]] to Parquet files, e.g.: {{{ "file:///data/users" }}}
      * @param decoder decodes [[RowParquetRecord]] to your data type
      * @return final [[akka.stream.scaladsl.Source]]
      */
-    def read(path: String)(implicit decoder: ParquetRecordDecoder[T]): Source[T, NotUsed]
+    def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): Source[T, NotUsed]
   }
 
   private case class BuilderImpl[T](
@@ -50,8 +49,8 @@ object ParquetSource extends IOOps {
     override def withProjection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[T] =
       this.copy(projectedSchemaOpt = Option(ParquetSchemaResolver.resolveSchema[T]))
 
-    override def read(path: String)(implicit decoder: ParquetRecordDecoder[T]): Source[T, NotUsed] =
-      ParquetSource.apply(new Path(path), options, filter, projectedSchemaOpt)
+    override def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): Source[T, NotUsed] =
+      ParquetSource.apply(path, options, filter, projectedSchemaOpt)
 
   }
 
@@ -110,7 +109,9 @@ object ParquetSource extends IOOps {
                            partitionedPath: PartitionedPath,
                            projectedSchemaOpt: Option[MessageType]
                           ): HadoopParquetReader[RowParquetRecord] =
-    HadoopParquetReader.builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), partitionedPath.path)
+    HadoopParquetReader.builder[RowParquetRecord](
+      new ParquetReadSupport(projectedSchemaOpt), partitionedPath.path.toHadoop
+    )
       .withConf(hadoopConf)
       .withFilter(filterCompat)
       .build()

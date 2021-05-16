@@ -31,9 +31,9 @@ class TimeEncodingCompatibilityItSpec extends
   private def writeWithSpark(data: TimePrimitives): Unit = writeToTemp(Seq(data))
   private def readWithSpark: TimePrimitives = readFromTemp[TimePrimitives].head
   private def writeWithParquet4S(data: TimePrimitives, timeZone: TimeZone): Unit =
-    ParquetWriter.writeAndClose(tempPathString, Seq(data), ParquetWriter.Options(timeZone = timeZone))
+    ParquetWriter.writeAndClose(tempPath, Seq(data), ParquetWriter.Options(timeZone = timeZone))
   private def readWithParquet4S(timeZone: TimeZone): TimePrimitives = {
-    val parquetIterable = ParquetReader.read[TimePrimitives](tempPathString, ParquetReader.Options(timeZone = timeZone))
+    val parquetIterable = ParquetReader.read[TimePrimitives](tempPath, ParquetReader.Options(timeZone = timeZone))
     try {
       parquetIterable.head
     } finally {

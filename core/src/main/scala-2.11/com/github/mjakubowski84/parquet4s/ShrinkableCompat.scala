@@ -7,7 +7,7 @@ trait ShrinkableCompat {
   /** Removes a single entry from this map.
    *
    *  @param key  the key of the entry to remove.
-   *  @return the MapParquetRecord itself
+   *  @return the [[MapParquetRecord]] itself
    */
   override def -=(key: Value): This = {
     entries -= key
@@ -17,7 +17,7 @@ trait ShrinkableCompat {
   /** ${Add}s a single element to this map.
    *
    *  @param elem  the element to $add.
-   *  @return the MapParquetRecord itself
+   *  @return the [[MapParquetRecord]] itself
    */
   override def +=(elem: (Value, Value)): This = {
     entries += elem

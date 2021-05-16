@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import java.io.Closeable
 import java.util.TimeZone
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.api.WriteSupport
 import org.apache.parquet.hadoop.api.WriteSupport.WriteContext
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
@@ -45,11 +44,12 @@ object ParquetWriter  {
   @implicitNotFound("Cannot write data of type ${T}. " +
       "Please check if there are implicit ValueCodec and TypedSchemaDef available for each field and subfield of ${T}."
   )
-  type ParquetWriterFactory[T] = (String, Options) => ParquetWriter[T]
+  type ParquetWriterFactory[T] = (Path, Options) => ParquetWriter[T]
 
   private val SignatureMetadata = Map("MadeBy" -> "https://github.com/mjakubowski84/parquet4s")
 
-  private class Builder(path: Path, schema: MessageType) extends HadoopParquetWriter.Builder[RowParquetRecord, Builder](path) {
+  private class Builder(path: Path, schema: MessageType)
+      extends HadoopParquetWriter.Builder[RowParquetRecord, Builder](path.toHadoop) {
     private val logger = LoggerFactory.getLogger(ParquetWriter.this.getClass)
 
     if (logger.isDebugEnabled) {
@@ -103,20 +103,20 @@ object ParquetWriter  {
     * Path can represent local file or directory, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     *
-    * @param path URI where the data will be written to
+    * @param path [[Path]] where the data will be written to
     * @param data Collection of <i>T</> that will be written in Parquet file format
     * @param options configuration of writer, see [[ParquetWriter.Options]]
     * @param writerFactory [[ParquetWriterFactory]] that will be used to create an instance of writer
     * @tparam T type of data, will be used also to resolve the schema of Parquet files
     */
-  def writeAndClose[T](path: String, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options())
+  def writeAndClose[T](path: Path, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options())
                       (implicit writerFactory: ParquetWriterFactory[T]): Unit = {
     val writer = writerFactory(path, options)
     try writer.write(data)
     finally writer.close()
   }
 
-  def writer[T](path: String, options: ParquetWriter.Options = ParquetWriter.Options())
+  def writer[T](path: Path, options: ParquetWriter.Options = ParquetWriter.Options())
                (implicit writerFactory: ParquetWriterFactory[T]): ParquetWriter[T] =
     writerFactory(path, options)
 
@@ -130,11 +130,11 @@ object ParquetWriter  {
 }
 
 private class DefaultParquetWriter[T : ParquetRecordEncoder : ParquetSchemaResolver](
-                                                                                      path: String,
+                                                                                      path: Path,
                                                                                       options: ParquetWriter.Options
                                                                                     ) extends ParquetWriter[T] {
   private val internalWriter = ParquetWriter.internalWriter(
-    path = new Path(path),
+    path = path,
     schema = ParquetSchemaResolver.resolveSchema[T],
     options = options
   )

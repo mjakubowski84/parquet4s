@@ -35,14 +35,14 @@ package object parquet {
    * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
    * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
    *
-   * @param path URI to Parquet files, e.g.: {{{ "file:///data/users/users-2019-01-01.parquet" }}}
+   * @param path [[Path]] to Parquet files, e.g.: {{{ Path("file:///data/users/users-2019-01-01.parquet") }}}
    * @param options set of options that define how Parquet files will be created
    * @tparam F effect type
    * @tparam T type of data that represent the schema of the Parquet data, e.g.:
    *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
    * @return The pipe that writes Parquet file
    */
-  def writeSingleFile[F[_]: Sync, T : ParquetRecordEncoder : ParquetSchemaResolver](path: String,
+  def writeSingleFile[F[_]: Sync, T : ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
                                                                                     options: ParquetWriter.Options = ParquetWriter.Options()
                                                                                    ): Pipe[F, T, fs2.INothing] =
     writer.write(path, options)

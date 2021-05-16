@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import akka.Done
 import akka.stream.scaladsl.Sink
-import org.apache.hadoop.fs.Path
 
 import scala.concurrent.Future
 
@@ -39,16 +38,16 @@ object ParquetStreams {
     * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
     * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
     *
-    * @param path URI to Parquet files, e.g.: {{{ "file:///data/users/users-2019-01-01.parquet" }}}
+    * @param path [[Path]] to Parquet files, e.g.: {{{ "file:///data/users/users-2019-01-01.parquet" }}}
     * @param options set of options that define how Parquet files will be created
     * @tparam T type of data that represent the schema of the Parquet data, e.g.:
     *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
     * @return The sink that writes Parquet file
     */
-  def toParquetSingleFile[T : ParquetRecordEncoder : ParquetSchemaResolver](path: String,
+  def toParquetSingleFile[T : ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
                                                                             options: ParquetWriter.Options = ParquetWriter.Options()
                                                                            ): Sink[T, Future[Done]] =
-    SingleFileParquetSink(new Path(path), options)
+    SingleFileParquetSink(path, options)
 
   /**
    * Builds a flow that:
@@ -58,10 +57,10 @@ object ParquetStreams {
    *   <li>Flushes and rotates files after given number of rows is written or given time period elapses</li>
    *   <li>Outputs incoming message after it is written but can write an effect of provided message transformation.</li>
    * </ol>
-   * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
+   * @param path [[Path]] to Parquet files, e.g.: {{{ Path("file:///data/users") }}}
    * @tparam T type of message that flow is meant to accept
    * @return Builder of the flow.
    */
-  def viaParquet[T](path: String): ParquetPartitioningFlow.Builder[T, T] =
-    ParquetPartitioningFlow.builder(new Path(path))
+  def viaParquet[T](path: Path): ParquetPartitioningFlow.Builder[T, T] =
+    ParquetPartitioningFlow.builder(path)
 }

@@ -6,7 +6,6 @@ import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
 import com.github.mjakubowski84.parquet4s.PartitionFilterRewriter.AssumeTrue
 import com.github.mjakubowski84.parquet4s.PartitionFilterSpec.IsUppercase
 import org.apache.commons.lang3.StringUtils
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.compat.FilterCompat.FilterPredicateCompat
 import org.apache.parquet.filter2.predicate.FilterApi.{and => AND, eq => EQ, gt => GT, gtEq => GTE, lt => LT, ltEq => LTE, not => NOT, notEq => NEQ, or => OR, userDefined => UDP, _}
@@ -48,7 +47,7 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration(TimeZone.getDefault)
 
   def partitionedPath(partitions: (ColumnPath, String)*): PartitionedPath =
-    PartitionedPath(new Path("/"), partitions .toList)
+    PartitionedPath(Path("/"), partitions.toList)
 
   def partitionedDirectory(partitionedPaths: PartitionedPath*): PartitionedDirectory =
     PartitionedDirectory(partitionedPaths).value

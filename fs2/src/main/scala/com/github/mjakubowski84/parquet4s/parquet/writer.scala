@@ -2,9 +2,8 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.{Resource, Sync}
 import cats.implicits._
-import com.github.mjakubowski84.parquet4s.{ParquetRecordEncoder, ParquetSchemaResolver, ParquetWriter, RowParquetRecord}
+import com.github.mjakubowski84.parquet4s.{ParquetRecordEncoder, ParquetSchemaResolver, ParquetWriter, Path, RowParquetRecord}
 import fs2.{Chunk, Pipe, Pull, Stream}
-import org.apache.hadoop.fs.Path
 
 import scala.language.higherKinds
 
@@ -35,15 +34,14 @@ private[parquet4s] object writer {
     override def close(): Unit = internalWriter.close()
   }
 
-  def write[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: Sync](path: String,
+  def write[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: Sync](path: Path,
                                                                           options: ParquetWriter.Options
                                                                          ): Pipe[F, T, fs2.INothing] =
     in =>
       for {
-        hadoopPath <- Stream.eval(io.makePath(path))
         logger <- Stream.eval(logger(getClass))
-        _ <- Stream.eval(io.validateWritePath(hadoopPath, options, logger))
-        writer <- Stream.resource(writerResource[T, F](hadoopPath, options))
+        _ <- Stream.eval(io.validateWritePath(path, options, logger))
+        writer <- Stream.resource(writerResource[T, F](path, options))
         nothing <- writer.writeAllStream(in)
       } yield nothing
 

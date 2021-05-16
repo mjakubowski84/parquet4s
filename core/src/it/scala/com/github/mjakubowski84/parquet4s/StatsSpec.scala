@@ -29,7 +29,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   val enum: Seq[String] = List("a", "b", "c", "d")
   val dataSize: Int = 256 * 256
   val halfSize: Int = dataSize / 2
-  val path: String = Files.createTempDirectory("example").toString
+  val path: Path = Path(Files.createTempDirectory("example"))
   val zeroDate: LocalDate = LocalDate.of(1900, 1, 1)
   def decimal(i: Int): BigDecimal = BigDecimal.valueOf(0.001 * (i - halfSize))
 
@@ -68,13 +68,13 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
       .sliding(window, window)
       .zipWithIndex
       .foreach { case (part, index) =>
-        ParquetWriter.writeAndClose(s"$path/$index.parquet", part, writeOptions)
+        ParquetWriter.writeAndClose(path.append(s"$index.parquet"), part, writeOptions)
       }
 
   }
 
   "recordCount" should "be valid for a single file" in {
-    Stats(s"$path/0.parquet").recordCount should be(dataSize / 4)
+    Stats(path.append("0.parquet")).recordCount should be(dataSize / 4)
   }
 
   it should "be valid for a whole dataset" in {
@@ -94,7 +94,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   }
 
   "min & max" should "should provide proper value for a single file" in {
-    val stats = Stats(s"$path/0.parquet")
+    val stats = Stats(path.append("0.parquet"))
     stats.min[Int](Col("idx")) should be(Some(0))
     stats.max[Int](Col("idx")) should be(Some((dataSize / 4) - 1))
   }
@@ -102,7 +102,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   it should "should provide proper value for a single file when filtering" in {
     val expectedMin = 16
     val expectedMax = 128
-    val stats = Stats(s"$path/0.parquet", filter = Col("idx") >= expectedMin && Col("idx") <= expectedMax)
+    val stats = Stats(path.append("0.parquet"), filter = Col("idx") >= expectedMin && Col("idx") <= expectedMax)
     stats.min[Int](Col("idx")) should be(Some(expectedMin))
     stats.max[Int](Col("idx")) should be(Some(expectedMax))
   }

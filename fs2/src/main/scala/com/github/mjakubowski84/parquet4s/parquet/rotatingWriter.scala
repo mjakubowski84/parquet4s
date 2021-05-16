@@ -5,7 +5,6 @@ import cats.implicits._
 import com.github.mjakubowski84.parquet4s._
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import fs2.{Pipe, Pull, Stream}
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.parquet.schema.MessageType
 
@@ -90,10 +89,10 @@ object rotatingWriter {
     /**
      * Builds final writer pipe.
      */
-    def write(basePath: String)(implicit
-                                schemaResolver: ParquetSchemaResolver[W],
-                                encoder: ParquetRecordEncoder[W],
-                                async: Async[F]): Pipe[F, T, T]
+    def write(basePath: Path)(implicit
+                              schemaResolver: ParquetSchemaResolver[W],
+                              encoder: ParquetRecordEncoder[W],
+                              async: Async[F]): Pipe[F, T, T]
   }
 
   private case class BuilderImpl[F[_], T, W](
@@ -120,10 +119,10 @@ object rotatingWriter {
       )
     override def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): Builder[F, T, W] =
       copy(postWriteHandlerOpt = Option(postWriteHandler))
-    override def write(basePath: String)(implicit
-                                         schemaResolver: ParquetSchemaResolver[W],
-                                         encoder: ParquetRecordEncoder[W],
-                                         async: Async[F]): Pipe[F, T, T] =
+    override def write(basePath: Path)(implicit
+                                       schemaResolver: ParquetSchemaResolver[W],
+                                       encoder: ParquetRecordEncoder[W],
+                                       async: Async[F]): Pipe[F, T, T] =
       rotatingWriter.write[F, T, W](
         basePath, maxCount, maxDuration, partitionBy, preWriteTransformation, postWriteHandlerOpt, writeOptions
       )
@@ -179,14 +178,14 @@ object rotatingWriter {
       UUID.randomUUID().toString + compressionExtension + ".parquet"
     }
 
-    private def getOrCreateWriter(path: Path, writers: Writers): F[(RecordWriter[F], Writers)] =
-      writers.get(path) match {
+    private def getOrCreateWriter(basePath: Path, writers: Writers): F[(RecordWriter[F], Writers)] =
+      writers.get(basePath) match {
         case Some(writer) =>
           F.pure(writer -> writers)
         case None =>
           for {
-            writer <- RecordWriter(new Path(path, newFileName), schema, options)
-            updatedWriters = writers.updated(path, writer)
+            writer <- RecordWriter(basePath.append(newFileName), schema, options)
+            updatedWriters = writers.updated(basePath, writer)
             _ <- writersRef.set(updatedWriters)
           } yield writer -> updatedWriters
       }
@@ -196,7 +195,7 @@ object rotatingWriter {
         record <- encode(entity)
         path <- partitionBy.traverse(partition(record)).map {
           partitions => partitions.foldLeft(basePath) {
-            case (path, (partitionName, partitionValue)) => new Path(path, s"$partitionName=$partitionValue")
+            case (path, (partitionName, partitionValue)) => path.append(s"$partitionName=$partitionValue")
           }
         }
         getResult <- getOrCreateWriter(path, writers)
@@ -268,7 +267,7 @@ object rotatingWriter {
   private[parquet4s] def write[
     F[_],
     T,
-    W: ParquetRecordEncoder : ParquetSchemaResolver](path: String,
+    W: ParquetRecordEncoder : ParquetSchemaResolver](basePath: Path,
                                                      maxCount: Long,
                                                      maxDuration: FiniteDuration,
                                                      partitionBy: Seq[ColumnPath],
@@ -278,14 +277,13 @@ object rotatingWriter {
                                                     )(implicit F: Async[F]): Pipe[F, T, T] =
     in =>
       for {
-        hadoopPath <- Stream.eval(io.makePath(path))
         schema <- Stream.eval(F.catchNonFatal(ParquetSchemaResolver.resolveSchema[W](partitionBy)))
         valueCodecConfiguration <- Stream.eval(F.catchNonFatal(options.toValueCodecConfiguration))
         encode = { (entity: W) => F.catchNonFatal(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
         logger <- Stream.eval(logger[F](this.getClass))
         rotatingWriter <- Stream.emit(
           new RotatingWriter[T, W, F](
-            basePath = hadoopPath,
+            basePath = basePath,
             options = options,
             writersRef = Ref.unsafe(Map.empty),
             maxCount = maxCount,

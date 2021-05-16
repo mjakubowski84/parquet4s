@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import java.nio.file.Files
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.Path
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.hadoop.{ParquetFileReader, ParquetFileWriter}
 import org.scalatest.{BeforeAndAfter, Entry}
@@ -24,36 +23,36 @@ class ParquetWriterItSpec
         Record(Random.nextInt(), Random.nextDouble(), Random.nextString(10)))
   }
 
-  private val tempDir = Files.createTempDirectory("example").toAbsolutePath
-  private val writePath = tempDir.resolve("file.parquet")
+  private val tempDir = Path(Files.createTempDirectory("example"))
+  private val writePath = tempDir.append("file.parquet")
 
   // Generate records and do a single batch write.
   private val records = Record.random(5000)
 
   private def readRecords: Seq[Record] = {
-    val iter = ParquetReader.read[Record](writePath.toString)
+    val iter = ParquetReader.read[Record](writePath)
     try iter.toSeq
     finally iter.close()
   }
 
   after { // Delete written files
-    Files.deleteIfExists(writePath)
+    Files.deleteIfExists(writePath.toNio)
   }
 
   "Batch write should result in proper number of records in the file" in {
-    ParquetWriter.writeAndClose(writePath.toString, records)
+    ParquetWriter.writeAndClose(writePath, records)
     readRecords should be(records)
   }
 
   "Multiple incremental writes produce same result as a single batch write" in {
-    val w = ParquetWriter.writer[Record](writePath.toString)
+    val w = ParquetWriter.writer[Record](writePath)
     try records.grouped(5).foreach(w.write)
     finally w.close()
     readRecords shouldBe records
   }
 
   "Writing record by record works as well" in {
-    val w = ParquetWriter.writer[Record](writePath.toString)
+    val w = ParquetWriter.writer[Record](writePath)
     try records.foreach(record => w.write(record))
     finally w.close()
     readRecords shouldBe records
@@ -61,7 +60,7 @@ class ParquetWriterItSpec
 
   "Incremental writes work with write mode OVERWRITE" in {
     val w = ParquetWriter.writer[Record](
-      writePath.toString,
+      writePath,
       ParquetWriter.Options(ParquetFileWriter.Mode.OVERWRITE))
     try records.grouped(5).foreach(w.write)
     finally w.close()
@@ -69,7 +68,7 @@ class ParquetWriterItSpec
   }
 
   "Writing to closed writer throws an exception" in {
-    val w = ParquetWriter.writer[Record](writePath.toString)
+    val w = ParquetWriter.writer[Record](writePath)
     w.close()
     an[IllegalStateException] should be thrownBy records
       .grouped(2)
@@ -77,20 +76,20 @@ class ParquetWriterItSpec
   }
 
   "Closing writer without writing anything to it throws no exception" in {
-    val w = ParquetWriter.writer[Record](writePath.toString)
+    val w = ParquetWriter.writer[Record](writePath)
     noException should be thrownBy w.close()
   }
 
   "Closing writer twice throws no exception" in {
-    val w = ParquetWriter.writer[Record](writePath.toString)
+    val w = ParquetWriter.writer[Record](writePath)
     noException should be thrownBy w.close()
     noException should be thrownBy w.close()
   }
 
   "ParquetWriter should add metadata with Parquet4S signature" in {
-    ParquetWriter.writeAndClose(writePath.toString, records)
+    ParquetWriter.writeAndClose(writePath, records)
     val meta = ParquetFileReader.open(
-      HadoopInputFile.fromPath(new Path(writePath.toString), new Configuration())
+      HadoopInputFile.fromPath(writePath.toHadoop, new Configuration())
     ).getFileMetaData.getKeyValueMetaData
     meta should contain (Entry("MadeBy", "https://github.com/mjakubowski84/parquet4s"))
   }

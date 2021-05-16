@@ -5,6 +5,7 @@ import scala.language.implicitConversions
 /**
   * Auxiliary conversions to write more concise code, e.g. when initializing [[RowParquetRecord]].
   */
+@deprecated("Use functions provided by API of RowParquetRecord")
 object ValueImplicits extends AllValueCodecs {
 
   implicit val valueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration.default

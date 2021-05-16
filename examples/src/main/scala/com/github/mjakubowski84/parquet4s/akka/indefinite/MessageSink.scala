@@ -7,8 +7,7 @@ import akka.kafka.scaladsl.Committer
 import akka.stream.FlowShape
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import akka.stream.stage.GraphStage
-import com.github.mjakubowski84.parquet4s.{Col, ParquetStreams, ParquetWriter}
-import org.apache.hadoop.fs.Path
+import com.github.mjakubowski84.parquet4s.{Col, ParquetStreams, ParquetWriter, Path}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
 import java.nio.file.Files
@@ -39,7 +38,7 @@ trait MessageSink {
   import MessageSink._
   import MessageSource._
 
-  protected val baseWritePath: String = new Path(Files.createTempDirectory("example").toString, WriteDirectoryName).toString
+  protected val baseWritePath: Path = Path(Files.createTempDirectory("example")).append(WriteDirectoryName)
 
   private val writerOptions = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
 
