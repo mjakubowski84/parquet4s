@@ -79,9 +79,11 @@ object reader {
       (partitionFilter, partitionedPath) = partitionData
       reader <- Stream.resource(readerResource(partitionedPath.path, options, partitionFilter, projectionSchemaOpt))
       entity <- readerStream(reader)
-        .evalTap { record =>
-          partitionedPath.partitions.traverse_ { case (columnPath, value) =>
-            F.catchNonFatal(record.add(columnPath, BinaryValue(value)))
+        .evalMap { record =>
+          partitionedPath.partitions.foldLeft(F.pure(record)) { case (f, (columnPath, value)) =>
+            f.flatMap { r =>
+              F.catchNonFatal(r.updated(columnPath, BinaryValue(value)))
+            }
           }
         }
         .evalMap(decode)

@@ -106,7 +106,7 @@ trait PrimitiveValueCodecs {
       value match {
         case BinaryValue(binary) => binary.toStringUsingUTF8
       }
-    override def encodeNonNull(data: String, configuration: ValueCodecConfiguration): Value = BinaryValue(Binary.fromString(data))
+    override def encodeNonNull(data: String, configuration: ValueCodecConfiguration): Value = BinaryValue(data)
   }
 
   implicit val charCodec: ValueCodec[Char] = new RequiredValueCodec[Char] {
@@ -327,9 +327,9 @@ trait ComplexValueCodecs {
 
     override def encodeNonNull(data: Col[T], configuration: ValueCodecConfiguration): Value =
       evidence(data)
-        .foldLeft(ListParquetRecord.empty) {
+        .foldLeft(ListParquetRecord.Empty) {
           case (record, element) =>
-            record.add(element, configuration)
+            record.appended(element, configuration)
         }
   }
 
@@ -352,9 +352,9 @@ trait ComplexValueCodecs {
         BinaryValue(data.asInstanceOf[Array[Byte]])
       else
         evidence(data)
-          .foldLeft(ListParquetRecord.empty) {
+          .foldLeft(ListParquetRecord.Empty) {
             case (record, element) =>
-              record.add(element, configuration)
+              record.appended(element, configuration)
           }
 
   }
@@ -380,16 +380,16 @@ trait ComplexValueCodecs {
     override def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Map[K, V] =
       value match {
         case mapParquetRecord: MapParquetRecord =>
-          mapParquetRecord.toMap.map { case (mapKey, mapValue) =>
+          mapParquetRecord.map { case (mapKey, mapValue) =>
             require(mapKey != NullValue, "Map cannot have null keys")
             kCodec.decode(mapKey, configuration) -> vCodec.decode(mapValue, configuration)
           }
       }
 
     override def encodeNonNull(data: Map[K, V], configuration: ValueCodecConfiguration): Value =
-      data.foldLeft(MapParquetRecord.empty) { case (record, (key, value)) =>
+      data.foldLeft(MapParquetRecord.Empty) { case (record, (key, value)) =>
         require(key != null, "Map cannot have null keys")
-        record.add(key, value, configuration)
+        record.updated(key, value, configuration)
       }
   }
 
