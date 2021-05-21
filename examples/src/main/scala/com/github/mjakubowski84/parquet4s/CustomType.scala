@@ -29,7 +29,7 @@ object CustomType {
         case BinaryValue(binary) => valueOf(binary.toStringUsingUTF8)
       }
       override protected def encodeNonNull(data: Type, configuration: ValueCodecConfiguration): Value =
-        BinaryValue(Binary.fromString(data.toString))
+        BinaryValue(data.toString)
     }
 
     // required for writing only

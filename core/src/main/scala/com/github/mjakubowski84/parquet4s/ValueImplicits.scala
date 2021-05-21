@@ -1,35 +1,55 @@
 package com.github.mjakubowski84.parquet4s
 
-import scala.language.implicitConversions
+import java.time.{LocalDate, LocalDateTime}
 
-/** Auxiliary conversions to write more concise code, e.g. when initializing [[RowParquetRecord]].
-  */
-@deprecated("Use functions provided by API of RowParquetRecord")
-object ValueImplicits extends AllValueCodecs {
-
-  implicit val valueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration.default
-
-  implicit def valueConversion[T](value: T)(implicit
-      valueCodec: ValueCodec[T],
-      configuration: ValueCodecConfiguration
-  ): Value = valueCodec.encode(value, configuration)
-
-  implicit def leftTupleConversion[A](tuple: (A, Value))(implicit
-      valueACodec: ValueCodec[A],
-      configuration: ValueCodecConfiguration
-  ): (Value, Value) =
-    (valueACodec.encode(tuple._1, configuration), tuple._2)
-  implicit def rightTupleConversion[B](tuple: (Value, B))(implicit
-      valueBCodec: ValueCodec[B],
-      configuration: ValueCodecConfiguration
-  ): (Value, Value) =
-    (tuple._1, valueBCodec.encode(tuple._2, configuration))
-
-  implicit def tupleConversion[A, B](tuple: (A, B))(implicit
-      valueACodec: ValueCodec[A],
-      valueBCodec: ValueCodec[B],
-      configuration: ValueCodecConfiguration
-  ): (Value, Value) =
-    (valueACodec.encode(tuple._1, configuration), valueBCodec.encode(tuple._2, configuration))
-
+/**
+ * Provides simple conversion methods for primitives.
+ */
+object ValueImplicits {
+  
+  import ValueCodecConfiguration._
+  
+  implicit class IntWrapper(v: Int)(implicit codec: ValueCodec[Int]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class LongWrapper(v: Long)(implicit codec: ValueCodec[Long]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class FloatWrapper(v: Float)(implicit codec: ValueCodec[Float]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class DoubleWrapper(v: Double)(implicit codec: ValueCodec[Double]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class ByteWrapper(v: Byte)(implicit codec: ValueCodec[Byte]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class ShortWrapper(v: Short)(implicit codec: ValueCodec[Short]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class BooleanWrapper(v: Boolean)(implicit codec: ValueCodec[Boolean]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class StringWrapper(v: String)(implicit codec: ValueCodec[String]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class CharWrapper(v: Char)(implicit codec: ValueCodec[Char]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class BigDecimalWrapper(v: BigDecimal)(implicit codec: ValueCodec[BigDecimal]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class LocalDateTimeWrapper(v: LocalDateTime)(implicit codec: ValueCodec[LocalDateTime]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class LocalDateWrapper(v: LocalDate)(implicit codec: ValueCodec[LocalDate]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class TimestampWrapper(v: java.sql.Timestamp)(implicit codec: ValueCodec[java.sql.Timestamp]) {
+    def value: Value = codec.encode(v, default)
+  }
+  implicit class DateWrapper(v: java.sql.Date)(implicit codec: ValueCodec[java.sql.Date]) {
+    def value: Value = codec.encode(v, default)
+  }
+  
 }

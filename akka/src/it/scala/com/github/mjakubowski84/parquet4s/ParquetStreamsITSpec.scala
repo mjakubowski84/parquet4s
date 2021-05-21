@@ -234,6 +234,7 @@ class ParquetStreamsITSpec
 
   it should "monitor written rows and flush on signal" in {
     case class User(name: String, id: Int, id_part: String)
+    case class UserNoPartition(name: String, id: Int)
 
     val maxCount = 10
     val usersToWrite = 33
@@ -266,7 +267,7 @@ class ParquetStreamsITSpec
       files = rootFiles.flatMap(p => fileSystem.listStatus(p).map(_.getPath).toSeq)
       readDataPartitioned <- Future.sequence( // generate the file lists in a partitioned form
         files.map(file =>
-          ParquetStreams.fromParquet[User].read(Path(file)).runWith(Sink.seq)
+          ParquetStreams.fromParquet[UserNoPartition].read(Path(file)).runWith(Sink.seq)
         ))
     } yield {
       every(files.map(_.getName)) should endWith(".snappy.parquet")
@@ -384,12 +385,12 @@ class ParquetStreamsITSpec
       .build()
 
     val genericUsers = Seq(
-      RowParquetRecord.empty
-          .add(Col("name"), "John")
-          .add(Col("address.street.name"), "Broad St")
-          .add(Col("address.street.more"), "12")
-          .add(Col("address.country"), "ABC")
-          .add(Col("address.postCode"), "123456")
+      RowParquetRecord.emptyWithSchema("name", "address")
+          .updated(Col("name"), "John".value)
+          .updated(Col("address.street.name"), "Broad St".value)
+          .updated(Col("address.street.more"), "12".value)
+          .updated(Col("address.country"), "ABC".value)
+          .updated(Col("address.postCode"), "123456".value)
     ).toList
 
     val expectedUsers = Seq(
