@@ -99,10 +99,9 @@ object ParquetSource extends IOOps {
         read = reader => Option(reader.read()),
         close = _.close()
       ).map { record =>
-        partitionedPath.partitions.foreach { case (columnPath, value) =>
-          record.add(columnPath, BinaryValue(value))
+        partitionedPath.partitions.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
+          currentRecord.updated(columnPath, BinaryValue(value))
         }
-        record
       }.map(decode)
   }
 

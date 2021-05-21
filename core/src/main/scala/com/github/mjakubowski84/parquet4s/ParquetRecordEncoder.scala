@@ -40,7 +40,8 @@ object ParquetRecordEncoder {
                (implicit ev: ParquetRecordEncoder[T]): RowParquetRecord = ev.encode(entity, configuration)
 
   implicit val nilEncoder: ParquetRecordEncoder[HNil] = new ParquetRecordEncoder[HNil] {
-    override def encode(nil: HNil, configuration: ValueCodecConfiguration): RowParquetRecord = RowParquetRecord()
+    override def encode(nil: HNil, configuration: ValueCodecConfiguration): RowParquetRecord =
+      RowParquetRecord.EmptyNoSchema
   }
 
   implicit def headValueEncoder[FieldName <: Symbol, Head, Tail <: HList](implicit
@@ -57,7 +58,7 @@ object ParquetRecordEncoder {
           case NonFatal(cause) =>
             throw EncodingException(s"Failed to encode field $fieldName: ${entity.head}, due to ${cause.getMessage}", cause)
         }
-        tailEncoder.encode(entity.tail, configuration).prepend(fieldName, fieldValue)
+        tailEncoder.encode(entity.tail, configuration).prepended(fieldName, fieldValue)
       }
     }
 

@@ -64,7 +64,7 @@ lazy val core = (project in file("core"))
 
       // tests
       "org.mockito" %% "mockito-scala-scalatest" % "1.16.37" % "test",
-      "org.scalatest" %% "scalatest" % "3.2.7" % "test,it",
+      "org.scalatest" %% "scalatest" % "3.2.9" % "test,it",
       "ch.qos.logback" % "logback-classic" % "1.2.3" % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
