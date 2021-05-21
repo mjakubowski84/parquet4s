@@ -37,9 +37,9 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
     val outRecords = ParquetReader.withProjection[RowParquetRecord].read(filePath)
 
     outRecords should contain theSameElementsAs List(
-      RowParquetRecord("b" -> 1),
-      RowParquetRecord("b" -> 2),
-      RowParquetRecord("b" -> 3)
+      RowParquetRecord("b" -> 1.value),
+      RowParquetRecord("b" -> 2.value),
+      RowParquetRecord("b" -> 3.value)
     )
   }
 
@@ -56,9 +56,9 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
 
     outRecords should contain theSameElementsAs List(
       RowParquetRecord("nested" -> RowParquetRecord("b" -> ListParquetRecord(
-        RowParquetRecord("x" -> 1),
-        RowParquetRecord("x" -> 2),
-        RowParquetRecord("x" -> 3)
+        RowParquetRecord("x" -> 1.value),
+        RowParquetRecord("x" -> 2.value),
+        RowParquetRecord("x" -> 3.value)
       )))
     )
   }

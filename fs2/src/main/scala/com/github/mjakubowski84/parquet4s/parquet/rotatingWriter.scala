@@ -193,21 +193,25 @@ object rotatingWriter {
     private def write(entity: W, writers: Writers): F[Writers] =
       for {
         record <- encode(entity)
-        path <- partitionBy.traverse(partition(record)).map {
-          partitions => partitions.foldLeft(basePath) {
-            case (path, (partitionName, partitionValue)) => path.append(s"$partitionName=$partitionValue")
-          }
+        partitioning <- partitionBy.foldLeft(F.pure(basePath -> record)) {
+          case (f, currentPartition) =>
+            f.flatMap { case (currentPath, currentRecord) =>
+              partition(currentRecord, currentPartition).map { case (partitionPath, partitionValue, modifiedRecord) =>
+                currentPath.append(s"$partitionPath=$partitionValue") -> modifiedRecord
+              }
+            }
         }
+        (path, partitionedRecord) = partitioning
         getResult <- getOrCreateWriter(path, writers)
         (writer, writers) = getResult
-        _ <- writer.write(record)
+        _ <- writer.write(partitionedRecord)
       } yield writers
 
-    private def partition(record: RowParquetRecord)(partitionPath: ColumnPath): F[(ColumnPath, String)] = {
-      record.remove(partitionPath) match {
-        case None => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' does not exist."))
-        case Some(NullValue) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' is null."))
-        case Some(BinaryValue(binary)) => F.catchNonFatal(partitionPath -> binary.toStringUsingUTF8)
+    private def partition(record: RowParquetRecord, partitionPath: ColumnPath): F[(ColumnPath, String, RowParquetRecord)] = {
+      record.removed(partitionPath) match {
+        case (None, _) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' does not exist."))
+        case (Some(NullValue), _) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' is null."))
+        case (Some(BinaryValue(binary)), modifiedRecord) => F.catchNonFatal((partitionPath, binary.toStringUsingUTF8, modifiedRecord))
         case _ => F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning."))
       }
     }
