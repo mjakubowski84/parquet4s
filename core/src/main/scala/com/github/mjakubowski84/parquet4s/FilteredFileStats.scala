@@ -85,7 +85,7 @@ private[parquet4s] class FilteredFileStats(
           case Some(record) => record.get(columnPath)
         }
         .collect {
-          case value if value != NullValue => codec.decode(value, vcc)
+          case Some(value) if value != NullValue => codec.decode(value, vcc)
         }
         .foldLeft(currentExtremeOpt) {
           case (None, v) => Some(v)

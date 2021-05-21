@@ -37,10 +37,10 @@ private[parquet4s] class ParquetRecordMaterializer(schema: MessageType) extends 
 
 }
 
-private abstract class ParquetRecordConverter[R <: ParquetRecord[_]](
+private abstract class ParquetRecordConverter[R <: ParquetRecord[_, R]](
                                                                      schema: GroupType,
                                                                      name: Option[String],
-                                                                     parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_]]]
+                                                                     parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_, _]]]
                                                                    ) extends GroupConverter {
 
   protected var record: R = _
@@ -76,51 +76,54 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord[_]](
 
   def getCurrentRecord: R = record
 
+  protected def update(name: String, value: Value): Unit =
+    this.record = this.record.add(name, value)
+
   override def end(): Unit = {
-    parent.foreach(_.getCurrentRecord.add(name.get, record))
+    parent.foreach(_.update(name.get, record))
   }
 
   private class ParquetPrimitiveConverter(name: String) extends PrimitiveConverter {
     override def addBinary(value: Binary): Unit = {
-      record.add(name, BinaryValue(value))
+      record = record.add(name, BinaryValue(value))
     }
 
     override def addBoolean(value: Boolean): Unit = {
-      record.add(name, BooleanValue(value))
+      record = record.add(name, BooleanValue(value))
     }
 
     override def addDouble(value: Double): Unit = {
-      record.add(name, DoubleValue(value))
+      record = record.add(name, DoubleValue(value))
     }
 
     override def addFloat(value: Float): Unit = {
-      record.add(name, FloatValue(value))
+      record = record.add(name, FloatValue(value))
     }
 
     override def addInt(value: Int): Unit = {
-      record.add(name, IntValue(value))
+      record = record.add(name, IntValue(value))
     }
 
     override def addLong(value: Long): Unit = {
-      record.add(name, LongValue(value))
+      record = record.add(name, LongValue(value))
     }
   }
 
   private class StringConverter(name: String) extends ParquetPrimitiveConverter(name) {
     override def addBinary(value: Binary): Unit = {
-      record.add(name, BinaryValue(value))
+      record = record.add(name, BinaryValue(value))
     }
   }
 
   private class ShortConverter(name: String) extends ParquetPrimitiveConverter(name) {
     override def addInt(value: Int): Unit = {
-      record.add(name, IntValue(value))
+      record = record.add(name, IntValue(value))
     }
   }
 
   private class ByteConverter(name: String) extends ParquetPrimitiveConverter(name) {
     override def addInt(value: Int): Unit = {
-      record.add(name, IntValue(value))
+      record = record.add(name, IntValue(value))
     }
   }
 
@@ -132,39 +135,46 @@ private abstract class ParquetRecordConverter[R <: ParquetRecord[_]](
       val rescaled =
         if (shouldRescale) Decimals.rescaleBinary(value, scale, mathContext)
         else value
-      record.add(name, BinaryValue(rescaled))
+      record = record.add(name, BinaryValue(rescaled))
     }
   }
 
 }
 
-private class RowParquetRecordConverter(schema: GroupType, name: Option[String], parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_]]])
+private class RowParquetRecordConverter(schema: GroupType, name: Option[String], parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_, _]]])
   extends ParquetRecordConverter[RowParquetRecord](schema, name, parent) {
+
+  /* Initial record has all fields (according to schema) set with NullValues.
+     During reading those nulls are replaced with a real value from a file.
+     Missing values stay null.
+     Thanks to that generic record preserves null representation for missing values.
+   */
+  private lazy val initial = RowParquetRecord.emptyWithSchema(schema.getFields.asScala.map(_.getName))
 
   def this(schema: GroupType) = {
     this(schema, None, None)
   }
 
   override def start(): Unit = {
-    record = RowParquetRecord()
+    record = initial
   }
   
 }
 
-private class ListParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter[_ <: ParquetRecord[_]])
+private class ListParquetRecordConverter[P <: ParquetRecord[_, P]](schema: GroupType, name: String, parent: ParquetRecordConverter[P])
   extends ParquetRecordConverter[ListParquetRecord](schema, Option(name), Option(parent)){
 
   override def start(): Unit = {
-    this.record = ListParquetRecord()
+    this.record = ListParquetRecord.Empty
   }
 
 }
 
-private class MapParquetRecordConverter(schema: GroupType, name: String, parent: ParquetRecordConverter[_ <: ParquetRecord[_]])
+private class MapParquetRecordConverter[P <: ParquetRecord[_, P]](schema: GroupType, name: String, parent: ParquetRecordConverter[P])
   extends ParquetRecordConverter[MapParquetRecord](schema, Option(name), Option(parent)) {
 
   override def start(): Unit = {
-    this.record = MapParquetRecord()
+    this.record = MapParquetRecord.Empty
   }
 
 }

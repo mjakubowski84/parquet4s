@@ -10,8 +10,7 @@ import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32,
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
 import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, Types}
 
-import java.time.{LocalDate, ZoneOffset}
-import java.util.TimeZone
+import java.time.LocalDate
 
 object WriteAndReadGenericFS2App extends IOApp.Simple {
 
@@ -28,17 +27,17 @@ object WriteAndReadGenericFS2App extends IOApp.Simple {
 
   private implicit val showRecords: Show[RowParquetRecord] = Show.fromToString
 
-  private val vcc = ValueCodecConfiguration(TimeZone.getTimeZone(ZoneOffset.UTC))
+  private val vcc = ValueCodecConfiguration.default
 
   private val users = List(
     (1L, "Alice", LocalDate.of(2000, 1, 1)),
     (2L, "Bob", LocalDate.of(1980, 2, 28)),
     (3L, "Cecilia", LocalDate.of(1977, 3, 15))
   ).map { case (id, name, birthday) =>
-    RowParquetRecord.empty
-      .add(ID, id, vcc)
-      .add(Name, name, vcc)
-      .add(Birthday, birthday, vcc)
+    RowParquetRecord.emptyWithSchema(ID, Name, Birthday)
+      .updated(ID, id, vcc)
+      .updated(Name, name, vcc)
+      .updated(Birthday, birthday, vcc)
   }
 
 

@@ -54,13 +54,18 @@ object ParquetRecordDecoder {
     new ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] {
       override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): FieldType[FieldName, Head] :: Tail = {
         val fieldName = witness.value.name
-        val decodedFieldValue = try {
+        val decodedFieldOpt = try {
           record.get[Head](fieldName, configuration)
         } catch {
           case NonFatal(cause) =>
             throw DecodingException(s"Failed to decode field $fieldName of record: $record", cause)
         }
-        field[FieldName](decodedFieldValue) :: tailDecoder.decode(record, configuration)
+        decodedFieldOpt match {
+          case Some(decodedFieldValue) =>
+            field[FieldName](decodedFieldValue) :: tailDecoder.decode(record, configuration)
+          case None => // TODO add test
+            throw DecodingException(s"Field $fieldName is not in schema of: $record")
+        }
       }
     }
 

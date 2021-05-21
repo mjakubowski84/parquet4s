@@ -1,13 +1,12 @@
 package com.github.mjakubowski84.parquet4s.core
 
-import java.time.{LocalDate, ZoneOffset}
-import java.util.TimeZone
-import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path, RowParquetRecord, ValueCodecConfiguration}
+import com.github.mjakubowski84.parquet4s._
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
-import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, OriginalType, Types}
+import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, Types}
 
 import java.nio.file.Files
+import java.time.LocalDate
 
 object WriteAndReadGenericApp extends App {
 
@@ -17,17 +16,17 @@ object WriteAndReadGenericApp extends App {
   val SchemaName = "user_schema"
 
   val path = Path(Files.createTempDirectory("example"))
-  val vcc = ValueCodecConfiguration(TimeZone.getTimeZone(ZoneOffset.UTC))
+  val vcc = ValueCodecConfiguration.default
 
   val users = List(
     (1L, "Alice", LocalDate.of(2000, 1, 1)),
     (2L, "Bob", LocalDate.of(1980, 2, 28)),
     (3L, "Cecilia", LocalDate.of(1977, 3, 15))
   ).map { case (id, name, birthday) =>
-    RowParquetRecord.empty
-      .add(ID, id, vcc)
-      .add(Name, name, vcc)
-      .add(Birthday, birthday, vcc)
+    RowParquetRecord.emptyWithSchema(ID, Name, Birthday)
+      .updated(ID, id, vcc)
+      .updated(Name, name, vcc)
+      .updated(Birthday, birthday, vcc)
   }
 
   // write

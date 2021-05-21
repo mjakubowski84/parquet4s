@@ -11,7 +11,7 @@ object ParquetIterableSpec {
 
   case class TestRow(int: Int)
 
-  def testRecord(int: Int): RowParquetRecord = RowParquetRecord("int" -> int)
+  def testRecord(int: Int): RowParquetRecord = RowParquetRecord("int" -> int.value)
 
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration.default
 }

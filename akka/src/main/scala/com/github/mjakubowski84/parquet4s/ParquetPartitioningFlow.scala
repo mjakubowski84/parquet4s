@@ -169,21 +169,25 @@ private class ParquetPartitioningFlow[T, W](
     private def compressionExtension: String = writeOptions.compressionCodecName.getExtension
     private def newFileName: String = UUID.randomUUID().toString + compressionExtension + ".parquet"
 
-    private def partition(record: RowParquetRecord): Path =
-      partitionBy.foldLeft(basePath) {
-        (path, partitionPath) =>
-          record.remove(partitionPath) match {
-            case Some(BinaryValue(binary)) => Path(path, s"$partitionPath=${binary.toStringUsingUTF8}")
-            case None => throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
-            case Some(NullValue) => throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
-            case _ => throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
+    private def partition(record: RowParquetRecord): (Path, RowParquetRecord) =
+      partitionBy.foldLeft(basePath -> record) {
+        case ((currentPath, currentRecord), partitionPath) =>
+          currentRecord.removed(partitionPath) match {
+            case (Some(BinaryValue(binary)), modifiedRecord) =>
+              Path(currentPath, s"$partitionPath=${binary.toStringUsingUTF8}") -> modifiedRecord
+            case (None, _) =>
+              throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
+            case (Some(NullValue), _) =>
+              throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
+            case _ =>
+              throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
           }
       }
 
     private def write(msg: T): Unit = {
       val valueToWrite = preWriteTransformation(msg)
       val record = encode(valueToWrite, vcc)
-      val writerPath = partition(record)
+      val (writerPath, partitionedRecord) = partition(record)
       val writer = writers.get(writerPath) match {
         case Some(writer) =>
           writer
@@ -197,7 +201,7 @@ private class ParquetPartitioningFlow[T, W](
           writers = writers.updated(writerPath, writer)
           writer
       }
-      writer.write(record)
+      writer.write(partitionedRecord)
     }
 
     private def close(): Unit = {

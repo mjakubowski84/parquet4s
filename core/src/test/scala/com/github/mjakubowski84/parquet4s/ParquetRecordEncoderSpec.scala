@@ -29,16 +29,16 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
       bigDecimal = BigDecimal.valueOf(1.00000000000001d)
     )
     val record = RowParquetRecord(
-      "boolean" -> true,
-      "int" -> 1,
-      "long" -> 1234567890L,
-      "float" -> 1.1f,
-      "double" -> 1.00000000000001d,
-      "string" -> "text",
-      "short" -> (1: Short),
-      "byte" -> (1: Byte),
-      "char" -> '\n',
-      "bigDecimal" -> BigDecimal.valueOf(1.00000000000001d)
+      "boolean" -> true.value,
+      "int" -> 1.value,
+      "long" -> 1234567890L.value,
+      "float" -> 1.1f.value,
+      "double" -> 1.00000000000001d.value,
+      "string" -> "text".value,
+      "short" -> (1: Short).value,
+      "byte" -> (1: Byte).value,
+      "char" -> '\n'.value,
+      "bigDecimal" -> BigDecimal.valueOf(1.00000000000001d).value
     )
     encode(data) should be(record)
   }
@@ -69,8 +69,8 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
     val record = RowParquetRecord(
       "localDateTime" -> binaryDateTime,
       "sqlTimestamp" -> binaryDateTime,
-      "localDate" -> epochDays,
-      "sqlDate" -> epochDays
+      "localDate" -> epochDays.value,
+      "sqlDate" -> epochDays.value
     )
 
     encode(data, ValueCodecConfiguration(timeZone)) should be(record)
@@ -103,8 +103,8 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
     val record = RowParquetRecord(
       "localDateTime" -> binaryDateTime,
       "sqlTimestamp" -> binaryDateTime,
-      "localDate" -> epochDays,
-      "sqlDate" -> epochDays
+      "localDate" -> epochDays.value,
+      "sqlDate" -> epochDays.value
     )
 
     encode(data, ValueCodecConfiguration(timeZone)) should be(record)
@@ -112,7 +112,7 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
 
   it should "encode record containing optional values" in {
     encode(ContainsOption(None)) should be(RowParquetRecord("optional" -> NullValue))
-    encode(ContainsOption(Some(1))) should be(RowParquetRecord("optional" -> 1))
+    encode(ContainsOption(Some(1))) should be(RowParquetRecord("optional" -> 1.value))
   }
 
   it should "encode record containing collection of primitives" in {
@@ -123,13 +123,13 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
       set = Set.empty,
       array = Array.empty
     )) should be(RowParquetRecord(
-      "list" -> ListParquetRecord.empty,
-      "seq" -> ListParquetRecord.empty,
-      "vector" -> ListParquetRecord.empty,
-      "set" -> ListParquetRecord.empty,
-      "array" -> ListParquetRecord.empty
+      "list" -> ListParquetRecord.Empty,
+      "seq" -> ListParquetRecord.Empty,
+      "vector" -> ListParquetRecord.Empty,
+      "set" -> ListParquetRecord.Empty,
+      "array" -> ListParquetRecord.Empty
     ))
-    val listRecordWithValues = ListParquetRecord(1, 2, 3)
+    val listRecordWithValues = ListParquetRecord(1.value, 2.value, 3.value)
     encode(Collections(
       list = List(1, 2, 3),
       seq = Seq(1, 2, 3),
@@ -147,29 +147,29 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
 
   it should "encode record containing collection of optional primitives" in {
     encode(ContainsCollectionOfOptionalPrimitives(List.empty)) should be(
-      RowParquetRecord("list" -> ListParquetRecord.empty)
+      RowParquetRecord("list" -> ListParquetRecord.Empty)
     )
     encode(ContainsCollectionOfOptionalPrimitives(List(None, Some(2), None))) should be(
-      RowParquetRecord("list" -> ListParquetRecord(NullValue, 2, NullValue))
+      RowParquetRecord("list" -> ListParquetRecord(NullValue, 2.value, NullValue))
     )
   }
 
   it should "encode record containing collection of collections" in {
     encode(ContainsCollectionOfCollections(List.empty)) should be(
-      RowParquetRecord("listOfSets" -> ListParquetRecord.empty)
+      RowParquetRecord("listOfSets" -> ListParquetRecord.Empty)
     )
     encode(ContainsCollectionOfCollections(List(Set.empty, Set(1, 2, 3), Set.empty))) should be(
       RowParquetRecord("listOfSets" -> ListParquetRecord(
-        ListParquetRecord.empty,
-        ListParquetRecord(1, 2, 3),
-        ListParquetRecord.empty
+        ListParquetRecord.Empty,
+        ListParquetRecord(1.value, 2.value, 3.value),
+        ListParquetRecord.Empty
       ))
     )
   }
 
   it should "encode record containing map of primitives" in {
     encode(ContainsMapOfPrimitives(Map("key" -> 1))) should be(
-      RowParquetRecord("map" -> MapParquetRecord("key" -> 1))
+      RowParquetRecord("map" -> MapParquetRecord("key".value -> 1.value))
     )
   }
 
@@ -181,7 +181,7 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
     encode(ContainsMapOfOptionalPrimitives(
       Map("1" -> None, "2" -> Some(2))
     )) should be(RowParquetRecord(
-      "map" -> MapParquetRecord("1" -> NullValue, "2" -> IntValue(2))
+      "map" -> MapParquetRecord("1".value -> NullValue, "2".value -> IntValue(2))
     ))
   }
 
@@ -189,13 +189,13 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
     encode(ContainsMapOfCollectionsOfPrimitives(
       Map("1" -> List.empty, "2" -> List(1, 2, 3))
     )) should be(RowParquetRecord(
-      "map" -> MapParquetRecord("1" -> ListParquetRecord.empty, "2" -> ListParquetRecord(1, 2, 3))
+      "map" -> MapParquetRecord("1".value -> ListParquetRecord.Empty, "2".value -> ListParquetRecord(1.value, 2.value, 3.value))
     ))
   }
 
   it should "encode record containing nested record" in {
     encode(ContainsNestedClass(Nested(1))) should be(
-      RowParquetRecord("nested" -> RowParquetRecord("int" -> 1))
+      RowParquetRecord("nested" -> RowParquetRecord("int" -> 1.value))
     )
   }
 
@@ -207,7 +207,7 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
 
   it should "encode record containing optional nested record" in {
     encode(ContainsOptionalNestedClass(Some(Nested(1)))) should be(
-      RowParquetRecord("nestedOptional" -> RowParquetRecord("int" -> 1))
+      RowParquetRecord("nestedOptional" -> RowParquetRecord("int" -> 1.value))
     )
     encode(ContainsOptionalNestedClass(None)) should be(
       RowParquetRecord("nestedOptional" -> NullValue)
@@ -222,15 +222,15 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
       set = Set.empty,
       array = Array.empty
     )) should be(RowParquetRecord(
-      "list" -> ListParquetRecord.empty,
-      "seq" -> ListParquetRecord.empty,
-      "vector" -> ListParquetRecord.empty,
-      "set" -> ListParquetRecord.empty,
-      "array" -> ListParquetRecord.empty
+      "list" -> ListParquetRecord.Empty,
+      "seq" -> ListParquetRecord.Empty,
+      "vector" -> ListParquetRecord.Empty,
+      "set" -> ListParquetRecord.Empty,
+      "array" -> ListParquetRecord.Empty
     ))
 
     val listOfNestedRecords = ListParquetRecord(
-      RowParquetRecord("int" -> 1), RowParquetRecord("int" -> 2), RowParquetRecord("int" -> 3)
+      RowParquetRecord("int" -> 1.value), RowParquetRecord("int" -> 2.value), RowParquetRecord("int" -> 3.value)
     )
     encode(CollectionsOfNestedClass(
       list = List(Nested(1), Nested(2), Nested(3)),
@@ -261,11 +261,11 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
     val dataWithEmptyMap = ContainsMapOfNestedClassAsValue(Map.empty)
     val dataWithMap = ContainsMapOfNestedClassAsValue(Map("1" -> Nested(1), "2" -> Nested(2)))
 
-    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
+    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.Empty))
 
     val record = RowParquetRecord("nested" -> MapParquetRecord(
-      "1" -> RowParquetRecord("int" -> 1),
-      "2" -> RowParquetRecord("int" -> 2)
+      "1".value -> RowParquetRecord("int" -> 1.value),
+      "2".value -> RowParquetRecord("int" -> 2.value)
     ))
     encode(dataWithMap) should be(record)
   }
@@ -274,11 +274,11 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
     val dataWithEmptyMap = ContainsMapOfNestedClassAsKey(Map.empty)
     val dataWithMap = ContainsMapOfNestedClassAsKey(Map(Nested(1) -> "1", Nested(2) -> "2"))
 
-    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
+    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.Empty))
 
     val record = RowParquetRecord("nested" -> MapParquetRecord(
-      RowParquetRecord("int" -> 1) -> "1",
-      RowParquetRecord("int" -> 2) -> "2"
+      RowParquetRecord("int" -> 1.value) -> "1".value,
+      RowParquetRecord("int" -> 2.value) -> "2".value
     ))
     encode(dataWithMap) should be(record)
   }
@@ -290,11 +290,11 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
       "some" -> Some(Nested(2))
     ))
 
-    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
+    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.Empty))
 
     val record = RowParquetRecord("nested" -> MapParquetRecord(
-      "none" -> NullValue,
-      "some" -> RowParquetRecord("int" -> 2)
+      "none".value -> NullValue,
+      "some".value -> RowParquetRecord("int" -> 2.value)
     ))
     encode(dataWithMap) should be(record)
   }
@@ -306,11 +306,15 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
       "nonEmpty" -> List(Nested(1), Nested(2), Nested(3))
     ))
 
-    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.empty))
+    encode(dataWithEmptyMap) should be(RowParquetRecord("nested" -> MapParquetRecord.Empty))
 
     val record = RowParquetRecord("nested" -> MapParquetRecord(
-      "empty" -> ListParquetRecord.empty,
-      "nonEmpty" -> ListParquetRecord(RowParquetRecord("int" -> 1), RowParquetRecord("int" -> 2), RowParquetRecord("int" -> 3))
+      "empty".value -> ListParquetRecord.Empty,
+      "nonEmpty".value -> ListParquetRecord(
+        RowParquetRecord("int" -> 1.value),
+        RowParquetRecord("int" -> 2.value),
+        RowParquetRecord("int" -> 3.value)
+      )
     ))
     encode(dataWithMap) should be(record)
   }
