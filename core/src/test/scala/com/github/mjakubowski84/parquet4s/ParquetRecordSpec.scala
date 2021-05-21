@@ -1,166 +1,219 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.apache.parquet.io.api.Binary
 import org.scalatest.enablers.Sequencing
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.Inspectors
 import org.scalatest.matchers.should.Matchers
-
-import scala.collection.mutable
+import com.github.mjakubowski84.parquet4s.ValueImplicits._
 
 class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
 
   private val vcc = ValueCodecConfiguration.default
-  implicit private val sequencing: Sequencing[mutable.Seq[Value]] =
-    Sequencing.sequencingNatureOfGenSeq[Value, mutable.Seq]
+  private implicit val sequencing: Sequencing[ListParquetRecord] = Sequencing.sequencingNatureOfGenSeq[Value, Seq]
 
   "RowParquetRecord" should "indicate that is empty" in {
-    val record = RowParquetRecord.empty
+    val record = RowParquetRecord.EmptyNoSchema
     record should be(empty)
     record should have size 0
   }
 
   it should "fail to get field from invalid index" in {
-    an[NoSuchElementException] should be thrownBy RowParquetRecord.empty.head
-    an[IndexOutOfBoundsException] should be thrownBy RowParquetRecord("a" -> IntValue(1))(2)
+    an[NoSuchElementException] should be thrownBy RowParquetRecord.EmptyNoSchema.head
+    an[IndexOutOfBoundsException] should be thrownBy RowParquetRecord("a"-> 1.value)(2)
   }
 
   it should "succeed to add and retrieve a field" in {
-    val record = RowParquetRecord.empty.add("a", "a", vcc).add("b", "b", vcc).add("c", "c", vcc)
-    record.get[String]("a", vcc) should be("a")
-    record.get[String]("b", vcc) should be("b")
-    record.get[String]("c", vcc) should be("c")
-    record.get[String]("d", vcc) should be(null)
+    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+      .updated("a", "a", vcc)
+      .updated("b", "b", vcc)
+      .updated("c", "c", vcc)
+    record.get[String]("a", vcc) should be(Some("a"))
+    record.get[String]("b", vcc) should be(Some("b"))
+    record.get[String]("c", vcc) should be(Some("c"))
+    record.get[String]("d", vcc) should be(None)
     record.length should be(3)
   }
 
   it should "succeed to add and retrieve a field using a path" in {
-    val record = RowParquetRecord.empty
-      .add("a", "a", vcc)
-      .add(Col("x.y.z"), BinaryValue("xyz".getBytes))
-    record.get(Col("a")) should be(BinaryValue("a".getBytes))
-    record.get(Col("a.b")) should be(NullValue)
-    record.get(Col("k")) should be(NullValue)
-    record.get(Col("x")) should be(RowParquetRecord.empty.add(Col("y.z"), BinaryValue("xyz".getBytes)))
-    record.get(Col("x.y")) should be(RowParquetRecord.empty.add("z", BinaryValue("xyz".getBytes)))
-    record.get(Col("x.y.z")) should be(BinaryValue("xyz".getBytes))
+    val record = RowParquetRecord.emptyWithSchema("a", "x")
+      .updated("a", "a", vcc)
+      .updated(Col("x.y.z"), "xyz".value)
+      .updated(Col("x.v"), NullValue)
+
+    record.get(Col("")) should be(Some(record))
+    record.get(Col("a")) should be(Some("a".value))
+    record.get(Col("a.b")) should be(None)
+    record.get(Col("k")) should be(None)
+    record.get(Col("x")) should be(Some(RowParquetRecord.fromColumns(Col("y.z") -> "xyz".value, Col("v") -> NullValue)))
+    record.get(Col("x.y")) should be(Some(RowParquetRecord("z" -> "xyz".value)))
+    record.get(Col("x.y.z")) should be(Some("xyz".value))
+    record.get(Col("x.v")) should be(Some(NullValue))
     record.length should be(2)
   }
 
   it should "be updatable" in {
-    val record = RowParquetRecord.empty.add("a", "a", vcc).add("b", "b", vcc).add("c", "c", vcc)
-    record.update(0, BinaryValue("x".getBytes))
-    record.update(1, ("z", BinaryValue("z".getBytes)))
-    an[IndexOutOfBoundsException] should be thrownBy record.update(3, BinaryValue("z".getBytes))
+    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+      .updated("a", "a", vcc)
+      .updated("b", "b", vcc)
+      .updated("c", "c", vcc)
+      .updated(0, "x".value)
+      .updated(1, "z", "z".value)
+
+    an[java.lang.IndexOutOfBoundsException] should be thrownBy record.updated(3, "z".value)
 
     record should have size 3
-    record.get[String]("a", vcc) should be("x")
-    record.get[String]("z", vcc) should be("z")
-    record.get[String]("c", vcc) should be("c")
+    record.get[String]("a", vcc) should be(Some("x"))
+    record.get[String]("z", vcc) should be(Some("z"))
+    record.get[String]("c", vcc) should be(Some("c"))
   }
 
   it should "allow to remove fields by id" in {
-    val record = RowParquetRecord.empty.add("a", "a", vcc).add("b", "b", vcc).add("c", "c", vcc)
-    record.remove(2) should be(("c", BinaryValue("c".getBytes)))
-    record.remove(0) should be(("a", BinaryValue("a".getBytes)))
-    record.remove(0) should be(("b", BinaryValue("b".getBytes)))
-    an[IndexOutOfBoundsException] should be thrownBy record.remove(0)
-    record should be(empty)
+    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+      .updated("a", "a", vcc)
+      .updated("b", "b", vcc)
+      .updated("c", "c", vcc)
+
+    an[IndexOutOfBoundsException] should be thrownBy record.removed(4)
+    val (c, step1) = record.removed(2)
+    val (a, step2) = step1.removed(0)
+    val (b, step3) = step2.removed(0)
+
+    c should be("c" -> "c".value)
+    a should be("a" -> "a".value)
+    b should be("b" -> "b".value)
+    an[IndexOutOfBoundsException] should be thrownBy step3.removed(0)
+    step3 should be(empty)
   }
 
   it should "allow to remove fields by name" in {
-    val record = RowParquetRecord.empty.add("a", "a", vcc).add("b", "b", vcc).add("c", "c", vcc)
-    record.remove("c") should be(Some(BinaryValue("c".getBytes)))
-    record.remove("c") should be(None)
-    record should have size 2
+    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+      .updated("a", "a", vcc)
+      .updated("b", "b", vcc)
+      .updated("c", "c", vcc)
+
+    val (cSome, step1) = record.removed("c")
+    val (cNone, step2) = step1.removed("c")
+    cSome should be(Some("c".value))
+    cNone should be(None)
+    step2 should have size 2
   }
 
   it should "allow to remove fields by path" in {
-    def createRecord() = RowParquetRecord.empty
-      .add("a", "a", vcc)
-      .add(Col("x.y.z"), BinaryValue("xyz".getBytes))
+    val record = RowParquetRecord.fromColumns(
+      Col("a") -> "a".value,
+      Col("x.y.z") -> "xyz".value
+    )
 
-    val r1 = createRecord()
-    val r2 = createRecord()
-    val r3 = createRecord()
-    val r4 = createRecord()
+    record.removed(Col("")) should be(Some(record) -> RowParquetRecord.EmptyNoSchema)
+    record.removed(Col("b")) should be(None -> record)
+    record.removed(Col("x.q")) should be(None -> record)
+    record.removed(Col("x.y.v")) should be(None -> record)
+    record.removed(Col("x.y.z.q")) should be(None -> record)
 
-    r1.remove(Col("a")) should be(Some(BinaryValue("a".getBytes)))
-    r1 should be(RowParquetRecord.empty.add(Col("x.y.z"), BinaryValue("xyz".getBytes)))
+    record.removed(Col("a")) should be(
+      Some("a".value) -> RowParquetRecord.fromColumns(Col("x.y.z") -> "xyz".value)
+    )
 
-    r2.remove(Col("x")) should be(Some(RowParquetRecord.empty.add(Col("y.z"), BinaryValue("xyz".getBytes))))
-    r2 should be(RowParquetRecord.empty.add("a", "a", vcc))
+    record.removed(Col("x")) should be(
+      Some(RowParquetRecord.fromColumns(Col("y.z") -> "xyz".value)) -> RowParquetRecord("a" -> "a".value)
+    )
 
-    r3.remove(Col("x.y")) should be(Some(RowParquetRecord.empty.add(Col("z"), BinaryValue("xyz".getBytes))))
-    r3 should be(RowParquetRecord.empty.add("a", "a", vcc))
+    record.removed(Col("x.y")) should be(
+      Some(RowParquetRecord.fromColumns(Col("z") -> "xyz".value)) -> RowParquetRecord("a" -> "a".value)
+    )
 
-    r4.remove(Col("x.y.z")) should be(Some(BinaryValue("xyz".getBytes)))
-    r4 should be(RowParquetRecord.empty.add("a", "a", vcc))
+    record.removed(Col("x.y.z")) should be(
+      Some("xyz".value) -> RowParquetRecord("a" -> "a".value)
+    )
+  }
+
+  it should "iterate over values" in {
+    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+      .updated("a", "a", vcc)
+      .updated("b", "b", vcc)
+      .updated("c", "c", vcc)
+    record.iterator.toSeq should be(Seq("a" -> "a".value, "b" -> "b".value, "c" -> "c".value))
+  }
+
+  it should "provide NullValue for unset columns" in {
+    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+    record.iterator.toSeq should be(Seq("a" -> NullValue, "b" -> NullValue, "c" -> NullValue))
+
+    val updated = record.updated("b", "b", vcc)
+    updated.head should be("a" -> NullValue)
+    updated(1) should be("b" -> "b".value)
+    updated(2) should be("c" -> NullValue)
+    updated.get("b") should be(Some("b".value))
+    updated.get("c") should be(Some(NullValue))
+    updated.iterator.toSeq should be(Seq("a" -> NullValue, "b" -> "b".value, "c" -> NullValue))
   }
 
   "ListParquetRecord" should "indicate that is empty" in {
-    val record = ListParquetRecord.empty
+    val record = ListParquetRecord.Empty
     record should be(empty)
     record should have size 0
   }
 
   it should "accumulate normal primitive values" in {
-    val b1 = BinaryValue(Binary.fromString("a string"))
-    val b2 = BinaryValue(Binary.fromString("another string"))
-    val lst = ListParquetRecord.empty
+    val b1 = "a string".value
+    val b2 = "another string".value
+    val lst = ListParquetRecord.Empty
       .add("list", RowParquetRecord("element" -> b1))
       .add("list", RowParquetRecord("element" -> b2))
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
   it should "accumulate normal compound values" in {
-    val r1 = RowParquetRecord("a" -> IntValue(1), "b" -> IntValue(2))
-    val r2 = RowParquetRecord("c" -> IntValue(3), "d" -> IntValue(4))
-    val lst = ListParquetRecord.empty
+    val r1 = RowParquetRecord("a"-> 1.value, "b"-> 2.value)
+    val r2 = RowParquetRecord("c"-> 3.value, "d"-> 4.value)
+    val lst = ListParquetRecord.Empty
       .add("list", RowParquetRecord("element" -> r1))
       .add("list", RowParquetRecord("element" -> r2))
     lst should contain theSameElementsInOrderAs Seq(r1, r2)
   }
 
   it should "accumulate legacy primitive values" in {
-    val b1  = BinaryValue(Binary.fromString("a string"))
-    val b2  = BinaryValue(Binary.fromString("another string"))
-    val lst = ListParquetRecord.empty.add("array", b1).add("array", b2)
+    val b1 = "a string".value
+    val b2 = "another string".value
+    val lst = ListParquetRecord.Empty.add("array",  b1).add("array",  b2)
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
   it should "accumulate 3-levels legacy primitive values" in {
-    val b1  = BinaryValue(Binary.fromString("a string"))
-    val b2  = BinaryValue(Binary.fromString("another string"))
-    val r1  = RowParquetRecord("array" -> b1)
-    val r2  = RowParquetRecord("array" -> b2)
-    val lst = ListParquetRecord.empty.add("bag", r1).add("bag", r2)
+    val b1 = "a string".value
+    val b2 = "another string".value
+    val r1 = RowParquetRecord("array" -> b1)
+    val r2 = RowParquetRecord("array" -> b2)
+    val lst = ListParquetRecord.Empty.add("bag",  r1).add("bag",  r2)
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
   it should "accumulate legacy compound values" in {
-    val r1  = RowParquetRecord("a" -> IntValue(1), "b" -> IntValue(2))
-    val r2  = RowParquetRecord("c" -> IntValue(3), "d" -> IntValue(4))
-    val lst = ListParquetRecord.empty.add("array", r1).add("array", r2)
+    val r1 = RowParquetRecord("a"-> 1.value, "b"-> 2.value)
+    val r2 = RowParquetRecord("c"-> 3.value, "d"-> 4.value)
+    val lst = ListParquetRecord.Empty.add("array", r1).add("array", r2)
     lst should contain theSameElementsInOrderAs Seq(r1, r2)
   }
 
   it should "accumulate null values" in {
-    val lst = ListParquetRecord.empty
-      .add("array", RowParquetRecord.empty)
-      .add("array", RowParquetRecord.empty)
-      .add("array", RowParquetRecord.empty)
+    val lst = ListParquetRecord.Empty
+      .add("array", RowParquetRecord.EmptyNoSchema)
+      .add("array", RowParquetRecord.EmptyNoSchema)
+      .add("array", RowParquetRecord.EmptyNoSchema)
     lst should have size 3
-    every(lst) should be(NullValue)
+    every[Value, Seq](lst) should be(NullValue)
   }
 
   it should "fail to get field from invalid index" in {
-    an[NoSuchElementException] should be thrownBy ListParquetRecord.empty.head
-    an[IndexOutOfBoundsException] should be thrownBy ListParquetRecord(IntValue(1))(2)
+    an[NoSuchElementException] should be thrownBy ListParquetRecord.Empty.head
+    an[IndexOutOfBoundsException] should be thrownBy ListParquetRecord(1.value)(2)
   }
 
   it should "succeed to add and retrieve a field" in {
-    val record = ListParquetRecord.empty.add("a", vcc).add("b", vcc).add("c", vcc)
+    val record = ListParquetRecord.Empty
+      .appended("a", vcc)
+      .appended("b", vcc)
+      .appended("c", vcc)
     record should have size 3
     record[String](0, vcc) should be("a")
     record[String](1, vcc) should be("b")
@@ -168,9 +221,12 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "be updatable" in {
-    val record = ListParquetRecord.empty.add("a", vcc).add("b", vcc).add("c", vcc)
-    record.update(1, BinaryValue("x".getBytes))
-    an[IndexOutOfBoundsException] should be thrownBy record.update(3, BinaryValue("z".getBytes))
+    val record = ListParquetRecord.Empty
+      .appended("a", vcc)
+      .appended("b", vcc)
+      .appended("c", vcc)
+      .updated(1, "x".value)
+    an[IndexOutOfBoundsException] should be thrownBy record.updated(3, "z".value)
 
     record should have size 3
     record[String](0, vcc) should be("a")
@@ -179,22 +235,26 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   "MapParquetRecord" should "indicate that is empty" in {
-    val record = MapParquetRecord.empty
+    val record = MapParquetRecord.Empty
     record should be(empty)
     record should have size 0
   }
 
   it should "fail to get field from invalid key" in {
-    an[NoSuchElementException] should be thrownBy MapParquetRecord.empty.apply[Int, Int](1, vcc)
-    an[NoSuchElementException] should be thrownBy MapParquetRecord(IntValue(1) -> IntValue(1)).apply[Int, Int](2, vcc)
+    a[NoSuchElementException] should be thrownBy MapParquetRecord.Empty.apply[Int, Int](1, vcc)
+    a[NoSuchElementException] should be thrownBy MapParquetRecord(1.value -> 1.value).apply[Int, Int](2, vcc)
   }
 
   it should "succeed to add and retrieve a field" in {
-    val record = MapParquetRecord.empty.add(1, "a", vcc).add(2, "b", vcc).add(3, "c", vcc)
+    val record = MapParquetRecord.Empty
+      .updated(1, "a", vcc)
+      .updated(2, "b", vcc)
+      .updated(3, "c", vcc)
     record should have size 3
     record[Int, String](1, vcc) should be("a")
     record[Int, String](2, vcc) should be("b")
     record[Int, String](3, vcc) should be("c")
+    a[NoSuchElementException] should be thrownBy record[Int, String](4, vcc)
     record.get[Int, String](1, vcc) should be(Some("a"))
     record.get[Int, String](2, vcc) should be(Some("b"))
     record.get[Int, String](3, vcc) should be(Some("c"))
@@ -202,9 +262,12 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "be updatable" in {
-    val record = MapParquetRecord.empty.add(1, "a", vcc).add(2, "b", vcc).add(3, "c", vcc)
-    record.update[Int, String](2, "x", vcc)
-    record.update[Int, String](4, "z", vcc)
+    val record = MapParquetRecord.Empty
+      .updated(1, "a", vcc)
+      .updated(2, "b", vcc)
+      .updated(3, "c", vcc)
+      .updated(2, "x", vcc)
+      .updated(4, "z", vcc)
 
     record should have size 4
     record[Int, String](1, vcc) should be("a")

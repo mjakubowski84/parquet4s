@@ -9,6 +9,7 @@ import java.nio.file.Files
 
 class ProjectionItSpec extends AnyFlatSpec with Matchers {
 
+
   case class Full(a: String, b: Int, c: Double)
   case class Partial(b: Int)
 
@@ -36,19 +37,16 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
     val outRecords = ParquetReader.withProjection[RowParquetRecord].read(filePath)
 
     outRecords should contain theSameElementsAs List(
-      RowParquetRecord("b" -> 1),
-      RowParquetRecord("b" -> 2),
-      RowParquetRecord("b" -> 3)
+      RowParquetRecord("b" -> 1.value),
+      RowParquetRecord("b" -> 2.value),
+      RowParquetRecord("b" -> 3.value)
     )
   }
 
   it should "read the subset of fields from written complex file" in {
     val filePath = tempPath.append("complex.parquet")
     val in = List(
-      FullComplex(
-        a      = "A",
-        nested = FullNested(b = List(FullElem(1, "a"), FullElem(2, "b"), FullElem(3, "c")), c = true)
-      )
+      FullComplex(a = "A", nested = FullNested(b = List(FullElem(1, "a"), FullElem(2, "b"), FullElem(3, "c")), c = true))
     )
     ParquetWriter.writeAndClose(filePath, in)
 
@@ -57,15 +55,11 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
     val outRecords = ParquetReader.withProjection[RowParquetRecord].read(filePath)
 
     outRecords should contain theSameElementsAs List(
-      RowParquetRecord(
-        "nested" -> RowParquetRecord(
-          "b" -> ListParquetRecord(
-            RowParquetRecord("x" -> 1),
-            RowParquetRecord("x" -> 2),
-            RowParquetRecord("x" -> 3)
-          )
-        )
-      )
+      RowParquetRecord("nested" -> RowParquetRecord("b" -> ListParquetRecord(
+        RowParquetRecord("x" -> 1.value),
+        RowParquetRecord("x" -> 2.value),
+        RowParquetRecord("x" -> 3.value)
+      )))
     )
   }
 
