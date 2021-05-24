@@ -98,7 +98,7 @@ Parquet4S has an integration module that allows you to read and write Parquet fi
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
-Parquet4S has so far a single `Source` for reading single file or directory and `Sink`s for writing.
+Parquet4S has a single `Source` for reading single file or a directory, a `Sink`s for writing a single file and a sophisticated `Flow` for performing complex writes.
 
 ```scala
 import com.github.mjakubowski84.parquet4s.{ParquetStreams, ParquetWriter}
@@ -165,9 +165,9 @@ Please check [examples](./examples/src/main/scala/com/github/mjakubowski84/parqu
 
 ## Before-read filtering or filter pushdown
 
-One of the best features of Parquet is an efficient way of fitering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Parquet4S allows do define filter predicates in all modules in order to push filtering out from Scala collections and Akka or FS2 stream down to point before file content is even read.
+One of the best features of Parquet is an efficient way of filtering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Parquet4S allows to define filter predicates in all modules in order to push filtering out from Scala collections and Akka or FS2 stream down to point before file content is even read.
 
-You define you filters using simple algebra as follows.
+You define your filters using simple algebra as follows.
 
 In core library:
 
@@ -191,7 +191,7 @@ Check ScalaDoc and code for more!
 
 ## Schema projection
 
-Schema projection is another way of optimization of reads. By default Parquet4S reads the whole content of each Parquet record even when you provide a case class that maps only a part of the columns. Such a behaviour is expected because you may want to use [generic records](#generic-records) to process your data. However, you can explicitely tell Parquet4S to use the provided case class (or implicit `ParquetSchemaResolver`) as an override for the original file schema. In effect, all columns not matching your schema will be skipped and not read. This functionality is available in every module of Parquet4S.
+Schema projection is another way of optimization of reads. By default, Parquet4S reads the whole content of each Parquet record even when you provide a case class that maps only a part of the columns. Such a behaviour is expected because you may want to use [generic records](#generic-records) to process your data. However, you can explicitly tell Parquet4S to use the provided case class (or implicit `ParquetSchemaResolver`) as an override for the original file schema. In effect, all columns not matching your schema will be skipped and not read. This functionality is available in every module of Parquet4S.
 
 ```scala
 // core
@@ -259,9 +259,9 @@ Complex types can be arbitrarily nested.
 
 ## Generic Records
 
-You may want to not use strict schema and process your data in a generic way. Since version 1.2.0 Parquet4S has rich API that allows to build, transform, write and read Parquet records in easy way. Each implementation of  `ParquetRecord` is Scala `Iterable` and a mutable collection. You can execute operations on `RowParquetRecord` and `ListParquetRecord` as on mutable `Seq` and you can treat `MapParquetRecord` as mutable `Map`. Moreover, records received addition functions like `get` and `add` (and more) that take implicit `ValueCodec` and allow to read and modify records using regular Scala types.  There is default `ParquetRecordEndcoder`, `ParquetRecordDecoder` and `ParquetSchemaResolver` for  `RowParquetRecord` so reading Parquet in a generic way works out of the box! In order to write you still need to provide a schema in form of Parquet's `MessageType`.
+You may want to not use strict schema and process your data in a generic way. Since version 1.2.0 Parquet4S has rich API that allows to build, transform, write and read Parquet records in easy way. Each implementation of  `ParquetRecord` is Scala `Iterable` and a mutable collection. You can execute operations on `RowParquetRecord` and `ListParquetRecord` as on mutable `Seq` and you can treat `MapParquetRecord` as mutable `Map`. Moreover, records received addition functions like `get` and `add` (and more) that take implicit `ValueCodec` and allow to read and modify records using regular Scala types. There is default `ParquetRecordEndcoder`, `ParquetRecordDecoder` and `ParquetSchemaResolver` for  `RowParquetRecord` so reading Parquet in a generic way works out of the box! In order to write you still need to provide a schema in form of Parquet's `MessageType`.
 
-Funcionality is available in all modules. See [examples](https://github.com/mjakubowski84/parquet4s/blob/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/core/WriteAndReadGenericApp.scala).
+Functionality is available in all modules. See [examples](https://github.com/mjakubowski84/parquet4s/blob/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/core/WriteAndReadGenericApp.scala).
 
 ## Customisation and Extensibility
 
