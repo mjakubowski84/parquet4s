@@ -3,10 +3,9 @@ import Releasing._
 import bloop.integrations.sbt.BloopDefaults
 
 
-lazy val twoEleven = "2.11.12"
 lazy val twoTwelve = "2.12.13"
-lazy val twoThirteen = "2.13.5"
-lazy val supportedScalaVersions = Seq(twoEleven, twoTwelve, twoThirteen)
+lazy val twoThirteen = "2.13.6"
+lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen)
 lazy val fs2ScalaVersions = Seq(twoTwelve, twoThirteen)
 lazy val akkaScalaVersions = Seq(twoTwelve, twoThirteen)
 

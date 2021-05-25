@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
-import org.apache.parquet.io.api.Binary
 import org.apache.parquet.schema.{LogicalTypeAnnotation, PrimitiveType}
 
 import scala.util.Random

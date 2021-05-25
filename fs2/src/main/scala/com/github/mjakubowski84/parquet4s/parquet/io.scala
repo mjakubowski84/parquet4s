@@ -17,7 +17,7 @@ private[parquet] object io {
 
   private type Partition = (ColumnPath, String)
 
-  private trait StatusAccumulator
+  private sealed trait StatusAccumulator
   private case object Empty extends StatusAccumulator
   private object Dirs {
     def apply(partitionPath: (Path, Partition)): Dirs = Dirs(Vector(partitionPath))
@@ -87,7 +87,7 @@ private[parquet] object io {
           Files
       }
       .flatMap {
-        case Dirs(partitionPaths) => // node od directory tree
+        case Dirs(partitionPaths) => // node of directory tree
           Stream.emits(partitionPaths).flatMap {
             case (subPath, partition) => findPartitionedPaths(fs, subPath, partitions :+ partition)
           }

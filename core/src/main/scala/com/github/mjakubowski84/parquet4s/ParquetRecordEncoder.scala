@@ -39,36 +39,28 @@ object ParquetRecordEncoder {
   def encode[T](entity: T, configuration: ValueCodecConfiguration = ValueCodecConfiguration.default)
                (implicit ev: ParquetRecordEncoder[T]): RowParquetRecord = ev.encode(entity, configuration)
 
-  implicit val nilEncoder: ParquetRecordEncoder[HNil] = new ParquetRecordEncoder[HNil] {
-    override def encode(nil: HNil, configuration: ValueCodecConfiguration): RowParquetRecord =
-      RowParquetRecord.EmptyNoSchema
-  }
+  implicit val nilEncoder: ParquetRecordEncoder[HNil] = (_, _) => RowParquetRecord.EmptyNoSchema
 
   implicit def headValueEncoder[FieldName <: Symbol, Head, Tail <: HList](implicit
                                                                           witness: Witness.Aux[FieldName],
                                                                           headEncoder: ValueCodec[Head],
                                                                           tailEncoder: ParquetRecordEncoder[Tail]
                                                                          ): ParquetRecordEncoder[FieldType[FieldName, Head] :: Tail] =
-    new ParquetRecordEncoder[FieldType[FieldName, Head] :: Tail] {
-      override def encode(entity: FieldType[FieldName, Head] :: Tail, configuration: ValueCodecConfiguration): RowParquetRecord = {
-        val fieldName = witness.value.name
-        val fieldValue = try {
-          headEncoder.encode(entity.head, configuration)
-        } catch {
-          case NonFatal(cause) =>
-            throw EncodingException(s"Failed to encode field $fieldName: ${entity.head}, due to ${cause.getMessage}", cause)
-        }
-        tailEncoder.encode(entity.tail, configuration).prepended(fieldName, fieldValue)
+    (entity: FieldType[FieldName, Head] :: Tail, configuration: ValueCodecConfiguration) => {
+      val fieldName = witness.value.name
+      val fieldValue = try {
+        headEncoder.encode(entity.head, configuration)
+      } catch {
+        case NonFatal(cause) =>
+          throw EncodingException(s"Failed to encode field $fieldName: ${entity.head}, due to ${cause.getMessage}", cause)
       }
+      tailEncoder.encode(entity.tail, configuration).prepended(fieldName, fieldValue)
     }
 
   implicit def genericEncoder[A, R](implicit
                                     gen: LabelledGeneric.Aux[A, R],
                                     encoder: Lazy[ParquetRecordEncoder[R]]
                                    ): ParquetRecordEncoder[A] =
-    new ParquetRecordEncoder[A] {
-      override def encode(entity: A, configuration: ValueCodecConfiguration): RowParquetRecord =
-        encoder.value.encode(gen.to(entity), configuration)
-    }
+    (entity: A, configuration: ValueCodecConfiguration) => encoder.value.encode(gen.to(entity), configuration)
 
 }

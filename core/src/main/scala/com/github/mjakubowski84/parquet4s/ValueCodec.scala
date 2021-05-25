@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import java.nio.{ByteBuffer, ByteOrder}
 import java.time._
 import java.util.TimeZone
-import org.apache.parquet.io.api.Binary
 
 import scala.annotation.implicitNotFound
 import scala.collection.compat._

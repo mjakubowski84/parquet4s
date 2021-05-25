@@ -114,15 +114,9 @@ object RowParquetRecord {
    */
   val EmptyNoSchema: RowParquetRecord = new RowParquetRecord(Map.empty, RowParquetRecord.Fields(Iterable.empty))
 
-  implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] =
-    new ParquetRecordEncoder[RowParquetRecord] {
-      override def encode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
-    }
+  implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] = (record, _) => record
 
-  implicit val genericParquetRecordDecoder: ParquetRecordDecoder[RowParquetRecord] =
-    new ParquetRecordDecoder[RowParquetRecord] {
-      override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): RowParquetRecord = record
-    }
+  implicit val genericParquetRecordDecoder: ParquetRecordDecoder[RowParquetRecord] = (record, _) => record
 
   implicit def genericParquetSchemaResolver(implicit message: MessageType): ParquetSchemaResolver[RowParquetRecord] =
     new ParquetSchemaResolver[RowParquetRecord] {
