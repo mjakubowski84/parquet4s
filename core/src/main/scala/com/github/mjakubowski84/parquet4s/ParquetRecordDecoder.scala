@@ -42,30 +42,26 @@ object ParquetRecordDecoder {
   def decode[T](record: RowParquetRecord, configuration: ValueCodecConfiguration = ValueCodecConfiguration.default)
                (implicit ev: ParquetRecordDecoder[T]): T = ev.decode(record, configuration)
 
-  implicit val nilDecoder: ParquetRecordDecoder[HNil] = new ParquetRecordDecoder[HNil] {
-    override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): HNil.type = HNil
-  }
+  implicit val nilDecoder: ParquetRecordDecoder[HNil] = (_, _) => HNil
 
   implicit def headValueDecoder[FieldName <: Symbol, Head, Tail <: HList](implicit
                                                                           witness: Witness.Aux[FieldName],
                                                                           headDecoder: ValueCodec[Head],
                                                                           tailDecoder: ParquetRecordDecoder[Tail]
                                                                          ): ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] =
-    new ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] {
-      override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): FieldType[FieldName, Head] :: Tail = {
-        val fieldName = witness.value.name
-        val decodedFieldOpt = try {
-          record.get[Head](fieldName, configuration)
-        } catch {
-          case NonFatal(cause) =>
-            throw DecodingException(s"Failed to decode field $fieldName of record: $record", cause)
-        }
-        decodedFieldOpt match {
-          case Some(decodedFieldValue) =>
-            field[FieldName](decodedFieldValue) :: tailDecoder.decode(record, configuration)
-          case None => // TODO add test
-            throw DecodingException(s"Field $fieldName is not in schema of: $record")
-        }
+    (record: RowParquetRecord, configuration: ValueCodecConfiguration) => {
+      val fieldName = witness.value.name
+      val decodedFieldOpt = try {
+        record.get[Head](fieldName, configuration)
+      } catch {
+        case NonFatal(cause) =>
+          throw DecodingException(s"Failed to decode field $fieldName of record: $record", cause)
+      }
+      decodedFieldOpt match {
+        case Some(decodedFieldValue) =>
+          field[FieldName](decodedFieldValue) :: tailDecoder.decode(record, configuration)
+        case None => // TODO add test
+          throw DecodingException(s"Field $fieldName is not in schema of: $record")
       }
     }
 
@@ -73,9 +69,7 @@ object ParquetRecordDecoder {
                                     gen: LabelledGeneric.Aux[A, R],
                                     decoder: Lazy[ParquetRecordDecoder[R]]
                                    ): ParquetRecordDecoder[A] =
-    new ParquetRecordDecoder[A] {
-      override def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): A =
-        gen.from(decoder.value.decode(record, configuration))
-    }
+    (record: RowParquetRecord, configuration: ValueCodecConfiguration) =>
+      gen.from(decoder.value.decode(record, configuration))
 
 }
