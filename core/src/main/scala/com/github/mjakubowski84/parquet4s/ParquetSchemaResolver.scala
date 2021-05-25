@@ -56,9 +56,7 @@ object ParquetSchemaResolver
   def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType =
     Message(g.schemaName, g.resolveSchema(Cursor.simple):_*)
 
-  implicit val hnil: ParquetSchemaResolver[HNil] = new ParquetSchemaResolver[HNil] {
-    def resolveSchema(cursor: Cursor): List[Type] = List.empty
-  }
+  implicit val hnil: ParquetSchemaResolver[HNil] = _ => List.empty
 
   implicit def hcons[K <: Symbol, V, T <: HList](implicit
                                                  witness: Witness.Aux[K],
@@ -66,17 +64,14 @@ object ParquetSchemaResolver
                                                  visitor: SchemaVisitor[K, V] = defaultSchemaVisitor[K, V],
                                                  rest: ParquetSchemaResolver[T]
                                                 ): ParquetSchemaResolver[FieldType[K, V] :: T] =
-    new ParquetSchemaResolver[FieldType[K, V] :: T] {
-      override def resolveSchema(cursor: Cursor): List[Type] =
-        cursor
-          .advance[K]
-          .flatMap(newCursor => newCursor.accept(new TypedSchemaDefInvoker(schemaDef), visitor)) match {
-          case Some(head) =>
-            head +: rest.resolveSchema(cursor)
-          case None =>
-            rest.resolveSchema(cursor)
-        }
-    }
+    cursor => cursor
+      .advance[K]
+      .flatMap(newCursor => newCursor.accept(new TypedSchemaDefInvoker(schemaDef), visitor)) match {
+        case Some(head) =>
+          head +: rest.resolveSchema(cursor)
+        case None =>
+          rest.resolveSchema(cursor)
+      }
 
   implicit def generic[T, G](implicit
                              lg: LabelledGeneric.Aux[T, G],
@@ -92,20 +87,15 @@ object ParquetSchemaResolver
       throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
   }
 
-  def defaultSchemaVisitor[K <: Symbol, V]: SchemaVisitor[K, V] = new SchemaVisitor[K, V] {
-    override def onActive(cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]): Option[Type] =
-      Option(invoker.`type`)
-  }
+  def defaultSchemaVisitor[K <: Symbol, V]: SchemaVisitor[K, V] =
+    (_, invoker: TypedSchemaDefInvoker[K, V]) => Option(invoker.`type`)
 
   implicit def productSchemaVisitor[K <: Symbol, V](implicit resolver: ParquetSchemaResolver[V]): SchemaVisitor[K, V] =
-    new SchemaVisitor[K, V] {
-      override def onActive(cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]): Option[Type] =
-        resolver.resolveSchema(cursor) match {
-          case Nil =>
-            None
-          case fieldTypes =>
-            Option(invoker.productType(SchemaDef.group(fieldTypes:_*).typed[V]))
-        }
+    (cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]) => resolver.resolveSchema(cursor) match {
+      case Nil =>
+        None
+      case fieldTypes =>
+        Option(invoker.productType(SchemaDef.group(fieldTypes: _*).typed[V]))
     }
 
 

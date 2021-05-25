@@ -92,20 +92,18 @@ object ParquetReader {
   /**
     * Default implementation of [[ParquetReader]].
     */
-  implicit def reader[T : ParquetRecordDecoder]: ParquetReader[T] = new ParquetReader[T] {
-    override def read(path: Path, options: Options, filter: Filter): ParquetIterable[T] =
+  implicit def reader[T : ParquetRecordDecoder]: ParquetReader[T] =
+    (path: Path, options: Options, filter: Filter) =>
       newParquetIterable(path = path, options = options, filter = filter, projectedSchemaOpt = None)
-  }
 
-  def withProjection[T : ParquetRecordDecoder: ParquetSchemaResolver]: ParquetReader[T] = new ParquetReader[T] {
-    override def read(path: Path, options: Options, filter: Filter): ParquetIterable[T] =
+  def withProjection[T : ParquetRecordDecoder: ParquetSchemaResolver]: ParquetReader[T] =
+    (path: Path, options: Options, filter: Filter) =>
       newParquetIterable(
         path = path,
         options = options,
         filter = filter,
         projectedSchemaOpt = Option(ParquetSchemaResolver.resolveSchema[T])
       )
-  }
 
 }
 
