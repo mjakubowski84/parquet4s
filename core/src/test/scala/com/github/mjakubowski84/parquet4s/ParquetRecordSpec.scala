@@ -8,7 +8,7 @@ import com.github.mjakubowski84.parquet4s.ValueImplicits._
 
 class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
 
-  private val vcc = ValueCodecConfiguration.default
+  private val vcc = ValueCodecConfiguration.Default
   private implicit val sequencing: Sequencing[ListParquetRecord] = Sequencing.sequencingNatureOfGenSeq[Value, Seq]
 
   "RowParquetRecord" should "indicate that is empty" in {

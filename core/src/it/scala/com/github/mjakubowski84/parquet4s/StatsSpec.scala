@@ -36,7 +36,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   implicit val localDateOrdering: Ordering[LocalDate] = new Ordering[LocalDate] {
     override def compare(x: LocalDate, y: LocalDate): Int = x.compareTo(y)
   }
-  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.default
+  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
 
   lazy val data: LazyList[Data] =
     LazyList.range(0, dataSize).map { i =>

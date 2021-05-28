@@ -157,7 +157,7 @@ private class ParquetPartitioningFlow[T, W](
   val out: Outlet[T] = Outlet[T]("ParquetPartitioningFlow.out")
   val shape: FlowShape[T, T] = FlowShape.of(in, out)
   private val logger = LoggerFactory.getLogger("ParquetPartitioningFlow")
-  private val vcc = writeOptions.toValueCodecConfiguration
+  private val vcc = ValueCodecConfiguration(writeOptions)
 
   private class Logic extends TimerGraphStageLogic(shape) with InHandler with OutHandler {
     private var writers: scala.collection.immutable.Map[Path, ParquetWriter.InternalWriter] = Map.empty
