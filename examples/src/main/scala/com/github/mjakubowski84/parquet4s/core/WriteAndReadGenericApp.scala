@@ -16,7 +16,7 @@ object WriteAndReadGenericApp extends App {
   val SchemaName = "user_schema"
 
   val path = Path(Files.createTempDirectory("example"))
-  val vcc = ValueCodecConfiguration.default
+  val vcc = ValueCodecConfiguration.Default
 
   val users = List(
     (1L, "Alice", LocalDate.of(2000, 1, 1)),

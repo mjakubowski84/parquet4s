@@ -23,7 +23,7 @@ object WriteAndReadGenericAkkaApp extends App {
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
-  private val vcc = ValueCodecConfiguration.default
+  private val vcc = ValueCodecConfiguration.Default
 
   private val users = List(
     (1L, "Alice", LocalDate.of(2000, 1, 1)),

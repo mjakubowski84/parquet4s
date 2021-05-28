@@ -17,26 +17,26 @@ trait Stats {
 
   /**
    * @param columnPath [[ColumnPath]]
-   * @param codec [[ValueCodec]] required to decode the value
+   * @param decoder [[ValueDecoder]] required to decode the value
    * @param ordering required to sort filtered values
    * @tparam V type of value stored in the column
    * @return Minimum value across Parquet data. [[Filter]] is considered during calculation.
    */
-  def min[V](columnPath: ColumnPath)(implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = min(columnPath, None)
+  def min[V](columnPath: ColumnPath)(implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] = min(columnPath, None)
 
   /**
    * @param columnPath [[ColumnPath]]
-   * @param codec [[ValueCodec]] required to decode the value
+   * @param decoder [[ValueDecoder]] required to decode the value
    * @param ordering required to sort filtered values
    * @tparam V type of value stored in the column
    * @return Maximum value across Parquet data. [[Filter]] is considered during calculation.
    */
-  def max[V](columnPath: ColumnPath)(implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = max(columnPath, None)
+  def max[V](columnPath: ColumnPath)(implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] = max(columnPath, None)
 
   protected[parquet4s] def min[V](columnPath: ColumnPath, currentMin: Option[V])
-                                 (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V]
+                                 (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V]
   protected[parquet4s] def max[V](columnPath: ColumnPath, currentMax: Option[V])
-                                 (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V]
+                                 (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V]
 
   protected def statsMinValue(statistics: Statistics[_]): Option[Value] =
     statistics match {
@@ -115,13 +115,13 @@ private class CompoundStats(statsSeq: Seq[Stats]) extends Stats {
   override lazy val recordCount: Long = statsSeq.map(_.recordCount).sum
 
   override def min[V](columnPath: ColumnPath, currentMin: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
+                     (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] =
     statsSeq.foldLeft(currentMin) {
       case (acc, stats) => stats.min(columnPath, acc)
     }
 
   override def max[V](columnPath: ColumnPath, currentMax: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
+                     (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] =
     statsSeq.foldLeft(currentMax) {
       case (acc, stats) => stats.max(columnPath, acc)
     }
@@ -145,10 +145,10 @@ private class LazyDelegateStats(path: Path,
   override def recordCount: Long = delegate.recordCount
 
   override protected[parquet4s] def min[V](columnPath: ColumnPath, currentMin: Option[V])
-                                          (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
+                                          (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] =
     delegate.min(columnPath, currentMin)
 
   override protected[parquet4s] def max[V](columnPath: ColumnPath, currentMax: Option[V])
-                                          (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] =
+                                          (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] =
     delegate.max(columnPath, currentMax)
 }

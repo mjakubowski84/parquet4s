@@ -27,7 +27,7 @@ object WriteAndReadGenericFS2App extends IOApp.Simple {
 
   private implicit val showRecords: Show[RowParquetRecord] = Show.fromToString
 
-  private val vcc = ValueCodecConfiguration.default
+  private val vcc = ValueCodecConfiguration.Default
 
   private val users = List(
     (1L, "Alice", LocalDate.of(2000, 1, 1)),

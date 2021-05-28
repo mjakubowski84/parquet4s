@@ -17,8 +17,7 @@ private[parquet4s] object SingleFileParquetSink {
                                                             ): Sink[T, Future[Done]] = {
     val schema = ParquetSchemaResolver.resolveSchema[T]
     val writer = ParquetWriter.internalWriter(path, schema, options)
-    val valueCodecConfiguration = options.toValueCodecConfiguration
-    val isDebugEnabled = logger.isDebugEnabled
+    val valueCodecConfiguration = ValueCodecConfiguration(options)
 
     def encode(data: T): RowParquetRecord = ParquetRecordEncoder.encode[T](data, valueCodecConfiguration)
 
@@ -26,7 +25,7 @@ private[parquet4s] object SingleFileParquetSink {
       .map(encode)
       .fold(0) { case (acc, record) => writer.write(record); acc + 1}
       .map { count =>
-        if (isDebugEnabled) logger.debug(s"$count records were successfully written to $path")
+        if (logger.isDebugEnabled) logger.debug(s"$count records were successfully written to $path")
         writer.close()
       }
       .recover { case NonFatal(e) =>

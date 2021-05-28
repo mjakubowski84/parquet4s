@@ -56,7 +56,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       a = dictA(Random.nextInt(3)),
       b = dictB(Random.nextInt(3))
     ))
-  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.default
+  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
 
   def read[T: ParquetRecordDecoder](path: Path): Stream[IO, Vector[T]] =
     parquet.fromParquet[IO, T].read(path).fold(Vector.empty[T])(_ :+ _)

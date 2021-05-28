@@ -209,12 +209,16 @@ final class RowParquetRecord private (
 
   /**
     * Retrieves value from the record and decodes it.
+    * Decodes the value using provided implicit [[ValueDecoder]].
     * @param fieldName field/column name
+    * @param valueCodecConfiguration codec configuration
+    * @param valueDecoder [[ValueDecoder]]
+    * @tparam T type of read value
     * @return [[scala.Some]] decoded field value or [[scala.None]] if such field does not exist
     */
   def get[T](fieldName: String, valueCodecConfiguration: ValueCodecConfiguration)
-            (implicit valueCodec: ValueCodec[T]): Option[T] =
-    get(fieldName).map(valueCodec.decode(_, valueCodecConfiguration))
+            (implicit valueDecoder: ValueDecoder[T]): Option[T] =
+    get(fieldName).map(valueDecoder.decode(_, valueCodecConfiguration))
 
   /**
    *
@@ -272,17 +276,17 @@ final class RowParquetRecord private (
 
   /**
    * Updates existing field or appends a new field to the record if it doesn't exist yet.
-   * Encodes the provided value using implicit [[ValueCodec]].
+   * Encodes the provided value using implicit [[ValueEncoder]].
    * @param name the name of the field
    * @param value the value of the field
    * @param valueCodecConfiguration codec configuration
-   * @param valueCodec [[ValueCodec]]
+   * @param valueEncoder [[ValueEncoder]]
    * @tparam T the type of the value
    * @return updated record
    */
   def updated[T](name: String, value: T, valueCodecConfiguration: ValueCodecConfiguration)
-                (implicit valueCodec: ValueCodec[T]): RowParquetRecord =
-    updated(name, valueCodec.encode(value, valueCodecConfiguration))
+                (implicit valueEncoder: ValueEncoder[T]): RowParquetRecord =
+    updated(name, valueEncoder.encode(value, valueCodecConfiguration))
 
   def updated(idx: Int, field: String, newVal: Value): RowParquetRecord = {
     val oldField = fields.get(idx)
@@ -444,13 +448,13 @@ final class ListParquetRecord private (private val values: Vector[Value])
   /** Appends value to the list.
     * @param value the value to append
     * @param valueCodecConfiguration codec configuration
-    * @param valueCodec [[ValueCodec]]
+    * @param valueEncoder [[ValueEncoder]]
     * @tparam T type of the value
     * @return this record with the value appended
     */
   def appended[T](value: T, valueCodecConfiguration: ValueCodecConfiguration)
-                 (implicit valueCodec: ValueCodec[T]): ListParquetRecord =
-    this.appended(valueCodec.encode(value, valueCodecConfiguration))
+                 (implicit valueEncoder: ValueEncoder[T]): ListParquetRecord =
+    this.appended(valueEncoder.encode(value, valueCodecConfiguration))
 
   /** Gets the value at the specified index.
     *
@@ -464,13 +468,13 @@ final class ListParquetRecord private (private val values: Vector[Value])
     *
     * @param idx The index
     * @param valueCodecConfiguration codec configuration
-    * @param valueCodec [[ValueCodec]]
+    * @param valueDecoder [[ValueDecoder]]
     * @tparam T type of the value
     * @return The value
     * @throws scala.IndexOutOfBoundsException if the index is not valid
     */
-  def apply[T](idx: Int, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueCodec: ValueCodec[T]): T =
-    valueCodec.decode(this.apply(idx), valueCodecConfiguration)
+  def apply[T](idx: Int, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueDecoder: ValueDecoder[T]): T =
+    valueDecoder.decode(this.apply(idx), valueCodecConfiguration)
 
   /** Replaces value at given index with a new value.
     *
@@ -572,19 +576,19 @@ final class MapParquetRecord private[parquet4s](protected val entries: Map[Value
   def updated(key: Value, value: Value): MapParquetRecord = new MapParquetRecord(entries.updated(key, value))
 
   /**
-   * Updates or adds a key-value entry. Encodes the key and the value suing the provided [[ValueCodec]]s
+   * Updates or adds a key-value entry. Encodes the key and the value suing the provided [[ValueEncoder]]s
    * @param key the key
    * @param value the value
    * @param valueCodecConfiguration codec configuration
-   * @param kCodec [[ValueCodec]] for the key
-   * @param vCodec [[ValueCodec]] for the value
+   * @param kEncoder [[ValueEncoder]] for the key
+   * @param vEncoder [[ValueEncoder]] for the value
    * @tparam K type of the key
    * @tparam V type of the value
    * @return the modified record
    */
   def updated[K, V](key: K, value: V, valueCodecConfiguration: ValueCodecConfiguration)
-                  (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): MapParquetRecord =
-    updated(kCodec.encode(key, valueCodecConfiguration), vCodec.encode(value, valueCodecConfiguration))
+                   (implicit kEncoder: ValueEncoder[K], vEncoder: ValueEncoder[V]): MapParquetRecord =
+    updated(kEncoder.encode(key, valueCodecConfiguration), vEncoder.encode(value, valueCodecConfiguration))
 
   /** Retrieves the value which is associated with the given key.
     *
@@ -599,16 +603,16 @@ final class MapParquetRecord private[parquet4s](protected val entries: Map[Value
     *
     * @param key the key
     * @param valueCodecConfiguration configuration used by some of codecs
-    * @param kCodec key codec
-    * @param vCodec value codec
+    * @param kEncoder key encoder
+    * @param vDecoder value decoder
     * @tparam K type of the key
     * @tparam V type of the value
     * @return retrieved value
     * @throws scala.NoSuchElementException if there is no entry for the given key
     */
   def apply[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)
-                 (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): V =
-    vCodec.decode(this.apply(kCodec.encode(key, valueCodecConfiguration)), valueCodecConfiguration)
+                 (implicit kEncoder: ValueEncoder[K], vDecoder: ValueDecoder[V]): V =
+    vDecoder.decode(this.apply(kEncoder.encode(key, valueCodecConfiguration)), valueCodecConfiguration)
 
 
   /** Optionally returns the value associated with a key.
@@ -623,17 +627,17 @@ final class MapParquetRecord private[parquet4s](protected val entries: Map[Value
     *
     * @param key the key
     * @param valueCodecConfiguration configuration used by some of codecs
-    * @param kCodec key codec
-    * @param vCodec value codec
+    * @param kEncoder key codec
+    * @param vDecoder value codec
     * @tparam K type of the key
     * @tparam V type of the value
     * @return retrieved value or None if there is no value associated with the key
     */
   def get[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)
-               (implicit kCodec: ValueCodec[K], vCodec: ValueCodec[V]): Option[V] =
+               (implicit kEncoder: ValueEncoder[K], vDecoder: ValueDecoder[V]): Option[V] =
     this
-      .get(kCodec.encode(key, valueCodecConfiguration))
-      .map(v => vCodec.decode(v, valueCodecConfiguration))
+      .get(kEncoder.encode(key, valueCodecConfiguration))
+      .map(v => vDecoder.decode(v, valueCodecConfiguration))
 
   override def iterator: Iterator[(Value, Value)] = entries.iterator
 

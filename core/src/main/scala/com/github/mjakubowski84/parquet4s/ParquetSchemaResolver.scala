@@ -8,6 +8,7 @@ import org.apache.parquet.schema._
 import shapeless._
 import shapeless.labelled._
 
+import scala.annotation.implicitNotFound
 import scala.language.higherKinds
 import scala.reflect.ClassTag
 
@@ -15,6 +16,9 @@ import scala.reflect.ClassTag
   * Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
   * @tparam T scala type that represents schema of Parquet data.
   */
+@implicitNotFound("Cannot write data of type ${T}. " +
+  "Please check if there is implicit TypedSchemaDef available for each field and subfield of ${T}."
+)
 trait ParquetSchemaResolver[T] {
 
   /**

@@ -21,7 +21,7 @@ private[parquet4s] class FilteredFileStats(
                                             filter: Filter
                                           ) extends Stats {
 
-  private val vcc = options.toValueCodecConfiguration
+  private val vcc = ValueCodecConfiguration(options)
   private val inputFile = HadoopInputFile.fromStatus(status, options.hadoopConf)
   private val readerOptions = ParquetReadOptions.builder().withRecordFilter(filter.toFilterCompat(vcc)).build()
 
@@ -57,7 +57,7 @@ private[parquet4s] class FilteredFileStats(
   }
 
   private class MinMaxReader[V](columnPath: ColumnPath, startExtremeOpt: Option[V])
-                               (implicit codec: ValueCodec[V], ordering: Ordering[V]) extends StatsReader {
+                               (implicit decoder: ValueDecoder[V], ordering: Ordering[V]) extends StatsReader {
     private val dotString = columnPath.toString
     private lazy val currentBlockField = {
       val f = reader.getClass.getDeclaredField("currentBlock")
@@ -70,10 +70,10 @@ private[parquet4s] class FilteredFileStats(
       reader.getRowGroups.get(currentBlock).getColumns.asScala.find(_.getPath.toDotString == dotString).map(_.getStatistics)
 
     private def currentRowGroupStatisticsMin =
-      currentRowGroupStatistics.flatMap(statsMinValue).map(value => codec.decode(value, vcc))
+      currentRowGroupStatistics.flatMap(statsMinValue).map(value => decoder.decode(value, vcc))
 
     private def currentRowGroupStatisticsMax =
-      currentRowGroupStatistics.flatMap(statsMaxValue).map(value => codec.decode(value, vcc))
+      currentRowGroupStatistics.flatMap(statsMaxValue).map(value => decoder.decode(value, vcc))
 
     private def extremeOfRowGroup(currentExtremeOpt: Option[V], choose: (V, V) => V) = {
       val store = reader.readNextFilteredRowGroup()
@@ -85,7 +85,7 @@ private[parquet4s] class FilteredFileStats(
           case Some(record) => record.get(columnPath)
         }
         .collect {
-          case Some(value) if value != NullValue => codec.decode(value, vcc)
+          case Some(value) if value != NullValue => decoder.decode(value, vcc)
         }
         .foldLeft(currentExtremeOpt) {
           case (None, v) => Some(v)
@@ -146,7 +146,7 @@ private[parquet4s] class FilteredFileStats(
   }
 
   override def min[V](columnPath: ColumnPath, currentMin: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
+                     (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMin)
     try {
       reader.min
@@ -156,7 +156,7 @@ private[parquet4s] class FilteredFileStats(
   }
 
   override def max[V](columnPath: ColumnPath, currentMax: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
+                     (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMax)
     try {
       reader.max

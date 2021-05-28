@@ -19,7 +19,7 @@ private[parquet4s] class FileStats(
                                     projectionSchemaOpt: Option[MessageType]
                                   ) extends Stats {
 
-  private val vcc = options.toValueCodecConfiguration
+  private val vcc = ValueCodecConfiguration(options)
   private val inputFile = HadoopInputFile.fromStatus(status, options.hadoopConf)
   private val readerOptions = ParquetReadOptions.builder().build()
 
@@ -34,7 +34,7 @@ private[parquet4s] class FileStats(
   }
 
   private class MinMaxReader[V](columnPath: ColumnPath, currentExtreme: Option[V])
-                            (implicit codec: ValueCodec[V], ordering: Ordering[V]) extends StatsReader {
+                               (implicit decoder: ValueDecoder[V], ordering: Ordering[V]) extends StatsReader {
     private val dotString = columnPath.toString
 
     private def extreme(statsValue: Statistics[_] => IterableOnce[Value], choose: (V, V) => V) =
@@ -43,7 +43,7 @@ private[parquet4s] class FileStats(
         .collect { case Some(column) => column }
         .map(_.getStatistics)
         .flatMap(statsValue)
-        .map(value => codec.decode(value, vcc))
+        .map(value => decoder.decode(value, vcc))
         .foldLeft(currentExtreme) {
           case (None, v) => Option(v)
           case (Some(a), b) => Option(choose(a, b))
@@ -64,7 +64,7 @@ private[parquet4s] class FileStats(
   }
 
   override def min[V](columnPath: ColumnPath, currentMin: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
+                     (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMin)
     try {
       reader.min
@@ -74,7 +74,7 @@ private[parquet4s] class FileStats(
   }
 
   override def max[V](columnPath: ColumnPath, currentMax: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
+                     (implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMax)
     try {
       reader.max
