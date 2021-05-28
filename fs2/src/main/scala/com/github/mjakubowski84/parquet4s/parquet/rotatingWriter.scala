@@ -282,7 +282,7 @@ object rotatingWriter {
     in =>
       for {
         schema <- Stream.eval(F.catchNonFatal(ParquetSchemaResolver.resolveSchema[W](partitionBy)))
-        valueCodecConfiguration <- Stream.eval(F.catchNonFatal(options.toValueCodecConfiguration))
+        valueCodecConfiguration <- Stream.eval(F.catchNonFatal(ValueCodecConfiguration(options)))
         encode = { (entity: W) => F.catchNonFatal(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
         logger <- Stream.eval(logger[F](this.getClass))
         rotatingWriter <- Stream.emit(
