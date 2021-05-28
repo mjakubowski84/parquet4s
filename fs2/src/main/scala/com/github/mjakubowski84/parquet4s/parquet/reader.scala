@@ -68,12 +68,13 @@ object reader {
                                                                           )(implicit F: Sync[F]): Stream[F, T] = {
 
     for {
-      vcc      <- Stream.eval(F.pure(options.toValueCodecConfiguration))
+      vcc                  <- Stream.eval(F.pure(ValueCodecConfiguration(options)))
       decode = (record: RowParquetRecord) => F.catchNonFatal(ParquetRecordDecoder.decode(record, vcc))
       partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf)
       projectedSchemaOpt <- Stream.eval(projectedSchemaResolverOpt
-        .traverse(implicit resolver => F.delay(SkippingParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))))
-      partitionData        <- Stream.eval(F.catchNonFatal(PartitionFilter.filter(filter, vcc, partitionedDirectory))).flatMap(Stream.iterable)
+        .traverse(implicit resolver => F.catchNonFatal(SkippingParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))))
+      partitionData        <- Stream.eval(F.catchNonFatal(PartitionFilter.filter(filter, vcc, partitionedDirectory)))
+                                .flatMap(Stream.iterable)
       (partitionFilter, partitionedPath) = partitionData
       reader <- Stream.resource(readerResource(partitionedPath.path, options, partitionFilter, projectedSchemaOpt))
       entity <- readerStream(reader)

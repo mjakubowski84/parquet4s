@@ -265,13 +265,13 @@ object FilterCodec {
     apply[String, Binary, BinaryColumn]((v, _) => Binary.fromString(v), (v, _) => v.toStringUsingUTF8)
   implicit val sqlDateCodec: FilterCodec[java.sql.Date, java.lang.Integer, IntColumn] =
     apply[java.sql.Date, java.lang.Integer, IntColumn](
-      ValueCodec.sqlDateCodec.encode(_, _).asInstanceOf[PrimitiveValue[Int]].value,
-      (v, vcc) => ValueCodec.sqlDateCodec.decode(IntValue(v), vcc)
+      ValueEncoder.sqlDateEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Int]].value,
+      (v, vcc) => ValueDecoder.sqlDateDecoder.decode(IntValue(v), vcc)
     )
   implicit val localDateCodec: FilterCodec[java.time.LocalDate, java.lang.Integer, IntColumn] =
     apply[java.time.LocalDate, java.lang.Integer, IntColumn](
-      ValueCodec.localDateCodec.encode(_, _).asInstanceOf[PrimitiveValue[Int]].value,
-      (v, vcc) => ValueCodec.localDateCodec.decode(IntValue(v), vcc))
+      ValueEncoder.localDateEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Int]].value,
+      (v, vcc) => ValueDecoder.localDateDecoder.decode(IntValue(v), vcc))
   implicit val decimalCodec: FilterCodec[BigDecimal, Binary, BinaryColumn] =
     apply[BigDecimal, Binary, BinaryColumn](
       (v, _) => Decimals.binaryFromDecimal(v),

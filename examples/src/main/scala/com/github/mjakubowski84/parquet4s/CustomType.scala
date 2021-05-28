@@ -22,16 +22,15 @@ object CustomType {
 
     def random: Type = values(Random.nextInt(values.length))
 
-    // required for reading and writing
-    implicit val codec: OptionalValueCodec[Type] = new OptionalValueCodec[Type] {
-      override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Type = value match {
+    // required for reading
+    implicit val decoder: OptionalValueDecoder[Type] =
+      (value: Value, _: ValueCodecConfiguration) => value match {
         case BinaryValue(binary) => valueOf(binary.toStringUsingUTF8)
       }
-      override protected def encodeNonNull(data: Type, configuration: ValueCodecConfiguration): Value =
-        BinaryValue(data.toString)
-    }
-
-    // required for writing only
+    // required for writing
+    implicit val encoder: OptionalValueEncoder[Type] =
+      (data: Type, _: ValueCodecConfiguration) => BinaryValue(data.toString)
+    // required for writing
     implicit val schema: TypedSchemaDef[Type] =
       SchemaDef
         .primitive(

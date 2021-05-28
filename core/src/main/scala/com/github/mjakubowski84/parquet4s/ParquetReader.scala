@@ -13,7 +13,7 @@ import scala.annotation.implicitNotFound
   * @tparam T Type that represents schema of Parquet file
   */
 @implicitNotFound("Cannot read data of type ${T}. " +
-  "Please check if there is implicit ValueCodec available for each field and subfield of ${T}."
+  "Please check if there is implicit ValueDecoder available for each field and subfield of ${T}."
 )
 trait ParquetReader[T] {
 
@@ -41,17 +41,15 @@ object ParquetReader {
     *                 time zone is used by default
     * @param hadoopConf use it to programmatically override Hadoop's [[org.apache.hadoop.conf.Configuration]]
     */
-  case class Options(timeZone: TimeZone = TimeZone.getDefault, hadoopConf: Configuration = new Configuration()) {
-    private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
-  }
+  case class Options(timeZone: TimeZone = TimeZone.getDefault, hadoopConf: Configuration = new Configuration())
 
-  private def newParquetIterable[T : ParquetRecordDecoder](
-                                                            path: Path,
-                                                            options: Options,
-                                                            filter: Filter,
-                                                            projectedSchemaOpt: Option[MessageType]
-                                                          ): ParquetIterable[T] = {
-    val valueCodecConfiguration = options.toValueCodecConfiguration
+  private def newParquetIterable[T: ParquetRecordDecoder](
+                                                           path: Path,
+                                                           options: Options,
+                                                           filter: Filter,
+                                                           projectedSchemaOpt: Option[MessageType]
+                                                         ): ParquetIterable[T] = {
+    val valueCodecConfiguration = ValueCodecConfiguration(options)
     newParquetIterable(
       builder = HadoopParquetReader
         .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), path.toHadoop)
@@ -63,11 +61,11 @@ object ParquetReader {
     )
   }
 
-  private[parquet4s] def newParquetIterable[T : ParquetRecordDecoder](
-                                                                       builder: Builder,
-                                                                       valueCodecConfiguration: ValueCodecConfiguration,
-                                                                       stats: Stats
-                                                                       ): ParquetIterable[T] =
+  private[parquet4s] def newParquetIterable[T: ParquetRecordDecoder](
+                                                                      builder: Builder,
+                                                                      valueCodecConfiguration: ValueCodecConfiguration,
+                                                                      stats: Stats
+                                                                    ): ParquetIterable[T] =
     new ParquetIterableImpl(builder, valueCodecConfiguration, stats)
 
   /**
@@ -92,11 +90,11 @@ object ParquetReader {
   /**
     * Default implementation of [[ParquetReader]].
     */
-  implicit def reader[T : ParquetRecordDecoder]: ParquetReader[T] =
+  implicit def reader[T: ParquetRecordDecoder]: ParquetReader[T] =
     (path: Path, options: Options, filter: Filter) =>
       newParquetIterable(path = path, options = options, filter = filter, projectedSchemaOpt = None)
 
-  def withProjection[T : ParquetRecordDecoder: ParquetSchemaResolver]: ParquetReader[T] =
+  def withProjection[T: ParquetRecordDecoder: ParquetSchemaResolver]: ParquetReader[T] =
     (path: Path, options: Options, filter: Filter) =>
       newParquetIterable(
         path = path,
@@ -120,7 +118,7 @@ trait ParquetIterable[T] extends Iterable[T] with Closeable {
    * @tparam V type of data at given path
    * @return min value or [[scala.None]] if there is no matching data or path is invalid
    */
-  def min[V: Ordering: ValueCodec](columnPath: ColumnPath): Option[V]
+  def min[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V]
 
   /**
    * Returns max value of underlying dataset at given path
@@ -129,11 +127,11 @@ trait ParquetIterable[T] extends Iterable[T] with Closeable {
    * @tparam V type of data at given path
    * @return max value or [[scala.None]] if there is no matching data or path is invalid
    */
-  def max[V: Ordering: ValueCodec](columnPath: ColumnPath): Option[V]
+  def max[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V]
 
 }
 
-private class ParquetIterableImpl[T : ParquetRecordDecoder](
+private class ParquetIterableImpl[T: ParquetRecordDecoder](
                                                              builder: ParquetReader.Builder,
                                                              valueCodecConfiguration: ValueCodecConfiguration,
                                                              stats: Stats
@@ -181,9 +179,9 @@ private class ParquetIterableImpl[T : ParquetRecordDecoder](
     }
   }
 
-  override def min[V: Ordering : ValueCodec](columnPath: ColumnPath): Option[V] = stats.min(columnPath)
+  override def min[V: Ordering : ValueDecoder](columnPath: ColumnPath): Option[V] = stats.min(columnPath)
 
-  override def max[V: Ordering : ValueCodec](columnPath: ColumnPath): Option[V] = stats.max(columnPath)
+  override def max[V: Ordering : ValueDecoder](columnPath: ColumnPath): Option[V] = stats.max(columnPath)
 
   override def size: Int = stats.recordCount.toInt
 

@@ -13,7 +13,7 @@ object ParquetIterableSpec {
 
   def testRecord(int: Int): RowParquetRecord = RowParquetRecord("int" -> int.value)
 
-  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.default
+  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
 }
 
 class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockito {
@@ -217,7 +217,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
       vcc,
       stats
     ).min[Int](Col("int"))
-    stats.min(Col("int"))(any[ValueCodec[Int]], any[Ordering[Int]]) was called
+    stats.min(Col("int"))(any[ValueDecoder[Int]], any[Ordering[Int]]) was called
   }
 
   "max" should "use stats for returning record count" in {
@@ -227,7 +227,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
       vcc,
       stats
     ).max[Int](Col("int"))
-    stats.max(Col("int"))(any[ValueCodec[Int]], any[Ordering[Int]]) was called
+    stats.max(Col("int"))(any[ValueDecoder[Int]], any[Ordering[Int]]) was called
   }
 
 }
