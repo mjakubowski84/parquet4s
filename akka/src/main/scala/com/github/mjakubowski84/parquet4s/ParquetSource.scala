@@ -68,7 +68,7 @@ object ParquetSource extends IOOps {
                                                         filter: Filter,
                                                         projectedSchemaResolverOpt: Option[SkippingParquetSchemaResolver[T]]
                                                        ): Source[T, NotUsed] = {
-    val valueCodecConfiguration = options.toValueCodecConfiguration
+    val valueCodecConfiguration = ValueCodecConfiguration(options)
     val hadoopConf = options.hadoopConf
 
     findPartitionedPaths(path, hadoopConf).fold(

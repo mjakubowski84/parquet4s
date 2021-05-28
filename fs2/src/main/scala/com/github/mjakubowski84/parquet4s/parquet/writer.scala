@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.{Resource, Sync}
 import cats.implicits._
-import com.github.mjakubowski84.parquet4s.{ParquetRecordEncoder, ParquetSchemaResolver, ParquetWriter, Path, RowParquetRecord}
+import com.github.mjakubowski84.parquet4s.{ParquetRecordEncoder, ParquetSchemaResolver, ParquetWriter, Path, RowParquetRecord, ValueCodecConfiguration}
 import fs2.{Chunk, Pipe, Pull, Stream}
 
 import scala.language.higherKinds
@@ -16,7 +16,7 @@ private[parquet4s] object writer {
     def write(elem: T): F[Unit] =
       for {
         record <- encode(elem)
-        // F.delay is much faster when using local file system - let's compare it when using AWS
+        // TODO F.delay is much faster when using local file system - let's compare it when using AWS
         _ <- F.blocking(internalWriter.write(record))
       } yield ()
 
@@ -51,7 +51,7 @@ private[parquet4s] object writer {
     Resource.fromAutoCloseable(
       for {
         schema <- F.catchNonFatal(ParquetSchemaResolver.resolveSchema[T])
-        valueCodecConfiguration <- F.catchNonFatal(options.toValueCodecConfiguration)
+        valueCodecConfiguration <- F.catchNonFatal(ValueCodecConfiguration(options))
         internalWriter <- F.blocking(ParquetWriter.internalWriter(path, schema, options))
         encode = { (entity: T) => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)) }
       } yield new Writer[T, F](internalWriter, encode)
