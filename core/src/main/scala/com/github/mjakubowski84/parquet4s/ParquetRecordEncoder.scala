@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
+import scala.annotation.implicitNotFound
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
@@ -11,6 +12,9 @@ import scala.util.control.NonFatal
   * Type class that allows to encode given data entity as [[RowParquetRecord]]
   * @tparam T type of source data
   */
+@implicitNotFound("Cannot write data of type ${T}. " +
+  "Please check if there is implicit ValueEncoder available for each field and subfield of ${T}."
+)
 trait ParquetRecordEncoder[T] {
 
   /**
@@ -36,14 +40,14 @@ object ParquetRecordEncoder {
 
   def apply[T](implicit ev: ParquetRecordEncoder[T]): ParquetRecordEncoder[T] = ev
 
-  def encode[T](entity: T, configuration: ValueCodecConfiguration = ValueCodecConfiguration.default)
+  def encode[T](entity: T, configuration: ValueCodecConfiguration = ValueCodecConfiguration.Default)
                (implicit ev: ParquetRecordEncoder[T]): RowParquetRecord = ev.encode(entity, configuration)
 
   implicit val nilEncoder: ParquetRecordEncoder[HNil] = (_, _) => RowParquetRecord.EmptyNoSchema
 
   implicit def headValueEncoder[FieldName <: Symbol, Head, Tail <: HList](implicit
                                                                           witness: Witness.Aux[FieldName],
-                                                                          headEncoder: ValueCodec[Head],
+                                                                          headEncoder: ValueEncoder[Head],
                                                                           tailEncoder: ParquetRecordEncoder[Tail]
                                                                          ): ParquetRecordEncoder[FieldType[FieldName, Head] :: Tail] =
     (entity: FieldType[FieldName, Head] :: Tail, configuration: ValueCodecConfiguration) => {
