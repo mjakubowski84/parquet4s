@@ -42,7 +42,7 @@ object ParquetWriter  {
   private[parquet4s] type InternalWriter = HadoopParquetWriter[RowParquetRecord]
 
   @implicitNotFound("Cannot write data of type ${T}. " +
-      "Please check if there are implicit ValueCodec and TypedSchemaDef available for each field and subfield of ${T}."
+      "Please check if there are implicit ValueEncoder and TypedSchemaDef available for each field and subfield of ${T}."
   )
   type ParquetWriterFactory[T] = (Path, Options) => ParquetWriter[T]
 
@@ -81,9 +81,7 @@ object ParquetWriter  {
                     validationEnabled: Boolean = HadoopParquetWriter.DEFAULT_IS_VALIDATING_ENABLED,
                     hadoopConf: Configuration = new Configuration(),
                     timeZone: TimeZone = TimeZone.getDefault
-                    ) {
-    private[parquet4s] def toValueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration(timeZone)
-  }
+                    )
 
   private[parquet4s] def internalWriter(path: Path, schema: MessageType, options: Options): InternalWriter =
     new Builder(path, schema)
@@ -138,7 +136,7 @@ private class DefaultParquetWriter[T : ParquetRecordEncoder : ParquetSchemaResol
     schema = ParquetSchemaResolver.resolveSchema[T],
     options = options
   )
-  private val valueCodecConfiguration = options.toValueCodecConfiguration
+  private val valueCodecConfiguration = ValueCodecConfiguration(options)
   private val logger = LoggerFactory.getLogger(this.getClass)
   private var closed = false
 

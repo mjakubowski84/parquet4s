@@ -11,8 +11,8 @@ import scala.util.control.NonFatal
   * Type class that allows to decode instances of [[RowParquetRecord]]
   * @tparam T represents schema of [[RowParquetRecord]]
   */
-@implicitNotFound("Cannot read data of type ${T}. " +
-  "Please check if there is implicit ValueCodec available for each field and subfield of ${T}."
+@implicitNotFound("ParquetRecordDecoder. Cannot read data of type ${T}. " +
+  "Please check if there is implicit ValueDecoder available for each field and subfield of ${T}."
 )
 trait ParquetRecordDecoder[T] {
 
@@ -39,14 +39,14 @@ object ParquetRecordDecoder {
 
   def apply[T](implicit ev: ParquetRecordDecoder[T]): ParquetRecordDecoder[T] = ev
 
-  def decode[T](record: RowParquetRecord, configuration: ValueCodecConfiguration = ValueCodecConfiguration.default)
+  def decode[T](record: RowParquetRecord, configuration: ValueCodecConfiguration = ValueCodecConfiguration.Default)
                (implicit ev: ParquetRecordDecoder[T]): T = ev.decode(record, configuration)
 
   implicit val nilDecoder: ParquetRecordDecoder[HNil] = (_, _) => HNil
 
   implicit def headValueDecoder[FieldName <: Symbol, Head, Tail <: HList](implicit
                                                                           witness: Witness.Aux[FieldName],
-                                                                          headDecoder: ValueCodec[Head],
+                                                                          headDecoder: ValueDecoder[Head],
                                                                           tailDecoder: ParquetRecordDecoder[Tail]
                                                                          ): ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] =
     (record: RowParquetRecord, configuration: ValueCodecConfiguration) => {
