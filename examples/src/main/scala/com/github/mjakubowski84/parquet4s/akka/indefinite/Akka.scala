@@ -15,5 +15,6 @@ trait Akka {
   def stopAkka(): Unit = {
     logger.info("Stopping Akka...")
     Await.ready(system.terminate(), 1.second)
+    ()
   }
 }

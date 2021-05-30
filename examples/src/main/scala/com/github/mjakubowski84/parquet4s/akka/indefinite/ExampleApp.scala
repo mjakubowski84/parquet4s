@@ -28,6 +28,7 @@ object ExampleApp
   def stopStream(): Unit = {
     logger.info("Stopping stream...")
     Await.ready(streamControl.drainAndShutdown(), 10.second)
+    ()
   }
 
   sys.addShutdownHook {

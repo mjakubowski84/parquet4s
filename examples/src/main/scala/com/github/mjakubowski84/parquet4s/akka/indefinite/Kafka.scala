@@ -17,7 +17,10 @@ trait Kafka {
 
   def sendKafkaMessage(message: String): Unit = EmbeddedKafka.publishStringMessageToKafka(topic, message)
 
-  def startKafka(): Unit = broker
+  def startKafka(): Unit = {
+    broker
+    ()
+  }
 
   def stopKafka(): Unit = {
     logger.info("Stopping Kafka...")
