@@ -1,94 +1,136 @@
 package com.github.mjakubowski84.parquet4s
 
 import java.nio.{ByteBuffer, ByteOrder}
+import java.sql.{Date, Timestamp}
 import java.time._
-
 import scala.collection.compat._
-import scala.language.higherKinds
 import scala.reflect.ClassTag
+
+import scala.language.higherKinds
 
 
 trait PrimitiveValueDecoders {
 
-  implicit val stringDecoder: OptionalValueDecoder[String] = (value, _) =>
-    value match {
-      case BinaryValue(binary) => binary.toStringUsingUTF8
-    }
+  implicit val stringDecoder: OptionalValueDecoder[String] = new OptionalValueDecoder[String] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): String =
+      value match {
+        case BinaryValue(binary) => binary.toStringUsingUTF8
+      }
+  }
 
-  implicit val charDecoder: RequiredValueDecoder[Char] = (value, _) =>
-    value match {
-      case IntValue(int) => int.toChar
-    }
+  implicit val charDecoder: RequiredValueDecoder[Char] = new RequiredValueDecoder[Char] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Char =
+      value match {
+        case IntValue(int) => int.toChar
+      }
+  }
 
-  implicit val booleanDecoder: RequiredValueDecoder[Boolean] = (value, _) =>
-    value match {
-      case BooleanValue(b) => b
-    }
+  implicit val booleanDecoder: RequiredValueDecoder[Boolean] = new RequiredValueDecoder[Boolean] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Boolean =
+      value match {
+        case BooleanValue(b) => b
+      }
+  }
 
-  implicit val intDecoder: RequiredValueDecoder[Int] = (value, _) =>
-    value match {
-      case IntValue(int) => int
-      case LongValue(long) => long.toInt
-    }
+  implicit val intDecoder: RequiredValueDecoder[Int] = new RequiredValueDecoder[Int] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Int =
+      value match {
+        case IntValue(int) => int
+        case LongValue(long) => long.toInt
+      }
+  }
 
-  implicit val longDecoder: RequiredValueDecoder[Long] = (value, _) =>
-    value match {
-      case IntValue(int) => int.toLong
-      case LongValue(long) => long
-    }
+  implicit val longDecoder: RequiredValueDecoder[Long] = new RequiredValueDecoder[Long] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Long =
+      value match {
+        case IntValue(int) => int.toLong
+        case LongValue(long) => long
+      }
+  }
 
-  implicit val doubleDecoder: RequiredValueDecoder[Double] = (value, _) =>
-    value match {
-      case DoubleValue(double) => double
-      case FloatValue(float) => float.toDouble
-    }
+  implicit val doubleDecoder: RequiredValueDecoder[Double] = new RequiredValueDecoder[Double] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Double =
+      value match {
+        case DoubleValue(double) => double
+        case FloatValue(float) => float.toDouble
+      }
+  }
 
-  implicit val floatDecoder: RequiredValueDecoder[Float] = (value, _) =>
-    value match {
-      case DoubleValue(double) => double.toFloat
-      case FloatValue(float) => float
-    }
+  implicit val floatDecoder: RequiredValueDecoder[Float] = new RequiredValueDecoder[Float] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Float =
+      value match {
+        case DoubleValue(double) => double.toFloat
+        case FloatValue(float) => float
+      }
+  }
 
-  implicit val shortDecoder: RequiredValueDecoder[Short] = (value, _) =>
-    value match {
-      case IntValue(int) => int.toShort
-    }
+  implicit val shortDecoder: RequiredValueDecoder[Short] = new RequiredValueDecoder[Short] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Short =
+      value match {
+        case IntValue(int) => int.toShort
+      }
+  }
 
-  implicit val byteDecoder: RequiredValueDecoder[Byte] = (value, _) =>
-    value match {
-      case IntValue(int) => int.toByte
-    }
+  implicit val byteDecoder: RequiredValueDecoder[Byte] = new RequiredValueDecoder[Byte] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Byte =
+      value match {
+        case IntValue(int) => int.toByte
+      }
+  }
 
-  implicit val decimalDecoder: OptionalValueDecoder[BigDecimal] = (value, _) =>
-    value match {
-      case IntValue(int) => BigDecimal(int)
-      case LongValue(long) => BigDecimal.decimal(long)
-      case DoubleValue(double) => BigDecimal.decimal(double)
-      case FloatValue(float) => BigDecimal.decimal(float)
-      case BinaryValue(binary) => Decimals.decimalFromBinary(binary)
-    }
+  implicit val decimalDecoder: OptionalValueDecoder[BigDecimal] = new OptionalValueDecoder[BigDecimal] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): BigDecimal =
+      value match {
+        case IntValue(int) => BigDecimal(int)
+        case LongValue(long) => BigDecimal.decimal(long)
+        case DoubleValue(double) => BigDecimal.decimal(double)
+        case FloatValue(float) => BigDecimal.decimal(float)
+        case BinaryValue(binary) => Decimals.decimalFromBinary(binary)
+      }
+  }
 }
 trait PrimitiveValueEncoders {
 
-  implicit val stringEncoder: OptionalValueEncoder[String] = (data, _) => BinaryValue(data)
+  implicit val stringEncoder: OptionalValueEncoder[String] = new OptionalValueEncoder[String] {
+    def encodeNonNull(data: String, configuration: ValueCodecConfiguration): Value = BinaryValue(data)
+  }
 
-  implicit val charEncoder: RequiredValueEncoder[Char] = (data, _) => IntValue(data)
+  implicit val charEncoder: RequiredValueEncoder[Char] = new RequiredValueEncoder[Char] {
+    def encodeNonNull(data: Char, configuration: ValueCodecConfiguration): Value = IntValue(data)
+  }
 
-  implicit val booleanEncoder: RequiredValueEncoder[Boolean] = (data, _)=> BooleanValue(data)
+  implicit val booleanEncoder: RequiredValueEncoder[Boolean] = new RequiredValueEncoder[Boolean] {
+    def encodeNonNull(data: Boolean, configuration: ValueCodecConfiguration): Value = BooleanValue(data)
+  }
 
-  implicit val intEncoder: RequiredValueEncoder[Int] = (data, _) => IntValue(data)
+  implicit val intEncoder: RequiredValueEncoder[Int] = new RequiredValueEncoder[Int] {
+    def encodeNonNull(data: Int, configuration: ValueCodecConfiguration): Value = IntValue(data)
+  }
 
-  implicit val longEncoder: RequiredValueEncoder[Long] = (data, _) => LongValue(data)
+  implicit val longEncoder: RequiredValueEncoder[Long] = new RequiredValueEncoder[Long] {
+    def encodeNonNull(data: Long, configuration: ValueCodecConfiguration): Value = LongValue(data)
+  }
 
-  implicit val doubleEncoder: RequiredValueEncoder[Double] = (data, _) => DoubleValue(data)
+  implicit val doubleEncoder: RequiredValueEncoder[Double] = new RequiredValueEncoder[Double] {
+    def encodeNonNull(data: Double, configuration: ValueCodecConfiguration): Value = DoubleValue(data)
+  }
 
-  implicit val floatEncoder: RequiredValueEncoder[Float] = (data, _) => FloatValue(data)
+  implicit val floatEncoder: RequiredValueEncoder[Float] = new RequiredValueEncoder[Float] {
+    def encodeNonNull(data: Float, configuration: ValueCodecConfiguration): Value = FloatValue(data)
+  }
 
-  implicit val shortEncoder: RequiredValueEncoder[Short] = (data, _) => IntValue(data)
+  implicit val shortEncoder: RequiredValueEncoder[Short] = new RequiredValueEncoder[Short] {
+    def encodeNonNull(data: Short, configuration: ValueCodecConfiguration): Value = IntValue(data)
+  }
 
-  implicit val byteEncoder: RequiredValueEncoder[Byte] = (data, _) => IntValue(data)
+  implicit val byteEncoder: RequiredValueEncoder[Byte] = new RequiredValueEncoder[Byte] {
+    def encodeNonNull(data: Byte, configuration: ValueCodecConfiguration): Value = IntValue(data)
+  }
 
-  implicit val decimalEncoder: OptionalValueEncoder[BigDecimal] = (data, _) => BinaryValue(Decimals.binaryFromDecimal(data))
+  implicit val decimalEncoder: OptionalValueEncoder[BigDecimal] = new OptionalValueEncoder[BigDecimal] {
+    def encodeNonNull(data: BigDecimal, configuration: ValueCodecConfiguration): Value =
+      BinaryValue(Decimals.binaryFromDecimal(data))
+  }
 }
 
 private[parquet4s] object TimeValueCodecs {
@@ -163,33 +205,49 @@ private[parquet4s] object TimeValueCodecs {
 
 trait TimeValueDecoders {
 
-  implicit val localDateTimeDecoder: OptionalValueDecoder[LocalDateTime] =
-    (value, configuration) => TimeValueCodecs.decodeLocalDateTime(value, configuration)
+  implicit val localDateTimeDecoder: OptionalValueDecoder[LocalDateTime] = new OptionalValueDecoder[LocalDateTime] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): LocalDateTime =
+      TimeValueCodecs.decodeLocalDateTime(value, configuration)
+  }
 
-  implicit val sqlTimestampDecoder: OptionalValueDecoder[java.sql.Timestamp] =
-    (value, configuration) => java.sql.Timestamp.valueOf(TimeValueCodecs.decodeLocalDateTime(value, configuration))
+  implicit val sqlTimestampDecoder: OptionalValueDecoder[java.sql.Timestamp] = new OptionalValueDecoder[Timestamp] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Timestamp =
+      java.sql.Timestamp.valueOf(TimeValueCodecs.decodeLocalDateTime(value, configuration))
+  }
 
-  implicit val localDateDecoder: OptionalValueDecoder[LocalDate] =
-    (value, _) => TimeValueCodecs.decodeLocalDate(value)
+  implicit val localDateDecoder: OptionalValueDecoder[LocalDate] = new OptionalValueDecoder[LocalDate] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): LocalDate =
+      TimeValueCodecs.decodeLocalDate(value)
+  }
 
-  implicit val sqlDateDecoder: OptionalValueDecoder[java.sql.Date] =
-    (value, _) => java.sql.Date.valueOf(TimeValueCodecs.decodeLocalDate(value))
+  implicit val sqlDateDecoder: OptionalValueDecoder[java.sql.Date] = new OptionalValueDecoder[Date] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Date =
+      java.sql.Date.valueOf(TimeValueCodecs.decodeLocalDate(value))
+  }
 
 }
 
 trait TimeValueEncoders {
 
-  implicit val localDateTimeEncoder: OptionalValueEncoder[LocalDateTime] =
-    (data, configuration) => TimeValueCodecs.encodeLocalDateTime(data, configuration)
+  implicit val localDateTimeEncoder: OptionalValueEncoder[LocalDateTime] = new OptionalValueEncoder[LocalDateTime] {
+    def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeLocalDateTime(data, configuration)
+  }
 
-  implicit val sqlTimestampEncoder: OptionalValueEncoder[java.sql.Timestamp] =
-    (data, configuration) => TimeValueCodecs.encodeLocalDateTime(data.toLocalDateTime, configuration)
+  implicit val sqlTimestampEncoder: OptionalValueEncoder[java.sql.Timestamp] = new OptionalValueEncoder[Timestamp] {
+    def encodeNonNull(data: Timestamp, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeLocalDateTime(data.toLocalDateTime, configuration)
+  }
 
-  implicit val localDateEncoder: OptionalValueEncoder[LocalDate] =
-    (data, _) => TimeValueCodecs.encodeLocalDate(data)
+  implicit val localDateEncoder: OptionalValueEncoder[LocalDate] = new OptionalValueEncoder[LocalDate] {
+    def encodeNonNull(data: LocalDate, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeLocalDate(data)
+  }
 
-  implicit val sqlDateEncoder: OptionalValueEncoder[java.sql.Date] =
-    (data, _) => TimeValueCodecs.encodeLocalDate(data.toLocalDate)
+  implicit val sqlDateEncoder: OptionalValueEncoder[java.sql.Date] = new OptionalValueEncoder[Date] {
+    def encodeNonNull(data: Date, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeLocalDate(data.toLocalDate)
+  }
 
 }
 
@@ -200,11 +258,13 @@ trait ComplexValueDecoders {
                                             elementDecoder: ValueDecoder[T],
                                             factory: Factory[T, Col[T]]
                                            ): OptionalValueDecoder[Col[T]] =
-    (value, configuration) =>
-      value match {
-        case listRecord: ListParquetRecord =>
-          listRecord.map((elementDecoder.decode _).curried(_)(configuration)).to(factory)
-      }
+    new OptionalValueDecoder[Col[T]] {
+      def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Col[T] =
+        value match {
+          case listRecord: ListParquetRecord =>
+            listRecord.map((elementDecoder.decode _).curried(_)(configuration)).to(factory)
+        }
+    }
 
   implicit def arrayDecoder[T, Col[_]](implicit
                                        evidence: Col[T] =:= Array[T],
@@ -212,39 +272,47 @@ trait ComplexValueDecoders {
                                        factory: Factory[T, Col[T]],
                                        elementDecoder: ValueDecoder[T]
                                       ): OptionalValueDecoder[Col[T]] =
-    (value, configuration) =>
-      value match {
-        case listRecord: ListParquetRecord =>
-          listRecord.map((elementDecoder.decode _).curried(_)(configuration)).to(factory)
-        case binaryValue: BinaryValue if classTag.runtimeClass == classOf[Byte] =>
-          binaryValue.value.getBytes.asInstanceOf[Col[T]]
-      }
+    new OptionalValueDecoder[Col[T]] {
+      def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Col[T] =
+        value match {
+          case listRecord: ListParquetRecord =>
+            listRecord.map((elementDecoder.decode _).curried(_)(configuration)).to(factory)
+          case binaryValue: BinaryValue if classTag.runtimeClass == classOf[Byte] =>
+            binaryValue.value.getBytes.asInstanceOf[Col[T]]
+        }
+    }
 
   implicit def optionDecoder[T](implicit elementDecoder: ValueDecoder[T]): ValueDecoder[Option[T]] =
-    (value, configuration) =>
-      value match {
-        case NullValue => None
-        case _ => Option(elementDecoder.decode(value, configuration))
-      }
+    new ValueDecoder[Option[T]] {
+      def decode(value: Value, configuration: ValueCodecConfiguration): Option[T] =
+        value match {
+          case NullValue => None
+          case _         => Option(elementDecoder.decode(value, configuration))
+        }
+    }
 
   implicit def mapDecoder[K, V](implicit
                                 kDecoder: ValueDecoder[K],
                                 vDecoder: ValueDecoder[V]
                                ): OptionalValueDecoder[Map[K, V]] =
-    (value, configuration) =>
-      value match {
-        case mapParquetRecord: MapParquetRecord =>
-          mapParquetRecord.map { case (mapKey, mapValue) =>
-            require(mapKey != NullValue, "Map cannot have null keys")
-            kDecoder.decode(mapKey, configuration) -> vDecoder.decode(mapValue, configuration)
-          }
-      }
+    new OptionalValueDecoder[Map[K, V]] {
+      def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Map[K, V] =
+        value match {
+          case mapParquetRecord: MapParquetRecord =>
+            mapParquetRecord.map { case (mapKey, mapValue) =>
+              require(mapKey != NullValue, "Map cannot have null keys")
+              kDecoder.decode(mapKey, configuration) -> vDecoder.decode(mapValue, configuration)
+            }
+        }
+    }
 
   implicit def productDecoder[T](implicit decoder: ParquetRecordDecoder[T]): OptionalValueDecoder[T] =
-    (value, configuration) =>
-      value match {
-        case record: RowParquetRecord => decoder.decode(record, configuration)
-      }
+    new OptionalValueDecoder[T] {
+      def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): T =
+        value match {
+          case record: RowParquetRecord => decoder.decode(record, configuration)
+        }
+    }
 
 }
 
@@ -254,44 +322,54 @@ trait ComplexValueEncoders {
                                             evidence: Col[T] <:< Iterable[T],
                                             elementEncoder: ValueEncoder[T]
                                            ): OptionalValueEncoder[Col[T]] =
-    (data, configuration) =>
-      evidence(data)
-        .foldLeft(ListParquetRecord.Empty) {
-          case (record, element) => record.appended(element, configuration)
-        }
+    new OptionalValueEncoder[Col[T]] {
+      def encodeNonNull(data: Col[T], configuration: ValueCodecConfiguration): Value =
+        evidence(data)
+          .foldLeft(ListParquetRecord.Empty) {
+            case (record, element) => record.appended(element, configuration)
+          }
+    }
 
   implicit def arrayEncoder[T, Col[_]](implicit
                                        evidence: Col[T] =:= Array[T],
                                        classTag: ClassTag[T],
                                        elementEncoder: ValueEncoder[T],
                                       ): OptionalValueEncoder[Col[T]] =
-    (data, configuration) =>
-      if (classTag.runtimeClass == classOf[Byte])
-        BinaryValue(data.asInstanceOf[Array[Byte]])
-      else
-        evidence(data)
-          .foldLeft(ListParquetRecord.Empty) {
-            case (record, element) => record.appended(element, configuration)
-          }
+    new OptionalValueEncoder[Col[T]] {
+      def encodeNonNull(data: Col[T], configuration: ValueCodecConfiguration): Value =
+        if (classTag.runtimeClass == classOf[Byte])
+          BinaryValue(data.asInstanceOf[Array[Byte]])
+        else
+          evidence(data)
+            .foldLeft(ListParquetRecord.Empty) {
+              case (record, element) => record.appended(element, configuration)
+            }
+    }
 
   implicit def optionEncoder[T](implicit elementEncoder: ValueEncoder[T]): ValueEncoder[Option[T]] =
-    (data, configuration) =>
-      data match {
-        case None => NullValue
-        case Some(t) => elementEncoder.encode(t, configuration)
-      }
+    new ValueEncoder[Option[T]] {
+      def encode(data: Option[T], configuration: ValueCodecConfiguration): Value =
+        data match {
+          case None => NullValue
+          case Some(t) => elementEncoder.encode(t, configuration)
+        }
+    }
 
   implicit def mapEncoder[K, V](implicit
                                 kEncoder: ValueEncoder[K],
                                 vEncoder: ValueEncoder[V]
                                ): OptionalValueEncoder[Map[K, V]] =
-    (data, configuration) =>
-      data.foldLeft(MapParquetRecord.Empty) { case (record, (key, value)) =>
-        require(key != null, "Map cannot have null keys")
-        record.updated(key, value, configuration)
-      }
+    new OptionalValueEncoder[Map[K, V]] {
+      def encodeNonNull(data: Map[K, V], configuration: ValueCodecConfiguration): Value =
+        data.foldLeft(MapParquetRecord.Empty) { case (record, (key, value)) =>
+          require(key != null, "Map cannot have null keys")
+          record.updated(key, value, configuration)
+        }
+    }
 
   implicit def productEncoder[T](implicit encoder: ParquetRecordEncoder[T]): OptionalValueEncoder[T] =
-    (data, configuration) => encoder.encode(data, configuration)
+    new OptionalValueEncoder[T] {
+      def encodeNonNull(data: T, configuration: ValueCodecConfiguration): Value = encoder.encode(data, configuration)
+    }
 
 }

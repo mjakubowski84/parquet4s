@@ -126,36 +126,60 @@ object Filter {
 
   def eqFilter[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: ColumnPath, in: In)
                                                                            (implicit codec: FilterCodec[In, V, C]): Filter =
-    valueCodecConfiguration => FilterApi.eq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    new Filter {
+      def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+        FilterApi.eq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    }
 
   def neqFilter[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: ColumnPath, in: In)
                                                                             (implicit codec: FilterCodec[In, V, C]): Filter =
-    valueCodecConfiguration => FilterApi.notEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    new Filter {
+      def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+        FilterApi.notEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    }
 
-  def andFilter(left: Filter, right: Filter): Filter =
-    valueCodecConfiguration => FilterApi.and(left.toPredicate(valueCodecConfiguration), right.toPredicate(valueCodecConfiguration))
+  def andFilter(left: Filter, right: Filter): Filter = new Filter {
+    def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+      FilterApi.and(left.toPredicate(valueCodecConfiguration), right.toPredicate(valueCodecConfiguration))
+  }
 
-  def orFilter(left: Filter, right: Filter): Filter =
-    valueCodecConfiguration => FilterApi.or(left.toPredicate(valueCodecConfiguration), right.toPredicate(valueCodecConfiguration))
+  def orFilter(left: Filter, right: Filter): Filter = new Filter {
+    def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+      FilterApi.or(left.toPredicate(valueCodecConfiguration), right.toPredicate(valueCodecConfiguration))
+  }
 
-  def notFilter(filter: Filter): Filter =
-    valueCodecConfiguration=> FilterApi.not(filter.toPredicate(valueCodecConfiguration))
+  def notFilter(filter: Filter): Filter = new Filter {
+    def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+      FilterApi.not(filter.toPredicate(valueCodecConfiguration))
+  }
 
   def gtFilter[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: ColumnPath, in: In)
                                                                         (implicit codec: FilterCodec[In, V, C]): Filter =
-    valueCodecConfiguration => FilterApi.gt(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    new Filter {
+      def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+        FilterApi.gt(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    }
 
   def gtEqFilter[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: ColumnPath, in: In)
                                                                           (implicit codec: FilterCodec[In, V, C]): Filter =
-    valueCodecConfiguration => FilterApi.gtEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    new Filter {
+      def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+        FilterApi.gtEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    }
 
   def ltFilter[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: ColumnPath, in: In)
                                                                         (implicit codec: FilterCodec[In, V, C]): Filter =
-    valueCodecConfiguration => FilterApi.lt(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    new Filter {
+      def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+        FilterApi.lt(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    }
 
   def ltEqFilter[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: ColumnPath, in: In)
                                                                           (implicit codec: FilterCodec[In, V, C]): Filter =
-    valueCodecConfiguration=> FilterApi.ltEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    new Filter {
+      def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+        FilterApi.ltEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+    }
 
   def inFilter[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: ColumnPath, in: Iterable[In])
                                                                            (implicit codec: FilterCodec[In, V, C]): Filter =
@@ -172,8 +196,10 @@ object Filter {
                                                         ordering: Ordering[In],
                                                         codec: FilterCodec[In, V, C]
                                                        ): Filter =
-    valueCodecConfiguration =>
-      FilterApi.userDefined(codec.columnFactory(columnPath), new UDPAdapter[In, V](udp, codec, valueCodecConfiguration))
+    new Filter {
+      def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+        FilterApi.userDefined(codec.columnFactory(columnPath), new UDPAdapter[In, V](udp, codec, valueCodecConfiguration))
+    }
 
   val noopFilter: Filter = new Filter {
     override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = new FilterPredicate {
@@ -254,11 +280,11 @@ object FilterCodec {
   implicit val doubleCodec: FilterCodec[Double, java.lang.Double, DoubleColumn] =
     apply[Double, java.lang.Double, DoubleColumn]((v, _) => v, (v, _) => v)
   implicit val shortCodec: FilterCodec[Short, java.lang.Integer, IntColumn] =
-    apply[Short, java.lang.Integer, IntColumn]((v, _) => v, (v, _) => v.toShort)
+    apply[Short, java.lang.Integer, IntColumn]((v, _) => v.toInt, (v, _) => v.toShort)
   implicit val byteCodec: FilterCodec[Byte, java.lang.Integer, IntColumn] =
-    apply[Byte, java.lang.Integer, IntColumn]((v, _) => v, (v, _) => v.toByte)
+    apply[Byte, java.lang.Integer, IntColumn]((v, _) => v.toInt, (v, _) => v.toByte)
   implicit val charCodec: FilterCodec[Char, java.lang.Integer, IntColumn] =
-    apply[Char, java.lang.Integer, IntColumn]((v, _) => v, (v, _) => v.toChar)
+    apply[Char, java.lang.Integer, IntColumn]((v, _) => v.toInt, (v, _) => v.toChar)
   implicit val byteArrayCodec: FilterCodec[Array[Byte], Binary, BinaryColumn] =
     apply[Array[Byte], Binary, BinaryColumn]((v, _) => Binary.fromReusedByteArray(v), (v, _) => v.getBytes)
   implicit val stringCodec: FilterCodec[String, Binary, BinaryColumn] =

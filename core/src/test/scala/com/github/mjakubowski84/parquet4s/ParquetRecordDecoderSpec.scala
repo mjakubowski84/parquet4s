@@ -20,7 +20,7 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
       buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
       buf.array()
     }
-
+  
   "Parquet record decoder" should "be used to decode empty record" in {
     decode[Empty](RowParquetRecord.EmptyNoSchema) should be(Empty())
   }
@@ -167,7 +167,7 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
   it should "decode record with optional field that has no value" in {
     decode[ContainsOption](RowParquetRecord.emptyWithSchema("optional")) should be(ContainsOption(None))
   }
-
+  
   it should "throw exception if type of input field does not match expected type" in {
     case class ContainsInt(int: Int)
 

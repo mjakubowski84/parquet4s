@@ -5,15 +5,14 @@ import bloop.integrations.sbt.BloopDefaults
 
 lazy val twoTwelve = "2.12.14"
 lazy val twoThirteen = "2.13.6"
-lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen)
-lazy val fs2ScalaVersions = Seq(twoTwelve, twoThirteen)
-lazy val akkaScalaVersions = Seq(twoTwelve, twoThirteen)
+lazy val three = "3.0.0"
+lazy val coreScalaVersions = Seq(twoTwelve, twoThirteen, three)
+lazy val integrationVersions = Seq(twoTwelve, twoThirteen)
 
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "2.0.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
-ThisBuild / scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8")
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature")
 ThisBuild / resolvers := Seq(
   Opts.resolver.sonatypeReleases,
@@ -24,6 +23,30 @@ Global / excludeLintKeys += run / cancelable
 Global / excludeLintKeys += IntegrationTest / publishArtifact
 Global / excludeLintKeys += makePomConfiguration
 
+
+lazy val compilationSettings = Seq(
+  scalacOptions ++= {
+    Seq(
+      "-encoding",
+      "UTF-8",
+      "-feature",
+      "-language:implicitConversions",
+      "-Xfatal-warnings"
+    ) ++ {
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) => Seq(
+          "-unchecked"
+        )
+        case _ =>
+          Seq(
+            "-deprecation",
+            "-Xfatal-warnings",
+            "-Xsource:3"
+          )
+      }
+    }
+  }
+)
 
 lazy val itSettings = Defaults.itSettings ++
   Project.inConfig(IntegrationTest)(Seq(
@@ -51,31 +74,31 @@ lazy val core = (project in file("core"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-core",
-    crossScalaVersions := supportedScalaVersions,
+    crossScalaVersions := coreScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.parquet" % "parquet-hadoop" % parquetVersion
         exclude(org = "org.slf4j", name = "slf4j-api"),
-      "com.chuusai" %% "shapeless" % shapelessVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.4",
 
       // tests
-      "org.mockito" %% "mockito-scala-scalatest" % "1.16.37" % "test",
+      "org.mockito" % "mockito-core" % "3.11.1" % "test",
       "org.scalatest" %% "scalatest" % "3.2.9" % "test,it",
       "ch.qos.logback" % "logback-classic" % "1.2.3" % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
-      val scala = scalaBinaryVersion.value
-      scala match {
-        case "2.12" => sparkDeps
-        case _ => Seq.empty
+      CrossVersion.partialVersion(scalaBinaryVersion.value) match {
+        case Some((2, 12)) => sparkDeps :+ ("com.chuusai" %% "shapeless" % shapelessVersion)
+        case Some((2, _))  => Seq("com.chuusai" %% "shapeless" % shapelessVersion)
+        case _             => Seq.empty
       }
     },
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
     )
   )
+  .settings(compilationSettings)
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
@@ -84,7 +107,7 @@ lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-akka",
-    crossScalaVersions := akkaScalaVersions,
+    crossScalaVersions := integrationVersions,
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided
@@ -93,6 +116,7 @@ lazy val akka = (project in file("akka"))
       ExclusionRule("org.slf4j", "slf4j-log4j12")
     )
   )
+  .settings(compilationSettings)
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
@@ -102,17 +126,18 @@ lazy val fs2 = (project in file("fs2"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-fs2",
-    crossScalaVersions := fs2ScalaVersions,
+    crossScalaVersions := integrationVersions,
     libraryDependencies ++= Seq(
       "co.fs2" %% "fs2-core" % fs2Version,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "co.fs2" %% "fs2-io" % fs2Version % "it",
-      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.1.0" % "it"
+      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.1.1" % "it"
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
     )
   )
+  .settings(compilationSettings)
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
@@ -121,7 +146,7 @@ lazy val fs2 = (project in file("fs2"))
 lazy val examples = (project in file("examples"))
   .settings(
     name := "parquet4s-examples",
-    crossScalaVersions := fs2ScalaVersions,
+    crossScalaVersions := integrationVersions,
     publish / skip := true,
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
@@ -139,6 +164,7 @@ lazy val examples = (project in file("examples"))
     run / cancelable := true,
     run / fork := true
   )
+  .settings(compilationSettings)
   .dependsOn(akka, fs2)
 
 lazy val benchmarks = (project in file("benchmarks"))
@@ -160,6 +186,7 @@ lazy val benchmarks = (project in file("benchmarks"))
     run / cancelable := true,
     run / fork := true
   )
+  .settings(compilationSettings)
   .dependsOn(akka, fs2)
 
 lazy val root = (project in file("."))
