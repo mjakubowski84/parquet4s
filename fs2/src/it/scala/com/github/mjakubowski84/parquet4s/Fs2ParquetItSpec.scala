@@ -46,10 +46,10 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   val dictA: Seq[String] = Vector("1", "2", "3")
   val dictB: Seq[String] = Vector("x", "y", "z")
   val data: LazyList[Data] = LazyList
-    .range(start = 0L, end = count, step = 1L)
+    .range(start = 0L, end = count.toLong, step = 1L)
     .map(i => Data(i = i, s = dictS(Random.nextInt(4))))
   val dataPartitioned: LazyList[DataPartitioned] = LazyList
-    .range(start = 0L, end = count, step = 1L)
+    .range(start = 0L, end = count.toLong, step = 1L)
     .map(i => DataPartitioned(
       i = i,
       s = dictS(Random.nextInt(4)),
