@@ -13,6 +13,9 @@ trait TestUtils {
   protected lazy val fileSystem: FileSystem = tempPath.toHadoop.getFileSystem(configuration)
   private val tempDir = new File(tempPath.toUri)
 
-  def clearTemp(): Unit = FileUtil.fullyDelete(tempDir)
+  def clearTemp(): Unit = {
+    FileUtil.fullyDelete(tempDir)
+    ()
+  }
 
 }

@@ -2,108 +2,14 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
 import org.apache.parquet.schema.LogicalTypeAnnotation.{DateLogicalTypeAnnotation, DecimalLogicalTypeAnnotation, IntLogicalTypeAnnotation, StringLogicalTypeAnnotation}
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, BOOLEAN, DOUBLE, FIXED_LEN_BYTE_ARRAY, FLOAT, INT32, INT64, INT96}
 import org.apache.parquet.schema.Type.Repetition
-import org.apache.parquet.schema._
-import shapeless._
-import shapeless.labelled._
+import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, PrimitiveType, Type, Types}
 
-import scala.annotation.implicitNotFound
-import scala.language.higherKinds
 import scala.reflect.ClassTag
 
-/**
-  * Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
-  * @tparam T scala type that represents schema of Parquet data.
-  */
-@implicitNotFound("Cannot write data of type ${T}. " +
-  "Please check if there is implicit TypedSchemaDef available for each field and subfield of ${T}."
-)
-trait ParquetSchemaResolver[T] {
+import scala.language.higherKinds
 
-  /**
-   * @param cursor facilitates traversal over T
-   * @return list of [[org.apache.parquet.schema.Type]] for each product element that <i>T</i> contains.
-   */
-  def resolveSchema(cursor: Cursor): List[Type]
-
-  /**
-    * @return a name to be given to schema
-    */
-  def schemaName: Option[String] = None
-
-}
-
-object ParquetSchemaResolver
-  extends SchemaDefs {
-
-  trait Tag[V]
-  type TypedSchemaDef[V] = SchemaDef with Tag[V]
-
-  class TypedSchemaDefInvoker[K <: Symbol : Witness.Aux, V](schemaDef: TypedSchemaDef[V]) {
-    private def fieldName = implicitly[Witness.Aux[K]].value.name
-    def `type`: Type = schemaDef(fieldName)
-    def productType(productSchemaDef: TypedSchemaDef[V]): Type = productSchemaDef(fieldName)
-  }
-
-  /**
-   * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
-   *
-   * @param toSkip iterable of [[ColumnPath]]s that should be skipped when generating the schema
-   */
-  def resolveSchema[T](toSkip: Iterable[ColumnPath])(implicit g: ParquetSchemaResolver[T]): MessageType =
-    Message(g.schemaName, g.resolveSchema(Cursor.skipping(toSkip)):_*)
-
-  /**
-   * Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
-   */
-  def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType =
-    Message(g.schemaName, g.resolveSchema(Cursor.simple):_*)
-
-  implicit val hnil: ParquetSchemaResolver[HNil] = _ => List.empty
-
-  implicit def hcons[K <: Symbol, V, T <: HList](implicit
-                                                 witness: Witness.Aux[K],
-                                                 schemaDef: TypedSchemaDef[V],
-                                                 visitor: SchemaVisitor[K, V] = defaultSchemaVisitor[K, V],
-                                                 rest: ParquetSchemaResolver[T]
-                                                ): ParquetSchemaResolver[FieldType[K, V] :: T] =
-    cursor => cursor
-      .advance[K]
-      .flatMap(newCursor => newCursor.accept(new TypedSchemaDefInvoker(schemaDef), visitor)) match {
-        case Some(head) =>
-          head +: rest.resolveSchema(cursor)
-        case None =>
-          rest.resolveSchema(cursor)
-      }
-
-  implicit def generic[T, G](implicit
-                             lg: LabelledGeneric.Aux[T, G],
-                             rest: Lazy[ParquetSchemaResolver[G]],
-                             classTag: ClassTag[T]
-                            ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
-    override def resolveSchema(cursor: Cursor): List[Type] = rest.value.resolveSchema(cursor)
-    override def schemaName: Option[String] = Option(classTag.runtimeClass.getCanonicalName)
-  }
-
-  trait SchemaVisitor[K <: Symbol, V] extends Cursor.Visitor[TypedSchemaDefInvoker[K, V], Option[Type]] {
-    override def onCompleted(cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]): Option[Type] =
-      throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
-  }
-
-  def defaultSchemaVisitor[K <: Symbol, V]: SchemaVisitor[K, V] =
-    (_, invoker: TypedSchemaDefInvoker[K, V]) => Option(invoker.`type`)
-
-  implicit def productSchemaVisitor[K <: Symbol, V](implicit resolver: ParquetSchemaResolver[V]): SchemaVisitor[K, V] =
-    (cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]) => resolver.resolveSchema(cursor) match {
-      case Nil =>
-        None
-      case fieldTypes =>
-        Option(invoker.productType(SchemaDef.group(fieldTypes: _*).typed[V]))
-    }
-
-
-}
 
 object Message {
 
@@ -159,7 +65,7 @@ private case class PrimitiveSchemaDef (primitiveType: PrimitiveType.PrimitiveTyp
                                        logicalTypeAnnotation: Option[LogicalTypeAnnotation],
                                        required: Boolean,
                                        length: Option[Int]
-                                     ) extends SchemaDef {
+                                      ) extends SchemaDef {
 
   override type Self = PrimitiveSchemaDef
 
@@ -256,12 +162,12 @@ trait SchemaDefs {
     SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int8Type)).typed[Byte]
 
   implicit val decimalSchema: TypedSchemaDef[BigDecimal] =
-      SchemaDef.primitive(
-        FIXED_LEN_BYTE_ARRAY,
-        required = false,
-        logicalTypeAnnotation = Option(LogicalTypes.DecimalType),
-        length = Some(Decimals.ByteArrayLength)
-      ).typed[BigDecimal]
+    SchemaDef.primitive(
+      FIXED_LEN_BYTE_ARRAY,
+      required = false,
+      logicalTypeAnnotation = Option(LogicalTypes.DecimalType),
+      length = Some(Decimals.ByteArrayLength)
+    ).typed[BigDecimal]
 
   implicit val localDateSchema: TypedSchemaDef[java.time.LocalDate] =
     SchemaDef.primitive(INT32, required = false, logicalTypeAnnotation = Option(LogicalTypes.DateType)).typed[java.time.LocalDate]
@@ -284,7 +190,7 @@ trait SchemaDefs {
   implicit def collectionSchema[E, Col[_]](implicit
                                            elementSchema: TypedSchemaDef[E],
                                            ev: Col[E] <:< Iterable[E]): TypedSchemaDef[Col[E]] =
-     SchemaDef.list(elementSchema).typed[Col[E]]
+    SchemaDef.list(elementSchema).typed[Col[E]]
 
   implicit def arraySchema[E, Col[_]](implicit
                                       elementSchema: TypedSchemaDef[E],
@@ -303,3 +209,4 @@ trait SchemaDefs {
     SchemaDef.map(keySchema.withRequired(true), valueSchema).typed[Map[MapKey, MapValue]]
 
 }
+

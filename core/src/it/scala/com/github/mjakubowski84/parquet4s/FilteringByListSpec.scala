@@ -3,7 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import org.apache.parquet.filter2.predicate.Operators.{Column, DoubleColumn, FloatColumn, SupportsEqNotEq}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.{BeforeAndAfterAll, Inspectors}
+import org.scalatest.{Assertion, BeforeAndAfterAll, Inspectors}
 
 import java.nio.file.Files
 import java.sql.Date
@@ -24,7 +24,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
                    long: Long,
                    float: Float,
                    double: Double,
-                   enum: String,
+                   `enum`: String,
                    flag: Boolean,
                    date: LocalDate,
                    sqlDate: Date,
@@ -32,7 +32,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
                    embedded: Embedded
                  )
 
-  val enum: Seq[String] = List("a", "b", "c", "d")
+  val `enum`: Seq[String] = List("a", "b", "c", "d")
   val dataSize: Int = 4096
   val halfSize: Int = dataSize / 2
   val filePath: Path = Path(Path(Files.createTempDirectory("example")), "file.parquet")
@@ -56,7 +56,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
         long = i.toLong,
         float = (BigDecimal("0.01") * BigDecimal(i)).toFloat,
         double = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
-        enum = enum(Random.nextInt(enum.size)),
+        `enum` = `enum`(Random.nextInt(`enum`.size)),
         flag = Random.nextBoolean(),
         date = zeroDate.plusDays(i),
         sqlDate = Date.valueOf(zeroDate.plusDays(i)),
@@ -77,7 +77,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
   }
 
   def genericFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T)
-                                                                                             (implicit codec: FilterCodec[T, V, C]): Unit = {
+                                                                                             (implicit codec: FilterCodec[T, V, C]): Assertion = {
     val filterValues = everyOtherDatum.map(field)
     val actual = ParquetReader.read[Data](filePath, filter = Col(columnName) in filterValues)
     try {
@@ -86,12 +86,12 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
   }
 
   def specificValueFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T, values: Vector[T])
-                                                                                                   (implicit codec: FilterCodec[T, V, C]): Unit = {
+                                                                                                   (implicit codec: FilterCodec[T, V, C]): Assertion = {
     val filteredRecords = ParquetReader.read[Data](filePath, filter = Col(columnName) in values)
     val unfilteredRecords = ParquetReader.read[Data](filePath)
 
     try {
-      filteredRecords.map(field) should contain only (values: _*)
+      filteredRecords.map(field).toSet should contain theSameElementsAs values
       val manuallyFilteredRecords = unfilteredRecords.filter(row => values.contains(field(row)))
       filteredRecords.map(_.idx) should equal(manuallyFilteredRecords.map(_.idx))
     } finally {
@@ -115,7 +115,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
 
   it should "filter data by a list of doubles" in genericFilterTest[Double, java.lang.Double, DoubleColumn]("double", _.double)
 
-  it should "filter data by a list of strings" in specificValueFilterTest("enum", _.enum, Vector("a", "b"))
+  it should "filter data by a list of strings" in specificValueFilterTest("enum", _.`enum`, Vector("a", "b"))
 
   it should "filter data by a list of SQL dates" in genericFilterTest("sqlDate", _.sqlDate)
 

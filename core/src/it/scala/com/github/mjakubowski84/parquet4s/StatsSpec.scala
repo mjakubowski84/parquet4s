@@ -17,7 +17,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
                    idx: Int,
                    float: Float,
                    double: Double,
-                   enum: String,
+                   `enum`: String,
                    bool: Boolean,
                    date: LocalDate,
                    decimal: BigDecimal,
@@ -26,7 +26,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
                    random: String
                  )
 
-  val enum: Seq[String] = List("a", "b", "c", "d")
+  val `enum`: Seq[String] = List("a", "b", "c", "d")
   val dataSize: Int = 256 * 256
   val halfSize: Int = dataSize / 2
   val path: Path = Path(Files.createTempDirectory("example"))
@@ -44,7 +44,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
         idx = i,
         float = (BigDecimal("0.01") * BigDecimal(i)).toFloat,
         double = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
-        enum = enum(Random.nextInt(enum.size)),
+        `enum` = `enum`(Random.nextInt(`enum`.size)),
         bool = Random.nextBoolean(),
         date = zeroDate.plusDays(i),
         decimal = decimal(i),

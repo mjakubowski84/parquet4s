@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import scala.annotation.implicitNotFound
-import scala.language.higherKinds
 
 
 trait AllValueDecoders

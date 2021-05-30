@@ -1,24 +1,20 @@
 package com.github.mjakubowski84.parquet4s
 
-import shapeless.Witness
+
 
 /**
   * Auxiliary construct that facilitates traversal over tree of case classes.
   * Apart from pointing if program should advance the tree it implements visitor pattern that allows to process
   * the content of the tree in context of cursor's state.
   */
-trait Cursor {
+trait Cursor extends CursorCompat {
 
   /**
     * @return current path of the cursor
     */
   def path: ColumnPath
 
-  /**
-    * @tparam FieldName symbol of the field that cursor shall advance
-    * @return a new cursor or None if advance to given field is disallowed
-    */
-  def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor]
+  protected[parquet4s] def advanceByFieldName(fieldName: String): Option[Cursor]
 
   /**
     * Processes given object in context of cursor's state
@@ -56,7 +52,7 @@ object Cursor {
 
   final class Completed(val path: ColumnPath) extends Cursor {
     override def accept[T, R](obj: T, visitor: Visitor[T, R]): R = visitor.onCompleted(this, obj)
-    override def advance[FieldName <: Symbol : Witness.Aux]: Option[Cursor] = None
+    override def advanceByFieldName(fieldName: String): Option[Cursor] = None
   }
 
   trait Active {
@@ -88,8 +84,8 @@ private object SkippingCursor {
 
 private class SkippingCursor private (val path: ColumnPath, toSkip: Set[ColumnPath]) extends Cursor with Cursor.Active {
 
-  override def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor] = {
-    val newPath = path.appendElement(implicitly[Witness.Aux[FieldName]].value.name)
+  override def advanceByFieldName(fieldName: String): Option[Cursor] = {
+    val newPath = path.appendElement(fieldName)
     if (toSkip.contains(newPath)) None
     else Some(new SkippingCursor(newPath, toSkip))
   }
@@ -104,8 +100,8 @@ private object FollowingCursor {
 
 private class FollowingCursor private(val path: ColumnPath, toFollow: ColumnPath) extends Cursor with Cursor.Active {
 
-  override def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor] = {
-    val newPath = path.appendElement(implicitly[Witness.Aux[FieldName]].value.name)
+  override def advanceByFieldName(fieldName: String): Option[Cursor] = {
+    val newPath = path.appendElement(fieldName)
     if (toFollow == newPath)
       Some(new Cursor.Completed(newPath))
     else if (toFollow.startsWith(newPath))
@@ -121,8 +117,8 @@ private object SimpleCursor {
 
 private class SimpleCursor private(val path: ColumnPath) extends Cursor with Cursor.Active {
 
-  override def advance[FieldName <: Symbol: Witness.Aux]: Option[Cursor] = {
-    val newPath = path.appendElement(implicitly[Witness.Aux[FieldName]].value.name)
+  override def advanceByFieldName(fieldName: String): Option[Cursor] = {
+    val newPath = path.appendElement(fieldName)
     Some(new SimpleCursor(newPath))
   }
 

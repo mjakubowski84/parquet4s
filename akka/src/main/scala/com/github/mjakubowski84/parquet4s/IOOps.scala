@@ -44,6 +44,7 @@ trait IOOps {
           if (logger.isDebugEnabled)
             logger.debug(s"Deleting $hadoopPath in order to override with new data.")
           fs.delete(hadoopPath, true)
+          ()
         }
       }
     } finally fs.close()

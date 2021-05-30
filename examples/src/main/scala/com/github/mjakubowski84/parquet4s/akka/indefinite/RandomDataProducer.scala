@@ -34,6 +34,7 @@ trait RandomDataProducer {
   def stopDataProducer(): Unit = {
     logger.info("Stopping scheduler...")
     Await.ready(scheduler.ask(FluctuatingSchedulerActor.Stop), Duration.Inf)
+    ()
   }
 
 }
