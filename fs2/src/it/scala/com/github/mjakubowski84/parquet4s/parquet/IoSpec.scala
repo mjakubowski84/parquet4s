@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
-import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, PartitionedPath, Path}
+import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, PartitionTestUtils, PartitionedPath, Path}
 import fs2.Stream
 import fs2.io.file._
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException

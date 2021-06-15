@@ -9,7 +9,7 @@ import org.openjdk.jmh.annotations._
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file._
+import java.nio.file.{Path => NioPath, _}
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.collection.immutable
@@ -33,13 +33,13 @@ object AkkaBenchmark {
     // 512 * 1024
     @Param(Array("524288"))
     var datasetSize: Int = _
-    var basePath: String = _
+    var basePath: Path = _
     var records: immutable.Iterable[Record] = _
     var actorSystem: ActorSystem = _
 
     @Setup(Level.Trial)
     def setup(): Unit = {
-      basePath = Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
+      basePath = Path(Files.createTempDirectory("benchmark")).append(datasetSize.toString)
       records = (1 to datasetSize).map { i =>
         Record(
           i = i,
@@ -64,14 +64,14 @@ object AkkaBenchmark {
     @TearDown(Level.Trial)
     def tearDown(): Unit = Await.ready(actorSystem.terminate(), Duration.Inf)
 
-    def delete(): Path = Files.walkFileTree(Paths.get(basePath), new FileVisitor[Path]() {
-      override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
-      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+    def delete(): NioPath = Files.walkFileTree(basePath.toNio, new FileVisitor[NioPath]() {
+      override def preVisitDirectory(dir: NioPath, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
+      override def visitFile(file: NioPath, attrs: BasicFileAttributes): FileVisitResult = {
         Files.delete(file)
         FileVisitResult.CONTINUE
       }
-      override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+      override def visitFileFailed(file: NioPath, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+      override def postVisitDirectory(dir: NioPath, exc: IOException): FileVisitResult = {
         Files.delete(dir)
         FileVisitResult.CONTINUE
       }
@@ -81,12 +81,12 @@ object AkkaBenchmark {
 
   trait BaseState {
     var dataset: Dataset = _
-    var filePath: String = _
+    var filePath: Path = _
     implicit var actorSystem: ActorSystem = _
 
     def fetchDataset(dataset: Dataset): Unit = {
       this.dataset = dataset
-      this.filePath = dataset.basePath + "/file.parquet"
+      this.filePath = dataset.basePath.append("file.parquet")
       this.actorSystem = dataset.actorSystem
     }
   }
@@ -101,7 +101,7 @@ object AkkaBenchmark {
 
     private def writePartitionedGraph =
       Source(dataset.records)
-        .via(ParquetStreams.viaParquet[Record](dataset.basePath).withPartitionBy("dict").build())
+        .via(ParquetStreams.viaParquet[Record](dataset.basePath).withPartitionBy(ColumnPath("dict")).build())
         .toMat(Sink.last)(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))
 
