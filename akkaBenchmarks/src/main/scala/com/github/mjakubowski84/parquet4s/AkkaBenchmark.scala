@@ -9,7 +9,7 @@ import org.openjdk.jmh.annotations._
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file._
+import java.nio.file.{Path => NioPath, _}
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.collection.immutable
@@ -20,10 +20,11 @@ import scala.util.Random
 case class Embedded(fraction: Double, text: String)
 case class Record(i: Int, dict: String, embedded: Option[Embedded])
 
+
 object AkkaBenchmark {
 
   val Fractioner = 100.12
-  val Dict       = List("a", "b", "c", "d")
+  val Dict = List("a", "b", "c", "d")
   val Dispatcher = "akka.actor.single-thread-dispatcher"
 
   @State(Scope.Benchmark)
@@ -31,27 +32,24 @@ object AkkaBenchmark {
 
     // 512 * 1024
     @Param(Array("524288"))
-    var datasetSize: Int                    = _
-    var basePath: String                    = _
+    var datasetSize: Int = _
+    var basePath: Path = _
     var records: immutable.Iterable[Record] = _
-    var actorSystem: ActorSystem            = _
+    var actorSystem: ActorSystem = _
 
     @Setup(Level.Trial)
     def setup(): Unit = {
-      basePath = Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
+      basePath = Path(Files.createTempDirectory("benchmark")).append(datasetSize.toString)
       records = (1 to datasetSize).map { i =>
         Record(
-          i    = i,
+          i = i,
           dict = Dict(Random.nextInt(Dict.size - 1)),
-          embedded =
-            if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
-            else None
+          embedded = if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
+          else None
         )
       }
-      actorSystem = ActorSystem(
-        "Benchmark",
-        ConfigFactory.parseString(
-          """
+      actorSystem = ActorSystem("Benchmark", ConfigFactory.parseString(
+        """
             akka.actor.single-thread-dispatcher {
                 type = PinnedDispatcher
                 executor = "thread-pool-executor"
@@ -60,40 +58,35 @@ object AkkaBenchmark {
                 }
             }
             """
-        )
-      )
+      ))
     }
 
     @TearDown(Level.Trial)
     def tearDown(): Unit = Await.ready(actorSystem.terminate(), Duration.Inf)
 
-    def delete(): Path = Files.walkFileTree(
-      Paths.get(basePath),
-      new FileVisitor[Path]() {
-        override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult =
-          FileVisitResult.CONTINUE
-        override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-          Files.delete(file)
-          FileVisitResult.CONTINUE
-        }
-        override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-        override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
-          Files.delete(dir)
-          FileVisitResult.CONTINUE
-        }
+    def delete(): NioPath = Files.walkFileTree(basePath.toNio, new FileVisitor[NioPath]() {
+      override def preVisitDirectory(dir: NioPath, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
+      override def visitFile(file: NioPath, attrs: BasicFileAttributes): FileVisitResult = {
+        Files.delete(file)
+        FileVisitResult.CONTINUE
       }
-    )
+      override def visitFileFailed(file: NioPath, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+      override def postVisitDirectory(dir: NioPath, exc: IOException): FileVisitResult = {
+        Files.delete(dir)
+        FileVisitResult.CONTINUE
+      }
+    })
 
   }
 
   trait BaseState {
-    var dataset: Dataset                  = _
-    var filePath: String                  = _
+    var dataset: Dataset = _
+    var filePath: Path = _
     implicit var actorSystem: ActorSystem = _
 
     def fetchDataset(dataset: Dataset): Unit = {
-      this.dataset     = dataset
-      this.filePath    = dataset.basePath + "/file.parquet"
+      this.dataset = dataset
+      this.filePath = dataset.basePath.append("file.parquet")
       this.actorSystem = dataset.actorSystem
     }
   }
@@ -108,7 +101,7 @@ object AkkaBenchmark {
 
     private def writePartitionedGraph =
       Source(dataset.records)
-        .via(ParquetStreams.viaParquet[Record](dataset.basePath).withPartitionBy("dict").build())
+        .via(ParquetStreams.viaParquet[Record](dataset.basePath).withPartitionBy(ColumnPath("dict")).build())
         .toMat(Sink.last)(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))
 
