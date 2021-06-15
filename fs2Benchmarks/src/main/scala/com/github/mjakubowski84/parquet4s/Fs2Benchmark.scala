@@ -1,14 +1,15 @@
 package com.github.mjakubowski84.parquet4s
 
-import cats.effect.{Blocker, ContextShift, IO, Timer}
+import cats.effect.IO
+import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
 import fs2.Stream
 import org.openjdk.jmh.annotations._
 
 import java.io.IOException
-import java.nio.file._
 import java.nio.file.attribute.BasicFileAttributes
+import java.nio.file.{Path => NioPath, _}
 import java.util.UUID
-import java.util.concurrent.{ExecutorService, Executors, TimeUnit}
+import java.util.concurrent.{Executors, TimeUnit}
 import scala.collection.immutable
 import scala.concurrent.ExecutionContext
 import scala.util.Random
@@ -28,17 +29,13 @@ object Fs2Benchmark {
     // 1024 & 512 * 1024
     @Param(Array("1024", "524288"))
     var datasetSize: Int = _
-    var basePath: String = _
+    var basePath: Path = _
     var records: immutable.Iterable[Record] = _
-    var threadPool: ExecutorService = _
-    var executionContext: ExecutionContext = _
-    var blocker: Blocker = _
-    var contextShift: ContextShift[IO] = _
-    var timer: Timer[IO] = _
+    var ioRuntime: IORuntime = _
 
     @Setup(Level.Trial)
     def setup(): Unit = {
-      basePath = Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
+      basePath = Path(Files.createTempDirectory("benchmark")).append(datasetSize.toString)
       records = (1 to datasetSize).map { i =>
         Record(
           i = i,
@@ -47,26 +44,33 @@ object Fs2Benchmark {
           else None
         )
       }
-      threadPool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
-      executionContext = ExecutionContext.fromExecutor(threadPool)
+      val threadPool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
+      val executionContext = ExecutionContext.fromExecutor(threadPool)
       // using the same execution context in order to avoid unnecessary thread switching
-      blocker = Blocker.liftExecutionContext(executionContext)
-      contextShift = IO.contextShift(executionContext)
-      timer = IO.timer(executionContext)
+      val (scheduler, closeScheduler) = Scheduler.createDefaultScheduler()
+      ioRuntime = IORuntime(
+        compute = executionContext,
+        blocking = executionContext,
+        scheduler = scheduler,
+        shutdown = () => { threadPool.shutdown(); closeScheduler() },
+        config = IORuntimeConfig()
+      )
+      // TODO consider using default runtime
+//      ioRuntime = IORuntime.global
+
     }
 
     @TearDown(Level.Trial)
-    def tearDown(): Unit =
-      threadPool.shutdown()
+    def tearDown(): Unit = ioRuntime.shutdown()
 
-    def delete(): Path = Files.walkFileTree(Paths.get(basePath), new FileVisitor[Path]() {
-      override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
-      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+    def delete(): NioPath = Files.walkFileTree(basePath.toNio, new FileVisitor[NioPath]() {
+      override def preVisitDirectory(dir: NioPath, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
+      override def visitFile(file: NioPath, attrs: BasicFileAttributes): FileVisitResult = {
         Files.delete(file)
         FileVisitResult.CONTINUE
       }
-      override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+      override def visitFileFailed(file: NioPath, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+      override def postVisitDirectory(dir: NioPath, exc: IOException): FileVisitResult = {
         Files.delete(dir)
         FileVisitResult.CONTINUE
       }
@@ -76,15 +80,13 @@ object Fs2Benchmark {
 
   trait BaseState {
     var dataset: Dataset = _
-    var filePath: String = _
-    implicit var contextShift: ContextShift[IO] = _
-    implicit var timer: Timer[IO] = _
+    var filePath: Path = _
+    implicit var ioRuntime: IORuntime = _
 
     def fetchDataset(dataset: Dataset): Unit = {
       this.dataset = dataset
-      this.filePath = dataset.basePath + "/file.parquet"
-      this.contextShift = dataset.contextShift
-      this.timer = dataset.timer
+      this.filePath = dataset.basePath.append("file.parquet")
+      this.ioRuntime = dataset.ioRuntime
     }
   }
 
@@ -98,7 +100,7 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       operation = Stream
         .iterable(dataset.records)
-        .through(parquet.writeSingleFile[IO, Record](dataset.blocker, filePath))
+        .through(parquet.writeSingleFile[IO, Record](filePath))
         .compile
         .drain
     }
@@ -122,7 +124,7 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       operation = Stream
         .iterable(dataset.records)
-        .through(parquet.viaParquet[IO, Record].partitionBy("dict").write(dataset.blocker, dataset.basePath))
+        .through(parquet.viaParquet[IO, Record].partitionBy( ColumnPath("dict")).write(dataset.basePath))
         .compile
         .lastOrError
     }
@@ -147,7 +149,7 @@ object Fs2Benchmark {
       ParquetWriter.writeAndClose(filePath, dataset.records)
       operation = parquet
         .fromParquet[IO, Record]
-        .read(dataset.blocker, dataset.basePath)
+        .read(dataset.basePath)
         .compile
         .lastOrError
     }

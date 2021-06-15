@@ -1,0 +1,14 @@
+15th Jun 2021, 22:00
+version 2.x
+
+2.12
+[write] min = 774, max = 808, mean = 786 - 100%
+[read] min = 313, max = 437, mean = 322  - 100%
+
+2.13:
+[write] min = 753, max = 806, mean = 767 - 98%
+[read] min = 305, max = 329, mean = 313 - 97%
+
+3.0.0
+[write] min = 654, max = 700, mean = 665 - 85%
+[read] min = 248, max = 409, mean = 256 - 80%
