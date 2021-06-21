@@ -13,6 +13,7 @@ class IOOpsSpec
     with Matchers
     with IOOps
     with TestUtils
+    with PartitionTestUtils
     with BeforeAndAfter
     with EitherValues {
 
@@ -124,4 +125,40 @@ class IOOpsSpec
     findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
   }
 
+  "PartitionRegexp" should "match valid partition names and values" in {
+    val validNames = generatePartitionStrings(prefix = "testValue", withChars = allowedPartitionNameChars)
+    val validValues = generatePartitionStrings(prefix = "testName", withChars = allowedPartitionValueChars)
+    val validPairs = validNames.flatMap(name => validValues.map(value => name -> value))
+
+    validPairs.foreach { case (name, value) =>
+      s"$name=$value" match {
+        case IOOps.PartitionRegexp(`name`, `value`) =>
+          succeed
+
+        case _ =>
+          fail(
+            s"Expected a valid match for name [$name] and value [$value] but none was found"
+          )
+      }
+    }
+  }
+
+  it should "not match invalid partition names and values" in {
+    val invalidNames = generatePartitionStrings(prefix = "testValue", withChars = disallowedPartitionNameChars)
+    val invalidValues = generatePartitionStrings(prefix = "testName", withChars = disallowedPartitionValueChars)
+    val invalidPairs = invalidNames.flatMap(name => invalidValues.map(value => name -> value))
+
+    invalidPairs.foreach { case (name, value) =>
+      s"$name=$value" match {
+        case IOOps.PartitionRegexp(capturedName, capturedValue) =>
+          fail(
+            s"Expected no match for name [$name] and value [$value] " +
+              s"but one was found: [$capturedName, $capturedValue]"
+          )
+
+        case _ =>
+          succeed
+      }
+    }
+  }
 }

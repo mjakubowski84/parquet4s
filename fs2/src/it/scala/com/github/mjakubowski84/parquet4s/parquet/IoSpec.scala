@@ -4,7 +4,7 @@ import java.nio.file
 import java.nio.file.Paths
 
 import cats.effect.{Blocker, ContextShift, IO}
-import com.github.mjakubowski84.parquet4s.{ParquetWriter, PartitionedPath}
+import com.github.mjakubowski84.parquet4s.{ParquetWriter, PartitionTestUtils, PartitionedPath}
 import fs2.Stream
 import fs2.io.file._
 import org.apache.hadoop.fs.Path
@@ -12,10 +12,9 @@ import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import scala.language.implicitConversions
 
-class IoSpec extends AsyncFlatSpec with Matchers {
+class IoSpec extends AsyncFlatSpec with Matchers with PartitionTestUtils {
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
   private val writeOptions = ParquetWriter.Options()
@@ -167,4 +166,44 @@ class IoSpec extends AsyncFlatSpec with Matchers {
     recoverToSucceededIf[IllegalArgumentException](testStream.compile.lastOrError.unsafeToFuture())
   }
 
+  "PartitionRegexp" should "match valid partition names and values" in {
+    val validNames = generatePartitionStrings(prefix = "testValue", withChars = allowedPartitionNameChars)
+    val validValues = generatePartitionStrings(prefix = "testName", withChars = allowedPartitionValueChars)
+    val validPairs = validNames.flatMap(name => validValues.map(value => name -> value))
+
+    validPairs.foreach { case (name, value) =>
+      s"$name=$value" match {
+        case io.PartitionRegexp(`name`, `value`) =>
+          succeed
+
+        case _ =>
+          fail(
+            s"Expected a valid match for name [$name] and value [$value] but none was found"
+          )
+      }
+    }
+
+    succeed
+  }
+
+  it should "not match invalid partition names and values" in {
+    val invalidNames = generatePartitionStrings(prefix = "testValue", withChars = disallowedPartitionNameChars)
+    val invalidValues = generatePartitionStrings(prefix = "testName", withChars = disallowedPartitionValueChars)
+    val invalidPairs = invalidNames.flatMap(name => invalidValues.map(value => name -> value))
+
+    invalidPairs.foreach { case (name, value) =>
+      s"$name=$value" match {
+        case io.PartitionRegexp(capturedName, capturedValue) =>
+          fail(
+            s"Expected no match for name [$name] and value [$value] " +
+              s"but one was found: [$capturedName, $capturedValue]"
+          )
+
+        case _ =>
+          succeed
+      }
+    }
+
+    succeed
+  }
 }
