@@ -5,7 +5,7 @@ import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter.Mode
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.{BeforeAndAfter, EitherValues}
+import org.scalatest.{BeforeAndAfter, EitherValues, Inside}
 import org.slf4j.{Logger, LoggerFactory}
 
 class IOOpsSpec
@@ -15,7 +15,8 @@ class IOOpsSpec
     with TestUtils
     with PartitionTestUtils
     with BeforeAndAfter
-    with EitherValues {
+    with EitherValues
+    with Inside {
 
   override protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
@@ -126,36 +127,22 @@ class IOOpsSpec
   }
 
   "PartitionRegexp" should "match valid partition names and values" in {
-    val validNames = generatePartitionStrings(prefix = "testValue", withChars = allowedPartitionNameChars)
-    val validValues = generatePartitionStrings(prefix = "testName", withChars = allowedPartitionValueChars)
-    val validPairs = validNames.flatMap(name => validValues.map(value => name -> value))
-
-    validPairs.foreach { case (name, value) =>
-      s"$name=$value" match {
+    forAll(ValidPartitionsTable) { case (name, value) =>
+      inside(s"$name=$value") {
         case IOOps.PartitionRegexp(`name`, `value`) =>
           succeed
-
-        case _ =>
-          fail(
-            s"Expected a valid match for name [$name] and value [$value] but none was found"
-          )
       }
     }
   }
 
   it should "not match invalid partition names and values" in {
-    val invalidNames = generatePartitionStrings(prefix = "testValue", withChars = disallowedPartitionNameChars)
-    val invalidValues = generatePartitionStrings(prefix = "testName", withChars = disallowedPartitionValueChars)
-    val invalidPairs = invalidNames.flatMap(name => invalidValues.map(value => name -> value))
-
-    invalidPairs.foreach { case (name, value) =>
+    forAll(InvalidPartitionsTable) { case (name, value) =>
       s"$name=$value" match {
         case IOOps.PartitionRegexp(capturedName, capturedValue) =>
           fail(
             s"Expected no match for name [$name] and value [$value] " +
               s"but one was found: [$capturedName, $capturedValue]"
           )
-
         case _ =>
           succeed
       }
