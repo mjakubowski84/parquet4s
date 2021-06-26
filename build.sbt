@@ -155,7 +155,7 @@ lazy val coreBenchmarks = (project in file("coreBenchmarks"))
     run / fork := true
   )
   .enablePlugins(JmhPlugin)
-  .dependsOn(akka)
+  .dependsOn(core)
 
 lazy val akkaBenchmarks = (project in file("akkaBenchmarks"))
   .settings(
