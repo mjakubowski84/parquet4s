@@ -30,7 +30,7 @@ object CoreBenchmark {
 
     @Setup(Level.Trial)
     def setup(): Unit = {
-      basePath =  Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
+      basePath = Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
       records = (1 to datasetSize).map { i =>
         Record(
           i = i,

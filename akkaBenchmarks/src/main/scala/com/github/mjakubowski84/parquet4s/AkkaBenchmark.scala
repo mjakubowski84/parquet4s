@@ -10,7 +10,7 @@ import java.nio.file._
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.collection.immutable
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.Random
 
@@ -35,7 +35,7 @@ object AkkaBenchmark {
 
     @Setup(Level.Trial)
     def setup(): Unit = {
-      basePath =  Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
+      basePath = Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
       records = (1 to datasetSize).map { i =>
         Record(
           i = i,
