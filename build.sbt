@@ -11,7 +11,7 @@ ThisBuild / version := "2.0.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := "2.13.5"
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8")
-ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-unchecked", "-deprecation", "-feature")
+ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ThisBuild / resolvers := Seq(
   Opts.resolver.sonatypeReleases,
   Resolver.jcenterRepo
@@ -137,15 +137,14 @@ lazy val examples = (project in file("examples"))
   )
   .dependsOn(akka, fs2)
 
-lazy val benchmarks = (project in file("benchmarks"))
+lazy val coreBenchmarks = (project in file("coreBenchmarks"))
   .settings(
-    name := "parquet4s-benchmarks",
+    name := "parquet4s-core-benchmarks",
     publish / skip := true,
     publishLocal / skip := true,
-    crossScalaVersions := Nil,
+    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
-      "com.storm-enroute" %% "scalameter" % "0.21",
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
     ),
@@ -155,7 +154,48 @@ lazy val benchmarks = (project in file("benchmarks"))
     run / cancelable := true,
     run / fork := true
   )
-  .dependsOn(akka, fs2)
+  .enablePlugins(JmhPlugin)
+  .dependsOn(akka)
+
+lazy val akkaBenchmarks = (project in file("akkaBenchmarks"))
+  .settings(
+    name := "parquet4s-akka-benchmarks",
+    publish / skip := true,
+    publishLocal / skip := true,
+    crossScalaVersions := supportedScalaVersions,
+    libraryDependencies ++= Seq(
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
+      "org.slf4j" % "slf4j-nop" % slf4jVersion,
+      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
+    ),
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.slf4j", "slf4j-log4j12")
+    ),
+    run / cancelable := true,
+    run / fork := true
+  )
+  .enablePlugins(JmhPlugin)
+  .dependsOn(akka)
+
+lazy val fs2Benchmarks = (project in file("fs2Benchmarks"))
+  .settings(
+    name := "parquet4s-fs2-benchmarks",
+    publish / skip := true,
+    publishLocal / skip := true,
+    crossScalaVersions := fs2ScalaVersions,
+    libraryDependencies ++= Seq(
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
+      "org.slf4j" % "slf4j-nop" % slf4jVersion,
+      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
+    ),
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.slf4j", "slf4j-log4j12")
+    ),
+    run / cancelable := true,
+    run / fork := true
+  )
+  .enablePlugins(JmhPlugin)
+  .dependsOn(fs2)
 
 lazy val root = (project in file("."))
   .settings(publishSettings)
@@ -164,4 +204,4 @@ lazy val root = (project in file("."))
     publish / skip := true,
     publishLocal / skip := true
   )
-  .aggregate(core, akka, fs2, examples)
+  .aggregate(core, akka, fs2, examples, coreBenchmarks, akkaBenchmarks, fs2Benchmarks)
