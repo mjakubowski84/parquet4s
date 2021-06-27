@@ -68,6 +68,8 @@ object RowParquetRecord {
     def iterator: Iterator[String] = positions.iterator
 
     override def toString: String = positions.mkString("[", ",", "]")
+
+    override def hashCode(): Int = positions.hashCode
   }
 
   /**
@@ -84,7 +86,7 @@ object RowParquetRecord {
    * @return A new instance of [[RowParquetRecord]] initialized with given list of fields.
    */
   def apply(fields: (String, Value)*): RowParquetRecord =
-    apply(fields.toIterable)
+    apply(fields)
 
   /**
    * @param columns columns and their values to init the record with
@@ -100,21 +102,24 @@ object RowParquetRecord {
    * @return A new instance of [[RowParquetRecord]] initialized with [[NullValue]] per each field.
    */
   def emptyWithSchema(fields: Iterable[String]): RowParquetRecord =
-    apply(fields.map(_ -> NullValue))
+    new RowParquetRecord(
+      fields.map(_ -> NullValue).toMap,
+      RowParquetRecord.Fields(fields)
+    )
 
   /**
    * @param fields fields to init the record with
    * @return A new instance of [[RowParquetRecord]] initialized with [[NullValue]] per each field.
    */
   def emptyWithSchema(fields: String*): RowParquetRecord =
-    emptyWithSchema(fields.toIterable)
+    emptyWithSchema(fields)
 
   /**
    * Empty record holding no field and no value.
    */
   val EmptyNoSchema: RowParquetRecord = new RowParquetRecord(Map.empty, RowParquetRecord.Fields(Iterable.empty))
 
-  implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] = (record, _) => record
+  implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] = (record, _, _) => record
 
   implicit val genericParquetRecordDecoder: ParquetRecordDecoder[RowParquetRecord] = (record, _) => record
 
@@ -159,6 +164,7 @@ final class RowParquetRecord private (
   extends ParquetRecord[(String, Value), RowParquetRecord] with immutable.Seq[(String, Value)] {
 
   override protected[parquet4s] def add(name: String, value: Value): RowParquetRecord =
+    // TODO consider removing this test as it is just safeguarding algorithm itself
     if (fields.contains(name)) {
       new RowParquetRecord(values.updated(name, value), fields)
     } else {
@@ -384,7 +390,7 @@ final class RowParquetRecord private (
   }
 
   override def hashCode(): Int = {
-    val state = Seq(values)
+    val state = Seq(values.keys, fields)
     state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
   }
 
