@@ -369,7 +369,7 @@ trait ComplexValueEncoders {
 
   implicit def productEncoder[T](implicit encoder: ParquetRecordEncoder[T]): OptionalValueEncoder[T] =
     new OptionalValueEncoder[T] {
-      def encodeNonNull(data: T, configuration: ValueCodecConfiguration): Value = encoder.encode(data, configuration)
+      def encodeNonNull(data: T, configuration: ValueCodecConfiguration): Value = encoder.encode(data, null, configuration)
     }
 
 }
