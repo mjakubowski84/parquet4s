@@ -94,7 +94,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       Types.primitive(INT64, Repetition.REQUIRED).named("i")
     ).named("projected-schema")
 
-    def readProjected[T: ParquetRecordDecoder: SkippingParquetSchemaResolver](path: Path): Stream[IO, Vector[T]] =
+    def readProjected[T: ParquetRecordDecoder: ParquetSchemaResolver](path: Path): Stream[IO, Vector[T]] =
       parquet.fromParquet[IO, T].projection.read(path).fold(Vector.empty[T])(_ :+ _)
 
     val expectedRecords = data.map(d => RowParquetRecord.emptyWithSchema("i").updated("i", d.i, vcc))

@@ -24,7 +24,7 @@ object Path {
  */
 class Path private(val hadoopPath: HadoopPath) {
 
-  def append(element: String): Path = new Path(hadoopPath.suffix("/" + element))
+  def append(element: String): Path = new Path(new HadoopPath(hadoopPath, element))
 
   def parent: Option[Path] = Option(hadoopPath.getParent).map(Path.apply)
 

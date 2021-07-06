@@ -10,6 +10,7 @@ import org.apache.parquet.schema.MessageType
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
@@ -143,9 +144,9 @@ object rotatingWriter {
 
   private object RecordWriter {
     def apply[F[_]](path: Path,
-                          schema: MessageType,
-                          options: ParquetWriter.Options
-                         )(implicit F: Sync[F]): F[RecordWriter[F]] =
+                    schema: MessageType,
+                    options: ParquetWriter.Options
+                   )(implicit F: Sync[F]): F[RecordWriter[F]] =
       F.blocking(ParquetWriter.internalWriter(path, schema, options)).map(iw => new RecordWriter(iw))
   }
 
@@ -159,7 +160,6 @@ object rotatingWriter {
 
   private class RotatingWriter[T, W, F[_]](basePath: Path,
                                            options: ParquetWriter.Options,
-                                           writersRef: Ref[F, Map[Path, RecordWriter[F]]],
                                            maxCount: Long,
                                            partitionBy: List[ColumnPath],
                                            schema: MessageType,
@@ -168,29 +168,33 @@ object rotatingWriter {
                                            postWriteHandlerOpt: Option[PostWriteHandler[F, T]]
                                           )(implicit F: Sync[F]) {
 
-    private type Writers = Map[Path, RecordWriter[F]]
+    private val writers = TrieMap.empty[Path, RecordWriter[F]]
 
-    private def writePull(entity: W, writers: Writers): Pull[F, T, Writers] =
-      Pull.eval(write(entity, writers))
+    private def writePull(entity: W): Pull[F, T, Unit] =
+      Pull.eval(write(entity))
 
     private def newFileName: String = {
       val compressionExtension = options.compressionCodecName.getExtension
       UUID.randomUUID().toString + compressionExtension + ".parquet"
     }
 
-    private def getOrCreateWriter(basePath: Path, writers: Writers): F[(RecordWriter[F], Writers)] =
+    private def getOrCreateWriter(basePath: Path): F[RecordWriter[F]] = {
       writers.get(basePath) match {
-        case Some(writer) =>
-          F.pure(writer -> writers)
-        case None =>
-          for {
-            writer <- RecordWriter(basePath.append(newFileName), schema, options)
-            updatedWriters = writers.updated(basePath, writer)
-            _ <- writersRef.set(updatedWriters)
-          } yield writer -> updatedWriters
-      }
+          case Some(writer) =>
+            F.pure(writer)
+          case None =>
+            for {
+              writer <- RecordWriter(basePath.append(newFileName), schema, options)
+              existingWriterOpt <- F.delay { writers.putIfAbsent(basePath, writer) }
+              resultingWriter <- existingWriterOpt match {
+                case Some(existing) => writer.dispose.as(existing)
+                case None => F.pure(writer)
+              }
+            } yield resultingWriter
+        }
+    }
 
-    private def write(entity: W, writers: Writers): F[Writers] =
+    private def write(entity: W): F[Unit] =
       for {
         record <- encode(entity)
         partitioning <- partitionBy.foldLeft(F.pure(basePath -> record)) {
@@ -202,10 +206,9 @@ object rotatingWriter {
             }
         }
         (path, partitionedRecord) = partitioning
-        getResult <- getOrCreateWriter(path, writers)
-        (writer, writers) = getResult
+        writer <- getOrCreateWriter(path)
         _ <- writer.write(partitionedRecord)
-      } yield writers
+      } yield ()
 
     private def partition(record: RowParquetRecord, partitionPath: ColumnPath): F[(ColumnPath, String, RowParquetRecord)] = {
       record.removed(partitionPath) match {
@@ -216,19 +219,19 @@ object rotatingWriter {
       }
     }
 
-    // TODO consider using Hotswap
     private def dispose: F[Unit] =
-      for {
-        writers <- writersRef.modify(writers => (Map.empty, writers.values))
-        _ <- Stream.iterable(writers).evalMap(_.dispose).compile.drain
-      } yield ()
+      Stream
+        .suspend(Stream.iterable(writers.values))
+        .evalMap(_.dispose)
+        .onFinalize(F.delay { writers.clear() })
+        .compile.drain
 
     private def rotatePull(reason: String): Pull[F, T, Unit] =
       Pull.eval(logger.debug(s"Rotating on $reason")) >> Pull.eval(dispose)
 
     private def postWriteHandlerPull(out: T,
                                      count: Long,
-                                     partitions: Iterable[Path]
+                                     partitions: => Iterable[Path]
                                     ): Pull[F, T, Option[WriterEvent[T, W]]] =
       postWriteHandlerOpt.fold(Pull.eval[F, Option[WriterEvent[T, W]]](F.pure(None)))(handler => Pull.eval {
         for {
@@ -244,20 +247,21 @@ object rotatingWriter {
         } yield eventOpt
       })
 
-    private def writeAllPull(in: Stream[F, WriterEvent[T, W]], writers: Writers, count: Long): Pull[F, T, Unit] = {
+
+    private def writeAllPull(in: Stream[F, WriterEvent[T, W]], count: Long): Pull[F, T, Unit] = {
       in.pull.uncons1.flatMap {
         case Some((DataEvent(data), tail)) if count < maxCount =>
-          writePull(data, writers).flatMap(updatedWriters => writeAllPull(tail, updatedWriters, count + 1))
+          writePull(data) >> writeAllPull(tail, count + 1)
         case Some((DataEvent(data), tail)) =>
-          writePull(data, writers) >> rotatePull("max count reached") >> writeAllPull(tail, writers = Map.empty, count = 0)
+          writePull(data) >> rotatePull("max count reached") >> writeAllPull(tail, count = 0)
         case Some((RotateEvent(reason), tail)) =>
-          rotatePull(reason) >> writeAllPull(tail, writers = Map.empty, count = 0)
+          rotatePull(reason) >> writeAllPull(tail, count = 0)
         case Some((OutputEvent(out), tail)) if postWriteHandlerOpt.isEmpty =>
-          Pull.output1(out) >> writeAllPull(tail, writers, count)
+          Pull.output1(out) >> writeAllPull(tail, count)
         case Some((OutputEvent(out), tail)) =>
           Pull.output1(out) >> postWriteHandlerPull(out, count, writers.keys).flatMap {
-            case None => writeAllPull(tail, writers, count)
-            case Some(rotate) => writeAllPull(Stream.emit(rotate) ++ tail, writers, count)
+            case None => writeAllPull(tail, count)
+            case Some(rotate) => writeAllPull(Stream.emit(rotate) ++ tail, count)
           }
         case _ =>
           Pull.done
@@ -265,7 +269,7 @@ object rotatingWriter {
     }
 
     def writeAll(in: Stream[F, WriterEvent[T, W]]): Stream[F, T] =
-      writeAllPull(in, writers = Map.empty, count = 0).stream.onFinalize(dispose)
+      writeAllPull(in, count = 0).stream.onFinalize(dispose)
   }
 
   private[parquet4s] def write[
@@ -289,7 +293,6 @@ object rotatingWriter {
           new RotatingWriter[T, W, F](
             basePath = basePath,
             options = options,
-            writersRef = Ref.unsafe(Map.empty),
             maxCount = maxCount,
             partitionBy = partitionBy.toList,
             schema = schema,
