@@ -45,8 +45,8 @@ object Fs2Benchmark {
         )
       }
       // using single thread in order to not measure thread syncing
-      threadPool = Executors.newSingleThreadExecutor()
-      executionContext = ExecutionContext.fromExecutor(threadPool)
+      val threadPool = Executors.newSingleThreadExecutor()
+      val executionContext = ExecutionContext.fromExecutor(threadPool)
       // using the same execution context in order to avoid unnecessary thread switching
       val (scheduler, closeScheduler) = Scheduler.createDefaultScheduler()
       ioRuntime = IORuntime(

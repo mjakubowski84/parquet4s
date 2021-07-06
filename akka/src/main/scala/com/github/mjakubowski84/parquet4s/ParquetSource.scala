@@ -98,21 +98,23 @@ object ParquetSource extends IOOps {
         create = () => createReader(hadoopConf, filterCompat, partitionedPath, projectedSchemaOpt),
         read = reader => Option(reader.read()),
         close = _.close()
-      ).map { record =>
-        partitionedPath.partitions.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
-          currentRecord.updated(columnPath, BinaryValue(value))
-        }
-      }.map(decode)
+      )
+        .map(setPartitionValues(partitionedPath))
+        .map(decode)
   }
+
+  private def setPartitionValues[T](partitionedPath: PartitionedPath)(record: RowParquetRecord) =
+    partitionedPath.partitions.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
+      currentRecord.updated(columnPath, BinaryValue(value))
+    }
 
   private def createReader(hadoopConf: Configuration,
                            filterCompat: FilterCompat.Filter,
                            partitionedPath: PartitionedPath,
                            projectedSchemaOpt: Option[MessageType]
                           ): HadoopParquetReader[RowParquetRecord] =
-    HadoopParquetReader.builder[RowParquetRecord](
-      new ParquetReadSupport(projectedSchemaOpt), partitionedPath.path.toHadoop
-    )
+    HadoopParquetReader
+      .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), partitionedPath.path.toHadoop)
       .withConf(hadoopConf)
       .withFilter(filterCompat)
       .build()
