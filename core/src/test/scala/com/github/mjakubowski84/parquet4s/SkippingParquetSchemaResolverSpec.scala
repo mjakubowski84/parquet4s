@@ -77,7 +77,7 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     resolveSchema[Empty](Set(Col("field"))) should be(Message(None))
   }
 
-  "Generic SkippingParquetSchemaResolver" should "create unpartitioned schema" in {
+  "Generic skipping ParquetSchemaResolver" should "create unpartitioned schema" in {
     resolveSchema[RowParquetRecord](Set.empty) should be(fullSchema)
   }
 

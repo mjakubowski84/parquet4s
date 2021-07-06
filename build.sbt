@@ -32,17 +32,19 @@ lazy val compilationSettings = Seq(
       "UTF-8",
       "-feature",
       "-language:implicitConversions",
-      "-Xfatal-warnings"
+      "-Xfatal-warnings",
     ) ++ {
       CrossVersion.partialVersion(scalaVersion.value) match {
         case Some((3, _)) => Seq(
-          "-unchecked"
+          "-unchecked",
+          "-Xtarget:8"
         )
         case _ =>
           Seq(
             "-deprecation",
             "-Xfatal-warnings",
-            "-Xsource:3"
+            "-Xsource:3",
+            "-target:jvm-1.8"
           )
       }
     }
