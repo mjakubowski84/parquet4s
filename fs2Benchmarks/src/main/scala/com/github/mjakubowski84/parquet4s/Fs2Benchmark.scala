@@ -26,8 +26,8 @@ object Fs2Benchmark {
   @State(Scope.Benchmark)
   class Dataset {
 
-    // 1024 & 512 * 1024
-    @Param(Array("1024", "524288"))
+    // 512 * 1024
+    @Param(Array("524288"))
     var datasetSize: Int = _
     var basePath: Path = _
     var records: immutable.Iterable[Record] = _
@@ -44,7 +44,8 @@ object Fs2Benchmark {
           else None
         )
       }
-      val threadPool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
+      // using single thread in order to not measure thread syncing
+      val threadPool = Executors.newSingleThreadExecutor()
       val executionContext = ExecutionContext.fromExecutor(threadPool)
       // using the same execution context in order to avoid unnecessary thread switching
       val (scheduler, closeScheduler) = Scheduler.createDefaultScheduler()
@@ -55,8 +56,6 @@ object Fs2Benchmark {
         shutdown = () => { threadPool.shutdown(); closeScheduler() },
         config = IORuntimeConfig()
       )
-      // TODO consider using default runtime
-//      ioRuntime = IORuntime.global
 
     }
 
