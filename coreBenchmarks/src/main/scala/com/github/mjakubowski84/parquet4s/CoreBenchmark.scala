@@ -22,8 +22,8 @@ object CoreBenchmark {
   @State(Scope.Benchmark)
   class Dataset {
 
-    // 1024 & 512 * 1024
-    @Param(Array("1024", "524288"))
+    // 512 * 1024
+    @Param(Array("524288"))
     var datasetSize: Int = _
     var basePath: String = _
     var records: immutable.Iterable[Record] = _

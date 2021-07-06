@@ -1,7 +1,10 @@
 package com.github.mjakubowski84.parquet4s
 
+import akka.Done
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.ActorAttributes
+import akka.stream.scaladsl.{Keep, Sink, Source}
+import com.typesafe.config.ConfigFactory
 import org.openjdk.jmh.annotations._
 
 import java.io.IOException
@@ -22,12 +25,13 @@ object AkkaBenchmark {
 
   val Fractioner = 100.12
   val Dict = List("a", "b", "c", "d")
+  val Dispatcher = "akka.actor.single-thread-dispatcher"
 
   @State(Scope.Benchmark)
   class Dataset {
 
-    // 1024 & 512 * 1024
-    @Param(Array("1024", "524288"))
+    // 512 * 1024
+    @Param(Array("524288"))
     var datasetSize: Int = _
     var basePath: String = _
     var records: immutable.Iterable[Record] = _
@@ -44,7 +48,17 @@ object AkkaBenchmark {
           else None
         )
       }
-      actorSystem = ActorSystem("benchmark")
+      actorSystem = ActorSystem("Benchmark", ConfigFactory.parseString(
+        """
+            akka.actor.single-thread-dispatcher {
+                type = PinnedDispatcher
+                executor = "thread-pool-executor"
+                thread-pool-executor {
+                    fixed-pool-size = 1
+                }
+            }
+            """
+      ))
     }
 
     @TearDown(Level.Trial)
@@ -80,6 +94,17 @@ object AkkaBenchmark {
   @State(Scope.Thread)
   class WriteState extends BaseState {
 
+    private def writeGraph =
+      Source(dataset.records)
+        .toMat(ParquetStreams.toParquetSingleFile(filePath))(Keep.right)
+        .withAttributes(ActorAttributes.dispatcher(Dispatcher))
+
+    private def writePartitionedGraph =
+      Source(dataset.records)
+        .via(ParquetStreams.viaParquet[Record](dataset.basePath).withPartitionBy("dict").build())
+        .toMat(Sink.last)(Keep.right)
+        .withAttributes(ActorAttributes.dispatcher(Dispatcher))
+
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = fetchDataset(dataset)
 
@@ -87,23 +112,24 @@ object AkkaBenchmark {
     def clearDataset(): Unit = dataset.delete()
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
-    def write(): Unit =
-      Await.ready(Source(dataset.records).runWith(ParquetStreams.toParquetSingleFile(filePath)), Duration.Inf)
+    def write(): Done =
+      Await.result(writeGraph.run(), Duration.Inf)
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     def akkaWritePartitioned(): Record =
-        Await.result(
-          Source(dataset.records)
-            .via(ParquetStreams.viaParquet[Record](dataset.basePath).withPartitionBy("dict").build())
-            .runWith(Sink.last)
-          ,
-          Duration.Inf
-        )
+      Await.result(writePartitionedGraph.run(), Duration.Inf)
 
   }
 
   @State(Scope.Benchmark)
   class ReadState extends BaseState {
+
+    private def readGraph =
+      ParquetStreams
+        .fromParquet[Record]
+        .read(dataset.basePath)
+        .toMat(Sink.last)(Keep.right)
+        .withAttributes(ActorAttributes.dispatcher(Dispatcher))
 
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = {
@@ -115,8 +141,7 @@ object AkkaBenchmark {
     def clearDataset(): Unit = dataset.delete()
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
-    def read(): Record =
-      Await.result(ParquetStreams.fromParquet[Record].read(dataset.basePath).runWith(Sink.last), Duration.Inf)
+    def read(): Record = Await.result(readGraph.run(), Duration.Inf)
   }
 
 }
@@ -130,7 +155,7 @@ class AkkaBenchmark {
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  def write(state: WriteState): Unit =
+  def write(state: WriteState): Done =
     state.write()
 
   @Benchmark

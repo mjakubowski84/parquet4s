@@ -25,8 +25,8 @@ object Fs2Benchmark {
   @State(Scope.Benchmark)
   class Dataset {
 
-    // 1024 & 512 * 1024
-    @Param(Array("1024", "524288"))
+    // 512 * 1024
+    @Param(Array("524288"))
     var datasetSize: Int = _
     var basePath: String = _
     var records: immutable.Iterable[Record] = _
@@ -47,7 +47,8 @@ object Fs2Benchmark {
           else None
         )
       }
-      threadPool = Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors())
+      // using single thread in order to not measure thread syncing
+      threadPool = Executors.newSingleThreadExecutor()
       executionContext = ExecutionContext.fromExecutor(threadPool)
       // using the same execution context in order to avoid unnecessary thread switching
       blocker = Blocker.liftExecutionContext(executionContext)
