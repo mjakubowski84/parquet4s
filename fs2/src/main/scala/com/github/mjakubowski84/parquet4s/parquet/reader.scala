@@ -32,7 +32,7 @@ object reader {
     /**
      * @param schemaResolver resolved schema that is going to be used as a projection over original file schema
      */
-    def projection(implicit schemaResolver: SkippingParquetSchemaResolver[T]): Builder[F, T]
+    def projection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[F, T]
     /**
      * @param path [[Path]] to Parquet files, e.g.: {{{ Path("file:///data/users") }}}
      * @param decoder decodes [[RowParquetRecord]] to your data type
@@ -45,7 +45,7 @@ object reader {
 
   private case class BuilderImpl[F[_], T](options: ParquetReader.Options,
                                           filter: Filter,
-                                          projectedSchemaResolverOpt: Option[SkippingParquetSchemaResolver[T]]
+                                          projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
                                          ) extends Builder[F, T] {
     override def options(options: ParquetReader.Options): Builder[F, T] =
       this.copy(options = options)
@@ -53,7 +53,7 @@ object reader {
     override def filter(filter: Filter): Builder[F, T] =
       this.copy(filter = filter)
 
-    override def projection(implicit schemaResolver: SkippingParquetSchemaResolver[T]): Builder[F, T] =
+    override def projection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[F, T] =
       this.copy(projectedSchemaResolverOpt = Option(schemaResolver))
 
     override def read(path: Path)
@@ -61,18 +61,18 @@ object reader {
       reader.read(path, options, filter, projectedSchemaResolverOpt)
   }
 
-  private[parquet4s] def read[F[_]: ContextShift, T: ParquetRecordDecoder](basePath: Path,
-                                                                           options: ParquetReader.Options,
-                                                                           filter: Filter,
-                                                                           projectedSchemaResolverOpt: Option[SkippingParquetSchemaResolver[T]]
-                                                                          )(implicit F: Sync[F]): Stream[F, T] = {
+  private[parquet4s] def read[F[_], T: ParquetRecordDecoder](basePath: Path,
+                                                             options: ParquetReader.Options,
+                                                             filter: Filter,
+                                                             projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
+                                                            )(implicit F: Sync[F]): Stream[F, T] = {
 
     for {
       vcc                  <- Stream.eval(F.pure(ValueCodecConfiguration(options)))
       decode = (record: RowParquetRecord) => F.catchNonFatal(ParquetRecordDecoder.decode(record, vcc))
       partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf)
       projectedSchemaOpt <- Stream.eval(projectedSchemaResolverOpt
-        .traverse(implicit resolver => F.catchNonFatal(SkippingParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))))
+        .traverse(implicit resolver => F.catchNonFatal(ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))))
       partitionData        <- Stream.eval(F.catchNonFatal(PartitionFilter.filter(filter, vcc, partitionedDirectory)))
                                 .flatMap(Stream.iterable)
       (partitionFilter, partitionedPath) = partitionData
