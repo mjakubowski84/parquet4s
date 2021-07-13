@@ -12,29 +12,28 @@ import java.time.LocalDate
 
 object WriteAndReadGenericAkkaApp extends App {
 
-  private val ID         = "id"
-  private val Name       = "name"
-  private val Birthday   = "birthday"
-  private val SchemaName = "user_schema"
+  val ID = "id"
+  val Name = "name"
+  val Birthday = "birthday"
+  val SchemaName = "user_schema"
 
-  implicit val schema: MessageType = Types
-    .buildMessage()
+  val Schema: MessageType = Types.buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
-  private val vcc = ValueCodecConfiguration.Default
+  val Vcc = ValueCodecConfiguration.Default
 
-  private val users = List(
+  val users = List(
     (1L, "Alice", LocalDate.of(2000, 1, 1)),
     (2L, "Bob", LocalDate.of(1980, 2, 28)),
     (3L, "Cecilia", LocalDate.of(1977, 3, 15))
   ).map { case (id, name, birthday) =>
     RowParquetRecord.emptyWithSchema(ID, Name, Birthday)
-      .updated(ID, id, vcc)
-      .updated(Name, name, vcc)
-      .updated(Birthday, birthday, vcc)
+      .updated(ID, id, Vcc)
+      .updated(Name, name, Vcc)
+      .updated(Birthday, birthday, Vcc)
   }
 
   val path = Path(Files.createTempDirectory("example"))
@@ -44,9 +43,9 @@ object WriteAndReadGenericAkkaApp extends App {
 
   for {
     // write
-    _ <- Source(users).runWith(ParquetStreams.toParquetSingleFile(path.append("data.parquet")))
+    _ <- Source(users).runWith(ParquetStreams.toParquetSingleFile.generic(Schema).build(path.append("data.parquet")))
     // read
-    _ <- ParquetStreams.fromParquet[RowParquetRecord].read(path).runWith(Sink.foreach(println))
+    _ <- ParquetStreams.fromParquet.generic.read(path).runWith(Sink.foreach(println))
     // finish
     _ <- system.terminate()
   } yield ()

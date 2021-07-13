@@ -77,7 +77,7 @@ object CoreBenchmark {
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     def write(): Unit =
-      ParquetWriter.writeAndClose(filePath, dataset.records)
+      ParquetWriter.of[Record].writeAndClose(filePath, dataset.records)
 
   }
 
@@ -87,7 +87,7 @@ object CoreBenchmark {
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = {
       fetchDataset(dataset)
-      ParquetWriter.writeAndClose(filePath, dataset.records)
+      ParquetWriter.of[Record].writeAndClose(filePath, dataset.records)
     }
 
     @TearDown(Level.Trial)
@@ -95,7 +95,7 @@ object CoreBenchmark {
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     def read(): Record =
-      ParquetReader.read[Record](dataset.basePath).last
+      ParquetReader.as[Record].read(dataset.basePath).last
   }
 
 }

@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import cats.effect.Sync
-import fs2.Pipe
+import cats.effect.{Async, Sync}
 
 import scala.language.higherKinds
 
@@ -21,31 +20,25 @@ package object parquet {
    * <br/>
    * Allows to turn on a <b>projection</b> over original file schema in order to boost read performance if not all
    * columns are required to be read.
+   * <br/>
+   * Builder allows to create a stream of data of given type or of generic records.
    * @tparam F effect type
-   * @tparam T type of data that represent the schema of the Parquet data, e.g.:
-   *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
    * @return Builder of the [[fs2.Stream]]
    */
-  def fromParquet[F[_], T]: reader.Builder[F, T] = reader.Builder()
+  def fromParquet[F[_]: Sync]: reader.FromParquet[F] = new reader.FromParquetImpl[F]
 
   /**
-   * Creates a [[fs2.Pipe]] that writes Parquet data to single file at the specified path (including
+   * Builds a [[fs2.Pipe]] that writes Parquet data to single file at the specified path (including
    * file name). The resulting stream returns <b>nothing</b>, that is, it doesn't emit any element.
    * <br/>
    * Path can refer to local file, HDFS, AWS S3, Google Storage, Azure, etc.
    * Please refer to Hadoop client documentation or your data provider in order to know how to configure the connection.
-   *
-   * @param path [[Path]] to Parquet files, e.g.: {{{ Path("file:///data/users/users-2019-01-01.parquet") }}}
-   * @param options set of options that define how Parquet files will be created
+   * <br/>
+   * Builder allows to create a pipe for given data type or for generic records.
    * @tparam F effect type
-   * @tparam T type of data that represent the schema of the Parquet data, e.g.:
-   *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
-   * @return The pipe that writes Parquet file
+   * @return [[fs2.Pipe]] builder
    */
-  def writeSingleFile[F[_]: Sync, T : ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
-                                                                                    options: ParquetWriter.Options = ParquetWriter.Options()
-                                                                                   ): Pipe[F, T, fs2.INothing] =
-    writer.write(path, options)
+  def writeSingleFile[F[_]: Sync] = new writer.ToParquetImpl[F]
 
   /**
    * Builds a [[fs2.Pipe]] that:
@@ -55,13 +48,11 @@ package object parquet {
    *   <li>Flushes and rotates files after given number of rows is written or given time period elapses</li>
    *   <li>Outputs incoming message after it is written but can write an effect of provided message transformation.</li>
    * </ol>
-   *
+   * <br/>
+   * Builder allows to create a pipe for given data type or for generic records.
    * @tparam F effect type
-   * @tparam T type of data that represent the schema of the Parquet data, e.g.:
-   *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
-   * @return Pipe builder
+   * @return [[fs2.Pipe]] builder
    */
-  def viaParquet[F[_], T]: rotatingWriter.Builder[F, T, T] = rotatingWriter.Builder()
-
+  def viaParquet[F[_]: Async]: rotatingWriter.ViaParquet[F] = new rotatingWriter.ViaParquetImpl[F]
 
 }

@@ -1,11 +1,12 @@
 import DependecyVersions._
 import Releasing._
 import bloop.integrations.sbt.BloopDefaults
+import sbt.util
 
 
-lazy val twoTwelve = "2.12.14"
+lazy val twoTwelve = "2.12.15"
 lazy val twoThirteen = "2.13.6"
-lazy val three = "3.0.0"
+lazy val three = "3.0.2"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 lazy val akkaScalaVersions = Seq(twoTwelve, twoThirteen)
 
@@ -83,12 +84,12 @@ lazy val core = (project in file("core"))
         exclude(org = "org.slf4j", name = "slf4j-api"),
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.4",
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.5.0",
 
       // tests
-      "org.mockito" % "mockito-core" % "3.11.1" % "test",
+      "org.mockito" % "mockito-core" % "4.0.0" % "test",
       "org.scalatest" %% "scalatest" % "3.2.9" % "test,it",
-      "ch.qos.logback" % "logback-classic" % "1.2.3" % "test,it",
+      "ch.qos.logback" % "logback-classic" % "1.2.6" % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
       CrossVersion.partialVersion(scalaBinaryVersion.value) match {
@@ -134,7 +135,7 @@ lazy val fs2 = (project in file("fs2"))
       "co.fs2" %% "fs2-core" % fs2Version,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "co.fs2" %% "fs2-io" % fs2Version % "it",
-      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.1.1" % "it"
+      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.3.0" % "it"
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
@@ -154,16 +155,17 @@ lazy val examples = (project in file("examples"))
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "2.8.0",
-      "ch.qos.logback" % "logback-classic" % "1.2.3",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.0.0",
+      "ch.qos.logback" % "logback-classic" % "1.2.6",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.typesafe.akka" %% "akka-stream-kafka" % "2.0.7",
-      "com.github.fd4s" %% "fs2-kafka" % "2.0.0",
+      "com.typesafe.akka" %% "akka-stream-kafka" % "2.1.1",
+      "com.github.fd4s" %% "fs2-kafka" % "2.2.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
     ),
+    evictionErrorLevel := util.Level.Warn,
     run / cancelable := true,
     run / fork := true
   )

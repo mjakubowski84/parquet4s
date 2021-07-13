@@ -24,17 +24,17 @@ object WriteAndReadFilteredApp extends App {
   val path = Path(Files.createTempDirectory("example"))
 
   // write
-  ParquetWriter.writeAndClose(path.append("data.parquet"), data)
+  ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
   //read filtered
   println("""dict == "A"""")
-  val dictIsOnlyA = ParquetReader.read[Data](path, filter = Col("dict") === Dict.A)
+  val dictIsOnlyA = ParquetReader.as[Data].filter(Col("dict") === Dict.A).read(path)
   try {
     dictIsOnlyA.foreach(println)
   } finally dictIsOnlyA.close()
 
   println("""id >= 20 && id < 40""")
-  val idIsBetween10And90 = ParquetReader.read[Data](path, filter = Col("id") >= 20 && Col("id") < 40)
+  val idIsBetween10And90 = ParquetReader.as[Data].filter(Col("id") >= 20 && Col("id") < 40).read(path)
   try {
     idIsBetween10And90.foreach(println)
   } finally idIsBetween10And90.close()
