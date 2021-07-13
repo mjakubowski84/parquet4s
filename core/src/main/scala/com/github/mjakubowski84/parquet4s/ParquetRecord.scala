@@ -164,7 +164,7 @@ final class RowParquetRecord private (
   extends ParquetRecord[(String, Value), RowParquetRecord] with immutable.Seq[(String, Value)] {
 
   override protected[parquet4s] def add(name: String, value: Value): RowParquetRecord =
-    // TODO consider removing this test as it is just safeguarding algorithm itself
+    // TODO consider removing this check as it is just safeguarding algorithm itself
     if (fields.contains(name)) {
       new RowParquetRecord(values.updated(name, value), fields)
     } else {
@@ -351,10 +351,9 @@ final class RowParquetRecord private (
     */
   override def length: Int = fields.size
 
-  // FIXME use Product or Fields
   override def toString: String =
-    values
-      .map { case (key, value) => s"$key=$value"}
+    fields.iterator
+      .map(name => s"$name=${values(name)}")
       .mkString(getClass.getSimpleName + " (", ",", ")")
 
   /**

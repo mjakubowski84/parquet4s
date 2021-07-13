@@ -58,7 +58,9 @@ object ParquetRecordDecoder:
       decodedFieldOpt match
         case Some(decodedFieldValue) =>
           Fields(decodedFieldValue *: tailDecoder.decode(record, configuration).values)
-        case None => // TODO add test
+        case None =>
+          // TODO add test
+          // TODO add an option to not throw an error
           throw DecodingException(s"Field $fieldName is not in schema of: $record")
     
 

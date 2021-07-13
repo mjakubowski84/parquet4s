@@ -52,8 +52,9 @@ trait MessageSink {
 
   private lazy val saveDataToParquetFlow: GraphStage[FlowShape[Message, Message]] =
     ParquetStreams
-      .viaParquet[Message](baseWritePath)
-      .withPreWriteTransformation { message =>
+      .viaParquet
+      .of[Message]
+      .preWriteTransformation { message =>
         val timestamp = new Timestamp(message.record.timestamp())
         val localDateTime = timestamp.toLocalDateTime
         Data(
@@ -64,13 +65,13 @@ trait MessageSink {
           word = message.record.value()
         )
       }
-      .withPartitionBy(Col("year"), Col("month"), Col("day"))
-      .withMaxCount(MaxChunkSize)
-      .withMaxDuration(ChunkWriteTimeWindow)
-      .withWriteOptions(writerOptions)
-      .withPostWriteHandler { state =>
+      .partitionBy(Col("year"), Col("month"), Col("day"))
+      .maxCount(MaxChunkSize)
+      .maxDuration(ChunkWriteTimeWindow)
+      .options(writerOptions)
+      .postWriteHandler { state =>
         logger.info(s"Batch of ${state.count} collected.")
       }
-      .build()
+      .build(baseWritePath)
 
 }

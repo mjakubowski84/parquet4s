@@ -14,7 +14,7 @@ class ParquetWriterAndSparkCompatibilityItSpec extends AnyFreeSpec with Matchers
 
   private def runTestCase(testCase: CaseDef): Unit =
     testCase.description in {
-      ParquetWriter.writeAndClose(tempPath, testCase.data)(testCase.writerFactory)
+      ParquetWriter.of[testCase.DataType](testCase.encoder, testCase.resolver).writeAndClose(tempPath, testCase.data)
       readFromTemp(testCase.typeTag) should contain theSameElementsAs testCase.data
     }
 

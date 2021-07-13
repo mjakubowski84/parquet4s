@@ -30,16 +30,16 @@ object WriteAndReadGenericApp extends App {
   }
 
   // write
-  implicit val schema: MessageType = Types.buildMessage()
+  val schema: MessageType = Types.buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
-  ParquetWriter.writeAndClose(path.append("users.parquet"), users)
+  ParquetWriter.generic(schema).writeAndClose(path.append("users.parquet"), users)
 
   //read
-  val readData = ParquetReader.read[RowParquetRecord](path)
+  val readData = ParquetReader.generic.read(path)
   try {
     readData.foreach { record =>
       val id = record.get[Long](ID, vcc)

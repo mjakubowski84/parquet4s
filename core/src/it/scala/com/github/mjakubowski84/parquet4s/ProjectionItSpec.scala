@@ -30,11 +30,11 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
       Full(a = "y", b = 2, c = 1.1),
       Full(a = "z", b = 3, c = 1.2)
     )
-    ParquetWriter.writeAndClose(filePath, in)
+    ParquetWriter.of[Full].writeAndClose(filePath, in)
 
     implicit val partialSchema: MessageType = ParquetSchemaResolver.resolveSchema[Partial]
 
-    val outRecords = ParquetReader.withProjection[RowParquetRecord].read(filePath)
+    val outRecords = ParquetReader.projectedAs[RowParquetRecord].read(filePath)
 
     outRecords should contain theSameElementsAs List(
       RowParquetRecord("b" -> 1.value),
@@ -48,11 +48,11 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
     val in = List(
       FullComplex(a = "A", nested = FullNested(b = List(FullElem(1, "a"), FullElem(2, "b"), FullElem(3, "c")), c = true))
     )
-    ParquetWriter.writeAndClose(filePath, in)
+    ParquetWriter.of[FullComplex].writeAndClose(filePath, in)
 
     implicit val partialSchema: MessageType = ParquetSchemaResolver.resolveSchema[PartialComplex]
 
-    val outRecords = ParquetReader.withProjection[RowParquetRecord].read(filePath)
+    val outRecords = ParquetReader.projectedAs[RowParquetRecord].read(filePath)
 
     outRecords should contain theSameElementsAs List(
       RowParquetRecord("nested" -> RowParquetRecord("b" -> ListParquetRecord(

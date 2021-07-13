@@ -96,12 +96,12 @@ object AkkaBenchmark {
 
     private def writeGraph =
       Source(dataset.records)
-        .toMat(ParquetStreams.toParquetSingleFile(filePath))(Keep.right)
+        .toMat(ParquetStreams.toParquetSingleFile.of[Record].build(filePath))(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))
 
     private def writePartitionedGraph =
       Source(dataset.records)
-        .via(ParquetStreams.viaParquet[Record](dataset.basePath).withPartitionBy(ColumnPath("dict")).build())
+        .via(ParquetStreams.viaParquet.of[Record].partitionBy(ColumnPath("dict")).build(dataset.basePath))
         .toMat(Sink.last)(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))
 
@@ -126,7 +126,8 @@ object AkkaBenchmark {
 
     private def readGraph =
       ParquetStreams
-        .fromParquet[Record]
+        .fromParquet
+        .as[Record]
         .read(dataset.basePath)
         .toMat(Sink.last)(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))
@@ -134,7 +135,7 @@ object AkkaBenchmark {
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = {
       fetchDataset(dataset)
-      ParquetWriter.writeAndClose(filePath, dataset.records)
+      ParquetWriter.of[Record].writeAndClose(filePath, dataset.records)
     }
 
     @TearDown(Level.Trial)

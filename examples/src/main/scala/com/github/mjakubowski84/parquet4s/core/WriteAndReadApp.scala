@@ -14,10 +14,10 @@ object WriteAndReadApp extends App {
   val path = Path(Files.createTempDirectory("example"))
 
   // write
-  ParquetWriter.writeAndClose(path.append("data.parquet"), data)
+  ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
   //read
-  val readData = ParquetReader.read[Data](path)
+  val readData = ParquetReader.as[Data].read(path)
   try {
     readData.foreach(println)
   } finally readData.close()

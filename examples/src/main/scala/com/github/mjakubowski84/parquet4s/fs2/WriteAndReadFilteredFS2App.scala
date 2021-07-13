@@ -3,7 +3,7 @@ package com.github.mjakubowski84.parquet4s.fs2
 import cats.Show
 import cats.effect.{IO, IOApp}
 import com.github.mjakubowski84.parquet4s.{Col, Path}
-import com.github.mjakubowski84.parquet4s.parquet._
+import com.github.mjakubowski84.parquet4s.parquet.*
 import fs2.Stream
 import fs2.io.file.Files
 
@@ -28,14 +28,15 @@ object WriteAndReadFilteredFS2App extends IOApp.Simple {
 
   override def run: IO[Unit] = {
     val stream = for {
-      path <- Stream.resource(Files[IO].tempDirectory()).map(Path.apply)
+      path <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(fs2Path => Path(fs2Path.toNioPath))
       _ <- Stream.range[IO, Int](start = 0, stopExclusive = Count)
         .map { i => Data(id = i, dict = Dict.random) }
-        .through(writeSingleFile(path.append("data.parquet")))
+        .through(writeSingleFile[IO].of[Data].write(path.append("data.parquet")))
         .append(Stream.exec(IO.println("""dict == "A"""")))
-        .append(fromParquet[IO, Data].filter(Col("dict") === Dict.A).read(path).printlns.drain)
+        .append(fromParquet[IO].as[Data].filter(Col("dict") === Dict.A).read(path).printlns.drain)
         .append(Stream.exec(IO.println("""id >= 20 && id < 40""")))
-        .append(fromParquet[IO, Data]
+        .append(fromParquet[IO]
+          .as[Data]
           .filter(Col("id") >= 20 && Col("id") < 40)
           .read(path)
           .printlns
