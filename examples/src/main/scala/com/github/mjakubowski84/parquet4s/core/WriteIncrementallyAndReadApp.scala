@@ -20,7 +20,7 @@ object WriteIncrementallyAndReadApp extends App {
   } finally writer.close()
 
   //read
-  val readData = ParquetReader.read[Data](path)
+  val readData = ParquetReader().as[Data].read(path)
   try {
     readData.foreach(println)
   } finally readData.close()

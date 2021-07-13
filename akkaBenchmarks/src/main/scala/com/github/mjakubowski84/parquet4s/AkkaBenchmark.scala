@@ -126,7 +126,8 @@ object AkkaBenchmark {
 
     private def readGraph =
       ParquetStreams
-        .fromParquet[Record]
+        .fromParquet
+        .as[Record]
         .read(dataset.basePath)
         .toMat(Sink.last)(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))

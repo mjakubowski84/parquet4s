@@ -12,12 +12,43 @@ import scala.language.higherKinds
 
 object reader {
 
-  object Builder {
-    private[parquet4s] def apply[F[_], T](): Builder[F, T] = BuilderImpl(
+  trait FromParquet[F[_]] {
+
+    def as[T]: Builder[F, T]
+
+    def projectedAs[T: ParquetSchemaResolver]: Builder[F, T]
+
+    def generic: Builder[F, RowParquetRecord]
+
+    def projectedGeneric(projectedSchema: MessageType): Builder[F, RowParquetRecord]
+
+  }
+
+  private[parquet4s] class FromParquetImpl[F[_]] extends FromParquet[F] {
+    override def as[T]: Builder[F, T] = BuilderImpl(
       options = ParquetReader.Options(),
       filter = Filter.noopFilter,
       schemaResolverOpt = None
     )
+
+    override def projectedAs[T: ParquetSchemaResolver]: Builder[F, T] = BuilderImpl(
+      options = ParquetReader.Options(),
+      filter = Filter.noopFilter,
+      schemaResolverOpt = Option(implicitly[ParquetSchemaResolver[T]])
+    )
+
+    override def generic: Builder[F, RowParquetRecord] = BuilderImpl[F, RowParquetRecord](
+      options = ParquetReader.Options(),
+      filter = Filter.noopFilter,
+      schemaResolverOpt = None
+    )
+
+    override def projectedGeneric(projectedSchema: MessageType): Builder[F, RowParquetRecord] =
+      BuilderImpl[F, RowParquetRecord](
+        options = ParquetReader.Options(),
+        filter = Filter.noopFilter,
+        schemaResolverOpt = Option(RowParquetRecord.genericParquetSchemaResolver(projectedSchema))
+      )
   }
 
   trait Builder[F[_], T] {
@@ -59,6 +90,7 @@ object reader {
     override def read(path: Path)
                      (implicit decoder: ParquetRecordDecoder[T], F: Sync[F]): Stream[F, T] = {
       for {
+        // TODO we need to pass partitions to resolver
         projectionSchemaOpt <- Stream.eval(schemaResolverOpt.traverse(implicit resolver => F.catchNonFatal(ParquetSchemaResolver.resolveSchema)))
         readerStream <- reader.read(path, options, filter, projectionSchemaOpt)
       } yield readerStream

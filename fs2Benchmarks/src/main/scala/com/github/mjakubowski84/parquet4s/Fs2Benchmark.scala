@@ -147,7 +147,8 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       ParquetWriter.writeAndClose(filePath, dataset.records)
       operation = parquet
-        .fromParquet[IO, Record]
+        .fromParquet[IO]
+        .as[Record]
         .read(dataset.basePath)
         .compile
         .lastOrError

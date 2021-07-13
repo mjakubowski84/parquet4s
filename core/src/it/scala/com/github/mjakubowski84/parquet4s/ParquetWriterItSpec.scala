@@ -30,7 +30,7 @@ class ParquetWriterItSpec
   private val records = Record.random(5000)
 
   private def readRecords: Seq[Record] = {
-    val iter = ParquetReader.read[Record](writePath)
+    val iter = ParquetReader().as[Record].read(writePath)
     try iter.toSeq
     finally iter.close()
   }

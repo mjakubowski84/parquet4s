@@ -60,7 +60,7 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
   }
 
   def read(filter: Filter): Seq[Data] = {
-    val iter = ParquetReader.read[Data](filePath, filter = filter)
+    val iter = ParquetReader().as[Data].filter(filter).read(filePath)
     try iter.toSeq
     finally iter.close()
   }

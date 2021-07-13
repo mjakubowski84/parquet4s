@@ -95,7 +95,7 @@ object CoreBenchmark {
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     def read(): Record =
-      ParquetReader.read[Record](dataset.basePath).last
+      ParquetReader().as[Record].read(dataset.basePath).last
   }
 
 }

@@ -33,7 +33,7 @@ class TimeEncodingCompatibilityItSpec extends
   private def writeWithParquet4S(data: TimePrimitives, timeZone: TimeZone): Unit =
     ParquetWriter.writeAndClose(tempPath, Seq(data), ParquetWriter.Options(timeZone = timeZone))
   private def readWithParquet4S(timeZone: TimeZone): TimePrimitives = {
-    val parquetIterable = ParquetReader.read[TimePrimitives](tempPath, ParquetReader.Options(timeZone = timeZone))
+    val parquetIterable = ParquetReader().as[TimePrimitives].options(ParquetReader.Options(timeZone = timeZone)).read(tempPath)
     try {
       parquetIterable.head
     } finally {

@@ -59,7 +59,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
 
   def read[T: ParquetRecordDecoder](path: Path): Stream[IO, Vector[T]] =
-    parquet.fromParquet[IO, T].read(path).fold(Vector.empty[T])(_ :+ _)
+    parquet.fromParquet[IO].as[T].read(path).fold(Vector.empty[T])(_ :+ _)
 
   def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
     Files[IO].directoryStream(path.toNio)
@@ -95,7 +95,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     ).named("projected-schema")
 
     def readProjected[T: ParquetRecordDecoder: ParquetSchemaResolver](path: Path): Stream[IO, Vector[T]] =
-      parquet.fromParquet[IO, T].projection.read(path).fold(Vector.empty[T])(_ :+ _)
+      parquet.fromParquet[IO].projectedAs[T].read(path).fold(Vector.empty[T])(_ :+ _)
 
     val expectedRecords = data.map(d => RowParquetRecord.emptyWithSchema("i").updated("i", d.i, vcc))
 
@@ -287,7 +287,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     def read(path: Path): Stream[IO, Map[String, Vector[Data]]] =
       parquet
-        .fromParquet[IO, DataTransformed].read(path)
+        .fromParquet[IO].projectedAs[DataTransformed].read(path)
         .map { case DataTransformed(i, s, partition) => Map(partition -> Vector(Data(i, s))) }
         .reduceSemigroup
 

@@ -25,11 +25,9 @@ object ParquetStreams {
    * Allows to turn on a <b>projection</b> over original file schema in order to boost read performance if not all
    * columns are required to be read.
    *
-   * @tparam T type of data that represent the schema of the Parquet data, e.g.:
-   *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
    * @return Builder of the source.
    */
-  def fromParquet[T]: ParquetSource.Builder[T] = ParquetSource[T]
+  def fromParquet: ParquetSource.FromParquet = ParquetSource.FromParquetImpl
 
   /**
     * Creates a [[akka.stream.scaladsl.Sink]] that writes Parquet data to single file at the specified path (including

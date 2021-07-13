@@ -39,7 +39,7 @@ object WriteAndReadGenericApp extends App {
   ParquetWriter.writeAndClose(path.append("users.parquet"), users)
 
   //read
-  val readData = ParquetReader.read[RowParquetRecord](path)
+  val readData = ParquetReader().generic.read(path)
   try {
     readData.foreach { record =>
       val id = record.get[Long](ID, vcc)

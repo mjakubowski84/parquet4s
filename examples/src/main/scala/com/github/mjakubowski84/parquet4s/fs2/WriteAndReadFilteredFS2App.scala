@@ -33,9 +33,10 @@ object WriteAndReadFilteredFS2App extends IOApp.Simple {
         .map { i => Data(id = i, dict = Dict.random) }
         .through(writeSingleFile(path.append("data.parquet")))
         .append(Stream.exec(IO.println("""dict == "A"""")))
-        .append(fromParquet[IO, Data].filter(Col("dict") === Dict.A).read(path).printlns.drain)
+        .append(fromParquet[IO].as[Data].filter(Col("dict") === Dict.A).read(path).printlns.drain)
         .append(Stream.exec(IO.println("""id >= 20 && id < 40""")))
-        .append(fromParquet[IO, Data]
+        .append(fromParquet[IO]
+          .as[Data]
           .filter(Col("id") >= 20 && Col("id") < 40)
           .read(path)
           .printlns

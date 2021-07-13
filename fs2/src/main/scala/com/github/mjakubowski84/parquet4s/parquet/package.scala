@@ -22,11 +22,9 @@ package object parquet {
    * Allows to turn on a <b>projection</b> over original file schema in order to boost read performance if not all
    * columns are required to be read.
    * @tparam F effect type
-   * @tparam T type of data that represent the schema of the Parquet data, e.g.:
-   *           {{{ case class MyData(id: Long, name: String, created: java.sql.Timestamp) }}}
    * @return Builder of the [[fs2.Stream]]
    */
-  def fromParquet[F[_], T]: reader.Builder[F, T] = reader.Builder()
+  def fromParquet[F[_]]: reader.FromParquet[F] = new reader.FromParquetImpl[F]
 
   /**
    * Creates a [[fs2.Pipe]] that writes Parquet data to single file at the specified path (including
