@@ -8,7 +8,6 @@ import org.scalatest.{Assertion, BeforeAndAfterAll, Inspectors}
 import java.nio.file.Files
 import java.sql.Date
 import java.time.LocalDate
-import scala.collection.compat._
 import scala.collection.compat.immutable.LazyList
 import scala.util.Random
 
@@ -69,17 +68,19 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    ParquetWriter.writeAndClose(filePath, data, ParquetWriter.Options(
-      rowGroupSize = 512 * 1024,
-      pageSize = 128 * 1024,
-      dictionaryPageSize = 128 * 1024
-    ))
+    ParquetWriter
+      .of[Data]
+      .options(ParquetWriter.Options(
+        rowGroupSize = 512 * 1024,
+        pageSize = 128 * 1024,
+        dictionaryPageSize = 128 * 1024
+      ))
+      .writeAndClose(filePath, data)
   }
 
   def genericFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T)
                                                                                              (implicit codec: FilterCodec[T, V, C]): Assertion = {
-    val filterValues = everyOtherDatum.map(field)
-    val actual = ParquetReader.read[Data](filePath, filter = Col(columnName) in filterValues)
+    val actual = ParquetReader.as[Data].filter(Col(columnName) in everyOtherDatum.map(field)).read(filePath)
     try {
       actual.map(_.idx) should equal(everyOtherDatum.map(_.idx))
     } finally actual.close()
@@ -87,8 +88,8 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
 
   def specificValueFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T, values: Vector[T])
                                                                                                    (implicit codec: FilterCodec[T, V, C]): Assertion = {
-    val filteredRecords = ParquetReader.read[Data](filePath, filter = Col(columnName) in values)
-    val unfilteredRecords = ParquetReader.read[Data](filePath)
+    val filteredRecords = ParquetReader.as[Data].filter(Col(columnName) in values).read(filePath)
+    val unfilteredRecords = ParquetReader.as[Data].read(filePath)
 
     try {
       filteredRecords.map(field).toSet should contain theSameElementsAs values
@@ -126,7 +127,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
   it should "filter data by a list of embedded values" in genericFilterTest("embedded.x", _.idx)
 
   it should "filter data by a hard-coded list of values" in {
-    val filteredRecords = ParquetReader.read[Data](filePath, filter = Col("idx").in(1, 2, 3))
+    val filteredRecords = ParquetReader.as[Data].filter(Col("idx").in(1, 2, 3)).read(filePath)
     try {
       filteredRecords.size should equal(3)
       filteredRecords.map(_.idx) should contain allOf(1, 2, 3)

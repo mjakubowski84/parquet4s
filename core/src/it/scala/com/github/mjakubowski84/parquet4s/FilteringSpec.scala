@@ -52,15 +52,18 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    ParquetWriter.writeAndClose(filePath, data, ParquetWriter.Options(
-      rowGroupSize = 512 * 1024,
-      pageSize = 128 * 1024,
-      dictionaryPageSize = 128 * 1024
-    ))
+    ParquetWriter
+      .of[Data]
+      .options(ParquetWriter.Options(
+        rowGroupSize = 512 * 1024,
+        pageSize = 128 * 1024,
+        dictionaryPageSize = 128 * 1024
+      ))
+      .writeAndClose(filePath, data)
   }
 
   def read(filter: Filter): Seq[Data] = {
-    val iter = ParquetReader.read[Data](filePath, filter = filter)
+    val iter = ParquetReader.as[Data].filter(filter).read(filePath)
     try iter.toSeq
     finally iter.close()
   }

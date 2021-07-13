@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.fs2
 
 import cats.Show
 import cats.effect.{IO, IOApp}
-import com.github.mjakubowski84.parquet4s.parquet._
+import com.github.mjakubowski84.parquet4s.parquet.*
 import com.github.mjakubowski84.parquet4s.{Path, RowParquetRecord, ValueCodecConfiguration}
 import fs2.Stream
 import fs2.io.file.Files
@@ -19,7 +19,7 @@ object WriteAndReadGenericFS2App extends IOApp.Simple {
   private val Birthday = "birthday"
   private val SchemaName = "user_schema"
 
-  implicit val schema: MessageType = Types.buildMessage()
+  val schema: MessageType = Types.buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
@@ -43,10 +43,10 @@ object WriteAndReadGenericFS2App extends IOApp.Simple {
 
   override def run: IO[Unit] = {
     val stream = for {
-      path <- Stream.resource(Files[IO].tempDirectory()).map(Path.apply)
+      path <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(fs2Path => Path(fs2Path.toNioPath))
       _ <- Stream.iterable[IO, RowParquetRecord](users)
-        .through(writeSingleFile(path.append("data.parquet")))
-        .append(fromParquet[IO, RowParquetRecord].read(path).printlns.drain)
+        .through(writeSingleFile[IO].generic(schema).write(path.append("data.parquet")))
+        .append(fromParquet[IO].generic.read(path).printlns.drain)
     } yield ()
 
     stream.compile.drain

@@ -14,13 +14,13 @@ object WriteIncrementallyAndReadApp extends App {
   val path = Path(Files.createTempDirectory("example"))
 
   // write
-  val writer = ParquetWriter.writer[Data](path.append("data.parquet"))
+  val writer = ParquetWriter.of[Data].build(path.append("data.parquet"))
   try {
     data.foreach(entity => writer.write(entity))
   } finally writer.close()
 
   //read
-  val readData = ParquetReader.read[Data](path)
+  val readData = ParquetReader.as[Data].read(path)
   try {
     readData.foreach(println)
   } finally readData.close()

@@ -3,11 +3,11 @@ package com.github.mjakubowski84.parquet4s
 import cats.effect.IO
 import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
 import fs2.Stream
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{Path => NioPath, _}
+import java.nio.file.{Path as NioPath, _}
 import java.util.UUID
 import java.util.concurrent.{Executors, TimeUnit}
 import scala.collection.immutable
@@ -35,6 +35,7 @@ object Fs2Benchmark {
 
     @Setup(Level.Trial)
     def setup(): Unit = {
+      System.setProperty("cats.effect.stackTracingMode", "disabled")
       basePath = Path(Files.createTempDirectory("benchmark")).append(datasetSize.toString)
       records = (1 to datasetSize).map { i =>
         Record(
@@ -45,18 +46,18 @@ object Fs2Benchmark {
         )
       }
       // using single thread in order to not measure thread syncing
+      // using the same execution context for blocking ops in order to avoid unnecessary thread switching
       val threadPool = Executors.newSingleThreadExecutor()
       val executionContext = ExecutionContext.fromExecutor(threadPool)
-      // using the same execution context in order to avoid unnecessary thread switching
-      val (scheduler, closeScheduler) = Scheduler.createDefaultScheduler()
+      val schedulerThreadPool = Executors.newSingleThreadScheduledExecutor()
+      val scheduler = Scheduler.fromScheduledExecutor(Executors.newSingleThreadScheduledExecutor())
       ioRuntime = IORuntime(
-        compute = executionContext,
+      compute = executionContext,
         blocking = executionContext,
         scheduler = scheduler,
-        shutdown = () => { threadPool.shutdown(); closeScheduler() },
+        shutdown = () => { threadPool.shutdown(); schedulerThreadPool.shutdown() },
         config = IORuntimeConfig()
       )
-
     }
 
     @TearDown(Level.Trial)
@@ -99,7 +100,7 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       operation = Stream
         .iterable(dataset.records)
-        .through(parquet.writeSingleFile[IO, Record](filePath))
+        .through(parquet.writeSingleFile[IO].of[Record].write(filePath))
         .compile
         .drain
     }
@@ -123,7 +124,7 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       operation = Stream
         .iterable(dataset.records)
-        .through(parquet.viaParquet[IO, Record].partitionBy( ColumnPath("dict")).write(dataset.basePath))
+        .through(parquet.viaParquet[IO].of[Record].partitionBy(ColumnPath("dict")).write(dataset.basePath))
         .compile
         .lastOrError
     }
@@ -145,18 +146,18 @@ object Fs2Benchmark {
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = {
       fetchDataset(dataset)
-      ParquetWriter.writeAndClose(filePath, dataset.records)
+      ParquetWriter.of[Record].writeAndClose(filePath, dataset.records)
       operation = parquet
-        .fromParquet[IO, Record]
+        .fromParquet[IO]
+        .as[Record]
         .read(dataset.basePath)
         .compile
         .lastOrError
     }
 
     @TearDown(Level.Trial)
-    def clearDataset(): Unit = {
+    def clearDataset(): Unit =
       dataset.delete()
-    }
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     def read(): Record =
@@ -169,23 +170,26 @@ object Fs2Benchmark {
 @Measurement(iterations = 12, time = 1, timeUnit = TimeUnit.SECONDS)
 class Fs2Benchmark {
 
-  import Fs2Benchmark._
+  import Fs2Benchmark.*
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
   def write(state: WriteState): Unit =
     state.write()
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
   def read(state: ReadState): Record =
     state.read()
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
   def writePartitioned(state: WritePartitionedState): Record =
     state.writePartitioned()
 
