@@ -30,7 +30,7 @@ class ParquetWriterItSpec
   private val records = Record.random(5000)
 
   private def readRecords: Seq[Record] = {
-    val iter = ParquetReader.read[Record](writePath)
+    val iter = ParquetReader.as[Record].read(writePath)
     try iter.toSeq
     finally iter.close()
   }
@@ -40,35 +40,36 @@ class ParquetWriterItSpec
   }
 
   "Batch write should result in proper number of records in the file" in {
-    ParquetWriter.writeAndClose(writePath, records)
+    ParquetWriter.of[Record].writeAndClose(writePath, records)
     readRecords should be(records)
   }
 
   "Multiple incremental writes produce same result as a single batch write" in {
-    val w = ParquetWriter.writer[Record](writePath)
+    val w = ParquetWriter.of[Record].build(writePath)
     try records.grouped(5).foreach(w.write)
     finally w.close()
     readRecords shouldBe records
   }
 
   "Writing record by record works as well" in {
-    val w = ParquetWriter.writer[Record](writePath)
+    val w = ParquetWriter.of[Record].build(writePath)
     try records.foreach(record => w.write(record))
     finally w.close()
     readRecords shouldBe records
   }
 
   "Incremental writes work with write mode OVERWRITE" in {
-    val w = ParquetWriter.writer[Record](
-      writePath,
-      ParquetWriter.Options(ParquetFileWriter.Mode.OVERWRITE))
+    val w = ParquetWriter
+      .of[Record]
+      .options(ParquetWriter.Options(ParquetFileWriter.Mode.OVERWRITE))
+      .build(writePath)
     try records.grouped(5).foreach(w.write)
     finally w.close()
     readRecords shouldBe records
   }
 
   "Writing to closed writer throws an exception" in {
-    val w = ParquetWriter.writer[Record](writePath)
+    val w = ParquetWriter.of[Record].build(writePath)
     w.close()
     an[IllegalStateException] should be thrownBy records
       .grouped(2)
@@ -76,18 +77,18 @@ class ParquetWriterItSpec
   }
 
   "Closing writer without writing anything to it throws no exception" in {
-    val w = ParquetWriter.writer[Record](writePath)
+    val w = ParquetWriter.of[Record].build(writePath)
     noException should be thrownBy w.close()
   }
 
   "Closing writer twice throws no exception" in {
-    val w = ParquetWriter.writer[Record](writePath)
+    val w = ParquetWriter.of[Record].build(writePath)
     noException should be thrownBy w.close()
     noException should be thrownBy w.close()
   }
 
   "ParquetWriter should add metadata with Parquet4S signature" in {
-    ParquetWriter.writeAndClose(writePath, records)
+    ParquetWriter.of[Record].writeAndClose(writePath, records)
     val meta = ParquetFileReader.open(
       HadoopInputFile.fromPath(writePath.toHadoop, new Configuration())
     ).getFileMetaData.getKeyValueMetaData

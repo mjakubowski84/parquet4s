@@ -1,10 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.util.NoSuchElementException
-
 import com.github.mjakubowski84.parquet4s.CompatibilityParty.CompatibilityParty
-import com.github.mjakubowski84.parquet4s.ParquetWriter.ParquetWriterFactory
 
+import java.util.NoSuchElementException
 import scala.reflect.runtime.universe.TypeTag
 
 object CompatibilityParty {
@@ -18,19 +16,20 @@ object CompatibilityParty {
 
 object Case {
 
-  type CaseDef = Case[_ <: Product]
+  type CaseDef = Case[? <: Product]
 
-  def apply[T <: Product : TypeTag : ParquetReader : ParquetWriterFactory](
-                                                                            description: String,
-                                                                            data: Seq[T],
-                                                                            compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
-                                                                          ): Case[T] =
+  def apply[T <: Product: TypeTag: ParquetRecordDecoder: ParquetRecordEncoder: ParquetSchemaResolver](
+                                                                                                       description: String,
+                                                                                                       data: Seq[T],
+                                                                                                       compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
+                                                                                                     ): Case[T] =
     new Case(
       description = description,
       compatibilityParties = compatibilityParties,
       _data = data,
-      _reader = implicitly[ParquetReader[T]],
-      _writerFactory = implicitly[ParquetWriterFactory[T]],
+      _decoder = implicitly[ParquetRecordDecoder[T]],
+      _encoder = implicitly[ParquetRecordEncoder[T]],
+      _resolver = implicitly[ParquetSchemaResolver[T]],
       _typeTag = implicitly[TypeTag[T]]
     )
 }
@@ -40,14 +39,16 @@ class Case[T <: Product](
                           val description: String,
                           val compatibilityParties: Set[CompatibilityParty],
                           _data: Seq[T],
-                          _reader: ParquetReader[T],
-                          _writerFactory: ParquetWriterFactory[T],
+                          _decoder: ParquetRecordDecoder[T],
+                          _encoder: ParquetRecordEncoder[T],
+                          _resolver: ParquetSchemaResolver[T],
                           _typeTag: TypeTag[T]
                         ) {
   type DataType = T
   def data: Seq[DataType] = _data
-  def reader: ParquetReader[DataType] = _reader
-  def writerFactory: ParquetWriterFactory[DataType] = _writerFactory
+  def decoder: ParquetRecordDecoder[DataType] = _decoder
+  def encoder: ParquetRecordEncoder[DataType] = _encoder
+  def resolver: ParquetSchemaResolver[DataType] = _resolver
   def typeTag: TypeTag[DataType] = _typeTag
 }
 

@@ -26,7 +26,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers {
   import ParquetIterableSpec._
 
   private def mockTestBuilder(reader: HadoopParquetReader[RowParquetRecord]) = {
-    val builder = mock[ParquetReader.Builder]
+    val builder = mock[ParquetReader.HadoopBuilder]
     when(builder.build()).thenReturn(reader)
     builder
   }

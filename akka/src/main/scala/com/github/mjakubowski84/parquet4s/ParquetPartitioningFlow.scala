@@ -1,15 +1,16 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.util.UUID
-import java.util.concurrent.TimeUnit
-import akka.stream.stage._
+import akka.stream.stage.*
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
-import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow._
-import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
+import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.schema.MessageType
 import org.slf4j.LoggerFactory
 
+import java.util.UUID
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
+
+import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow.*
 
 object ParquetPartitioningFlow {
 
@@ -17,34 +18,55 @@ object ParquetPartitioningFlow {
   val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
   private val TimerKey = "ParquetPartitioningFlow.Rotation"
 
-  def builder[T](basePath: Path): Builder[T, T] = BuilderImpl(
-    basePath = basePath,
-    maxCount = DefaultMaxCount,
-    maxDuration = DefaultMaxDuration,
-    preWriteTransformation = identity,
-    partitionBy = Seq.empty,
-    writeOptions = ParquetWriter.Options(),
-    postWriteHandler = None
-  )
+  trait ViaParquet {
+    /**
+     * @tparam T schema type
+     * @return builder of flow that processes data of given schema
+     */
+    def of[T]: TypedBuilder[T, T]
+    /**
+     * @return builder of flow that processes generic records
+     */
+    def generic: GenericBuilder
+  }
+
+  private[parquet4s] object ViaParquetImpl extends ViaParquet {
+    override def of[T]: TypedBuilder[T, T] = TypedBuilderImpl(
+      maxCount = DefaultMaxCount,
+      maxDuration = DefaultMaxDuration,
+      preWriteTransformation = identity,
+      partitionBy = Seq.empty,
+      writeOptions = ParquetWriter.Options(),
+      postWriteHandler = None
+    )
+    override def generic: GenericBuilder = GenericBuilderImpl(
+      maxCount = DefaultMaxCount,
+      maxDuration = DefaultMaxDuration,
+      preWriteTransformation = identity,
+      partitionBy = Seq.empty,
+      options = ParquetWriter.Options(),
+      postWriteHandler = None
+    )
+  }
 
   /**
-   * Builds an instance [[ParquetPartitioningFlow]]
+   * Builds an instance of [[ParquetPartitioningFlow]]
    * @tparam T Type of message that flow accepts
    * @tparam W Schema of Parquet file that flow writes
    */
-  trait Builder[T, W] {
+  trait Builder[T, W, Self] {
     /**
      * @param maxCount max number of records to be written before file rotation
      */
-    def withMaxCount(maxCount: Long): Builder[T, W]
+    def maxCount(maxCount: Long): Self
     /**
      * @param maxDuration max time after which partition file is rotated
      */
-    def withMaxDuration(maxDuration: FiniteDuration): Builder[T, W]
+    def maxDuration(maxDuration: FiniteDuration): Self
     /**
-     * @param writeOptions writer options used by the flow
+     * @param options writer options used by the flow
      */
-    def withWriteOptions(writeOptions: ParquetWriter.Options): Builder[T, W]
+    def options(options: ParquetWriter.Options): Self
     /**
      * Sets partition paths that flow partitions data by. Can be empty.
      * Partition path can be a simple string column (e.g. "color") or a path pointing nested string field
@@ -72,12 +94,7 @@ object ParquetPartitioningFlow {
      *
      * @param partitionBy [[ColumnPath]]s to partition by
      */
-    def withPartitionBy(partitionBy: ColumnPath*): Builder[T, W]
-    /**
-     * @param transformation function that is called by flow in order to obtain Parquet schema. Identity by default.
-     * @tparam X Schema type
-     */
-    def withPreWriteTransformation[X](transformation: T => X): Builder[T, X]
+    def partitionBy(partitionBy: ColumnPath*): Self
 
     /**
      * Adds a handler after record writes, exposing some of the internal state of the flow.
@@ -86,52 +103,94 @@ object ParquetPartitioningFlow {
      * @param handler a function called after writing a record,
      *                receiving a snapshot of the internal state of the flow as a parameter.
      */
-    def withPostWriteHandler(handler: PostWriteState[T] => Unit): Builder[T, W]
+    def postWriteHandler(handler: PostWriteState[T] => Unit): Self
 
-    /**
-     * Builds final flow
-     */
-    def build()(implicit
-                schemaResolver: ParquetSchemaResolver[W],
-                encoder: ParquetRecordEncoder[W]): GraphStage[FlowShape[T, T]]
   }
 
-  private case class BuilderImpl[T, W](
-                                        basePath: Path,
-                                        maxCount: Long,
-                                        maxDuration: FiniteDuration,
-                                        preWriteTransformation: T => W,
-                                        partitionBy: Seq[ColumnPath],
-                                        writeOptions: ParquetWriter.Options,
-                                        postWriteHandler: Option[PostWriteState[T] => Unit]
-                                      ) extends Builder[T, W] {
+  trait GenericBuilder extends Builder[RowParquetRecord, RowParquetRecord, GenericBuilder] {
 
-    def withMaxCount(maxCount: Long): Builder[T, W] = copy(maxCount = maxCount)
-    def withMaxDuration(maxDuration: FiniteDuration): Builder[T, W] = copy(maxDuration = maxDuration)
-    def withWriteOptions(writeOptions: ParquetWriter.Options): Builder[T, W] = copy(writeOptions = writeOptions)
-    def withPartitionBy(partitionBy: ColumnPath*): Builder[T, W] = copy(partitionBy = partitionBy)
-    def build()(implicit
-                schemaResolver: ParquetSchemaResolver[W],
-                encoder: ParquetRecordEncoder[W]
+    /**
+     * @param transformation function that is called by flow in order to transform record to final write format. Identity by default.
+     */
+    def preWriteTransformation(transformation: RowParquetRecord => RowParquetRecord): GenericBuilder
+
+    /**
+     * Builds a final flow
+     */
+    def build(basePath: Path, schema: MessageType): GraphStage[FlowShape[RowParquetRecord, RowParquetRecord]]
+  }
+
+  trait TypedBuilder[T, W] extends Builder[T, W, TypedBuilder[T, W]] {
+
+    /**
+     * @param transformation function that is called by flow in order to transform data to final write format. Identity by default.
+     * @tparam X Schema type
+     */
+    def preWriteTransformation[X](transformation: T => X): TypedBuilder[T, X]
+
+    /**
+     * Builds a final flow
+     */
+    def build(basePath: Path)(implicit
+                              schemaResolver: ParquetSchemaResolver[W],
+                              encoder: ParquetRecordEncoder[W]): GraphStage[FlowShape[T, T]]
+  }
+
+  private case class GenericBuilderImpl(maxCount: Long,
+                                        maxDuration: FiniteDuration,
+                                        preWriteTransformation: RowParquetRecord => RowParquetRecord,
+                                        partitionBy: Seq[ColumnPath],
+                                        options: ParquetWriter.Options,
+                                        postWriteHandler: Option[PostWriteState[RowParquetRecord] => Unit]
+                                       ) extends GenericBuilder {
+
+    override def maxCount(maxCount: Long): GenericBuilder = copy(maxCount = maxCount)
+    override def maxDuration(maxDuration: FiniteDuration): GenericBuilder = copy(maxDuration = maxDuration)
+    override def options(options: ParquetWriter.Options): GenericBuilder = copy(options = options)
+    override def partitionBy(partitionBy: ColumnPath*): GenericBuilder = copy(partitionBy = partitionBy)
+    override def preWriteTransformation(transformation: RowParquetRecord => RowParquetRecord): GenericBuilder =
+      copy(preWriteTransformation = transformation)
+    override def postWriteHandler(handler: PostWriteState[RowParquetRecord] => Unit): GenericBuilder =
+      copy(postWriteHandler = Some(handler))
+
+    override def build(basePath: Path, schema: MessageType): GraphStage[FlowShape[RowParquetRecord, RowParquetRecord]] = {
+      val finalSchema = ParquetSchemaResolver
+        .resolveSchema(toSkip = partitionBy)(RowParquetRecord.genericParquetSchemaResolver(schema))
+      val encode = (record: RowParquetRecord, _: ValueCodecConfiguration) => record
+
+      new ParquetPartitioningFlow[RowParquetRecord, RowParquetRecord](basePath, maxCount, maxDuration,
+        preWriteTransformation, partitionBy, encode, finalSchema, options, postWriteHandler)
+    }
+  }
+
+  private case class TypedBuilderImpl[T, W](maxCount: Long,
+                                       maxDuration: FiniteDuration,
+                                       preWriteTransformation: T => W,
+                                       partitionBy: Seq[ColumnPath],
+                                       writeOptions: ParquetWriter.Options,
+                                       postWriteHandler: Option[PostWriteState[T] => Unit]
+                                      ) extends TypedBuilder[T, W] {
+
+    override def maxCount(maxCount: Long): TypedBuilder[T, W] = copy(maxCount = maxCount)
+    override def maxDuration(maxDuration: FiniteDuration): TypedBuilder[T, W] = copy(maxDuration = maxDuration)
+    override def options(options: ParquetWriter.Options): TypedBuilder[T, W] = copy(writeOptions = options)
+    override def partitionBy(partitionBy: ColumnPath*): TypedBuilder[T, W] = copy(partitionBy = partitionBy)
+    override def preWriteTransformation[X](transformation: T => X): TypedBuilder[T, X] =
+      TypedBuilderImpl(
+        maxCount, maxDuration, transformation, partitionBy, writeOptions, postWriteHandler
+      )
+    override def postWriteHandler(handler: PostWriteState[T] => Unit): TypedBuilder[T, W] =
+      copy(postWriteHandler = Some(handler))
+
+    override def build(basePath: Path)(implicit
+                                       schemaResolver: ParquetSchemaResolver[W],
+                                       encoder: ParquetRecordEncoder[W]
     ): GraphStage[FlowShape[T, T]] = {
       val schema = ParquetSchemaResolver.resolveSchema[W](toSkip = partitionBy)
       val encode = (obj: W, vcc: ValueCodecConfiguration) => ParquetRecordEncoder.encode(obj, vcc)
       new ParquetPartitioningFlow[T, W](basePath, maxCount, maxDuration, preWriteTransformation,
         partitionBy, encode, schema, writeOptions, postWriteHandler)
     }
-
-    override def withPreWriteTransformation[X](transformation: T => X): Builder[T, X] =
-      BuilderImpl(
-        basePath = basePath,
-        maxCount = maxCount,
-        maxDuration = maxDuration,
-        preWriteTransformation = transformation,
-        partitionBy = partitionBy,
-        postWriteHandler = postWriteHandler,
-        writeOptions = writeOptions
-      )
-
-    override def withPostWriteHandler(handler: PostWriteState[T] => Unit): Builder[T, W] = copy(postWriteHandler = Some(handler))
   }
 
   case class PostWriteState[T](count: Long,
@@ -142,16 +201,15 @@ object ParquetPartitioningFlow {
 
 }
 
-private class ParquetPartitioningFlow[T, W](
-                                             basePath: Path,
-                                             maxCount: Long,
-                                             maxDuration: FiniteDuration,
-                                             preWriteTransformation: T => W,
-                                             partitionBy: Seq[ColumnPath],
-                                             encode: (W, ValueCodecConfiguration) => RowParquetRecord,
-                                             schema: MessageType,
-                                             writeOptions: ParquetWriter.Options,
-                                             postWriteHandler: Option[PostWriteState[T] => Unit]
+private class ParquetPartitioningFlow[T, W](basePath: Path,
+                                            maxCount: Long,
+                                            maxDuration: FiniteDuration,
+                                            preWriteTransformation: T => W,
+                                            partitionBy: Seq[ColumnPath],
+                                            encode: (W, ValueCodecConfiguration) => RowParquetRecord,
+                                            schema: MessageType,
+                                            writeOptions: ParquetWriter.Options,
+                                            postWriteHandler: Option[PostWriteState[T] => Unit]
                                            ) extends GraphStage[FlowShape[T, T]] {
   val in: Inlet[T] = Inlet[T]("ParquetPartitioningFlow.in")
   val out: Outlet[T] = Outlet[T]("ParquetPartitioningFlow.out")
