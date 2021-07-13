@@ -5,14 +5,14 @@ import cats.effect.{IO, IOApp}
 import com.github.mjakubowski84.parquet4s.parquet.viaParquet
 import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, Path}
 import fs2.io.file.Files
-import fs2.kafka._
+import fs2.kafka.*
 import fs2.{INothing, Pipe, Stream}
 import io.github.embeddedkafka.EmbeddedKafka
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
 import java.sql.Timestamp
 import java.util.UUID
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.util.Random
 
 object IndefiniteFS2App extends IOApp.Simple {
@@ -62,7 +62,7 @@ object IndefiniteFS2App extends IOApp.Simple {
 
   override def run: IO[Unit] = {
     val stream = for {
-      writePath <- Stream.resource(Files[IO].tempDirectory())
+      writePath <- Stream.resource(Files[IO].tempDirectory(None, "", None))
       kafkaPort <- Stream
         .bracket(IO.blocking(EmbeddedKafka.start()))(_ => IO.blocking(EmbeddedKafka.stop()))
         .map(_.config.kafkaPort)
@@ -74,7 +74,7 @@ object IndefiniteFS2App extends IOApp.Simple {
         .withGroupId("group")
       _ <- Stream(
         producer(producerSettings),
-        consumer(consumerSettings, Path(writePath))
+        consumer(consumerSettings, Path(writePath.toNioPath))
       ).parJoin(maxOpen = 2)
     } yield ()
 
@@ -102,7 +102,8 @@ object IndefiniteFS2App extends IOApp.Simple {
       .drain
 
   private def write(path: Path): Pipe[IO, KafkaRecord, KafkaRecord] =
-    viaParquet[IO, KafkaRecord]
+    viaParquet[IO]
+      .of[KafkaRecord]
       .options(WriterOptions)
       .maxCount(MaxNumberOfRecordPerFile)
       .maxDuration(MaxDurationOfFileWrite)

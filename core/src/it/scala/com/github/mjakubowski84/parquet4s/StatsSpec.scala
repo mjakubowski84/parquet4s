@@ -68,7 +68,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
       .sliding(window, window)
       .zipWithIndex
       .foreach { case (part, index) =>
-        ParquetWriter.writeAndClose(path.append(s"$index.parquet"), part, writeOptions)
+        ParquetWriter.of[Data].options(writeOptions).writeAndClose(path.append(s"$index.parquet"), part)
       }
 
   }

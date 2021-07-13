@@ -1,13 +1,60 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.{Resource, Sync}
-import cats.implicits._
+import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.{ParquetRecordEncoder, ParquetSchemaResolver, ParquetWriter, Path, RowParquetRecord, ValueCodecConfiguration}
 import fs2.{Chunk, Pipe, Pull, Stream}
+import org.apache.parquet.schema.MessageType
 
 import scala.language.higherKinds
 
 private[parquet4s] object writer {
+
+  trait ToParquet[F[_]] {
+    /**
+     * Creates a builder of pipe that processes data of given type
+     * @tparam T Schema type
+     */
+    def of[T: ParquetSchemaResolver: ParquetRecordEncoder]: Builder[F, T]
+    /**
+     * Creates a builder of pipe that processes generic records
+     */
+    def generic(schema: MessageType): Builder[F, RowParquetRecord]
+  }
+
+  private[parquet4s] class ToParquetImpl[F[_]: Sync] extends ToParquet[F] {
+    override def of[T: ParquetSchemaResolver: ParquetRecordEncoder]: Builder[F, T] =
+      BuilderImpl()
+    override def generic(schema: MessageType): Builder[F, RowParquetRecord] =
+      BuilderImpl()(
+        schemaResolver = RowParquetRecord.genericParquetSchemaResolver(schema),
+        encoder = RowParquetRecord.genericParquetRecordEncoder,
+        sync = Sync[F]
+      )
+  }
+
+  trait Builder[F[_], T] {
+    /**
+     * @param options writer options
+     */
+    def options(options: ParquetWriter.Options): Builder[F, T]
+    /**
+     * @param path at which data is supposed to be written
+     * @return final [[fs2.Pipe]]
+     */
+    def write(path: Path): Pipe[F, T, fs2.INothing]
+  }
+
+  private case class BuilderImpl[F[_], T](options: ParquetWriter.Options = ParquetWriter.Options())
+                                         (implicit
+                                          schemaResolver: ParquetSchemaResolver[T],
+                                          encoder: ParquetRecordEncoder[T],
+                                          sync: Sync[F]
+                                         ) extends Builder[F, T] {
+    override def options(options: ParquetWriter.Options): Builder[F, T] = this.copy(options = options)
+    override def write(path: Path): Pipe[F, T, fs2.INothing] = pipe[F, T](path, options)
+  }
+
 
   private class Writer[T, F[_]](internalWriter: ParquetWriter.InternalWriter,
                                 encode: T => F[RowParquetRecord]
@@ -16,7 +63,6 @@ private[parquet4s] object writer {
     def write(elem: T): F[Unit] =
       for {
         record <- encode(elem)
-        // TODO F.delay is much faster when using local file system - let's compare it when using AWS
         _ <- F.blocking(internalWriter.write(record))
       } yield ()
 
@@ -34,9 +80,9 @@ private[parquet4s] object writer {
     override def close(): Unit = internalWriter.close()
   }
 
-  def write[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: Sync](path: Path,
-                                                                          options: ParquetWriter.Options
-                                                                         ): Pipe[F, T, fs2.INothing] =
+  private def pipe[F[_]: Sync, T : ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
+                                                                                  options: ParquetWriter.Options
+                                                                                 ): Pipe[F, T, fs2.INothing] =
     in =>
       for {
         logger <- Stream.eval(logger(getClass))

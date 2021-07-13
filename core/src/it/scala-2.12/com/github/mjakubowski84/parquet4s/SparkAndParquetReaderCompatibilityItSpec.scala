@@ -18,7 +18,7 @@ class SparkAndParquetReaderCompatibilityItSpec extends
   private def runTestCase(testCase: Case.CaseDef): Unit =
     testCase.description in {
       writeToTemp(testCase.data)(testCase.typeTag)
-      val parquetIterable = ParquetReader.read(tempPath)(testCase.reader)
+      val parquetIterable = ParquetReader.as[testCase.DataType].read(tempPath)(testCase.decoder)
       try {
         parquetIterable should contain theSameElementsAs testCase.data
       } finally {

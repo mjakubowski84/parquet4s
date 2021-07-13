@@ -1,23 +1,53 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.{Resource, Sync}
-import cats.implicits._
-import com.github.mjakubowski84.parquet4s._
+import cats.implicits.*
+import com.github.mjakubowski84.parquet4s.*
 import fs2.Stream
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
+import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
 import org.apache.parquet.schema.MessageType
 
 import scala.language.higherKinds
 
 object reader {
 
-  object Builder {
-    private[parquet4s] def apply[F[_], T](): Builder[F, T] = BuilderImpl(
-      options = ParquetReader.Options(),
-      filter = Filter.noopFilter,
-      projectedSchemaResolverOpt = None
+  /**
+    * Factory of builders of Parquet readers.
+    */
+  trait FromParquet[F[_]] {
+    /**
+      * Creates [[Builder]] of Parquet reader for documents of type [[T]].
+      */
+    def as[T: ParquetRecordDecoder]: Builder[F, T]
+    /**
+      * Creates [[Builder]] of Parquet reader for <i>projected</i> documents of type [[T]].
+      * Due to projection reader does not attempt to read all existing columns of the file but applies enforced
+      * projection schema.
+      */
+    def projectedAs[T: ParquetRecordDecoder: ParquetSchemaResolver]: Builder[F, T]
+    /**
+      * Creates [[Builder]] of Parquet reader of generic records.
+      */
+    def generic: Builder[F, RowParquetRecord]
+    /**
+      * Creates [[Builder]] of Parquet reader of <i>projected</i> generic records.
+      * Due to projection reader does not attempt to read all existing columns of the file but applies enforced
+      * projection schema.
+      */
+    def projectedGeneric(projectedSchema: MessageType): Builder[F, RowParquetRecord]
+  }
+
+  private[parquet4s] class FromParquetImpl[F[_]: Sync] extends FromParquet[F] {
+    override def as[T: ParquetRecordDecoder]: Builder[F, T] = BuilderImpl()
+    override def projectedAs[T: ParquetRecordDecoder: ParquetSchemaResolver]: Builder[F, T] = BuilderImpl(
+      projectedSchemaResolverOpt = Option(implicitly[ParquetSchemaResolver[T]])
     )
+    override def generic: Builder[F, RowParquetRecord] = BuilderImpl[F, RowParquetRecord]()
+    override def projectedGeneric(projectedSchema: MessageType): Builder[F, RowParquetRecord] =
+      BuilderImpl[F, RowParquetRecord](
+        projectedSchemaResolverOpt = Option(RowParquetRecord.genericParquetSchemaResolver(projectedSchema))
+      )
   }
 
   trait Builder[F[_], T] {
@@ -30,48 +60,33 @@ object reader {
      */
     def filter(filter: Filter): Builder[F, T]
     /**
-     * @param schemaResolver resolved schema that is going to be used as a projection over original file schema
-     */
-    def projection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[F, T]
-    /**
      * @param path [[Path]] to Parquet files, e.g.: {{{ Path("file:///data/users") }}}
-     * @param decoder decodes [[RowParquetRecord]] to your data type
-     * @param F [[cats.effect.Sync!]] monad
-     * @return final [[fs2.Stream!]]
+     * @return final [[fs2.Stream]]
      */
-    def read(path: Path)
-            (implicit decoder: ParquetRecordDecoder[T], F: Sync[F]): Stream[F, T]
+    def read(path: Path): Stream[F, T]
   }
 
-  private case class BuilderImpl[F[_], T](options: ParquetReader.Options,
-                                          filter: Filter,
-                                          projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
-                                         ) extends Builder[F, T] {
-    override def options(options: ParquetReader.Options): Builder[F, T] =
-      this.copy(options = options)
+  private case class BuilderImpl[F[_]: Sync, T: ParquetRecordDecoder](options: ParquetReader.Options = ParquetReader.Options(),
+                                                                      filter: Filter = Filter.noopFilter,
+                                                                      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None
+                                                                     ) extends Builder[F, T] {
+    override def options(options: ParquetReader.Options): Builder[F, T] = this.copy(options = options)
 
-    override def filter(filter: Filter): Builder[F, T] =
-      this.copy(filter = filter)
+    override def filter(filter: Filter): Builder[F, T] = this.copy(filter = filter)
 
-    override def projection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[F, T] =
-      this.copy(projectedSchemaResolverOpt = Option(schemaResolver))
-
-    override def read(path: Path)
-                     (implicit decoder: ParquetRecordDecoder[T], F: Sync[F]): Stream[F, T] =
-      reader.read(path, options, filter, projectedSchemaResolverOpt)
+    override def read(path: Path): Stream[F, T] = reader.read(path, options, filter, projectedSchemaResolverOpt)
   }
 
   private[parquet4s] def read[F[_], T: ParquetRecordDecoder](basePath: Path,
                                                              options: ParquetReader.Options,
                                                              filter: Filter,
                                                              projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
-                                                            )(implicit F: Sync[F]): Stream[F, T] = {
-
+                                                            )(implicit F: Sync[F]): Stream[F, T] =
     for {
       vcc                  <- Stream.eval(F.pure(ValueCodecConfiguration(options)))
       decode = (record: RowParquetRecord) => F.catchNonFatal(ParquetRecordDecoder.decode(record, vcc))
       partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf)
-      projectedSchemaOpt <- Stream.eval(projectedSchemaResolverOpt
+      projectedSchemaOpt   <- Stream.eval(projectedSchemaResolverOpt
         .traverse(implicit resolver => F.catchNonFatal(ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))))
       partitionData        <- Stream.eval(F.catchNonFatal(PartitionFilter.filter(filter, vcc, partitionedDirectory)))
                                 .flatMap(Stream.iterable)
@@ -87,13 +102,10 @@ object reader {
         }
         .evalMap(decode)
     } yield entity
-  }
 
   private def readerStream[T, F[_] : Sync](reader: HadoopParquetReader[RowParquetRecord])
-                                          (implicit F: Sync[F]): Stream[F, RowParquetRecord] = {
-    // TODO test using AWS in order to check the performance when using delay instead of blocking
+                                          (implicit F: Sync[F]): Stream[F, RowParquetRecord] =
     Stream.repeatEval(F.blocking(reader.read())).takeWhile(_ != null)
-  }
 
   private def readerResource[F[_]: Sync](path: Path,
                                          options: ParquetReader.Options,

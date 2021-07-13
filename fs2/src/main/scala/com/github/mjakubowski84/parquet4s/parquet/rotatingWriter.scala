@@ -1,11 +1,11 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
-import cats.effect._
-import cats.implicits._
-import com.github.mjakubowski84.parquet4s._
+import cats.effect.*
+import cats.implicits.*
+import com.github.mjakubowski84.parquet4s.*
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import fs2.{Pipe, Pull, Stream}
-import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
+import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.schema.MessageType
 
 import java.util.UUID
@@ -16,12 +16,23 @@ import scala.language.higherKinds
 
 object rotatingWriter {
 
-  object Builder {
+  val DefaultMaxCount: Long = HadoopParquetWriter.DEFAULT_BLOCK_SIZE
+  val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
 
-    val DefaultMaxCount: Long = HadoopParquetWriter.DEFAULT_BLOCK_SIZE
-    val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
+  trait ViaParquet[F[_]] {
+    /**
+     * @tparam T schema type
+     * @return Builder of pipe that processes data of specified schema
+     */
+    def of[T]: TypedBuilder[F, T, T]
+    /**
+     * @return Builder of pipe that processes generic records
+     */
+    def generic: GenericBuilder[F]
+  }
 
-    private[parquet4s] def apply[F[_], T](): Builder[F, T, T] = BuilderImpl[F, T, T](
+  private[parquet4s] class ViaParquetImpl[F[_]: Async] extends ViaParquet[F] {
+    override def of[T]: TypedBuilder[F, T, T] = TypedBuilderImpl[F, T, T](
       maxCount = DefaultMaxCount,
       maxDuration = DefaultMaxDuration,
       preWriteTransformation = t => Stream.emit(t),
@@ -29,22 +40,29 @@ object rotatingWriter {
       postWriteHandlerOpt = None,
       writeOptions = ParquetWriter.Options()
     )
-
+    override def generic: GenericBuilder[F] = GenericBuilderImpl(
+      maxCount = DefaultMaxCount,
+      maxDuration = DefaultMaxDuration,
+      preWriteTransformation = Stream.emit,
+      partitionBy = Seq.empty,
+      postWriteHandlerOpt = None,
+      writeOptions = ParquetWriter.Options()
+    )
   }
 
-  trait Builder[F[_], T, W] {
+  trait Builder[F[_], T, W, Self] {
     /**
      * @param maxCount max number of records to be written before file rotation
      */
-    def maxCount(maxCount: Long): Builder[F, T, W]
+    def maxCount(maxCount: Long): Self
     /**
      * @param maxDuration max time after which partition file is rotated
      */
-    def maxDuration(maxDuration: FiniteDuration): Builder[F, T, W]
+    def maxDuration(maxDuration: FiniteDuration): Self
     /**
      * @param writeOptions writer options used by the flow
      */
-    def options(writeOptions: ParquetWriter.Options): Builder[F, T, W]
+    def options(writeOptions: ParquetWriter.Options): Self
     /**
      * Sets partition paths that stream partitions data by. Can be empty.
      * Partition path can be a simple string column (e.g. "color") or a path pointing nested string field
@@ -63,7 +81,7 @@ object rotatingWriter {
      * Take <b>note</b>:
      * <ol>
      *   <li>PartitionBy must point a string field.</li>
-     *   <li>Partitioning removes partition fields from the schema. Data is stored in name of subdirectory
+     *   <li>Partitioning removes partition fields from the schema. Data is stored in the name of subdirectory
      *       instead of Parquet file.</li>
      *   <li>Partitioning cannot end in having empty schema. If you remove all fields of the message you will
      *       get an error.</li>
@@ -72,12 +90,7 @@ object rotatingWriter {
      *
      * @param partitionBy [[ColumnPath]]s to partition by
      */
-    def partitionBy(partitionBy: ColumnPath*): Builder[F, T, W]
-    /**
-     * @param transformation function that is called by stream in order to obtain Parquet schema. Identity by default.
-     * @tparam X Schema type
-     */
-    def preWriteTransformation[X](transformation: T => Stream[F, X]): Builder[F, T, X]
+    def partitionBy(partitionBy: ColumnPath*): Self
 
     /**
      * Adds a handler after record writes, exposing some of the internal state of the flow.
@@ -86,31 +99,71 @@ object rotatingWriter {
      * @param postWriteHandler an effect called after writing a record,
      *                         receiving a snapshot of the internal state of the flow as a parameter.
      */
-    def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): Builder[F, T, W]
+    def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): Self
+
+  }
+
+  trait GenericBuilder[F[_]] extends Builder[F, RowParquetRecord, RowParquetRecord, GenericBuilder[F]] {
+    /**
+     * @param transformation function that is called by stream in order to transform data to final write format. Identity by default.
+     */
+    def preWriteTransformation(transformation: RowParquetRecord => Stream[F, RowParquetRecord]): GenericBuilder[F]
+    /**
+     * Builds final writer pipe.
+     */
+    def write(basePath: Path, schema: MessageType): Pipe[F, RowParquetRecord, RowParquetRecord]
+  }
+
+  trait TypedBuilder[F[_], T, W] extends Builder[F, T, W, TypedBuilder[F, T, W]] {
+    /**
+     * @param transformation function that is called by stream in order to transform data to final write format. Identity by default.
+     * @tparam X Schema type
+     */
+    def preWriteTransformation[X](transformation: T => Stream[F, X]): TypedBuilder[F, T, X]
     /**
      * Builds final writer pipe.
      */
     def write(basePath: Path)(implicit
                               schemaResolver: ParquetSchemaResolver[W],
-                              encoder: ParquetRecordEncoder[W],
-                              async: Async[F]): Pipe[F, T, T]
+                              encoder: ParquetRecordEncoder[W]
+                              ): Pipe[F, T, T]
   }
 
-  private case class BuilderImpl[F[_], T, W](
-                                              maxCount: Long,
-                                              maxDuration: FiniteDuration,
-                                              preWriteTransformation: T => Stream[F, W],
-                                              partitionBy: Seq[ColumnPath],
-                                              postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
-                                              writeOptions: ParquetWriter.Options,
-                                            ) extends Builder[F, T, W] {
+  private case class GenericBuilderImpl[F[_]: Async](maxCount: Long,
+                                                     maxDuration: FiniteDuration,
+                                                     preWriteTransformation: RowParquetRecord => Stream[F, RowParquetRecord],
+                                                     partitionBy: Seq[ColumnPath],
+                                                     postWriteHandlerOpt: Option[PostWriteHandler[F, RowParquetRecord]],
+                                                     writeOptions: ParquetWriter.Options
+                                                    ) extends GenericBuilder[F] {
+    override def maxCount(maxCount: Long): GenericBuilder[F] = copy(maxCount = maxCount)
+    override def maxDuration(maxDuration: FiniteDuration): GenericBuilder[F] = copy(maxDuration = maxDuration)
+    override def options(writeOptions: ParquetWriter.Options): GenericBuilder[F] = copy(writeOptions = writeOptions)
+    override def partitionBy(partitionBy: ColumnPath*): GenericBuilder[F] = copy(partitionBy = partitionBy)
+    override def preWriteTransformation(transformation: RowParquetRecord => Stream[F, RowParquetRecord]): GenericBuilder[F] =
+      copy(preWriteTransformation = transformation)
+    override def postWriteHandler(postWriteHandler: PostWriteHandler[F, RowParquetRecord]): GenericBuilder[F] =
+      copy(postWriteHandlerOpt = Option(postWriteHandler))
+    def write(basePath: Path, schema: MessageType): Pipe[F, RowParquetRecord, RowParquetRecord] =
+      rotatingWriter.write[F, RowParquetRecord, RowParquetRecord](
+        basePath, Async[F].pure(schema), maxCount, maxDuration, partitionBy, preWriteTransformation, postWriteHandlerOpt, writeOptions
+      )
+  }
 
-    override def maxCount(maxCount: Long): Builder[F, T, W] = copy(maxCount = maxCount)
-    override def maxDuration(maxDuration: FiniteDuration): Builder[F, T, W] = copy(maxDuration = maxDuration)
-    override def options(writeOptions: ParquetWriter.Options): Builder[F, T, W] = copy(writeOptions = writeOptions)
-    override def partitionBy(partitionBy: ColumnPath*): Builder[F, T, W] = copy(partitionBy = partitionBy)
-    override def preWriteTransformation[X](transformation: T => Stream[F, X]): Builder[F, T, X] =
-      BuilderImpl(
+  private case class TypedBuilderImpl[F[_]: Async, T, W](maxCount: Long,
+                                                         maxDuration: FiniteDuration,
+                                                         preWriteTransformation: T => Stream[F, W],
+                                                         partitionBy: Seq[ColumnPath],
+                                                         postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
+                                                         writeOptions: ParquetWriter.Options
+                                                        ) extends TypedBuilder[F, T, W] {
+
+    override def maxCount(maxCount: Long): TypedBuilder[F, T, W] = copy(maxCount = maxCount)
+    override def maxDuration(maxDuration: FiniteDuration): TypedBuilder[F, T, W] = copy(maxDuration = maxDuration)
+    override def options(writeOptions: ParquetWriter.Options): TypedBuilder[F, T, W] = copy(writeOptions = writeOptions)
+    override def partitionBy(partitionBy: ColumnPath*): TypedBuilder[F, T, W] = copy(partitionBy = partitionBy)
+    override def preWriteTransformation[X](transformation: T => Stream[F, X]): TypedBuilder[F, T, X] =
+      TypedBuilderImpl(
         maxCount = maxCount,
         maxDuration = maxDuration,
         preWriteTransformation = transformation,
@@ -118,15 +171,16 @@ object rotatingWriter {
         writeOptions = writeOptions,
         postWriteHandlerOpt = postWriteHandlerOpt
       )
-    override def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): Builder[F, T, W] =
+    override def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): TypedBuilder[F, T, W] =
       copy(postWriteHandlerOpt = Option(postWriteHandler))
     override def write(basePath: Path)(implicit
                                        schemaResolver: ParquetSchemaResolver[W],
-                                       encoder: ParquetRecordEncoder[W],
-                                       async: Async[F]): Pipe[F, T, T] =
+                                       encoder: ParquetRecordEncoder[W]): Pipe[F, T, T] = {
+      val schemaF = Sync[F].catchNonFatal(ParquetSchemaResolver.resolveSchema[W](partitionBy))
       rotatingWriter.write[F, T, W](
-        basePath, maxCount, maxDuration, partitionBy, preWriteTransformation, postWriteHandlerOpt, writeOptions
+        basePath, schemaF, maxCount, maxDuration, partitionBy, preWriteTransformation, postWriteHandlerOpt, writeOptions
       )
+    }
   }
 
   type PostWriteHandler[F[_], T] = PostWriteState[F, T] => F[Unit]
@@ -272,20 +326,18 @@ object rotatingWriter {
       writeAllPull(in, count = 0).stream.onFinalize(dispose)
   }
 
-  private[parquet4s] def write[
-    F[_],
-    T,
-    W: ParquetRecordEncoder : ParquetSchemaResolver](basePath: Path,
-                                                     maxCount: Long,
-                                                     maxDuration: FiniteDuration,
-                                                     partitionBy: Seq[ColumnPath],
-                                                     prewriteTransformation: T => Stream[F, W],
-                                                     postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
-                                                     options: ParquetWriter.Options
-                                                    )(implicit F: Async[F]): Pipe[F, T, T] =
+  private def write[F[_], T, W: ParquetRecordEncoder](basePath: Path,
+                                                      schemaF: F[MessageType],
+                                                      maxCount: Long,
+                                                      maxDuration: FiniteDuration,
+                                                      partitionBy: Seq[ColumnPath],
+                                                      prewriteTransformation: T => Stream[F, W],
+                                                      postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
+                                                      options: ParquetWriter.Options
+                                                     )(implicit F: Async[F]): Pipe[F, T, T] =
     in =>
       for {
-        schema <- Stream.eval(F.catchNonFatal(ParquetSchemaResolver.resolveSchema[W](partitionBy)))
+        schema <- Stream.eval(schemaF)
         valueCodecConfiguration <- Stream.eval(F.catchNonFatal(ValueCodecConfiguration(options)))
         encode = { (entity: W) => F.catchNonFatal(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
         logger <- Stream.eval(logger[F](this.getClass))
