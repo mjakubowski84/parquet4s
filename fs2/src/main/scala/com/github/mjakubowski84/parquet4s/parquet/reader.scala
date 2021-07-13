@@ -17,7 +17,7 @@ object reader {
     private[parquet4s] def apply[F[_], T](): Builder[F, T] = BuilderImpl(
       options = ParquetReader.Options(),
       filter = Filter.noopFilter,
-      schemaResolverOpt = None
+      projectedSchemaResolverOpt = None
     )
   }
 
@@ -33,7 +33,7 @@ object reader {
     /**
      * @param schemaResolver resolved schema that is going to be used as a projection over original file schema
      */
-    def projection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[F, T]
+    def projection(implicit schemaResolver: SkippingParquetSchemaResolver[T]): Builder[F, T]
     /**
      * @param blocker Execution context for blocking operations
      * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
@@ -48,7 +48,7 @@ object reader {
 
   private case class BuilderImpl[F[_], T](options: ParquetReader.Options,
                                           filter: Filter,
-                                          schemaResolverOpt: Option[ParquetSchemaResolver[T]]
+                                          projectedSchemaResolverOpt: Option[SkippingParquetSchemaResolver[T]]
                                          ) extends Builder[F, T] {
     override def options(options: ParquetReader.Options): Builder[F, T] =
       this.copy(options = options)
@@ -56,23 +56,19 @@ object reader {
     override def filter(filter: Filter): Builder[F, T] =
       this.copy(filter = filter)
 
-    override def projection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[F, T] =
-      this.copy(schemaResolverOpt = Option(schemaResolver))
+    override def projection(implicit schemaResolver: SkippingParquetSchemaResolver[T]): Builder[F, T] =
+      this.copy(projectedSchemaResolverOpt = Option(schemaResolver))
 
     override def read(blocker: Blocker, path: String)
-                     (implicit decoder: ParquetRecordDecoder[T], F: Sync[F], cs: ContextShift[F]): Stream[F, T] = {
-      for {
-        projectionSchemaOpt <- Stream.eval(schemaResolverOpt.traverse(implicit resolver => F.delay(ParquetSchemaResolver.resolveSchema)))
-        readerStream <- reader.read(blocker, path, options, filter, projectionSchemaOpt)
-      } yield readerStream
-    }
+                     (implicit decoder: ParquetRecordDecoder[T], F: Sync[F], cs: ContextShift[F]): Stream[F, T] =
+      reader.read(blocker, path, options, filter, projectedSchemaResolverOpt)
   }
 
   private[parquet4s] def read[F[_]: ContextShift, T: ParquetRecordDecoder](blocker: Blocker,
                                                                            path: String,
                                                                            options: ParquetReader.Options,
                                                                            filter: Filter,
-                                                                           projectionSchemaOpt: Option[MessageType]
+                                                                           projectedSchemaResolverOpt: Option[SkippingParquetSchemaResolver[T]]
                                                                           )(implicit F: Sync[F]): Stream[F, T] = {
 
     for {
@@ -80,9 +76,11 @@ object reader {
       vcc      <- Stream.eval(F.delay(options.toValueCodecConfiguration))
       decode = (record: RowParquetRecord) => F.delay(ParquetRecordDecoder.decode(record, vcc))
       partitionedDirectory <- io.findPartitionedPaths(blocker, basePath, options.hadoopConf)
+      projectedSchemaOpt <- Stream.eval(projectedSchemaResolverOpt
+        .traverse(implicit resolver => F.delay(SkippingParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))))
       partitionData        <- Stream.eval(F.delay(PartitionFilter.filter(filter, vcc, partitionedDirectory))).flatMap(Stream.iterable)
       (partitionFilter, partitionedPath) = partitionData
-      reader <- Stream.resource(readerResource(blocker, partitionedPath.path, options, partitionFilter, projectionSchemaOpt))
+      reader <- Stream.resource(readerResource(blocker, partitionedPath.path, options, partitionFilter, projectedSchemaOpt))
       entity <- readerStream(blocker, reader)
         .evalTap { record =>
           partitionedPath.partitions.traverse_ { case (name, value) =>

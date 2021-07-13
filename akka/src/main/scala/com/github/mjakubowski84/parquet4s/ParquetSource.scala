@@ -27,7 +27,7 @@ object ParquetSource extends IOOps {
     /**
      * @param schemaResolver resolved schema that is going to be used as a projection over original file schema
      */
-    def withProjection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[T]
+    def withProjection(implicit schemaResolver: SkippingParquetSchemaResolver[T]): Builder[T]
     /**
      * @param path URI to Parquet files, e.g.: {{{ "file:///data/users" }}}
      * @param decoder decodes [[RowParquetRecord]] to your data type
@@ -39,7 +39,7 @@ object ParquetSource extends IOOps {
   private case class BuilderImpl[T](
                                     options: ParquetReader.Options,
                                     filter: Filter,
-                                    projectedSchemaOpt: Option[MessageType]
+                                    projectedSchemaResolverOpt: Option[SkippingParquetSchemaResolver[T]]
                                    ) extends Builder[T] {
     override def withOptions(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
@@ -47,11 +47,11 @@ object ParquetSource extends IOOps {
     override def withFilter(filter: Filter) : Builder[T] =
       this.copy(filter = filter)
 
-    override def withProjection(implicit schemaResolver: ParquetSchemaResolver[T]): Builder[T] =
-      this.copy(projectedSchemaOpt = Option(ParquetSchemaResolver.resolveSchema[T]))
+    override def withProjection(implicit schemaResolver: SkippingParquetSchemaResolver[T]): Builder[T] =
+      this.copy(projectedSchemaResolverOpt = Option(schemaResolver))
 
     override def read(path: String)(implicit decoder: ParquetRecordDecoder[T]): Source[T, NotUsed] =
-      ParquetSource.apply(new Path(path), options, filter, projectedSchemaOpt)
+      ParquetSource.apply(new Path(path), options, filter, projectedSchemaResolverOpt)
 
   }
 
@@ -61,13 +61,13 @@ object ParquetSource extends IOOps {
     BuilderImpl(
       options = ParquetReader.Options(),
       filter = Filter.noopFilter,
-      projectedSchemaOpt = None
+      projectedSchemaResolverOpt = None
     )
 
   private[parquet4s] def apply[T: ParquetRecordDecoder](path: Path,
                                                         options: ParquetReader.Options,
                                                         filter: Filter,
-                                                        projectedSchemaOpt: Option[MessageType]
+                                                        projectedSchemaResolverOpt: Option[SkippingParquetSchemaResolver[T]]
                                                        ): Source[T, NotUsed] = {
     val valueCodecConfiguration = options.toValueCodecConfiguration
     val hadoopConf = options.hadoopConf
@@ -75,6 +75,8 @@ object ParquetSource extends IOOps {
     findPartitionedPaths(path, hadoopConf).fold(
       Source.failed,
       partitionedDirectory => {
+        val projectedSchemaOpt = projectedSchemaResolverOpt
+          .map(implicit resolver => SkippingParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))
         val sources = PartitionFilter
           .filter(filter, valueCodecConfiguration, partitionedDirectory)
           .map(createSource[T](valueCodecConfiguration, hadoopConf, projectedSchemaOpt).tupled)
