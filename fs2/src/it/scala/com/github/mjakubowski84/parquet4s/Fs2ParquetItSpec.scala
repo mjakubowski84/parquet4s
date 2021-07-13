@@ -99,7 +99,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
       Types.primitive(INT64, Repetition.REQUIRED).named("i")
     ).named("projected-schema")
 
-    def readProjected[T: ParquetRecordDecoder: ParquetSchemaResolver](blocker: Blocker, path: Path): Stream[IO, Vector[T]] =
+    def readProjected[T: ParquetRecordDecoder: SkippingParquetSchemaResolver](blocker: Blocker, path: Path): Stream[IO, Vector[T]] =
       parquet.fromParquet[IO, T].projection.read(blocker, path.toString).fold(Vector.empty[T])(_ :+ _)
 
     val expectedRecords = data.map(d => RowParquetRecord.empty.add("i", d.i, vcc))
@@ -297,7 +297,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with Matchers with Inspectors {
 
     def read(blocker: Blocker, path: Path): Stream[IO, Map[String, Vector[Data]]] =
       parquet
-        .fromParquet[IO, DataTransformed].read(blocker, path.toString)
+        .fromParquet[IO, DataTransformed].projection.read(blocker, path.toString)
         .map { case DataTransformed(i, s, partition) => Map(partition -> Vector(Data(i, s))) }
         .reduceSemigroup
 

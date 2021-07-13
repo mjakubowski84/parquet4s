@@ -180,6 +180,8 @@ class ParquetStreamsITSpec
   }
 
   it should "use projection when reading files" in {
+    case class S(s: String)
+
     val outputFileName = "data.parquet"
 
     val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
@@ -190,11 +192,11 @@ class ParquetStreamsITSpec
     for {
       _ <- write()
       files <- filesAtPath(tempPath, configuration)
-      readData <- read[Data](tempPath)
+      readData <-  ParquetStreams.fromParquet[S].withProjection.read(tempPathString).runWith(Sink.seq)
     } yield {
       files should be(List(outputFileName))
       readData should have size count
-      readData should contain theSameElementsInOrderAs data
+      readData should contain theSameElementsInOrderAs data.map(d => S(d.s))
     }
   }
 
