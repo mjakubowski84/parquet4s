@@ -34,7 +34,7 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2
 
 ```scala
 libraryDependencies ++= Seq(
-  "com.github.mjakubowski84" %% "parquet4s-core" % "1.9.2",
+  "com.github.mjakubowski84" %% "parquet4s-core" % "1.9.3",
   "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 )
 ```
@@ -43,7 +43,7 @@ libraryDependencies ++= Seq(
 
 ```scala
 def ivyDeps = Agg(
-  ivy"com.github.mjakubowski84::parquet4s-core:1.9.2",
+  ivy"com.github.mjakubowski84::parquet4s-core:1.9.3",
   ivy"org.apache.hadoop:hadoop-client:$yourHadoopVersion"
 )
 ```
@@ -94,7 +94,7 @@ File system configs for S3, GCS or Hadoop can also be set programmatically to th
 Parquet4S has an integration module that allows you to read and write Parquet files using Akka Streams. Just import:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "1.9.2"
+"com.github.mjakubowski84" %% "parquet4s-akka" % "1.9.3"
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
@@ -157,7 +157,7 @@ ParquetStreams.fromParquet[User]
 FS2 integration allows you to read and write Parquet using functional streams. Functionality is exactly the same as in case of Akka module. In order to use it please import:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-fs2" % "1.9.2"
+"com.github.mjakubowski84" %% "parquet4s-fs2" % "1.9.3"
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
