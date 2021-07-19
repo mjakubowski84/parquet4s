@@ -189,7 +189,7 @@ class ParquetStreamsITSpec
     for {
       _ <- write()
       files <- filesAtPath(tempPath, configuration)
-      readData <-  ParquetStreams.fromParquet[S].withProjection.read(tempPathString).runWith(Sink.seq)
+      readData <-  ParquetStreams.fromParquet[S].withProjection.read(tempPath).runWith(Sink.seq)
     } yield {
       files should be(List(outputFileName))
       readData should have size count
