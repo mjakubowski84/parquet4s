@@ -331,15 +331,15 @@ class ParquetStreamsITSpec
     def genUser(id: Int) = User(s"name_$id", id, (id % partitions).toString) // Two partitions : even and odd `id`
 
     // Mimics a metrics library
-    var metrics = Vector.empty[Long]
-    def gauge(v: Long): Unit = metrics :+= v
+    var metrics = Vector.empty[(Long, Int)]
+    def gauge(count: Long, userId: Int): Unit = metrics :+= (count, userId)
 
     val flow = ParquetStreams.viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(maxCount)
       .withPartitionBy("id_part")
       .withPostWriteHandler { state =>
-        gauge(state.count)                                               // use-case 1 : monitoring internal counter
+        gauge(state.count, state.lastProcessed.id)                       // use-case 1 : monitoring internal counter
         if (state.lastProcessed.id > usersToWrite - lastToFlushOnDemand) // use-case 2 : on demand flush. e.g: the last two records must be in separate files
           state.flush()
       }
@@ -363,9 +363,22 @@ class ParquetStreamsITSpec
       readData should have size users.size
       readData should contain allElementsOf (users)
 
-      files should have size (((usersToWrite / maxCount) * partitions) + 1 + lastToFlushOnDemand) // 9 == ( 33 / 10 ) * 2 + 1[remainder] + 2
+      files should have size (((usersToWrite / maxCount) * partitions) + 1 + lastToFlushOnDemand) // 9 == ( 33 / 10 ) * 2 + 1[remainder] + 2)
 
-      metrics should be((0 until usersToWrite) map (i => (i % 10) + 1)) // Vector(1..10,1..10,1..10,1,2,3) - the counter is flushed 3 time and the last "batch" is just 1,2,3
+      // the counter is flushed 3 times due to max-count being reached
+      val completeCounts = Seq.fill(usersToWrite / maxCount) { 0 until maxCount }
+        .flatten
+        .zipWithIndex
+        .map { case (count, id) => (count + 1) -> (id + 1)}
+
+      // the counter is flushed twice due to on-demand calls
+      val onDemandCallsCounts = Seq(
+        1,
+        2, // first on-demand flush
+        1  // second on-demand flush
+      ).zipWithIndex.map { case (count, i) => count -> (completeCounts.length + i + 1)}
+
+      metrics should be (completeCounts ++ onDemandCallsCounts)
 
       val (remainder, full) = readDataPartitioned.partition(_.head.id >= usersToWrite - lastToFlushOnDemand)
       every(full) should have size (maxCount / partitions)                              // == 5 records in completed files

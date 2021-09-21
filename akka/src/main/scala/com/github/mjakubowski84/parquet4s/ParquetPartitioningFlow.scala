@@ -165,7 +165,6 @@ private class ParquetPartitioningFlow[T, W](
 
   private class Logic extends TimerGraphStageLogic(shape) with InHandler with OutHandler {
     private var writers: scala.collection.immutable.Map[Path, ParquetWriter.InternalWriter] = Map.empty
-    private var shouldRotate = true
     private var count = 0L
 
     setHandlers(in, out, this)
@@ -201,6 +200,7 @@ private class ParquetPartitioningFlow[T, W](
     private def close(): Unit = {
       writers.valuesIterator.foreach(_.close())
       writers = Map.empty
+      count = 0
     }
 
     override def preStart(): Unit =
@@ -208,28 +208,23 @@ private class ParquetPartitioningFlow[T, W](
 
     override def onTimer(timerKey: Any): Unit =
       if (TimerKey == timerKey) {
-        shouldRotate = true
+        close()
       }
 
     override def onPush(): Unit = {
-      if (shouldRotate) {
-        close()
-        shouldRotate = false
-        count = 0
-      }
       val msg = grab(in)
       write(msg)
       count += 1
-
-      if (count >= maxCount) {
-        shouldRotate = true
-      }
 
       postWriteHandler.foreach(_.apply(PostWriteState(count,
         lastProcessed = msg,
         partitions = writers.keySet,
         flush = () => close()
       )))
+
+      if (count >= maxCount) {
+        close()
+      }
 
       push(out, msg)
     }
