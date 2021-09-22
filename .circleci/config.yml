@@ -65,6 +65,7 @@ commands:
 jobs:
 
   build:
+    resource_class: large
     executor:
       name: jdk
     steps:
@@ -94,6 +95,7 @@ jobs:
           path: workspace/repo
 
   release:
+    resource_class: large
     executor:
       name: jdk
     steps:

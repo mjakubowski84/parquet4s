@@ -7,8 +7,8 @@ lazy val supportedScalaVersions = Seq("2.11.12", "2.12.13", "2.13.5")
 lazy val fs2ScalaVersions = Seq("2.12.13", "2.13.5")
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "1.9.4"
-ThisBuild / isSnapshot := false
+ThisBuild / version := "2.0.0-SNAPSHOT"
+ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := "2.13.5"
 ThisBuild / scalacOptions ++= Seq("-deprecation", "-target:jvm-1.8")
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -17,6 +17,7 @@ ThisBuild / resolvers := Seq(
   Resolver.jcenterRepo
 )
 ThisBuild / makePomConfiguration := makePomConfiguration.value.withConfigurations(Configurations.defaultMavenConfigurations)
+ThisBuild / versionScheme := Some("semver-spec")
 Global / excludeLintKeys += run / cancelable
 Global / excludeLintKeys += IntegrationTest / publishArtifact
 Global / excludeLintKeys += makePomConfiguration
