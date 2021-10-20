@@ -6,33 +6,33 @@ object TestCases {
 
   // Primitives
   case class Primitives(
-                         boolean: Boolean,
-                         int: Int,
-                         long: Long,
-                         float: Float,
-                         double: Double,
-                         string: String,
-                         short: Short,
-                         byte: Byte,
-                         char: Char,
-                         bigDecimal: BigDecimal
-                       )
+      boolean: Boolean,
+      int: Int,
+      long: Long,
+      float: Float,
+      double: Double,
+      string: String,
+      short: Short,
+      byte: Byte,
+      char: Char,
+      bigDecimal: BigDecimal
+  )
   case class TimePrimitives(
-                             localDateTime: java.time.LocalDateTime,
-                             sqlTimestamp: java.sql.Timestamp,
-                             localDate: java.time.LocalDate,
-                             sqlDate: java.sql.Date
-                           )
+      localDateTime: java.time.LocalDateTime,
+      sqlTimestamp: java.sql.Timestamp,
+      localDate: java.time.LocalDate,
+      sqlDate: java.sql.Date
+  )
   case class ContainsOption(optional: Option[Int])
 
   // Collections of primitives
   case class Collections(
-                          list: List[Int],
-                          seq: Seq[Int],
-                          vector: Vector[Int],
-                          set: Set[Int],
-                          array: Array[Int]
-                        ) {
+      list: List[Int],
+      seq: Seq[Int],
+      vector: Vector[Int],
+      set: Set[Int],
+      array: Array[Int]
+  ) {
     override def equals(obj: Any): Boolean =
       obj match {
         case other @ Collections(otherList, otherSeq, otherVector, otherSet, otherArray) =>
@@ -66,12 +66,12 @@ object TestCases {
 
   // Collections of nested class
   case class CollectionsOfNestedClass(
-                                       list: List[Nested],
-                                       seq: Seq[Nested],
-                                       vector: Vector[Nested],
-                                       set: Set[Nested],
-                                       array: Array[Nested]
-                                     ) {
+      list: List[Nested],
+      seq: Seq[Nested],
+      vector: Vector[Nested],
+      set: Set[Nested],
+      array: Array[Nested]
+  ) {
     override def equals(obj: Any): Boolean =
       obj match {
         case other @ CollectionsOfNestedClass(otherList, otherSeq, otherVector, otherSet, otherArray) =>

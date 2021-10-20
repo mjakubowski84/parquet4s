@@ -20,30 +20,32 @@ object WriteAndReadFilteredFS2App extends IOApp {
     val D = "D"
 
     val values: List[String] = List(A, B, C, D)
-    def random: String = values(Random.nextInt(values.length))
+    def random: String       = values(Random.nextInt(values.length))
   }
 
   case class Data(id: Int, dict: String)
 
-  private implicit val showData: Show[Data] = Show.fromToString
-  private val Count = 100
-  private val TmpPath = Paths.get(sys.props("java.io.tmpdir"))
+  implicit private val showData: Show[Data] = Show.fromToString
+  private val Count                         = 100
+  private val TmpPath                       = Paths.get(sys.props("java.io.tmpdir"))
 
   override def run(args: List[String]): IO[ExitCode] = {
     val stream = for {
       blocker <- Stream.resource(Blocker[IO])
-      path <- tempDirectoryStream[IO](blocker, dir = TmpPath)
-      _ <- Stream.range[IO](start = 0, stopExclusive = Count)
-        .map { i => Data(id = i, dict = Dict.random) }
+      path    <- tempDirectoryStream[IO](blocker, dir = TmpPath)
+      _ <- Stream
+        .range[IO](start = 0, stopExclusive = Count)
+        .map(i => Data(id = i, dict = Dict.random))
         .through(writeSingleFile(blocker, path.resolve("data.parquet").toString))
         .append(Stream.eval_(IO(println("""dict == "A""""))))
         .append(fromParquet[IO, Data].filter(Col("dict") === Dict.A).read(blocker, path.toString).showLinesStdOut.drain)
         .append(Stream.eval_(IO(println("""id >= 20 && id < 40"""))))
-        .append(fromParquet[IO, Data]
-          .filter(Col("id") >= 20 && Col("id") < 40)
-          .read(blocker, path.toString)
-          .showLinesStdOut
-          .drain
+        .append(
+          fromParquet[IO, Data]
+            .filter(Col("id") >= 20 && Col("id") < 40)
+            .read(blocker, path.toString)
+            .showLinesStdOut
+            .drain
         )
     } yield ()
 

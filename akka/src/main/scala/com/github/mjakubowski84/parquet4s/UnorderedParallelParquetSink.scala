@@ -14,19 +14,19 @@ private[parquet4s] object UnorderedParallelParquetSink extends IOOps {
 
   protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  def apply[T: ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
-                                                             parallelism: Int,
-                                                             options: ParquetWriter.Options = ParquetWriter.Options()
-                                                            ): Sink[T, Future[Done]] = {
-    val schema = ParquetSchemaResolver.resolveSchema[T]
+  def apply[T: ParquetRecordEncoder: ParquetSchemaResolver](
+      path: Path,
+      parallelism: Int,
+      options: ParquetWriter.Options = ParquetWriter.Options()
+  ): Sink[T, Future[Done]] = {
+    val schema                  = ParquetSchemaResolver.resolveSchema[T]
     val valueCodecConfiguration = options.toValueCodecConfiguration
 
     validateWritePath(path, options)
 
     def encode(data: T): RowParquetRecord = ParquetRecordEncoder.encode[T](data, valueCodecConfiguration)
 
-    Flow[T]
-      .zipWithIndex
+    Flow[T].zipWithIndex
       .groupBy(parallelism, elemAndIndex => Math.floorMod(elemAndIndex._2, parallelism.toLong))
       .map(elemAndIndex => encode(elemAndIndex._1))
       .fold(UnorderedChunk(path, schema, options))(_.write(_))
@@ -46,16 +46,17 @@ private[parquet4s] object UnorderedParallelParquetSink extends IOOps {
 
   private object UnorderedChunk {
 
-    def apply(basePath: Path,
-              schema: MessageType,
-              options: ParquetWriter.Options): UnorderedChunk = new PendingUnorderedChunk(basePath, schema, options)
+    def apply(basePath: Path, schema: MessageType, options: ParquetWriter.Options): UnorderedChunk =
+      new PendingUnorderedChunk(basePath, schema, options)
 
-    private[UnorderedChunk] class PendingUnorderedChunk(basePath: Path,
-                                        schema: MessageType,
-                                        options: ParquetWriter.Options) extends UnorderedChunk {
+    private[UnorderedChunk] class PendingUnorderedChunk(
+        basePath: Path,
+        schema: MessageType,
+        options: ParquetWriter.Options
+    ) extends UnorderedChunk {
       override def write(record: RowParquetRecord): UnorderedChunk = {
         val chunkPath = Path.mergePaths(basePath, new Path(s"/part-${UUID.randomUUID()}.parquet"))
-        val writer = ParquetWriter.internalWriter(chunkPath, schema, options)
+        val writer    = ParquetWriter.internalWriter(chunkPath, schema, options)
         writer.write(record)
         new StartedUnorderedChunk(chunkPath, writer, acc = 1)
       }
@@ -63,10 +64,11 @@ private[parquet4s] object UnorderedParallelParquetSink extends IOOps {
       override def close(): Unit = ()
     }
 
-    private[UnorderedChunk] class StartedUnorderedChunk(chunkPath: Path,
-                                        writer: ParquetWriter.InternalWriter,
-                                        acc: Long
-                                       ) extends UnorderedChunk {
+    private[UnorderedChunk] class StartedUnorderedChunk(
+        chunkPath: Path,
+        writer: ParquetWriter.InternalWriter,
+        acc: Long
+    ) extends UnorderedChunk {
       override def write(record: RowParquetRecord): UnorderedChunk = {
         writer.write(record)
         new StartedUnorderedChunk(chunkPath, writer, acc = acc + 1)

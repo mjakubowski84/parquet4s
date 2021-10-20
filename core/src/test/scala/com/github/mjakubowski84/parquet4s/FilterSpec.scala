@@ -5,7 +5,6 @@ import java.util.TimeZone
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-
 class FilterSpec extends AnyFlatSpec with Matchers {
 
   private val valueCodecConfiguration = ValueCodecConfiguration(timeZone = TimeZone.getDefault)
@@ -116,16 +115,17 @@ class FilterSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "build predicate for java.sql.LocalDate" in {
-    val predicate = (Col("date") === java.sql.Date.valueOf(LocalDate.of(1970, 1, 1))).toPredicate(valueCodecConfiguration)
+    val predicate =
+      (Col("date") === java.sql.Date.valueOf(LocalDate.of(1970, 1, 1))).toPredicate(valueCodecConfiguration)
     predicate.toString should be("eq(date, 0)")
   }
 
   it should "build udp" in {
     object MyUDP extends UDP[Int] {
-      override def keep(value: Int): Boolean = ???
-      override def canDrop(statistics: FilterStatistics[Int]): Boolean = ???
+      override def keep(value: Int): Boolean                                  = ???
+      override def canDrop(statistics: FilterStatistics[Int]): Boolean        = ???
       override def inverseCanDrop(statistics: FilterStatistics[Int]): Boolean = ???
-      override def name: String = "MyUDP"
+      override def name: String                                               = "MyUDP"
     }
     val predicate = Col("int").udp(MyUDP).toPredicate(valueCodecConfiguration)
     predicate.toString should be("userdefinedbyinstance(int, MyUDP)")

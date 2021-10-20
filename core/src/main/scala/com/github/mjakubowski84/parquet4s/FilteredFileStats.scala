@@ -11,29 +11,28 @@ import org.apache.parquet.schema.{GroupType, MessageType}
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
 
-/**
- * Calculates statistics from <b>filtered</b> Parquet files.
- */
+/** Calculates statistics from <b>filtered</b> Parquet files.
+  */
 private[parquet4s] class FilteredFileStats(
-                                            status: FileStatus,
-                                            options: ParquetReader.Options,
-                                            projectionSchemaOpt: Option[MessageType],
-                                            filter: Filter
-                                          ) extends Stats {
+    status: FileStatus,
+    options: ParquetReader.Options,
+    projectionSchemaOpt: Option[MessageType],
+    filter: Filter
+) extends Stats {
 
-  private val vcc = options.toValueCodecConfiguration
-  private val inputFile = HadoopInputFile.fromStatus(status, options.hadoopConf)
+  private val vcc           = options.toValueCodecConfiguration
+  private val inputFile     = HadoopInputFile.fromStatus(status, options.hadoopConf)
   private val readerOptions = ParquetReadOptions.builder().withRecordFilter(filter.toFilterCompat(vcc)).build()
 
-  private abstract class StatsReader {
+  abstract private class StatsReader {
     protected val reader: ParquetFileReader = ParquetFileReader.open(inputFile, readerOptions)
     projectionSchemaOpt.foreach(reader.setRequestedSchema)
 
-    private val fileMetaData = reader.getFooter.getFileMetaData
-    private val messageSchema = fileMetaData.getSchema
+    private val fileMetaData                   = reader.getFooter.getFileMetaData
+    private val messageSchema                  = fileMetaData.getSchema
     protected val requestedSchema: MessageType = projectionSchemaOpt.getOrElse(messageSchema)
-    private val columnIOFactory = new ColumnIOFactory(fileMetaData.getCreatedBy)
-    protected val columnIO: MessageColumnIO = columnIOFactory.getColumnIO(requestedSchema, messageSchema, true)
+    private val columnIOFactory                = new ColumnIOFactory(fileMetaData.getCreatedBy)
+    protected val columnIO: MessageColumnIO    = columnIOFactory.getColumnIO(requestedSchema, messageSchema, true)
 
     def close(): Unit = reader.close()
   }
@@ -49,15 +48,17 @@ private[parquet4s] class FilteredFileStats(
             new RowCountMaterializer(requestedSchema),
             filter.toFilterCompat(vcc)
           )
-          (0L until store.getRowCount.longValue())
-            .iterator
+          (0L until store.getRowCount.longValue()).iterator
             .map(_ => Option(recordReader.read()))
             .collect { case Some(v) => v.value }
-        }.sum
+        }
+        .sum
   }
 
-  private class MinMaxReader[V](columnPath: String, startExtremeOpt: Option[V])
-                               (implicit codec: ValueCodec[V], ordering: Ordering[V]) extends StatsReader {
+  private class MinMaxReader[V](columnPath: String, startExtremeOpt: Option[V])(implicit
+      codec: ValueCodec[V],
+      ordering: Ordering[V]
+  ) extends StatsReader {
     private val fieldName = columnPath.split('.').toList
     private lazy val currentBlockField = {
       val f = reader.getClass.getDeclaredField("currentBlock")
@@ -65,9 +66,14 @@ private[parquet4s] class FilteredFileStats(
       f
     }
     private lazy val numOfBlocks = reader.getRowGroups.size()
-    private def currentBlock = currentBlockField.getInt(reader).intValue()
+    private def currentBlock     = currentBlockField.getInt(reader).intValue()
     private def currentRowGroupStatistics =
-      reader.getRowGroups.get(currentBlock).getColumns.asScala.find(_.getPath.toDotString == columnPath).map(_.getStatistics)
+      reader.getRowGroups
+        .get(currentBlock)
+        .getColumns
+        .asScala
+        .find(_.getPath.toDotString == columnPath)
+        .map(_.getStatistics)
 
     private def currentRowGroupStatisticsMin =
       currentRowGroupStatistics.flatMap(statsMinValue).map(value => codec.decode(value, vcc))
@@ -77,28 +83,28 @@ private[parquet4s] class FilteredFileStats(
 
     private def extremeOfRowGroup(currentExtremeOpt: Option[V], choose: (V, V) => V) = {
       val store = reader.readNextFilteredRowGroup()
-      val recordReader = columnIO.getRecordReader(store, new ParquetRecordMaterializer(requestedSchema), filter.toFilterCompat(vcc))
-      (0L until store.getRowCount.longValue())
-        .iterator
+      val recordReader =
+        columnIO.getRecordReader(store, new ParquetRecordMaterializer(requestedSchema), filter.toFilterCompat(vcc))
+      (0L until store.getRowCount.longValue()).iterator
         .map(_ => Option(recordReader.read()))
-        .collect {
-          case Some(record) => record.get(fieldName)
+        .collect { case Some(record) =>
+          record.get(fieldName)
         }
         .collect {
           case value if value != NullValue => codec.decode(value, vcc)
         }
         .foldLeft(currentExtremeOpt) {
-          case (None, v) => Some(v)
+          case (None, v)    => Some(v)
           case (Some(a), v) => Some(choose(a, v))
         }
     }
 
     @tailrec
     private def advance(
-                         currentExtremeOpt: Option[V],
-                         choose: (V, V) => V,
-                         shouldSkipRowGroup: V => Boolean
-                       ): Option[V] = {
+        currentExtremeOpt: Option[V],
+        choose: (V, V)        => V,
+        shouldSkipRowGroup: V => Boolean
+    ): Option[V] =
       if (currentBlock >= numOfBlocks) {
         // end of file
         currentExtremeOpt
@@ -118,51 +124,47 @@ private[parquet4s] class FilteredFileStats(
           shouldSkipRowGroup
         )
       }
-    }
 
     def min: Option[V] =
       advance(
         currentExtremeOpt = startExtremeOpt,
-        choose = ordering.min,
-        shouldSkipRowGroup = currentMin => currentRowGroupStatisticsMin.exists(statMin => ordering.gteq(statMin, currentMin))
+        choose            = ordering.min,
+        shouldSkipRowGroup =
+          currentMin => currentRowGroupStatisticsMin.exists(statMin => ordering.gteq(statMin, currentMin))
       )
 
     def max: Option[V] =
       advance(
         currentExtremeOpt = startExtremeOpt,
-        choose = ordering.max,
-        shouldSkipRowGroup = currentMax => currentRowGroupStatisticsMax.exists(statMax => ordering.lteq(statMax, currentMax))
+        choose            = ordering.max,
+        shouldSkipRowGroup =
+          currentMax => currentRowGroupStatisticsMax.exists(statMax => ordering.lteq(statMax, currentMax))
       )
 
   }
 
   override def recordCount: Long = {
     val reader = new RecordCountReader
-    try {
-     reader.filteredRecordCount
-    } finally {
-      reader.close()
-    }
+    try reader.filteredRecordCount
+    finally reader.close()
   }
 
-  override def min[V](columnPath: String, currentMin: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
+  override def min[V](columnPath: String, currentMin: Option[V])(implicit
+      codec: ValueCodec[V],
+      ordering: Ordering[V]
+  ): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMin)
-    try {
-      reader.min
-    } finally {
-      reader.close()
-    }
+    try reader.min
+    finally reader.close()
   }
 
-  override def max[V](columnPath: String, currentMax: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
+  override def max[V](columnPath: String, currentMax: Option[V])(implicit
+      codec: ValueCodec[V],
+      ordering: Ordering[V]
+  ): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMax)
-    try {
-      reader.max
-    } finally {
-      reader.close()
-    }
+    try reader.max
+    finally reader.close()
   }
 
 }
@@ -170,23 +172,23 @@ private[parquet4s] class FilteredFileStats(
 private case class Mat[V](value: V) extends AnyVal
 
 private class RowCountMaterializer(schema: MessageType) extends RecordMaterializer[Mat[Long]] {
-  override val getCurrentRecord: Mat[Long] = Mat(1L)
+  override val getCurrentRecord: Mat[Long]      = Mat(1L)
   override val getRootConverter: GroupConverter = new DummyGroupConverter(schema)
 }
 
 private object DummyPrimitiveConverter extends PrimitiveConverter {
-  override def addInt(value: Int): Unit = ()
-  override def addFloat(value: Float): Unit = ()
-  override def addBinary(value: Binary): Unit = ()
-  override def addDouble(value: Double): Unit = ()
-  override def addLong(value: Long): Unit = ()
+  override def addInt(value: Int): Unit         = ()
+  override def addFloat(value: Float): Unit     = ()
+  override def addBinary(value: Binary): Unit   = ()
+  override def addDouble(value: Double): Unit   = ()
+  override def addLong(value: Long): Unit       = ()
   override def addBoolean(value: Boolean): Unit = ()
 }
 private class DummyGroupConverter(schema: GroupType) extends GroupConverter {
   override def getConverter(fieldIndex: Int): Converter = schema.getType(fieldIndex) match {
     case groupType: GroupType => new DummyGroupConverter(groupType)
-    case _ => DummyPrimitiveConverter
+    case _                    => DummyPrimitiveConverter
   }
   override def start(): Unit = ()
-  override def end(): Unit = ()
+  override def end(): Unit   = ()
 }

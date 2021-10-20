@@ -62,7 +62,6 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     reader.read() was called
   }
 
-
   it should "call 'read' when it is called itself multiple times in sequence (and return false)" in {
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns null
@@ -98,8 +97,11 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
     val reader = mock[HadoopParquetReader[RowParquetRecord]]
     reader.read() returns null
 
-    a[NoSuchElementException] should be thrownBy newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats])
-      .iterator.next()
+    a[NoSuchElementException] should be thrownBy newParquetIterable[TestRow](
+      mockTestBuilder(reader),
+      vcc,
+      mock[Stats]
+    ).iterator.next()
   }
 
   it should "try to read record only once in case of sequential calls for missing record" in {
@@ -186,7 +188,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers with IdiomaticMockit
   }
 
   it should "close all readers created by multiple iterators" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader   = mock[HadoopParquetReader[RowParquetRecord]]
     val iterable = newParquetIterable[TestRow](mockTestBuilder(reader), vcc, mock[Stats])
 
     iterable.iterator

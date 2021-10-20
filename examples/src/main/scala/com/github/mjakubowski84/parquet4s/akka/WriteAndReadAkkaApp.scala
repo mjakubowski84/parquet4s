@@ -12,8 +12,8 @@ object WriteAndReadAkkaApp extends App {
   case class Data(id: Int, text: String)
 
   val count = 100
-  val data = (1 to count).map { i => Data(id = i, text = Random.nextString(4)) }
-  val path = Files.createTempDirectory("example").toString
+  val data  = (1 to count).map(i => Data(id = i, text = Random.nextString(4)))
+  val path  = Files.createTempDirectory("example").toString
 
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher

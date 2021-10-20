@@ -8,14 +8,13 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 object ExampleApp
-  extends App
+    extends App
     with Logger
     with Akka
     with Kafka
     with RandomDataProducer
     with MessageSource
     with MessageSink {
-
 
   startKafka()
   startDataProducer()
@@ -37,5 +36,5 @@ object ExampleApp
     stopAkka()
     stopKafka()
     logger.info("Exiting...")
-  } 
+  }
 }

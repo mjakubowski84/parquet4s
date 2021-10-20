@@ -18,11 +18,15 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
     Some(classOf[Person].getCanonicalName),
     Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
     Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
-    Types.optionalGroup()
-      .addField(Types.optionalGroup()
-        .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"))
-        .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("more"))
-        .named("street"))
+    Types
+      .optionalGroup()
+      .addField(
+        Types
+          .optionalGroup()
+          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"))
+          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("more"))
+          .named("street")
+      )
       .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
       .named("address")
   )
@@ -32,39 +36,51 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "skip a field at a long path" in {
-    resolveSchema[Person](Set("address.street.name")) should be(Message(
-      Some(classOf[Person].getCanonicalName),
-      Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
-      Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
-      Types.optionalGroup()
-        .addField(Types.optionalGroup()
-          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("more"))
-          .named("street"))
-        .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
-        .named("address")
-    ))
+    resolveSchema[Person](Set("address.street.name")) should be(
+      Message(
+        Some(classOf[Person].getCanonicalName),
+        Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
+        Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
+        Types
+          .optionalGroup()
+          .addField(
+            Types
+              .optionalGroup()
+              .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("more"))
+              .named("street")
+          )
+          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
+          .named("address")
+      )
+    )
   }
 
   it should "skip a mid path" in {
-    resolveSchema[Person](Set("address.street")) should be(Message(
-      Some(classOf[Person].getCanonicalName),
-      Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
-      Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
-      Types.optionalGroup()
-        .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
-        .named("address")
-    ))
+    resolveSchema[Person](Set("address.street")) should be(
+      Message(
+        Some(classOf[Person].getCanonicalName),
+        Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
+        Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
+        Types
+          .optionalGroup()
+          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
+          .named("address")
+      )
+    )
   }
 
   it should "skip all fields of case class" in {
-    resolveSchema[Person](Set("address.street.name", "address.street.more")) should be(Message(
-      Some(classOf[Person].getCanonicalName),
-      Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
-      Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
-      Types.optionalGroup()
-        .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
-        .named("address")
-    ))
+    resolveSchema[Person](Set("address.street.name", "address.street.more")) should be(
+      Message(
+        Some(classOf[Person].getCanonicalName),
+        Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
+        Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
+        Types
+          .optionalGroup()
+          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
+          .named("address")
+      )
+    )
   }
 
   it should "skip the only field from a simple case class" in {
@@ -82,39 +98,51 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "skip a field at a long path" in {
-    resolveSchema[RowParquetRecord](Set("address.street.name")) should be(Message(
-      Some(classOf[Person].getCanonicalName),
-      Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
-      Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
-      Types.optionalGroup()
-        .addField(Types.optionalGroup()
-          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("more"))
-          .named("street"))
-        .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
-        .named("address")
-    ))
+    resolveSchema[RowParquetRecord](Set("address.street.name")) should be(
+      Message(
+        Some(classOf[Person].getCanonicalName),
+        Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
+        Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
+        Types
+          .optionalGroup()
+          .addField(
+            Types
+              .optionalGroup()
+              .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("more"))
+              .named("street")
+          )
+          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
+          .named("address")
+      )
+    )
   }
 
   it should "skip a mid path" in {
-    resolveSchema[RowParquetRecord](Set("address.street")) should be(Message(
-      Some(classOf[Person].getCanonicalName),
-      Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
-      Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
-      Types.optionalGroup()
-        .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
-        .named("address")
-    ))
+    resolveSchema[RowParquetRecord](Set("address.street")) should be(
+      Message(
+        Some(classOf[Person].getCanonicalName),
+        Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
+        Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
+        Types
+          .optionalGroup()
+          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
+          .named("address")
+      )
+    )
   }
 
   it should "skip all fields of case class" in {
-    resolveSchema[RowParquetRecord](Set("address.street.name", "address.street.more")) should be(Message(
-      Some(classOf[Person].getCanonicalName),
-      Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
-      Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
-      Types.optionalGroup()
-        .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
-        .named("address")
-    ))
+    resolveSchema[RowParquetRecord](Set("address.street.name", "address.street.more")) should be(
+      Message(
+        Some(classOf[Person].getCanonicalName),
+        Types.primitive(BINARY, OPTIONAL).as(StringType).named("name"),
+        Types.primitive(INT32, REQUIRED).as(Int32Type).named("age"),
+        Types
+          .optionalGroup()
+          .addField(Types.primitive(BINARY, OPTIONAL).as(StringType).named("city"))
+          .named("address")
+      )
+    )
   }
 
   it should "skip the only field from a simple case class" in {

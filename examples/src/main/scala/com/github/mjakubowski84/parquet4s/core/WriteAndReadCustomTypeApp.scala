@@ -9,7 +9,7 @@ import java.nio.file.Files
 object WriteAndReadCustomTypeApp extends App {
 
   object Data {
-    def generate(count: Int): Iterable[Data] = (1 to count).map { i => Data(id = i, dict = Dict.random) }
+    def generate(count: Int): Iterable[Data] = (1 to count).map(i => Data(id = i, dict = Dict.random))
   }
   case class Data(id: Long, dict: Dict.Type)
 
@@ -22,8 +22,7 @@ object WriteAndReadCustomTypeApp extends App {
   //read
   val readData = ParquetReader.read[Data](path)
   // hint: you can filter by dict using string value, for example: filter = Col("dict") === "A"
-  try {
-    readData.foreach(println)
-  } finally readData.close()
+  try readData.foreach(println)
+  finally readData.close()
 
 }

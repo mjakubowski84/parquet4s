@@ -10,20 +10,19 @@ import org.apache.parquet.schema.MessageType
 import scala.collection.compat._
 import scala.jdk.CollectionConverters._
 
-/**
- * Calculates statistics from <b>unfiltered</b> Parquet files.
- */
+/** Calculates statistics from <b>unfiltered</b> Parquet files.
+  */
 private[parquet4s] class FileStats(
-                                    status: FileStatus,
-                                    options: ParquetReader.Options,
-                                    projectionSchemaOpt: Option[MessageType]
-                                  ) extends Stats {
+    status: FileStatus,
+    options: ParquetReader.Options,
+    projectionSchemaOpt: Option[MessageType]
+) extends Stats {
 
-  private val vcc = options.toValueCodecConfiguration
-  private val inputFile = HadoopInputFile.fromStatus(status, options.hadoopConf)
+  private val vcc           = options.toValueCodecConfiguration
+  private val inputFile     = HadoopInputFile.fromStatus(status, options.hadoopConf)
   private val readerOptions = ParquetReadOptions.builder().build()
 
-  private abstract class StatsReader {
+  abstract private class StatsReader {
     protected val reader: ParquetFileReader = ParquetFileReader.open(inputFile, readerOptions)
     projectionSchemaOpt.foreach(reader.setRequestedSchema)
     def close(): Unit = reader.close()
@@ -33,8 +32,10 @@ private[parquet4s] class FileStats(
     def recordCount: Long = reader.getRecordCount
   }
 
-  private class MinMaxReader[V](columnPath: String, currentExtreme: Option[V])
-                            (implicit codec: ValueCodec[V], ordering: Ordering[V]) extends StatsReader {
+  private class MinMaxReader[V](columnPath: String, currentExtreme: Option[V])(implicit
+      codec: ValueCodec[V],
+      ordering: Ordering[V]
+  ) extends StatsReader {
 
     private def extreme(statsValue: Statistics[_] => IterableOnce[Value], choose: (V, V) => V) =
       reader.getRowGroups.asScala.iterator
@@ -44,7 +45,7 @@ private[parquet4s] class FileStats(
         .flatMap(statsValue)
         .map(value => codec.decode(value, vcc))
         .foldLeft(currentExtreme) {
-          case (None, v) => Option(v)
+          case (None, v)    => Option(v)
           case (Some(a), b) => Option(choose(a, b))
         }
 
@@ -55,30 +56,25 @@ private[parquet4s] class FileStats(
 
   override def recordCount: Long = {
     val reader = new RecordCountReader
-    try {
-      reader.recordCount
-    } finally {
-      reader.close()
-    }
+    try reader.recordCount
+    finally reader.close()
   }
 
-  override def min[V](columnPath: String, currentMin: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
+  override def min[V](columnPath: String, currentMin: Option[V])(implicit
+      codec: ValueCodec[V],
+      ordering: Ordering[V]
+  ): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMin)
-    try {
-      reader.min
-    } finally {
-      reader.close()
-    }
+    try reader.min
+    finally reader.close()
   }
 
-  override def max[V](columnPath: String, currentMax: Option[V])
-                     (implicit codec: ValueCodec[V], ordering: Ordering[V]): Option[V] = {
+  override def max[V](columnPath: String, currentMax: Option[V])(implicit
+      codec: ValueCodec[V],
+      ordering: Ordering[V]
+  ): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMax)
-    try {
-      reader.max
-    } finally {
-      reader.close()
-    }
+    try reader.max
+    finally reader.close()
   }
 }

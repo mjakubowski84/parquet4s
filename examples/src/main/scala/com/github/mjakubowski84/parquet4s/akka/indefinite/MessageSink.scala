@@ -19,16 +19,16 @@ import scala.concurrent.duration._
 object MessageSink {
 
   case class Data(
-                   year: String,
-                   month: String,
-                   day: String,
-                   timestamp: Timestamp,
-                   word: String
-                 )
+      year: String,
+      month: String,
+      day: String,
+      timestamp: Timestamp,
+      word: String
+  )
 
-  val MaxChunkSize: Int = 128
+  val MaxChunkSize: Int                    = 128
   val ChunkWriteTimeWindow: FiniteDuration = 10.seconds
-  val WriteDirectoryName: String = "messages"
+  val WriteDirectoryName: String           = "messages"
 
 }
 
@@ -39,7 +39,8 @@ trait MessageSink {
   import MessageSink._
   import MessageSource._
 
-  protected val baseWritePath: String = new Path(Files.createTempDirectory("example").toString, WriteDirectoryName).toString
+  protected val baseWritePath: String =
+    new Path(Files.createTempDirectory("example").toString, WriteDirectoryName).toString
 
   private val writerOptions = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
 
@@ -55,14 +56,14 @@ trait MessageSink {
     ParquetStreams
       .viaParquet[Message](baseWritePath)
       .withPreWriteTransformation { message =>
-        val timestamp = new Timestamp(message.record.timestamp())
+        val timestamp     = new Timestamp(message.record.timestamp())
         val localDateTime = timestamp.toLocalDateTime
         Data(
-          year = localDateTime.getYear.toString,
-          month = localDateTime.getMonthValue.toString,
-          day = localDateTime.getDayOfMonth.toString,
+          year      = localDateTime.getYear.toString,
+          month     = localDateTime.getMonthValue.toString,
+          day       = localDateTime.getDayOfMonth.toString,
           timestamp = timestamp,
-          word = message.record.value()
+          word      = message.record.value()
         )
       }
       .withPartitionBy("year", "month", "day")

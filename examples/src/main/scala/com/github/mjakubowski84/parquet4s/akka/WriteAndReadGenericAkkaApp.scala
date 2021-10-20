@@ -13,12 +13,13 @@ import java.util.TimeZone
 
 object WriteAndReadGenericAkkaApp extends App {
 
-  private val ID = "id"
-  private val Name = "name"
-  private val Birthday = "birthday"
+  private val ID         = "id"
+  private val Name       = "name"
+  private val Birthday   = "birthday"
   private val SchemaName = "user_schema"
 
-  implicit val schema: MessageType = Types.buildMessage()
+  implicit val schema: MessageType = Types
+    .buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))

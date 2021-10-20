@@ -12,10 +12,10 @@ class PartitionLensSpec extends AnyFlatSpec with Matchers {
 
   val person: Person = Person(
     name = "Joe",
-    age = 18,
+    age  = 18,
     address = Address(
       street = Street(name = "Broad St", more = Some("123")),
-      city = "Somewhere"
+      city   = "Somewhere"
     )
   )
 
@@ -41,13 +41,13 @@ class PartitionLensSpec extends AnyFlatSpec with Matchers {
 
   it should "fail to extract Option field" in {
     val path = "address.street.more"
-    val e = intercept[IllegalArgumentException](PartitionLens[Person](person, path))
+    val e    = intercept[IllegalArgumentException](PartitionLens[Person](person, path))
     e.getMessage should be(s"Invalid element at path '$path'. Only String field can be used for partitioning.")
   }
 
   it should "fail to extract non-String field" in {
     val path = "age"
-    val e = intercept[IllegalArgumentException](PartitionLens[Person](person, path))
+    val e    = intercept[IllegalArgumentException](PartitionLens[Person](person, path))
     e.getMessage should be(s"Invalid element at path '$path'. Only String field can be used for partitioning.")
   }
 
@@ -58,7 +58,9 @@ class PartitionLensSpec extends AnyFlatSpec with Matchers {
 
   it should "fail to read a child from a String field" in {
     val e = intercept[IllegalArgumentException](PartitionLens[Person](person, "name.[0]"))
-    e.getMessage should be(s"Invalid element at path 'name'. Attempted to access child field 'name.[0]' from parent String.")
+    e.getMessage should be(
+      s"Invalid element at path 'name'. Attempted to access child field 'name.[0]' from parent String."
+    )
   }
 
   it should "fail to extract Product" in {
@@ -81,13 +83,13 @@ class PartitionLensSpec extends AnyFlatSpec with Matchers {
 
   it should "fail to extract Option field" in {
     val path = "address.street.more"
-    val e = intercept[IllegalArgumentException](PartitionLens[RowParquetRecord](personRecord, path))
+    val e    = intercept[IllegalArgumentException](PartitionLens[RowParquetRecord](personRecord, path))
     e.getMessage should be(s"Invalid path '$path'. Only String field can be used for partitioning.")
   }
 
   it should "fail to extract non-String field" in {
     val path = "age"
-    val e = intercept[IllegalArgumentException](PartitionLens[RowParquetRecord](personRecord, path))
+    val e    = intercept[IllegalArgumentException](PartitionLens[RowParquetRecord](personRecord, path))
     e.getMessage should be(s"Invalid path '$path'. Only String field can be used for partitioning.")
   }
 

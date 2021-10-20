@@ -17,7 +17,8 @@ object CustomType {
     case object D extends Type
 
     val values: List[Type] = List(A, B, C, D)
-    def valueOf(name: String): Type = values.find(_.toString == name)
+    def valueOf(name: String): Type = values
+      .find(_.toString == name)
       .getOrElse(throw new IllegalArgumentException(s"Invalid dict name: $name"))
 
     def random: Type = values(Random.nextInt(values.length))
@@ -33,11 +34,13 @@ object CustomType {
 
     // required for writing only
     implicit val schema: TypedSchemaDef[Type] =
-        SchemaDef.primitive(
-          primitiveType = PrimitiveType.PrimitiveTypeName.BINARY,
-          required = false,
+      SchemaDef
+        .primitive(
+          primitiveType         = PrimitiveType.PrimitiveTypeName.BINARY,
+          required              = false,
           logicalTypeAnnotation = Option(LogicalTypeAnnotation.stringType())
-        ).typed[Type]
+        )
+        .typed[Type]
   }
 
 }

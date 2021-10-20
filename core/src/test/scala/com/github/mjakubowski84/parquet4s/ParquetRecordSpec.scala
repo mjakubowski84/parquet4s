@@ -11,7 +11,8 @@ import scala.collection.mutable
 class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
 
   private val vcc = ValueCodecConfiguration.default
-  private implicit val sequencing: Sequencing[mutable.Seq[Value]] = Sequencing.sequencingNatureOfGenSeq[Value, mutable.Seq]
+  implicit private val sequencing: Sequencing[mutable.Seq[Value]] =
+    Sequencing.sequencingNatureOfGenSeq[Value, mutable.Seq]
 
   "RowParquetRecord" should "indicate that is empty" in {
     val record = RowParquetRecord.empty
@@ -21,7 +22,7 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
 
   it should "fail to get field from invalid index" in {
     an[NoSuchElementException] should be thrownBy RowParquetRecord.empty.head
-    an[IndexOutOfBoundsException] should be thrownBy RowParquetRecord("a"-> IntValue(1))(2)
+    an[IndexOutOfBoundsException] should be thrownBy RowParquetRecord("a" -> IntValue(1))(2)
   }
 
   it should "succeed to add and retrieve a field" in {
@@ -113,8 +114,8 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "accumulate normal compound values" in {
-    val r1 = RowParquetRecord("a"-> IntValue(1), "b"-> IntValue(2))
-    val r2 = RowParquetRecord("c"-> IntValue(3), "d"-> IntValue(4))
+    val r1 = RowParquetRecord("a" -> IntValue(1), "b" -> IntValue(2))
+    val r2 = RowParquetRecord("c" -> IntValue(3), "d" -> IntValue(4))
     val lst = ListParquetRecord.empty
       .add("list", RowParquetRecord("element" -> r1))
       .add("list", RowParquetRecord("element" -> r2))
@@ -122,24 +123,24 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "accumulate legacy primitive values" in {
-    val b1 = BinaryValue(Binary.fromString("a string"))
-    val b2 = BinaryValue(Binary.fromString("another string"))
-    val lst = ListParquetRecord.empty.add("array",  b1).add("array",  b2)
+    val b1  = BinaryValue(Binary.fromString("a string"))
+    val b2  = BinaryValue(Binary.fromString("another string"))
+    val lst = ListParquetRecord.empty.add("array", b1).add("array", b2)
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
   it should "accumulate 3-levels legacy primitive values" in {
-    val b1 = BinaryValue(Binary.fromString("a string"))
-    val b2 = BinaryValue(Binary.fromString("another string"))
-    val r1 = RowParquetRecord("array" -> b1)
-    val r2 = RowParquetRecord("array" -> b2)
-    val lst = ListParquetRecord.empty.add("bag",  r1).add("bag",  r2)
+    val b1  = BinaryValue(Binary.fromString("a string"))
+    val b2  = BinaryValue(Binary.fromString("another string"))
+    val r1  = RowParquetRecord("array" -> b1)
+    val r2  = RowParquetRecord("array" -> b2)
+    val lst = ListParquetRecord.empty.add("bag", r1).add("bag", r2)
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
   it should "accumulate legacy compound values" in {
-    val r1 = RowParquetRecord("a"-> IntValue(1), "b"-> IntValue(2))
-    val r2 = RowParquetRecord("c"-> IntValue(3), "d"-> IntValue(4))
+    val r1  = RowParquetRecord("a" -> IntValue(1), "b" -> IntValue(2))
+    val r2  = RowParquetRecord("c" -> IntValue(3), "d" -> IntValue(4))
     val lst = ListParquetRecord.empty.add("array", r1).add("array", r2)
     lst should contain theSameElementsInOrderAs Seq(r1, r2)
   }
@@ -152,7 +153,6 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
     lst should have size 3
     every(lst) should be(NullValue)
   }
-
 
   it should "fail to get field from invalid index" in {
     an[NoSuchElementException] should be thrownBy ListParquetRecord.empty.head

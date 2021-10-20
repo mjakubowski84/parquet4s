@@ -9,7 +9,7 @@ trait Akka {
 
   this: Logger =>
 
-  implicit lazy val system: ActorSystem = ActorSystem()
+  implicit lazy val system: ActorSystem           = ActorSystem()
   implicit def executionContext: ExecutionContext = system.dispatcher
 
   def stopAkka(): Unit = {

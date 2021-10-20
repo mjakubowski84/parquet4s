@@ -12,8 +12,8 @@ trait Kafka {
   }
 
   lazy val kafkaAddress = s"localhost:${broker.config.kafkaPort}"
-  val topic = "exampleTopic"
-  val groupId = "exampleGroupId"
+  val topic             = "exampleTopic"
+  val groupId           = "exampleGroupId"
 
   def sendKafkaMessage(message: String): Unit = EmbeddedKafka.publishStringMessageToKafka(topic, message)
 
