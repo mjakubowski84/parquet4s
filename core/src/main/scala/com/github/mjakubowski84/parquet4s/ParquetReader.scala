@@ -95,11 +95,11 @@ object ParquetReader {
     projectedAs[T].options(options).filter(filter).read(path)
 
   /**
-    * Creates [[Builder]] of Parquet reader for documents of type [[T]].
+    * Creates [[Builder]] of Parquet reader for documents of type <i>T</i>.
     */
   def as[T]: Builder[T] = BuilderImpl()
   /**
-    * Creates [[Builder]] of Parquet reader for <i>projected</i> documents of type [[T]].
+    * Creates [[Builder]] of Parquet reader for <i>projected</i> documents of type <i>T</i>.
     * Due to projection reader does not attempt to read all existing columns of the file but applies enforced
     * projection schema.
     */

@@ -162,7 +162,7 @@ object ParquetWriter  {
     new ParquetWriterImpl[T](path, options)
 
   /**
-    * Creates [[Builder]] of [[ParquetWriter]] for documents of type [[T]].
+    * Creates [[Builder]] of [[ParquetWriter]] for documents of type <i>T</i>.
     */
   def of[T: ParquetRecordEncoder : ParquetSchemaResolver]: Builder[T] = BuilderImpl()
 
