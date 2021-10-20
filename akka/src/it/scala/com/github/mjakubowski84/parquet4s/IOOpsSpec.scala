@@ -9,7 +9,7 @@ import org.scalatest.{BeforeAndAfter, EitherValues, Inside}
 import org.slf4j.{Logger, LoggerFactory}
 
 class IOOpsSpec
-  extends AnyFlatSpec
+    extends AnyFlatSpec
     with Matchers
     with IOOps
     with TestUtils
@@ -29,7 +29,7 @@ class IOOpsSpec
     fileSystem.exists(tempPath) should be(true)
 
     an[AlreadyExistsException] should be thrownBy validateWritePath(
-      path = tempPath,
+      path         = tempPath,
       writeOptions = ParquetWriter.Options(writeMode = Mode.CREATE)
     )
 
@@ -40,7 +40,7 @@ class IOOpsSpec
     fileSystem.exists(tempPath) should be(false)
 
     validateWritePath(
-      path = tempPath,
+      path         = tempPath,
       writeOptions = ParquetWriter.Options(writeMode = Mode.CREATE)
     )
 
@@ -52,7 +52,7 @@ class IOOpsSpec
     fileSystem.exists(tempPath) should be(true)
 
     validateWritePath(
-      path = tempPath,
+      path         = tempPath,
       writeOptions = ParquetWriter.Options(writeMode = Mode.OVERWRITE)
     )
 
@@ -63,7 +63,7 @@ class IOOpsSpec
     fileSystem.exists(tempPath) should be(false)
 
     validateWritePath(
-      path = tempPath,
+      path         = tempPath,
       writeOptions = ParquetWriter.Options(writeMode = Mode.OVERWRITE)
     )
 
@@ -128,9 +128,8 @@ class IOOpsSpec
 
   "PartitionRegexp" should "match valid partition names and values" in {
     forAll(ValidPartitionsTable) { case (name, value) =>
-      inside(s"$name=$value") {
-        case IOOps.PartitionRegexp(`name`, `value`) =>
-          succeed
+      inside(s"$name=$value") { case IOOps.PartitionRegexp(`name`, `value`) =>
+        succeed
       }
     }
   }

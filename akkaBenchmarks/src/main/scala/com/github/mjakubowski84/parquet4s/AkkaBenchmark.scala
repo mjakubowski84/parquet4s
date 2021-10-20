@@ -20,11 +20,10 @@ import scala.util.Random
 case class Embedded(fraction: Double, text: String)
 case class Record(i: Int, dict: String, embedded: Option[Embedded])
 
-
 object AkkaBenchmark {
 
   val Fractioner = 100.12
-  val Dict = List("a", "b", "c", "d")
+  val Dict       = List("a", "b", "c", "d")
   val Dispatcher = "akka.actor.single-thread-dispatcher"
 
   @State(Scope.Benchmark)
@@ -32,24 +31,27 @@ object AkkaBenchmark {
 
     // 512 * 1024
     @Param(Array("524288"))
-    var datasetSize: Int = _
-    var basePath: String = _
+    var datasetSize: Int                    = _
+    var basePath: String                    = _
     var records: immutable.Iterable[Record] = _
-    var actorSystem: ActorSystem = _
+    var actorSystem: ActorSystem            = _
 
     @Setup(Level.Trial)
     def setup(): Unit = {
       basePath = Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
       records = (1 to datasetSize).map { i =>
         Record(
-          i = i,
+          i    = i,
           dict = Dict(Random.nextInt(Dict.size - 1)),
-          embedded = if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
-          else None
+          embedded =
+            if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
+            else None
         )
       }
-      actorSystem = ActorSystem("Benchmark", ConfigFactory.parseString(
-        """
+      actorSystem = ActorSystem(
+        "Benchmark",
+        ConfigFactory.parseString(
+          """
             akka.actor.single-thread-dispatcher {
                 type = PinnedDispatcher
                 executor = "thread-pool-executor"
@@ -58,35 +60,40 @@ object AkkaBenchmark {
                 }
             }
             """
-      ))
+        )
+      )
     }
 
     @TearDown(Level.Trial)
     def tearDown(): Unit = Await.ready(actorSystem.terminate(), Duration.Inf)
 
-    def delete(): Path = Files.walkFileTree(Paths.get(basePath), new FileVisitor[Path]() {
-      override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
-      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        Files.delete(file)
-        FileVisitResult.CONTINUE
+    def delete(): Path = Files.walkFileTree(
+      Paths.get(basePath),
+      new FileVisitor[Path]() {
+        override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult =
+          FileVisitResult.CONTINUE
+        override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+          Files.delete(file)
+          FileVisitResult.CONTINUE
+        }
+        override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+        override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+          Files.delete(dir)
+          FileVisitResult.CONTINUE
+        }
       }
-      override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
-        Files.delete(dir)
-        FileVisitResult.CONTINUE
-      }
-    })
+    )
 
   }
 
   trait BaseState {
-    var dataset: Dataset = _
-    var filePath: String = _
+    var dataset: Dataset                  = _
+    var filePath: String                  = _
     implicit var actorSystem: ActorSystem = _
 
     def fetchDataset(dataset: Dataset): Unit = {
-      this.dataset = dataset
-      this.filePath = dataset.basePath + "/file.parquet"
+      this.dataset     = dataset
+      this.filePath    = dataset.basePath + "/file.parquet"
       this.actorSystem = dataset.actorSystem
     }
   }

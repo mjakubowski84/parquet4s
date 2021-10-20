@@ -10,7 +10,7 @@ import java.nio.file.Files
 object WriteAndReadCustomTypeAkkaApp extends App {
 
   object Data {
-    def generate(count: Int): Iterator[Data] = Iterator.range(1, count).map { i => Data(id = i, dict = Dict.random) }
+    def generate(count: Int): Iterator[Data] = Iterator.range(1, count).map(i => Data(id = i, dict = Dict.random))
   }
   case class Data(id: Long, dict: Dict.Type)
 

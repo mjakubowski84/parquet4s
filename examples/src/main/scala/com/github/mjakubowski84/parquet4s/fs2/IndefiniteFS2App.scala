@@ -22,27 +22,27 @@ object IndefiniteFS2App extends IOApp {
   private type KafkaRecord = CommittableConsumerRecord[IO, String, String]
 
   private case class Data(
-                           year: String,
-                           month: String,
-                           day: String,
-                           timestamp: Timestamp,
-                           word: String
-                         )
+      year: String,
+      month: String,
+      day: String,
+      timestamp: Timestamp,
+      word: String
+  )
 
-  private sealed trait Fluctuation {
+  sealed private trait Fluctuation {
     def delay: FiniteDuration
   }
   private case class Up(delay: FiniteDuration) extends Fluctuation
   private case class Down(delay: FiniteDuration) extends Fluctuation
 
-  private val TmpPath = Paths.get(sys.props("java.io.tmpdir"))
+  private val TmpPath                  = Paths.get(sys.props("java.io.tmpdir"))
   private val MaxNumberOfRecordPerFile = 128
-  private val MaxDurationOfFileWrite = 10.seconds
-  private val WriterOptions = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
-  private val MinDelay = 1.milli
-  private val MaxDelay = 500.millis
-  private val StartDelay = 100.millis
-  private val Topic = "topic"
+  private val MaxDurationOfFileWrite   = 10.seconds
+  private val WriterOptions            = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
+  private val MinDelay                 = 1.milli
+  private val MaxDelay                 = 500.millis
+  private val StartDelay               = 100.millis
+  private val Topic                    = "topic"
   private val Words = Seq("Example", "how", "to", "setup", "indefinite", "stream", "with", "Parquet", "writer")
 
   private def nextWord(): String = Words(Random.nextInt(Words.size - 1))
@@ -65,10 +65,12 @@ object IndefiniteFS2App extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] = {
     val stream = for {
-      blocker <- Stream.resource(Blocker[IO])
+      blocker   <- Stream.resource(Blocker[IO])
       writePath <- tempDirectoryStream[IO](blocker, dir = TmpPath)
       kafkaPort <- Stream
-        .bracket(blocker.delay[IO, EmbeddedK](EmbeddedKafka.start()))(_ => blocker.delay[IO, Unit](EmbeddedKafka.stop()))
+        .bracket(blocker.delay[IO, EmbeddedK](EmbeddedKafka.start()))(_ =>
+          blocker.delay[IO, Unit](EmbeddedKafka.stop())
+        )
         .map(_.config.kafkaPort)
       producerSettings = ProducerSettings[IO, String, String]
         .withBootstrapServers(s"localhost:$kafkaPort")
@@ -94,9 +96,11 @@ object IndefiniteFS2App extends IOApp {
       .through(KafkaProducer.pipe(producerSettings))
       .drain
 
-  private def consumer(blocker: Blocker,
-                       consumerSettings: ConsumerSettings[IO, String, String],
-                       writePath: String): Stream[IO, INothing] =
+  private def consumer(
+      blocker: Blocker,
+      consumerSettings: ConsumerSettings[IO, String, String],
+      writePath: String
+  ): Stream[IO, INothing] =
     KafkaConsumer[IO]
       .stream(consumerSettings)
       .evalTap(_.subscribeTo(Topic))
@@ -112,15 +116,20 @@ object IndefiniteFS2App extends IOApp {
       .maxCount(MaxNumberOfRecordPerFile)
       .maxDuration(MaxDurationOfFileWrite)
       .preWriteTransformation[Data] { kafkaRecord =>
-        kafkaRecord.record.timestamp.createTime.map(l => new Timestamp(l)).fold[Stream[IO, Data]](Stream.empty) { timestamp =>
-          val dateTime = timestamp.toLocalDateTime
-          Stream.emit(Data(
-            year = dateTime.getYear.toString,
-            month = dateTime.getMonth.getValue.toString,
-            day = dateTime.getDayOfMonth.toString,
-            timestamp = timestamp,
-            word = kafkaRecord.record.value
-          )).evalTap(data => IO(println(data)))
+        kafkaRecord.record.timestamp.createTime.map(l => new Timestamp(l)).fold[Stream[IO, Data]](Stream.empty) {
+          timestamp =>
+            val dateTime = timestamp.toLocalDateTime
+            Stream
+              .emit(
+                Data(
+                  year      = dateTime.getYear.toString,
+                  month     = dateTime.getMonth.getValue.toString,
+                  day       = dateTime.getDayOfMonth.toString,
+                  timestamp = timestamp,
+                  word      = kafkaRecord.record.value
+                )
+              )
+              .evalTap(data => IO(println(data)))
         }
       }
       .partitionBy("year", "month", "day")

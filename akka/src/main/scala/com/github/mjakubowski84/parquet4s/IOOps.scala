@@ -12,9 +12,9 @@ import scala.util.matching.Regex
 
 private[parquet4s] object IOOps {
 
-  private implicit class RemoteIteratorWrapper[T](wrapped: RemoteIterator[T]) extends Iterator[T] {
+  implicit private class RemoteIteratorWrapper[T](wrapped: RemoteIterator[T]) extends Iterator[T] {
     override def hasNext: Boolean = wrapped.hasNext
-    override def next(): T = wrapped.next()
+    override def next(): T        = wrapped.next()
   }
 
   private type Partition = (String, String)
@@ -23,66 +23,69 @@ private[parquet4s] object IOOps {
 
 }
 
-/**
- * Utility functions that perform operations on HDFS.
- */
+/** Utility functions that perform operations on HDFS.
+  */
 trait IOOps {
 
   import IOOps._
 
   protected val logger: Logger
 
-  protected def validateWritePath(path: Path,
-                                  writeOptions: ParquetWriter.Options): Unit = {
+  protected def validateWritePath(path: Path, writeOptions: ParquetWriter.Options): Unit = {
     val fs = path.getFileSystem(writeOptions.hadoopConf)
-    try {
-      if (fs.exists(path)) {
-        if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
-          throw new AlreadyExistsException(s"File or directory already exists: $path")
-        else {
-          if (logger.isDebugEnabled)
-            logger.debug(s"Deleting $path in order to override with new data.")
-          fs.delete(path, true)
-        }
+    try if (fs.exists(path)) {
+      if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
+        throw new AlreadyExistsException(s"File or directory already exists: $path")
+      else {
+        if (logger.isDebugEnabled)
+          logger.debug(s"Deleting $path in order to override with new data.")
+        fs.delete(path, true)
       }
     } finally fs.close()
   }
 
-  protected def filesAtPath(path: Path, configuration: Configuration)
-                           (implicit ec: ExecutionContext): Future[List[String]] =
+  protected def filesAtPath(path: Path, configuration: Configuration)(implicit
+      ec: ExecutionContext
+  ): Future[List[String]] =
     Future {
       scala.concurrent.blocking {
         val fs = path.getFileSystem(configuration)
-        try {
-          fs.listFiles(path, false)
-            .map(_.getPath.getName)
-            .toList
-        } finally fs.close()
+        try fs
+          .listFiles(path, false)
+          .map(_.getPath.getName)
+          .toList
+        finally fs.close()
       }
     }
 
-  protected def filesAtPath(path: String, configuration: Configuration)
-                           (implicit ec: ExecutionContext): Future[List[String]] =
+  protected def filesAtPath(path: String, configuration: Configuration)(implicit
+      ec: ExecutionContext
+  ): Future[List[String]] =
     filesAtPath(new Path(path), configuration)
 
-  protected def findPartitionedPaths(path: Path,
-                                     configuration: Configuration): Either[Exception, PartitionedDirectory] = {
+  protected def findPartitionedPaths(
+      path: Path,
+      configuration: Configuration
+  ): Either[Exception, PartitionedDirectory] = {
     val fs = path.getFileSystem(configuration)
-    try {
-      findPartitionedPaths(fs, path, List.empty).fold(
-        PartitionedDirectory.failed,
-        PartitionedDirectory.apply
-      )
-    } finally fs.close()
+    try findPartitionedPaths(fs, path, List.empty).fold(
+      PartitionedDirectory.failed,
+      PartitionedDirectory.apply
+    )
+    finally fs.close()
   }
 
-  protected def findPartitionedPaths(path: String,
-                                     configuration: Configuration): Either[Exception, PartitionedDirectory] =
+  protected def findPartitionedPaths(
+      path: String,
+      configuration: Configuration
+  ): Either[Exception, PartitionedDirectory] =
     findPartitionedPaths(new Path(path), configuration)
 
-  private def findPartitionedPaths(fs: FileSystem,
-                                   path: Path,
-                                   partitions: List[Partition]): Either[List[Path], List[PartitionedPath]] = {
+  private def findPartitionedPaths(
+      fs: FileSystem,
+      path: Path,
+      partitions: List[Partition]
+  ): Either[List[Path], List[PartitionedPath]] = {
     val (dirs, files) = fs.listStatus(path).toList.partition(_.isDirectory)
     if (dirs.nonEmpty && files.nonEmpty)
       Left(path :: Nil) // path is invalid because it contains both dirs and files
@@ -102,7 +105,7 @@ trait IOOps {
               left
             case (_, left: Left[_, _]) =>
               left
-        }
+          }
     }
   }
 

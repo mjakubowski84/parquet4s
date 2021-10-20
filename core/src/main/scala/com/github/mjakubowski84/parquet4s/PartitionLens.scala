@@ -3,9 +3,9 @@ package com.github.mjakubowski84.parquet4s
 import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
-/**
-  * Extracts a value of String field from a tree of case classes.
-  * @tparam T type of the root case class
+/** Extracts a value of String field from a tree of case classes.
+  * @tparam T
+  *   type of the root case class
   */
 trait PartitionLens[T] {
 
@@ -23,24 +23,24 @@ object PartitionLens {
   }
 
   implicit def headValueLens[FieldName <: Symbol, Head, Tail <: HList](implicit
-                                                                       witness: Witness.Aux[FieldName],
-                                                                       headVisitor: FieldVisitor[Head] = defaultFieldVisitor[Head],
-                                                                       tailLens: PartitionLens[Tail]
+      witness: Witness.Aux[FieldName],
+      headVisitor: FieldVisitor[Head] = defaultFieldVisitor[Head],
+      tailLens: PartitionLens[Tail]
   ): PartitionLens[FieldType[FieldName, Head] :: Tail] =
     new PartitionLens[FieldType[FieldName, Head] :: Tail] {
-      override def apply(cursor: Cursor, field: FieldType[FieldName, Head] :: Tail): Either[LensError, String] = {
+      override def apply(cursor: Cursor, field: FieldType[FieldName, Head] :: Tail): Either[LensError, String] =
         cursor.advance[FieldName] match {
           case Some(newCursor) =>
             newCursor.accept(field.head, headVisitor)
           case None =>
             tailLens.apply(cursor, field.tail)
         }
-      }
     }
 
   implicit def genericLens[T, R](implicit
-                                 gen: LabelledGeneric.Aux[T, R],
-                                 lens: Lazy[PartitionLens[R]]): PartitionLens[T] =
+      gen: LabelledGeneric.Aux[T, R],
+      lens: Lazy[PartitionLens[R]]
+  ): PartitionLens[T] =
     new PartitionLens[T] {
       override def apply(cursor: Cursor, obj: T): Either[LensError, String] =
         lens.value.apply(cursor, gen.to(obj))

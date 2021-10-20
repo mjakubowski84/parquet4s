@@ -10,15 +10,16 @@ import scala.language.higherKinds
 
 private[parquet4s] object writer {
 
-  private class Writer[T, F[_]: Sync: ContextShift](blocker: Blocker,
-                                                    internalWriter: ParquetWriter.InternalWriter,
-                                                    encode: T => F[RowParquetRecord]
-                                                   ) extends AutoCloseable {
+  private class Writer[T, F[_]: Sync: ContextShift](
+      blocker: Blocker,
+      internalWriter: ParquetWriter.InternalWriter,
+      encode: T => F[RowParquetRecord]
+  ) extends AutoCloseable {
 
     def write(elem: T): F[Unit] =
       for {
         record <- encode(elem)
-        _ <- blocker.delay(internalWriter.write(record))
+        _      <- blocker.delay(internalWriter.write(record))
       } yield ()
 
     def writePull(chunk: Chunk[T]): Pull[F, Nothing, Unit] =
@@ -33,28 +34,30 @@ private[parquet4s] object writer {
     override def close(): Unit = internalWriter.close()
   }
 
-  def write[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: Sync: ContextShift](blocker: Blocker,
-                                                                                        path: String,
-                                                                                        options: ParquetWriter.Options
-                                                                                       ): Pipe[F, T, fs2.INothing] =
+  def write[T: ParquetRecordEncoder: ParquetSchemaResolver, F[_]: Sync: ContextShift](
+      blocker: Blocker,
+      path: String,
+      options: ParquetWriter.Options
+  ): Pipe[F, T, fs2.INothing] =
     in =>
       for {
         hadoopPath <- Stream.eval(io.makePath(path))
-        logger <- Stream.eval(logger(getClass))
-        _ <- Stream.eval(io.validateWritePath(blocker, hadoopPath, options, logger))
-        writer <- Stream.resource(writerResource[T, F](blocker, hadoopPath, options))
-        nothing <- writer.writeAll(in).stream
+        logger     <- Stream.eval(logger(getClass))
+        _          <- Stream.eval(io.validateWritePath(blocker, hadoopPath, options, logger))
+        writer     <- Stream.resource(writerResource[T, F](blocker, hadoopPath, options))
+        nothing    <- writer.writeAll(in).stream
       } yield nothing
 
-  private def writerResource[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]: ContextShift](blocker: Blocker,
-                                                                                                   path: Path,
-                                                                                                   options: ParquetWriter.Options)
-                                                                                                  (implicit F: Sync[F]): Resource[F, Writer[T, F]] =
+  private def writerResource[T: ParquetRecordEncoder: ParquetSchemaResolver, F[_]: ContextShift](
+      blocker: Blocker,
+      path: Path,
+      options: ParquetWriter.Options
+  )(implicit F: Sync[F]): Resource[F, Writer[T, F]] =
     Resource.fromAutoCloseableBlocking(blocker)(
       for {
-        schema <- F.delay(ParquetSchemaResolver.resolveSchema[T])
+        schema                  <- F.delay(ParquetSchemaResolver.resolveSchema[T])
         valueCodecConfiguration <- F.delay(options.toValueCodecConfiguration)
-        internalWriter <- blocker.delay(ParquetWriter.internalWriter(path, schema, options))
+        internalWriter          <- blocker.delay(ParquetWriter.internalWriter(path, schema, options))
         encode = { (entity: T) => F.delay(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)) }
       } yield new Writer[T, F](blocker, internalWriter, encode)
     )

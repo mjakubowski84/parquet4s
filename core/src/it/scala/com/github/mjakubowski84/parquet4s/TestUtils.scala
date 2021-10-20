@@ -9,12 +9,14 @@ import java.nio.file.Files
 trait TestUtils {
 
   protected val tempPath: Path = new Path(
-    "file", "", Files.createTempDirectory("example").toString
+    "file",
+    "",
+    Files.createTempDirectory("example").toString
   ).suffix("/testOutputPath")
-  protected val tempPathString: String = tempPath.toString
-  protected lazy val configuration = new Configuration()
+  protected val tempPathString: String      = tempPath.toString
+  protected lazy val configuration          = new Configuration()
   protected lazy val fileSystem: FileSystem = tempPath.getFileSystem(configuration)
-  private val tempDir = new File(tempPath.toUri)
+  private val tempDir                       = new File(tempPath.toUri)
 
   def clearTemp(): Unit = FileUtil.fullyDelete(tempDir)
 

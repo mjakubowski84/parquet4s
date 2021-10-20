@@ -15,18 +15,19 @@ import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, OriginalTy
 
 object WriteAndReadGenericFS2App extends IOApp {
 
-  private val ID = "id"
-  private val Name = "name"
-  private val Birthday = "birthday"
+  private val ID         = "id"
+  private val Name       = "name"
+  private val Birthday   = "birthday"
   private val SchemaName = "user_schema"
 
-  implicit val schema: MessageType = Types.buildMessage()
+  implicit val schema: MessageType = Types
+    .buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
-  private implicit val showRecords: Show[RowParquetRecord] = Show.fromToString
+  implicit private val showRecords: Show[RowParquetRecord] = Show.fromToString
 
   private val TmpPath = Paths.get(sys.props("java.io.tmpdir"))
 
@@ -43,12 +44,12 @@ object WriteAndReadGenericFS2App extends IOApp {
       .add(Birthday, birthday, vcc)
   }
 
-
   override def run(args: List[String]): IO[ExitCode] = {
     val stream = for {
       blocker <- Stream.resource(Blocker[IO])
-      path <- tempDirectoryStream[IO](blocker, dir = TmpPath)
-      _ <- Stream.iterable[IO, RowParquetRecord](users)
+      path    <- tempDirectoryStream[IO](blocker, dir = TmpPath)
+      _ <- Stream
+        .iterable[IO, RowParquetRecord](users)
         .through(writeSingleFile(blocker, path.resolve("data.parquet").toString))
         .append(fromParquet[IO, RowParquetRecord].read(blocker, path.toString).showLinesStdOut.drain)
     } yield ()

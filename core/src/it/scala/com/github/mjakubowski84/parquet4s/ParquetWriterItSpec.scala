@@ -12,19 +12,15 @@ import org.scalatest.matchers.should.Matchers
 
 import scala.util.Random
 
-class ParquetWriterItSpec
-  extends AnyFreeSpec
-    with Matchers
-    with BeforeAndAfter {
+class ParquetWriterItSpec extends AnyFreeSpec with Matchers with BeforeAndAfter {
 
   case class Record(i: Int, d: Double, s: String)
   object Record {
     def random(n: Int): Seq[Record] =
-      (1 to n).map(_ =>
-        Record(Random.nextInt(), Random.nextDouble(), Random.nextString(10)))
+      (1 to n).map(_ => Record(Random.nextInt(), Random.nextDouble(), Random.nextString(10)))
   }
 
-  private val tempDir = Files.createTempDirectory("example").toAbsolutePath
+  private val tempDir   = Files.createTempDirectory("example").toAbsolutePath
   private val writePath = tempDir.resolve("file.parquet")
 
   // Generate records and do a single batch write.
@@ -60,9 +56,7 @@ class ParquetWriterItSpec
   }
 
   "Incremental writes work with write mode OVERWRITE" in {
-    val w = ParquetWriter.writer[Record](
-      writePath.toString,
-      ParquetWriter.Options(ParquetFileWriter.Mode.OVERWRITE))
+    val w = ParquetWriter.writer[Record](writePath.toString, ParquetWriter.Options(ParquetFileWriter.Mode.OVERWRITE))
     try records.grouped(5).foreach(w.write)
     finally w.close()
     readRecords shouldBe records
@@ -89,10 +83,13 @@ class ParquetWriterItSpec
 
   "ParquetWriter should add metadata with Parquet4S signature" in {
     ParquetWriter.writeAndClose(writePath.toString, records)
-    val meta = ParquetFileReader.open(
-      HadoopInputFile.fromPath(new Path(writePath.toString), new Configuration())
-    ).getFileMetaData.getKeyValueMetaData
-    meta should contain (Entry("MadeBy", "https://github.com/mjakubowski84/parquet4s"))
+    val meta = ParquetFileReader
+      .open(
+        HadoopInputFile.fromPath(new Path(writePath.toString), new Configuration())
+      )
+      .getFileMetaData
+      .getKeyValueMetaData
+    meta should contain(Entry("MadeBy", "https://github.com/mjakubowski84/parquet4s"))
   }
 
 }

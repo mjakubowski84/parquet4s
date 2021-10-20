@@ -10,19 +10,17 @@ object WriteIncrementallyAndReadApp extends App {
   case class Data(id: Int, text: String)
 
   val count = 100
-  val data = (1 to count).map { i => Data(id = i, text = Random.nextString(4)) }
-  val path = Files.createTempDirectory("example").toString
+  val data  = (1 to count).map(i => Data(id = i, text = Random.nextString(4)))
+  val path  = Files.createTempDirectory("example").toString
 
   // write
   val writer = ParquetWriter.writer[Data](s"$path/data.parquet")
-  try {
-    data.foreach(entity => writer.write(entity))
-  } finally writer.close()
+  try data.foreach(entity => writer.write(entity))
+  finally writer.close()
 
   //read
   val readData = ParquetReader.read[Data](path)
-  try {
-    readData.foreach(println)
-  } finally readData.close()
+  try readData.foreach(println)
+  finally readData.close()
 
 }

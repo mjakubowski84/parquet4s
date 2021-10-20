@@ -11,13 +11,13 @@ import java.nio.file.Files
 
 object WriteAndReadGenericApp extends App {
 
-  val ID = "id"
-  val Name = "name"
-  val Birthday = "birthday"
+  val ID         = "id"
+  val Name       = "name"
+  val Birthday   = "birthday"
   val SchemaName = "user_schema"
 
   val path = Files.createTempDirectory("example").toString
-  val vcc = ValueCodecConfiguration(TimeZone.getTimeZone(ZoneOffset.UTC))
+  val vcc  = ValueCodecConfiguration(TimeZone.getTimeZone(ZoneOffset.UTC))
 
   val users = List(
     (1L, "Alice", LocalDate.of(2000, 1, 1)),
@@ -31,7 +31,8 @@ object WriteAndReadGenericApp extends App {
   }
 
   // write
-  implicit val schema: MessageType = Types.buildMessage()
+  implicit val schema: MessageType = Types
+    .buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
@@ -41,13 +42,11 @@ object WriteAndReadGenericApp extends App {
 
   //read
   val readData = ParquetReader.read[RowParquetRecord](path)
-  try {
-    readData.foreach { record =>
-      val id = record.get[Long](ID, vcc)
-      val name = record.get[String](Name, vcc)
-      val birthday = record.get[LocalDate](Birthday, vcc)
-      println(s"User[$ID=$id,$Name=$name,$Birthday=$birthday]")
-    }
+  try readData.foreach { record =>
+    val id       = record.get[Long](ID, vcc)
+    val name     = record.get[String](Name, vcc)
+    val birthday = record.get[LocalDate](Birthday, vcc)
+    println(s"User[$ID=$id,$Name=$name,$Birthday=$birthday]")
   } finally readData.close()
 
 }

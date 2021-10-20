@@ -36,7 +36,7 @@ object ParquetStreamsITSpec {
 }
 
 class ParquetStreamsITSpec
-  extends AsyncFlatSpec
+    extends AsyncFlatSpec
     with Matchers
     with TestUtils
     with IOOps
@@ -47,23 +47,23 @@ class ParquetStreamsITSpec
   import ParquetRecordDecoder._
   import ParquetStreamsITSpec._
 
-  override val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  override val logger: Logger      = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
 
   val writeOptions: ParquetWriter.Options = ParquetWriter.Options(
     compressionCodecName = CompressionCodecName.SNAPPY,
-    pageSize = 512,
-    rowGroupSize = 4 * 512,
-    hadoopConf = configuration
+    pageSize             = 512,
+    rowGroupSize         = 4 * 512,
+    hadoopConf           = configuration
   )
 
-  val count: Int = 4 * writeOptions.rowGroupSize
+  val count: Int        = 4 * writeOptions.rowGroupSize
   val dict: Seq[String] = Vector("a", "b", "c", "d")
   val data: LazyList[Data] = LazyList
     .range(start = 0L, end = count, step = 1L)
     .map(i => Data(i = i, s = dict(Random.nextInt(4))))
 
-  def read[T : ParquetRecordDecoder](path: Path, filter: Filter = Filter.noopFilter): Future[immutable.Seq[T]] =
+  def read[T: ParquetRecordDecoder](path: Path, filter: Filter = Filter.noopFilter): Future[immutable.Seq[T]] =
     ParquetStreams.fromParquet[T].withFilter(filter).read(path.toString).runWith(Sink.seq)
 
   before {
@@ -73,14 +73,17 @@ class ParquetStreamsITSpec
   "ParquetStreams" should "write single file and read it correctly" in {
     val outputFileName = "data.parquet"
 
-    val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
-      path = s"$tempPath/$outputFileName",
-      options = writeOptions
-    ))
+    val write = () =>
+      Source(data).runWith(
+        ParquetStreams.toParquetSingleFile(
+          path    = s"$tempPath/$outputFileName",
+          options = writeOptions
+        )
+      )
 
     for {
-      _ <- write()
-      files <- filesAtPath(tempPath, configuration)
+      _        <- write()
+      files    <- filesAtPath(tempPath, configuration)
       readData <- read[Data](tempPath)
     } yield {
       files should be(List(outputFileName))
@@ -93,7 +96,7 @@ class ParquetStreamsITSpec
     fileSystem.mkdirs(tempPath)
 
     for {
-      files <- filesAtPath(tempPath, configuration)
+      files    <- filesAtPath(tempPath, configuration)
       readData <- read[Data](tempPath)
     } yield {
       files should be(empty)
@@ -104,33 +107,39 @@ class ParquetStreamsITSpec
   it should "be able to filter files during reading" in {
     val outputFileName = "data.parquet"
 
-    val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
-      path = s"$tempPath/$outputFileName",
-      options = writeOptions
-    ))
+    val write = () =>
+      Source(data).runWith(
+        ParquetStreams.toParquetSingleFile(
+          path    = s"$tempPath/$outputFileName",
+          options = writeOptions
+        )
+      )
 
     for {
-      _ <- write()
+      _        <- write()
       readData <- read[Data](tempPath, filter = Col("s") === "a")
     } yield {
       readData should not be empty
-      forAll(readData) { _.s should be("a") }
+      forAll(readData)(_.s should be("a"))
     }
   }
 
   it should "be able to read partitioned data" in {
     val outputFileName = "data.parquet"
 
-    val write = (a: String, b: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
-      path = s"$tempPath/a=$a/b=$b/$outputFileName",
-      options = writeOptions
-    ))
+    val write = (a: String, b: String) =>
+      Source(data).runWith(
+        ParquetStreams.toParquetSingleFile(
+          path    = s"$tempPath/a=$a/b=$b/$outputFileName",
+          options = writeOptions
+        )
+      )
 
     for {
-      _ <- write("A", "1")
-      _ <- write("A", "2")
-      _ <- write("B", "1")
-      _ <- write("B", "2")
+      _        <- write("A", "1")
+      _        <- write("A", "2")
+      _        <- write("B", "1")
+      _        <- write("B", "2")
       readData <- read[DataPartitioned](tempPath)
     } yield {
       readData should have size count * 4
@@ -144,14 +153,17 @@ class ParquetStreamsITSpec
   it should "filter data by partition and file content" in {
     val outputFileName = "data.parquet"
 
-    val write = (midPath: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
-      path = s"$tempPath/$midPath/$outputFileName",
-      options = writeOptions
-    ))
+    val write = (midPath: String) =>
+      Source(data).runWith(
+        ParquetStreams.toParquetSingleFile(
+          path    = s"$tempPath/$midPath/$outputFileName",
+          options = writeOptions
+        )
+      )
 
     for {
-      _ <- write("a=A/b=1")
-      _ <- write("a=A/b=2")
+      _        <- write("a=A/b=1")
+      _        <- write("a=A/b=2")
       readData <- read[DataPartitioned](tempPath, filter = Col("b") === "1" && Col("s") === "a")
     } yield {
       readData should not be empty
@@ -165,10 +177,13 @@ class ParquetStreamsITSpec
   it should "fail to read data that is improperly partitioned" in {
     val outputFileName = "data.parquet"
 
-    val write = (midPath: String) => Source(data).runWith(ParquetStreams.toParquetSingleFile(
-      path = s"$tempPath/$midPath/$outputFileName",
-      options = writeOptions
-    ))
+    val write = (midPath: String) =>
+      Source(data).runWith(
+        ParquetStreams.toParquetSingleFile(
+          path    = s"$tempPath/$midPath/$outputFileName",
+          options = writeOptions
+        )
+      )
 
     val fut = for {
       _ <- write("a=A/b=1")
@@ -184,15 +199,18 @@ class ParquetStreamsITSpec
 
     val outputFileName = "data.parquet"
 
-    val write = () => Source(data).runWith(ParquetStreams.toParquetSingleFile(
-      path = s"$tempPath/$outputFileName",
-      options = writeOptions
-    ))
+    val write = () =>
+      Source(data).runWith(
+        ParquetStreams.toParquetSingleFile(
+          path    = s"$tempPath/$outputFileName",
+          options = writeOptions
+        )
+      )
 
     for {
-      _ <- write()
-      files <- filesAtPath(tempPath, configuration)
-      readData <-  ParquetStreams.fromParquet[S].withProjection.read(tempPathString).runWith(Sink.seq)
+      _        <- write()
+      files    <- filesAtPath(tempPath, configuration)
+      readData <- ParquetStreams.fromParquet[S].withProjection.read(tempPathString).runWith(Sink.seq)
     } yield {
       files should be(List(outputFileName))
       readData should have size count
@@ -203,15 +221,18 @@ class ParquetStreamsITSpec
   it should "split data into sequential chunks and read it correctly" in {
     val outputFileNames = List("part-00000.parquet", "part-00001.parquet")
 
-    val write = () => Source(data).runWith(ParquetStreams.toParquetSequentialWithFileSplit(
-      path = tempPathString,
-      maxRecordsPerFile = 2 * writeOptions.rowGroupSize,
-      options = writeOptions
-    ))
+    val write = () =>
+      Source(data).runWith(
+        ParquetStreams.toParquetSequentialWithFileSplit(
+          path              = tempPathString,
+          maxRecordsPerFile = 2 * writeOptions.rowGroupSize,
+          options           = writeOptions
+        )
+      )
 
     for {
-      _ <- write()
-      files <- filesAtPath(tempPath, configuration)
+      _        <- write()
+      files    <- filesAtPath(tempPath, configuration)
       readData <- read[Data](tempPath)
     } yield {
       files should contain theSameElementsAs outputFileNames
@@ -221,15 +242,18 @@ class ParquetStreamsITSpec
   }
 
   it should "write data in parallel as chunks and read it correctly" in {
-    val write = () => Source(data).runWith(ParquetStreams.toParquetParallelUnordered(
-      path = tempPathString,
-      parallelism = 2,
-      options = writeOptions
-    ))
+    val write = () =>
+      Source(data).runWith(
+        ParquetStreams.toParquetParallelUnordered(
+          path        = tempPathString,
+          parallelism = 2,
+          options     = writeOptions
+        )
+      )
 
     for {
-      _ <- write()
-      files <- filesAtPath(tempPath, configuration)
+      _        <- write()
+      files    <- filesAtPath(tempPath, configuration)
       readData <- read[Data](tempPath)
     } yield {
       files should have size 2
@@ -239,16 +263,19 @@ class ParquetStreamsITSpec
   }
 
   it should "split data into sequential chunks using indefinite stream support with default settings" in {
-    val write = () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
-      path = tempPathString,
-      maxChunkSize = writeOptions.rowGroupSize,
-      chunkWriteTimeWindow = 10.seconds,
-      options = writeOptions
-    ))
+    val write = () =>
+      Source(data).runWith(
+        ParquetStreams.toParquetIndefinite(
+          path                 = tempPathString,
+          maxChunkSize         = writeOptions.rowGroupSize,
+          chunkWriteTimeWindow = 10.seconds,
+          options              = writeOptions
+        )
+      )
 
     for {
-      _ <- write()
-      files <- filesAtPath(tempPath, configuration)
+      _        <- write()
+      files    <- filesAtPath(tempPath, configuration)
       readData <- read[Data](tempPath)
     } yield {
       files should have size 4
@@ -259,28 +286,31 @@ class ParquetStreamsITSpec
 
   it should "split data into sequential chunks using indefinite stream support with custom settings" in {
     val expectedFileNames = List("0.parquet", "2048.parquet", "4096.parquet", "6144.parquet")
-    val currentTime = new Timestamp(System.currentTimeMillis())
+    val currentTime       = new Timestamp(System.currentTimeMillis())
 
-    val write = () => Source(data).runWith(ParquetStreams.toParquetIndefinite(
-      path = tempPathString,
-      maxChunkSize = writeOptions.rowGroupSize,
-      chunkWriteTimeWindow = 10.seconds,
-      buildChunkPath = { case (basePath, chunk) => basePath.suffix(s"/${chunk.head.i}.parquet")},
-      preWriteTransformation = { data => DataTransformed(data, currentTime)},
-      postWriteSink = Sink.fold[Seq[Data], Seq[Data]](Seq.empty[Data])(_ ++ _),
-      options = writeOptions
-    ))
+    val write = () =>
+      Source(data).runWith(
+        ParquetStreams.toParquetIndefinite(
+          path                   = tempPathString,
+          maxChunkSize           = writeOptions.rowGroupSize,
+          chunkWriteTimeWindow   = 10.seconds,
+          buildChunkPath         = { case (basePath, chunk) => basePath.suffix(s"/${chunk.head.i}.parquet") },
+          preWriteTransformation = { data => DataTransformed(data, currentTime) },
+          postWriteSink          = Sink.fold[Seq[Data], Seq[Data]](Seq.empty[Data])(_ ++ _),
+          options                = writeOptions
+        )
+      )
 
     for {
       postWriteData <- write()
-      files <- filesAtPath(tempPath, configuration)
-      readData <- read[DataTransformed](tempPath)
+      files         <- filesAtPath(tempPath, configuration)
+      readData      <- read[DataTransformed](tempPath)
     } yield {
       postWriteData should have size count
       postWriteData should contain theSameElementsAs data
       files should contain theSameElementsAs expectedFileNames
       readData should have size count
-      forAll(readData) { _.t should be(currentTime) }
+      forAll(readData)(_.t should be(currentTime))
       readData.map(_.toData) should contain theSameElementsAs data
     }
   }
@@ -291,7 +321,8 @@ class ParquetStreamsITSpec
     case class Address(street: Street, country: String, postCode: String)
     case class Street(name: String, more: String)
 
-    val flow = ParquetStreams.viaParquet[User](tempPathString)
+    val flow = ParquetStreams
+      .viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
@@ -302,14 +333,14 @@ class ParquetStreamsITSpec
       User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456"))
     ).toList
 
-    val firstPartitionPath = tempPath.suffix("/address.country=ABC")
+    val firstPartitionPath  = tempPath.suffix("/address.country=ABC")
     val secondPartitionPath = firstPartitionPath.suffix("/address.postCode=123456")
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
-      rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
-      firstPartitionFiles = fileSystem.listStatus(firstPartitionPath).map(_.getPath).toSeq
+      readData    <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
+      rootFiles            = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
+      firstPartitionFiles  = fileSystem.listStatus(firstPartitionPath).map(_.getPath).toSeq
       secondPartitionFiles = fileSystem.listStatus(secondPartitionPath).map(_.getPath.getName).toSeq
     } yield {
       rootFiles should be(Seq(firstPartitionPath))
@@ -323,24 +354,27 @@ class ParquetStreamsITSpec
   it should "monitor written rows and flush on signal" in {
     case class User(name: String, id: Int, id_part: String)
 
-    val maxCount = 10
-    val usersToWrite = 33
-    val partitions = 2
+    val maxCount            = 10
+    val usersToWrite        = 33
+    val partitions          = 2
     val lastToFlushOnDemand = 2
 
     def genUser(id: Int) = User(s"name_$id", id, (id % partitions).toString) // Two partitions : even and odd `id`
 
     // Mimics a metrics library
-    var metrics = Vector.empty[(Long, Int)]
+    var metrics                               = Vector.empty[(Long, Int)]
     def gauge(count: Long, userId: Int): Unit = metrics :+= (count, userId)
 
-    val flow = ParquetStreams.viaParquet[User](tempPathString)
+    val flow = ParquetStreams
+      .viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(maxCount)
       .withPartitionBy("id_part")
       .withPostWriteHandler { state =>
-        gauge(state.count, state.lastProcessed.id)                       // use-case 1 : monitoring internal counter
-        if (state.lastProcessed.id > usersToWrite - lastToFlushOnDemand) // use-case 2 : on demand flush. e.g: the last two records must be in separate files
+        gauge(state.count, state.lastProcessed.id) // use-case 1 : monitoring internal counter
+        if (
+          state.lastProcessed.id > usersToWrite - lastToFlushOnDemand
+        ) // use-case 2 : on demand flush. e.g: the last two records must be in separate files
           state.flush()
       }
       .build()
@@ -349,41 +383,41 @@ class ParquetStreamsITSpec
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
+      readData    <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
       rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
-      files = rootFiles.flatMap(p => fileSystem.listStatus(p).map(_.getPath).toSeq)
+      files     = rootFiles.flatMap(p => fileSystem.listStatus(p).map(_.getPath).toSeq)
       readDataPartitioned <- Future.sequence( // generate the file lists in a partitioned form
-        files.map(file =>
-          ParquetStreams.fromParquet[User].read(file.toString).runWith(Sink.seq)
-        ))
+        files.map(file => ParquetStreams.fromParquet[User].read(file.toString).runWith(Sink.seq))
+      )
     } yield {
       every(files.map(_.getName)) should endWith(".snappy.parquet")
       writtenData should be(users)
 
       readData should have size users.size
-      readData should contain allElementsOf (users)
+      readData should contain allElementsOf users
 
       files should have size (((usersToWrite / maxCount) * partitions) + 1 + lastToFlushOnDemand) // 9 == ( 33 / 10 ) * 2 + 1[remainder] + 2)
 
       // the counter is flushed 3 times due to max-count being reached
-      val completeCounts = Seq.fill(usersToWrite / maxCount) { 0 until maxCount }
+      val completeCounts = Seq
+        .fill(usersToWrite / maxCount)(0 until maxCount)
         .flatten
         .zipWithIndex
-        .map { case (count, id) => (count + 1) -> (id + 1)}
+        .map { case (count, id) => (count + 1) -> (id + 1) }
 
       // the counter is flushed twice due to on-demand calls
       val onDemandCallsCounts = Seq(
         1,
         2, // first on-demand flush
-        1  // second on-demand flush
-      ).zipWithIndex.map { case (count, i) => count -> (completeCounts.length + i + 1)}
+        1 // second on-demand flush
+      ).zipWithIndex.map { case (count, i) => count -> (completeCounts.length + i + 1) }
 
-      metrics should be (completeCounts ++ onDemandCallsCounts)
+      metrics should be(completeCounts ++ onDemandCallsCounts)
 
       val (remainder, full) = readDataPartitioned.partition(_.head.id >= usersToWrite - lastToFlushOnDemand)
-      every(full) should have size (maxCount / partitions)                              // == 5 records in completed files
-      remainder should have size (usersToWrite - (usersToWrite / maxCount) * maxCount)  // == 3 files are flushed prematurely
-      every(remainder) should have size 1                                               // == 1 record in prematurely flushed files
+      every(full) should have size (maxCount / partitions) // == 5 records in completed files
+      remainder should have size (usersToWrite - (usersToWrite / maxCount) * maxCount) // == 3 files are flushed prematurely
+      every(remainder) should have size 1 // == 1 record in prematurely flushed files
     }
   }
 
@@ -392,7 +426,8 @@ class ParquetStreamsITSpec
     case class User(name: String, address: Address)
     case class Address(postcode: String, country: String)
 
-    val flow = ParquetStreams.viaParquet[User](tempPathString)
+    val flow = ParquetStreams
+      .viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
@@ -405,7 +440,7 @@ class ParquetStreamsITSpec
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
+      readData    <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
     } yield {
       writtenData should be(users)
       readData should be(users)
@@ -416,7 +451,8 @@ class ParquetStreamsITSpec
 
     case class User(name: String)
 
-    val flow = ParquetStreams.viaParquet[User](tempPathString)
+    val flow = ParquetStreams
+      .viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
@@ -434,21 +470,22 @@ class ParquetStreamsITSpec
     case class User(name: String, address: Address)
     case class Address(postcode: String, country: String)
 
-    val flow = ParquetStreams.viaParquet[User](tempPathString)
+    val flow = ParquetStreams
+      .viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
       .build()
 
     val users = Seq(
-      User(name = "John", address = Address("123456", "ABC")),
-      User(name = "Ben", address = Address("111111", "CDE")),
+      User(name = "John", address    = Address("123456", "ABC")),
+      User(name = "Ben", address     = Address("111111", "CDE")),
       User(name = "Cynthia", address = Address("7654321", "XYZ"))
     ).toList
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
+      readData    <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
     } yield {
       writtenData should be(users)
       readData should be(users)
@@ -464,7 +501,8 @@ class ParquetStreamsITSpec
 
     implicit val message: MessageType = ParquetSchemaResolver.resolveSchema[User]
 
-    val flow = ParquetStreams.viaParquet[RowParquetRecord](tempPathString)
+    val flow = ParquetStreams
+      .viaParquet[RowParquetRecord](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(writeOptions.rowGroupSize)
       .withMaxDuration(100.millis)
@@ -473,25 +511,25 @@ class ParquetStreamsITSpec
 
     val genericUsers = Seq(
       RowParquetRecord.empty
-          .add("name", "John")
-          .add(DotPath("address.street.name"), "Broad St")
-          .add(DotPath("address.street.more"), "12")
-          .add(DotPath("address.country"), "ABC")
-          .add(DotPath("address.postCode"), "123456")
+        .add("name", "John")
+        .add(DotPath("address.street.name"), "Broad St")
+        .add(DotPath("address.street.more"), "12")
+        .add(DotPath("address.country"), "ABC")
+        .add(DotPath("address.postCode"), "123456")
     ).toList
 
     val expectedUsers = Seq(
       User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456"))
     )
 
-    val firstPartitionPath = tempPath.suffix("/address.country=ABC")
+    val firstPartitionPath  = tempPath.suffix("/address.country=ABC")
     val secondPartitionPath = firstPartitionPath.suffix("/address.postCode=123456")
 
     for {
       writtenData <- Source(genericUsers).via(flow).runWith(Sink.seq)
-      readData <- ParquetStreams.fromParquet[RowParquetRecord].read(tempPathString).runWith(Sink.seq)
-      rootFiles = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
-      firstPartitionFiles = fileSystem.listStatus(firstPartitionPath).map(_.getPath).toSeq
+      readData    <- ParquetStreams.fromParquet[RowParquetRecord].read(tempPathString).runWith(Sink.seq)
+      rootFiles            = fileSystem.listStatus(tempPath).map(_.getPath).toSeq
+      firstPartitionFiles  = fileSystem.listStatus(firstPartitionPath).map(_.getPath).toSeq
       secondPartitionFiles = fileSystem.listStatus(secondPartitionPath).map(_.getPath.getName).toSeq
     } yield {
       rootFiles should be(Seq(firstPartitionPath))
@@ -507,18 +545,18 @@ class ParquetStreamsITSpec
 
     val failingSource = Source(data).map {
       case data @ Data(i, _) if i < numberOfSuccessfulWrites => data
-      case _ => throw new RuntimeException("test exception")
+      case _                                                 => throw new RuntimeException("test exception")
     }
 
-    val flow = ParquetStreams.viaParquet[Data](tempPathString)
+    val flow = ParquetStreams
+      .viaParquet[Data](tempPathString)
       .withWriteOptions(writeOptions)
       .build()
 
     for {
-      _ <- failingSource.via(flow).runWith(Sink.ignore).recover { case _ => Done }
+      _        <- failingSource.via(flow).runWith(Sink.ignore).recover { case _ => Done }
       readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
-    } yield
-      readData should have size numberOfSuccessfulWrites
+    } yield readData should have size numberOfSuccessfulWrites
   }
 
   it should "close viaParquet properly on downstream exception" in {
@@ -526,24 +564,25 @@ class ParquetStreamsITSpec
 
     val failingSink = Sink.foreach[Data] {
       case Data(i, _) if i < numberOfSuccessfulWrites - 1 => ()
-      case _ => throw new RuntimeException("test exception")
+      case _                                              => throw new RuntimeException("test exception")
     }
 
-    val flow = ParquetStreams.viaParquet[Data](tempPathString)
+    val flow = ParquetStreams
+      .viaParquet[Data](tempPathString)
       .withWriteOptions(writeOptions)
       .build()
 
     for {
-      _ <- Source(data).via(flow).runWith(failingSink).recover { case _ => Done }
+      _        <- Source(data).via(flow).runWith(failingSink).recover { case _ => Done }
       readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
-    } yield
-      readData should have size numberOfSuccessfulWrites
+    } yield readData should have size numberOfSuccessfulWrites
   }
 
   it should "close viaParquet properly on internal exception" in {
     val numberOfSuccessfulWrites = 25
 
-    val parquetFlow = ParquetStreams.viaParquet[Data](tempPathString)
+    val parquetFlow = ParquetStreams
+      .viaParquet[Data](tempPathString)
       .withWriteOptions(writeOptions)
       .withPostWriteHandler {
         case state if state.count >= numberOfSuccessfulWrites =>
@@ -554,10 +593,9 @@ class ParquetStreamsITSpec
       .build()
 
     for {
-      _ <- Source(data).via(parquetFlow).runWith(Sink.ignore).recover { case _ => Done }
+      _        <- Source(data).via(parquetFlow).runWith(Sink.ignore).recover { case _ => Done }
       readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
-    } yield
-      readData should have size numberOfSuccessfulWrites
+    } yield readData should have size numberOfSuccessfulWrites
   }
 
   override def afterAll(): Unit = {

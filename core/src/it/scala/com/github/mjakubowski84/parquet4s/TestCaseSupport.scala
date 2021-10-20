@@ -20,35 +20,34 @@ object Case {
 
   type CaseDef = Case[_ <: Product]
 
-  def apply[T <: Product : TypeTag : ParquetReader : ParquetWriterFactory](
-                                                                            description: String,
-                                                                            data: Seq[T],
-                                                                            compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
-                                                                          ): Case[T] =
+  def apply[T <: Product: TypeTag: ParquetReader: ParquetWriterFactory](
+      description: String,
+      data: Seq[T],
+      compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
+  ): Case[T] =
     new Case(
-      description = description,
+      description          = description,
       compatibilityParties = compatibilityParties,
-      _data = data,
-      _reader = implicitly[ParquetReader[T]],
-      _writerFactory = implicitly[ParquetWriterFactory[T]],
-      _typeTag = implicitly[TypeTag[T]]
+      _data                = data,
+      _reader              = implicitly[ParquetReader[T]],
+      _writerFactory       = implicitly[ParquetWriterFactory[T]],
+      _typeTag             = implicitly[TypeTag[T]]
     )
 }
 
-
 class Case[T <: Product](
-                          val description: String,
-                          val compatibilityParties: Set[CompatibilityParty],
-                          _data: Seq[T],
-                          _reader: ParquetReader[T],
-                          _writerFactory: ParquetWriterFactory[T],
-                          _typeTag: TypeTag[T]
-                        ) {
+    val description: String,
+    val compatibilityParties: Set[CompatibilityParty],
+    _data: Seq[T],
+    _reader: ParquetReader[T],
+    _writerFactory: ParquetWriterFactory[T],
+    _typeTag: TypeTag[T]
+) {
   type DataType = T
-  def data: Seq[DataType] = _data
-  def reader: ParquetReader[DataType] = _reader
+  def data: Seq[DataType]                           = _data
+  def reader: ParquetReader[DataType]               = _reader
   def writerFactory: ParquetWriterFactory[DataType] = _writerFactory
-  def typeTag: TypeTag[DataType] = _typeTag
+  def typeTag: TypeTag[DataType]                    = _typeTag
 }
 
 trait TestCaseSupport {

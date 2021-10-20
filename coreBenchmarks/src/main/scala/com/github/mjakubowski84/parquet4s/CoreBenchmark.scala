@@ -13,19 +13,18 @@ import scala.util.Random
 case class Embedded(fraction: Double, text: String)
 case class Record(i: Int, dict: String, embedded: Option[Embedded])
 
-
 object CoreBenchmark {
 
   val Fractioner = 100.12
-  val Dict = List("a", "b", "c", "d")
+  val Dict       = List("a", "b", "c", "d")
 
   @State(Scope.Benchmark)
   class Dataset {
 
     // 512 * 1024
     @Param(Array("524288"))
-    var datasetSize: Int = _
-    var basePath: String = _
+    var datasetSize: Int                    = _
+    var basePath: String                    = _
     var records: immutable.Iterable[Record] = _
 
     @Setup(Level.Trial)
@@ -33,26 +32,31 @@ object CoreBenchmark {
       basePath = Files.createTempDirectory("benchmark").resolve(datasetSize.toString).toString
       records = (1 to datasetSize).map { i =>
         Record(
-          i = i,
+          i    = i,
           dict = Dict(Random.nextInt(Dict.size - 1)),
-          embedded = if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
-          else None
+          embedded =
+            if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
+            else None
         )
       }
     }
 
-    def delete(): Path = Files.walkFileTree(Paths.get(basePath), new FileVisitor[Path]() {
-      override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
-      override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-        Files.delete(file)
-        FileVisitResult.CONTINUE
+    def delete(): Path = Files.walkFileTree(
+      Paths.get(basePath),
+      new FileVisitor[Path]() {
+        override def preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult =
+          FileVisitResult.CONTINUE
+        override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
+          Files.delete(file)
+          FileVisitResult.CONTINUE
+        }
+        override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+        override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
+          Files.delete(dir)
+          FileVisitResult.CONTINUE
+        }
       }
-      override def visitFileFailed(file: Path, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-      override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
-        Files.delete(dir)
-        FileVisitResult.CONTINUE
-      }
-    })
+    )
 
   }
 
@@ -61,7 +65,7 @@ object CoreBenchmark {
     var filePath: String = _
 
     def fetchDataset(dataset: Dataset): Unit = {
-      this.dataset = dataset
+      this.dataset  = dataset
       this.filePath = dataset.basePath + "/file.parquet"
     }
   }

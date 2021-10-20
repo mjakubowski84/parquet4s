@@ -21,9 +21,9 @@ trait RandomDataProducer {
   import RandomDataProducer._
 
   private def nextWord: String = words(Random.nextInt(words.size - 1))
-  private def action(): Unit = sendKafkaMessage(nextWord)
+  private def action(): Unit   = sendKafkaMessage(nextWord)
 
-  private lazy val scheduler: ActorRef = system.actorOf(FluctuatingSchedulerActor.props(action))
+  private lazy val scheduler: ActorRef      = system.actorOf(FluctuatingSchedulerActor.props(action))
   implicit private val stopTimeout: Timeout = new Timeout(FluctuatingSchedulerActor.MaxDelay)
 
   def startDataProducer(): Unit = {
@@ -44,8 +44,8 @@ private object FluctuatingSchedulerActor {
   case object ScheduleNext
   case object Stop
 
-  val MinDelay: FiniteDuration = 1.milli
-  val MaxDelay: FiniteDuration = 500.millis
+  val MinDelay: FiniteDuration   = 1.milli
+  val MaxDelay: FiniteDuration   = 500.millis
   val StartDelay: FiniteDuration = 100.millis
 
   trait Direction
@@ -61,13 +61,12 @@ private class FluctuatingSchedulerActor(action: () => Unit) extends Actor {
   import FluctuatingSchedulerActor._
 
   implicit def executionContext: ExecutionContext = context.system.dispatcher
-  def scheduler: Scheduler = context.system.scheduler
-  var scheduled: Option[Cancellable] = None
+  def scheduler: Scheduler                        = context.system.scheduler
+  var scheduled: Option[Cancellable]              = None
 
-  override def receive: Receive = {
-    case Start =>
-      self ! ScheduleNext
-      context.become(scheduling(StartDelay, direction = Down), discardOld = true)
+  override def receive: Receive = { case Start =>
+    self ! ScheduleNext
+    context.become(scheduling(StartDelay, direction = Down), discardOld = true)
   }
 
   def scheduling(delay: FiniteDuration, direction: Direction): Receive = {

@@ -90,7 +90,7 @@ class CursorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "be completed on start when path is empty" in {
-    val a = Symbol("a")
+    val a           = Symbol("a")
     val emptyCursor = Cursor.following("")
 
     emptyCursor.advance[a.type] should be(None)

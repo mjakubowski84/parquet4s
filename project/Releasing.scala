@@ -10,17 +10,15 @@ object Releasing {
       Keys.credentials ++= Seq(
         Credentials(
           realm = "Sonatype Nexus Repository Manager",
-          host = "oss.sonatype.org",
+          host  = "oss.sonatype.org",
           userName = sys.env.getOrElse(
-            "SONATYPE_USER_NAME",
-            {
+            "SONATYPE_USER_NAME", {
               streams.value.log.warn("Undefined environment variable: SONATYPE_USER_NAME")
               "UNDEFINED"
             }
           ),
           passwd = sys.env.getOrElse(
-            "SONATYPE_PASSWORD",
-            {
+            "SONATYPE_PASSWORD", {
               streams.value.log.warn("Undefined environment variable: SONATYPE_PASSWORD")
               "UNDEFINED"
             }
@@ -31,20 +29,20 @@ object Releasing {
       homepage := Some(url("https://github.com/mjakubowski84/parquet4s")),
       scmInfo := Some(
         ScmInfo(
-          browseUrl = url("https://github.com/mjakubowski84/parquet4s"),
+          browseUrl  = url("https://github.com/mjakubowski84/parquet4s"),
           connection = "scm:git@github.com:mjakubowski84/parquet4s.git"
         )
       ),
-      sonatypeProjectHosting := Some(GitHubHosting(
-        user = "mjakubowski84", repository = "parquet4s", email = "mjakubowski84@gmail.com")
+      sonatypeProjectHosting := Some(
+        GitHubHosting(user = "mjakubowski84", repository = "parquet4s", email = "mjakubowski84@gmail.com")
       ),
       sonatypeProfileName := "com.github.mjakubowski84",
       developers := List(
         Developer(
-          id = "mjakubowski84",
-          name = "Marcin Jakubowski",
+          id    = "mjakubowski84",
+          name  = "Marcin Jakubowski",
           email = "mjakubowski84@gmail.com",
-          url = url("https://github.com/mjakubowski84")
+          url   = url("https://github.com/mjakubowski84")
         )
       ),
       publishMavenStyle := true,
