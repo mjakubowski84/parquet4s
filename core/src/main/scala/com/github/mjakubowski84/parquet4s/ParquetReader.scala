@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.hadoop.{ParquetReader => HadoopParquetReader}
+import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
 import org.apache.parquet.schema.MessageType
 
 import java.io.Closeable

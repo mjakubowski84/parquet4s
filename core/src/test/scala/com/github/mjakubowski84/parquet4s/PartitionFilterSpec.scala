@@ -44,7 +44,7 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
   val case3: FilterPredicate = NOT(AND(udpi, neqj))
   val case4: FilterPredicate = NOT(OR(eqi, neqj))
 
-  val vcc: ValueCodecConfiguration = ValueCodecConfiguration(TimeZone.getDefault)
+  val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
 
   def partitionedPath(partitions: (ColumnPath, String)*): PartitionedPath =
     PartitionedPath(Path("/"), partitions.toList)
