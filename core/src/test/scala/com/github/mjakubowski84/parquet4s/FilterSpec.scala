@@ -7,7 +7,7 @@ import org.scalatest.matchers.should.Matchers
 
 class FilterSpec extends AnyFlatSpec with Matchers {
 
-  private val valueCodecConfiguration = ValueCodecConfiguration(timeZone = TimeZone.getDefault)
+  private val valueCodecConfiguration = ValueCodecConfiguration.Default
 
   "Filter" should "build eq predicate" in {
     val predicate = (Col("i") === 1).toPredicate(valueCodecConfiguration)
