@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ValueImplicits._
+import com.github.mjakubowski84.parquet4s.ValueImplicits.*
 import org.apache.parquet.schema.MessageType
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -32,15 +32,19 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
     )
     ParquetWriter.of[Full].writeAndClose(filePath, in)
 
-    implicit val partialSchema: MessageType = ParquetSchemaResolver.resolveSchema[Partial]
+    val partialSchema = ParquetSchemaResolver.resolveSchema[Partial]
 
-    val outRecords = ParquetReader.projectedAs[RowParquetRecord].read(filePath)
+    val outRecords = ParquetReader.projectedGeneric(partialSchema).read(filePath)
 
-    outRecords should contain theSameElementsAs List(
-      RowParquetRecord("b" -> 1.value),
-      RowParquetRecord("b" -> 2.value),
-      RowParquetRecord("b" -> 3.value)
-    )
+    try {
+      outRecords should contain theSameElementsAs List(
+        RowParquetRecord("b" -> 1.value),
+        RowParquetRecord("b" -> 2.value),
+        RowParquetRecord("b" -> 3.value)
+      )
+    } finally {
+      outRecords.close()
+    }
   }
 
   it should "read the subset of fields from written complex file" in {
@@ -50,17 +54,21 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers {
     )
     ParquetWriter.of[FullComplex].writeAndClose(filePath, in)
 
-    implicit val partialSchema: MessageType = ParquetSchemaResolver.resolveSchema[PartialComplex]
+    val partialSchema = ParquetSchemaResolver.resolveSchema[PartialComplex]
 
-    val outRecords = ParquetReader.projectedAs[RowParquetRecord].read(filePath)
+    val outRecords = ParquetReader.projectedGeneric(partialSchema).read(filePath)
 
-    outRecords should contain theSameElementsAs List(
-      RowParquetRecord("nested" -> RowParquetRecord("b" -> ListParquetRecord(
-        RowParquetRecord("x" -> 1.value),
-        RowParquetRecord("x" -> 2.value),
-        RowParquetRecord("x" -> 3.value)
-      )))
-    )
+    try {
+      outRecords should contain theSameElementsAs List(
+        RowParquetRecord("nested" -> RowParquetRecord("b" -> ListParquetRecord(
+          RowParquetRecord("x" -> 1.value),
+          RowParquetRecord("x" -> 2.value),
+          RowParquetRecord("x" -> 3.value)
+        )))
+      )
+    } finally {
+      outRecords.close()
+    }
   }
 
 }
