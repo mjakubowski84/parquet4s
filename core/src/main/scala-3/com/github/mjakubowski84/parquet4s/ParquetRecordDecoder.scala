@@ -59,9 +59,7 @@ object ParquetRecordDecoder:
         case Some(decodedFieldValue) =>
           Fields(decodedFieldValue *: tailDecoder.decode(record, configuration).values)
         case None =>
-          // TODO add test
-          // TODO add an option to not throw an error
-          throw DecodingException(s"Field $fieldName is not in schema of: $record")
+          throw DecodingException(s"Missing required field $fieldName in a record: $record")
     
 
   given derived[P <: Product](using

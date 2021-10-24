@@ -17,10 +17,10 @@ Released for Scala 2.11.x, 2.12.x and 2.13.x. FS2 integration is available for 2
 1. [Quick Start](#quick-start)
 1. [AWS S3](#aws-s3)
 1. [Akka Streams](#akka-streams)
-1. [FS2](#FS2)
+1. [FS2](#fs2)
 1. [Before-read filtering or filter pushdown](#before-read-filtering-or-filter-pushdown)
 1. [Schema projection](#schema-projection)
-1. [Statistics](#Statistics)
+1. [Statistics](#statistics)
 1. [Supported storage types](#supported-storage-types)
 1. [Supported types](#supported-types)
 1. [Generic Records](#generic-records)
@@ -161,7 +161,7 @@ FS2 integration allows you to read and write Parquet using functional streams. F
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
-Please check [examples](./examples/src/main/scala/com/github/mjakubowski84/parquet4s/fs2) to learn more.
+Please check [examples](examples/src/main/scala/com/github/mjakubowski84/parquet4s/fs2) to learn more.
 
 ## Before-read filtering or filter pushdown
 
@@ -207,7 +207,7 @@ fromParquet[IO, User].projection.read(blocker, "file://my/path")
 
 ## Statistics
 
-Parquet4S leverages Parquet metadata to efficiently read record count as well as max and min value of the column of Parquet files. It provides correct value for both filtered and unfiltered files. Functionality is available in core module either by direct call to [Stats](src/main/scala/com/github/mjakubowski84/parquet4s/Stats.scala) or via API of `ParquetReader` and `ParquetIterable`.
+Parquet4S leverages Parquet metadata to efficiently read record count as well as max and min value of the column of Parquet files. It provides correct value for both filtered and unfiltered files. Functionality is available in core module either by direct call to [Stats](core/src/main/scala/com/github/mjakubowski84/parquet4s/Stats.scala) or via API of `ParquetReader` and `ParquetIterable`.
 
 ## Supported storage types
 

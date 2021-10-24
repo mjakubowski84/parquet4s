@@ -1,12 +1,13 @@
 import DependecyVersions._
 import Releasing._
+import Documentation._
 import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
 
 lazy val twoTwelve = "2.12.15"
 lazy val twoThirteen = "2.13.6"
-lazy val three = "3.0.2"
+lazy val three = "3.1.0"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 lazy val akkaScalaVersions = Seq(twoTwelve, twoThirteen)
 
@@ -235,6 +236,19 @@ lazy val fs2Benchmarks = (project in file("fs2Benchmarks"))
   .enablePlugins(JmhPlugin)
   .dependsOn(fs2)
 
+lazy val documentation = (project in file("site"))
+  .settings(documentationSettings)
+  .settings(
+    publish / skip := true,
+    libraryDependencies ++= Seq(
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
+      "org.slf4j" % "slf4j-nop" % slf4jVersion,
+      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
+    )
+  )
+  .dependsOn(core)
+  .enablePlugins(MicrositesPlugin)
+
 lazy val root = (project in file("."))
   .settings(publishSettings)
   .settings(
@@ -242,4 +256,4 @@ lazy val root = (project in file("."))
     publish / skip := true,
     publishLocal / skip := true
   )
-  .aggregate(core, akka, fs2, examples, coreBenchmarks, akkaBenchmarks, fs2Benchmarks)
+  .aggregate(core, akka, fs2, examples, coreBenchmarks, akkaBenchmarks, fs2Benchmarks, documentation)
