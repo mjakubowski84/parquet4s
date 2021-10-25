@@ -5,11 +5,7 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
-class SparkAndParquetReaderCompatibilityItSpec extends
-  AnyFreeSpec
-    with Matchers
-    with BeforeAndAfter
-    with SparkHelper {
+class SparkAndParquetReaderCompatibilityItSpec extends AnyFreeSpec with Matchers with BeforeAndAfter with SparkHelper {
 
   before {
     clearTemp()
@@ -19,11 +15,8 @@ class SparkAndParquetReaderCompatibilityItSpec extends
     testCase.description in {
       writeToTemp(testCase.data)(testCase.typeTag)
       val parquetIterable = ParquetReader.read(tempPathString)(testCase.reader)
-      try {
-        parquetIterable should contain theSameElementsAs testCase.data
-      } finally {
-        parquetIterable.close()
-      }
+      try parquetIterable should contain theSameElementsAs testCase.data
+      finally parquetIterable.close()
     }
 
   "ParquetReader should be able to read file saved by Spark if the file contains" - {
