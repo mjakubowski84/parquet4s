@@ -6,11 +6,7 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
-class ParquetWriterAndSparkCompatibilityItSpec extends
-  AnyFreeSpec
-    with Matchers
-    with BeforeAndAfter
-    with SparkHelper {
+class ParquetWriterAndSparkCompatibilityItSpec extends AnyFreeSpec with Matchers with BeforeAndAfter with SparkHelper {
 
   before {
     clearTemp()
