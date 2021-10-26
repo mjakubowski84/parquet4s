@@ -3,6 +3,8 @@ package com.github.mjakubowski84.parquet4s
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
+import scala.concurrent.duration.FiniteDuration
+
 import akka.stream.stage._
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow._
@@ -11,13 +13,10 @@ import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.parquet.schema.MessageType
 import org.slf4j.LoggerFactory
 
-import scala.concurrent.duration.FiniteDuration
-
 object ParquetPartitioningFlow {
 
   val DefaultMaxCount: Long              = HadoopParquetWriter.DEFAULT_BLOCK_SIZE
   val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
-  private val TimerKey                   = "ParquetPartitioningFlow.Rotation"
 
   def builder[T](basePath: Path): Builder[T, T] = BuilderImpl(
     basePath               = basePath,
@@ -171,8 +170,12 @@ private class ParquetPartitioningFlow[T, W](
   private val vcc            = writeOptions.toValueCodecConfiguration
 
   private class Logic extends TimerGraphStageLogic(shape) with InHandler with OutHandler {
-    private var writers: scala.collection.immutable.Map[Path, ParquetWriter.InternalWriter] = Map.empty
-    private var count                                                                       = 0L
+    final case class WriterState(
+        writer: ParquetWriter.InternalWriter,
+        var written: Long
+    )
+
+    private var writers: Map[Path, WriterState] = Map.empty
 
     setHandlers(in, out, this)
 
@@ -181,54 +184,87 @@ private class ParquetPartitioningFlow[T, W](
       new Path(path, s"$key=$value")
     }
 
-    private def compressionExtension: String = writeOptions.compressionCodecName.getExtension
-    private def newFileName: String          = UUID.randomUUID().toString + compressionExtension + ".parquet"
+    private def compressionExtension: String =
+      writeOptions.compressionCodecName.getExtension
+
+    private def newFileName: String =
+      UUID.randomUUID().toString + compressionExtension + ".parquet"
+
+    private def scheduleNextRotation(path: Path, delay: FiniteDuration): Unit =
+      scheduleOnce(timerKey = path, delay = delay)
 
     private def write(msg: T): Unit = {
       val valueToWrite = preWriteTransformation(msg)
       val writerPath   = partitionPath(valueToWrite)
-      val writer = writers.get(writerPath) match {
-        case Some(writer) =>
-          writer
+      val state = writers.get(writerPath) match {
+        case Some(state) =>
+          state
+
         case None =>
-          if (logger.isDebugEnabled()) logger.debug(s"Creating writer to write to: " + writerPath)
+          logger.debug("Creating writer to write to [{}]", writerPath)
+
           val writer = ParquetWriter.internalWriter(
             path    = new Path(writerPath, newFileName),
             schema  = schema,
             options = writeOptions
           )
-          writers = writers.updated(writerPath, writer)
-          writer
+
+          val state = WriterState(
+            writer  = writer,
+            written = 0L
+          )
+
+          writers += writerPath -> state
+          scheduleNextRotation(writerPath, maxDuration)
+          state
       }
-      writer.write(encode(valueToWrite, vcc))
+
+      state.writer.write(encode(valueToWrite, vcc))
+      state.written += 1
+
+      if (state.written >= maxCount) {
+        close(writerPath, state)
+      }
+    }
+
+    private def close(path: Path, state: WriterState): Unit = {
+      cancelTimer(path)
+      state.writer.close()
+      writers -= path
     }
 
     private def close(): Unit = {
-      writers.valuesIterator.foreach(_.close())
+      writers.foreach { case (path, state) =>
+        cancelTimer(path)
+        state.writer.close()
+      }
+
       writers = Map.empty
-      count   = 0
     }
 
-    override def preStart(): Unit =
-      schedulePeriodically(TimerKey, maxDuration)
-
     override def onTimer(timerKey: Any): Unit =
-      if (TimerKey == timerKey) {
-        close()
+      writers.find(_._1 == timerKey) match {
+        case Some((path, state)) =>
+          close(path, state)
+
+        case None =>
+          logger.debug("Timer with key [{}] triggered but no state was found", timerKey)
       }
 
     override def onPush(): Unit = {
       val msg = grab(in)
       write(msg)
-      count += 1
 
       postWriteHandler.foreach(
-        _.apply(PostWriteState(count, lastProcessed = msg, partitions = writers.keySet, flush = () => close()))
+        _.apply(
+          PostWriteState(
+            count         = writers.values.map(_.written).sum,
+            lastProcessed = msg,
+            partitions    = writers.keySet,
+            flush         = () => close()
+          )
+        )
       )
-
-      if (count >= maxCount) {
-        close()
-      }
 
       push(out, msg)
     }

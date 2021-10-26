@@ -361,19 +361,14 @@ class ParquetStreamsITSpec
 
     def genUser(id: Int) = User(s"name_$id", id, (id % partitions).toString) // Two partitions : even and odd `id`
 
-    // Mimics a metrics library
-    var metrics                               = Vector.empty[(Long, Int)]
-    def gauge(count: Long, userId: Int): Unit = metrics :+= (count, userId)
-
     val flow = ParquetStreams
       .viaParquet[User](tempPathString)
       .withWriteOptions(writeOptions)
       .withMaxCount(maxCount)
       .withPartitionBy("id_part")
       .withPostWriteHandler { state =>
-        gauge(state.count, state.lastProcessed.id) // use-case 1 : monitoring internal counter
         if (
-          state.lastProcessed.id > usersToWrite - lastToFlushOnDemand
+          state.lastProcessed.id >= usersToWrite - lastToFlushOnDemand
         ) // use-case 2 : on demand flush. e.g: the last two records must be in separate files
           state.flush()
       }
@@ -396,28 +391,26 @@ class ParquetStreamsITSpec
       readData should have size users.size
       readData should contain allElementsOf users
 
-      files should have size (((usersToWrite / maxCount) * partitions) + 1 + lastToFlushOnDemand) // 9 == ( 33 / 10 ) * 2 + 1[remainder] + 2)
+      val usersPerPartition = usersToWrite / partitions
+      val filesPerPartition = (usersPerPartition / maxCount) + 1 // + 1 because the last file is partially filled
+      files.length should be(filesPerPartition * partitions + lastToFlushOnDemand)
 
-      // the counter is flushed 3 times due to max-count being reached
-      val completeCounts = Seq
-        .fill(usersToWrite / maxCount)(0 until maxCount)
-        .flatten
-        .zipWithIndex
-        .map { case (count, id) => (count + 1) -> (id + 1) }
+      val (full, partial) = readDataPartitioned.partition(_.length == maxCount)
 
-      // the counter is flushed twice due to on-demand calls
-      val onDemandCallsCounts = Seq(
-        1,
-        2, // first on-demand flush
-        1 // second on-demand flush
-      ).zipWithIndex.map { case (count, i) => count -> (completeCounts.length + i + 1) }
+      val expectedFullFiles        = (usersPerPartition / maxCount) * partitions
+      val expectedUsersInFullFiles = maxCount * expectedFullFiles
+      val actualUsersInFullFiles   = full.map(_.length).sum
 
-      metrics should be(completeCounts ++ onDemandCallsCounts)
+      val expectedPartialFiles = partitions + lastToFlushOnDemand // 2 partial files + 2 prematurely flushed files
+      val expectedUsersInPartialFiles = usersToWrite - expectedUsersInFullFiles
+      val actualUsersInPartialFiles   = partial.map(_.length).sum
 
-      val (remainder, full) = readDataPartitioned.partition(_.head.id >= usersToWrite - lastToFlushOnDemand)
-      every(full) should have size (maxCount / partitions) // == 5 records in completed files
-      remainder should have size (usersToWrite - (usersToWrite / maxCount) * maxCount) // == 3 files are flushed prematurely
-      every(remainder) should have size 1 // == 1 record in prematurely flushed files
+      full.length should be(expectedFullFiles)
+      actualUsersInFullFiles should be(expectedUsersInFullFiles)
+      partial.length should be(expectedPartialFiles)
+      actualUsersInPartialFiles should be(expectedUsersInPartialFiles)
+
+      partial.count(_.length == 1) should be(lastToFlushOnDemand) // prematurely flushed files
     }
   }
 
@@ -596,6 +589,129 @@ class ParquetStreamsITSpec
       _        <- Source(data).via(parquetFlow).runWith(Sink.ignore).recover { case _ => Done }
       readData <- ParquetStreams.fromParquet[Data].read(tempPathString).runWith(Sink.seq)
     } yield readData should have size numberOfSuccessfulWrites
+  }
+
+  it should "rotate files when max count is reached for each file" in {
+    case class User(name: String, id: Int, id_part: String)
+
+    val partitions   = 2
+    val maxCount     = 1000
+    val maxDuration  = 3.seconds
+    val usersToWrite = maxCount * 5
+
+    def genUser(id: Int) = User(
+      name    = s"name_$id",
+      id      = id,
+      id_part = (id % partitions).toString
+    )
+
+    val flow = ParquetStreams
+      .viaParquet[User](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withMaxCount(maxCount = maxCount)
+      .withMaxDuration(maxDuration = maxDuration)
+      .withPartitionBy("id_part")
+      .build()
+
+    val users = ((1 to usersToWrite) map genUser).toList
+
+    for {
+      written <- Source(users).via(flow).runWith(Sink.seq)
+      read    <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
+      files = fileSystem
+        .listStatus(tempPath)
+        .map(_.getPath)
+        .toSeq
+        .flatMap(fileSystem.listStatus(_).map(_.getPath).toSeq)
+      readPartitioned <- Future.sequence( // generate the file lists in a partitioned form
+        files.map(file => ParquetStreams.fromParquet[User].read(file.toString).runWith(Sink.seq))
+      )
+    } yield {
+      written.length should be(usersToWrite)
+      read.length should be(usersToWrite)
+
+      val usersPerPartition = usersToWrite / partitions
+      val filesPerPartition = (usersPerPartition / maxCount) + 1 // + 1 because the last file is partially filled
+      files.length should be(filesPerPartition * partitions)
+
+      readPartitioned.map(_.length).sorted.toList match {
+        case a :: b :: c :: d :: e :: f :: Nil =>
+          a should be(maxCount / partitions)
+          b should be(maxCount / partitions)
+          c should be(maxCount)
+          d should be(maxCount)
+          e should be(maxCount)
+          f should be(maxCount)
+
+        case _ =>
+          fail("Unexpected partitioned data found")
+      }
+    }
+  }
+
+  it should "rotate files when max duration is reached for each file" in {
+    case class User(name: String, id: Int, id_part: String)
+
+    val partitions        = 2
+    val intervals         = 5
+    val maxCount          = 1000
+    val maxDuration       = 1.second
+    val usersToWrite      = 500
+    val writeInterval     = maxDuration / intervals
+    val usersPerInterval  = usersToWrite / intervals
+    val filesPerPartition = 2
+
+    def genUser(id: Int) = User(
+      name    = s"name_$id",
+      id      = id,
+      id_part = (id % partitions).toString
+    )
+
+    val flow = ParquetStreams
+      .viaParquet[User](tempPathString)
+      .withWriteOptions(writeOptions)
+      .withMaxCount(maxCount = maxCount)
+      .withMaxDuration(maxDuration = maxDuration / filesPerPartition)
+      .withPartitionBy("id_part")
+      .build()
+
+    val users = ((1 to usersToWrite) map genUser).toList
+
+    for {
+      written <- Source(users)
+        .throttle(usersPerInterval, writeInterval)
+        .via(flow)
+        .take(usersToWrite)
+        .runWith(Sink.seq)
+      read <- ParquetStreams.fromParquet[User].read(tempPathString).runWith(Sink.seq)
+      files = fileSystem
+        .listStatus(tempPath)
+        .map(_.getPath)
+        .toSeq
+        .flatMap(fileSystem.listStatus(_).map(_.getPath).toSeq)
+      readPartitioned <- Future.sequence( // generate the file lists in a partitioned form
+        files.map(file => ParquetStreams.fromParquet[User].read(file.toString).runWith(Sink.seq))
+      )
+    } yield {
+      written.length should be(usersToWrite)
+      read.length should be(usersToWrite)
+
+      files.length should be(filesPerPartition * partitions)
+
+      readPartitioned.map(_.length).toList match {
+        case a :: b :: c :: d :: Nil =>
+          a should be > 0
+          b should be > 0
+          c should be > 0
+          d should be > 0
+
+          val usersWritten = a + b + c + d
+          usersWritten should be(usersToWrite)
+
+        case _ =>
+          fail("Unexpected partitioned data found")
+      }
+    }
   }
 
   override def afterAll(): Unit = {
