@@ -2,15 +2,14 @@ package com.github.mjakubowski84.parquet4s
 
 import scala.jdk.CollectionConverters._
 
-/**
- * Short alias for [[ColumnPath]].
- */
+/** Short alias for [[ColumnPath]].
+  */
 object Col {
-  /**
-   * Use dot notation to separate path elements.
-   * @example
-   *          {{{ Col("user.address.postcode") }}}
-   */
+
+  /** Use dot notation to separate path elements.
+    * @example
+    *   {{{Col("user.address.postcode")}}}
+    */
   def apply(column: String): ColumnPath = ColumnPath(column)
 }
 
@@ -18,11 +17,10 @@ object ColumnPath {
 
   val Separator: Char = '.'
 
-  /**
-   * Use dot notation to separate path elements.
-   * @example
-   *          {{{ Col("user.address.postcode") }}}
-   */
+  /** Use dot notation to separate path elements.
+    * @example
+    *   {{{Col("user.address.postcode")}}}
+    */
   def apply(path: String): ColumnPath =
     new ColumnPath(path.split(Separator).toList.filter(_.trim.nonEmpty))
 
@@ -45,15 +43,14 @@ object ColumnPath {
 
 }
 
-/**
- * Represents a path leading through the tree of schema fields. Points a column in a schema of Parquet file.
- *
- * Can be used to define a filter.
- *
- * @example
- *          {{{ Col("user.address.postcode") === "00000" }}}
- */
-class ColumnPath private(val elements: Seq[String]) extends FilterOps {
+/** Represents a path leading through the tree of schema fields. Points a column in a schema of Parquet file.
+  *
+  * Can be used to define a filter.
+  *
+  * @example
+  *   {{{Col("user.address.postcode") === "00000"}}}
+  */
+class ColumnPath private (val elements: Seq[String]) extends FilterOps {
   override def toString: String = elements.mkString(ColumnPath.Separator.toString)
 
   def isEmpty: Boolean = elements.isEmpty
@@ -73,4 +70,3 @@ class ColumnPath private(val elements: Seq[String]) extends FilterOps {
 
   override def hashCode(): Int = elements.hashCode()
 }
-

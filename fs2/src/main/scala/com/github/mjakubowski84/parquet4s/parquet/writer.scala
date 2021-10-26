@@ -2,7 +2,14 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.{Resource, Sync}
 import cats.implicits.*
-import com.github.mjakubowski84.parquet4s.{ParquetRecordEncoder, ParquetSchemaResolver, ParquetWriter, Path, RowParquetRecord, ValueCodecConfiguration}
+import com.github.mjakubowski84.parquet4s.{
+  ParquetRecordEncoder,
+  ParquetSchemaResolver,
+  ParquetWriter,
+  Path,
+  RowParquetRecord,
+  ValueCodecConfiguration
+}
 import fs2.{Chunk, Pipe, Pull, Stream}
 import org.apache.parquet.schema.MessageType
 
@@ -11,14 +18,15 @@ import scala.language.higherKinds
 private[parquet4s] object writer {
 
   trait ToParquet[F[_]] {
-    /**
-     * Creates a builder of pipe that processes data of given type
-     * @tparam T Schema type
-     */
+
+    /** Creates a builder of pipe that processes data of given type
+      * @tparam T
+      *   Schema type
+      */
     def of[T: ParquetSchemaResolver: ParquetRecordEncoder]: Builder[F, T]
-    /**
-     * Creates a builder of pipe that processes generic records
-     */
+
+    /** Creates a builder of pipe that processes generic records
+      */
     def generic(schema: MessageType): Builder[F, RowParquetRecord]
   }
 
@@ -28,42 +36,43 @@ private[parquet4s] object writer {
     override def generic(schema: MessageType): Builder[F, RowParquetRecord] =
       BuilderImpl()(
         schemaResolver = RowParquetRecord.genericParquetSchemaResolver(schema),
-        encoder = RowParquetRecord.genericParquetRecordEncoder,
-        sync = Sync[F]
+        encoder        = RowParquetRecord.genericParquetRecordEncoder,
+        sync           = Sync[F]
       )
   }
 
   trait Builder[F[_], T] {
-    /**
-     * @param options writer options
-     */
+
+    /** @param options
+      *   writer options
+      */
     def options(options: ParquetWriter.Options): Builder[F, T]
-    /**
-     * @param path at which data is supposed to be written
-     * @return final [[fs2.Pipe]]
-     */
+
+    /** @param path
+      *   at which data is supposed to be written
+      * @return
+      *   final [[fs2.Pipe]]
+      */
     def write(path: Path): Pipe[F, T, fs2.INothing]
   }
 
-  private case class BuilderImpl[F[_], T](options: ParquetWriter.Options = ParquetWriter.Options())
-                                         (implicit
-                                          schemaResolver: ParquetSchemaResolver[T],
-                                          encoder: ParquetRecordEncoder[T],
-                                          sync: Sync[F]
-                                         ) extends Builder[F, T] {
+  private case class BuilderImpl[F[_], T](options: ParquetWriter.Options = ParquetWriter.Options())(implicit
+      schemaResolver: ParquetSchemaResolver[T],
+      encoder: ParquetRecordEncoder[T],
+      sync: Sync[F]
+  ) extends Builder[F, T] {
     override def options(options: ParquetWriter.Options): Builder[F, T] = this.copy(options = options)
-    override def write(path: Path): Pipe[F, T, fs2.INothing] = pipe[F, T](path, options)
+    override def write(path: Path): Pipe[F, T, fs2.INothing]            = pipe[F, T](path, options)
   }
 
-
-  private class Writer[T, F[_]](internalWriter: ParquetWriter.InternalWriter,
-                                encode: T => F[RowParquetRecord]
-                               )(implicit F: Sync[F]) extends AutoCloseable {
+  private class Writer[T, F[_]](internalWriter: ParquetWriter.InternalWriter, encode: T => F[RowParquetRecord])(implicit
+      F: Sync[F]
+  ) extends AutoCloseable {
 
     def write(elem: T): F[Unit] =
       for {
         record <- encode(elem)
-        _ <- F.blocking(internalWriter.write(record))
+        _      <- F.blocking(internalWriter.write(record))
       } yield ()
 
     def writePull(chunk: Chunk[T]): Pull[F, Nothing, Unit] =
@@ -80,25 +89,27 @@ private[parquet4s] object writer {
     override def close(): Unit = internalWriter.close()
   }
 
-  private def pipe[F[_]: Sync, T : ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
-                                                                                  options: ParquetWriter.Options
-                                                                                 ): Pipe[F, T, fs2.INothing] =
+  private def pipe[F[_]: Sync, T: ParquetRecordEncoder: ParquetSchemaResolver](
+      path: Path,
+      options: ParquetWriter.Options
+  ): Pipe[F, T, fs2.INothing] =
     in =>
       for {
-        logger <- Stream.eval(logger(getClass))
-        _ <- Stream.eval(io.validateWritePath(path, options, logger))
-        writer <- Stream.resource(writerResource[T, F](path, options))
+        logger  <- Stream.eval(logger(getClass))
+        _       <- Stream.eval(io.validateWritePath(path, options, logger))
+        writer  <- Stream.resource(writerResource[T, F](path, options))
         nothing <- writer.writeAllStream(in)
       } yield nothing
 
-  private def writerResource[T : ParquetRecordEncoder : ParquetSchemaResolver, F[_]](path: Path,
-                                                                                     options: ParquetWriter.Options)
-                                                                                    (implicit F: Sync[F]): Resource[F, Writer[T, F]] =
+  private def writerResource[T: ParquetRecordEncoder: ParquetSchemaResolver, F[_]](
+      path: Path,
+      options: ParquetWriter.Options
+  )(implicit F: Sync[F]): Resource[F, Writer[T, F]] =
     Resource.fromAutoCloseable(
       for {
-        schema <- F.catchNonFatal(ParquetSchemaResolver.resolveSchema[T])
+        schema                  <- F.catchNonFatal(ParquetSchemaResolver.resolveSchema[T])
         valueCodecConfiguration <- F.catchNonFatal(ValueCodecConfiguration(options))
-        internalWriter <- F.blocking(ParquetWriter.internalWriter(path, schema, options))
+        internalWriter          <- F.blocking(ParquetWriter.internalWriter(path, schema, options))
         encode = { (entity: T) => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)) }
       } yield new Writer[T, F](internalWriter, encode)
     )

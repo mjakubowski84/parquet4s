@@ -13,14 +13,15 @@ object WriteAndReadFS2App extends IOApp.Simple {
 
   case class Data(id: Int, text: String)
 
-  private implicit val showData: Show[Data] = Show.fromToString
-  private val Count = 100
+  implicit private val showData: Show[Data] = Show.fromToString
+  private val Count                         = 100
 
   override def run: IO[Unit] = {
     val stream = for {
       path <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(fs2Path => Path(fs2Path.toNioPath))
-      _ <- Stream.range[IO, Int](start = 0, stopExclusive = Count)
-        .map { i => Data(id = i, text = Random.nextString(4)) }
+      _ <- Stream
+        .range[IO, Int](start = 0, stopExclusive = Count)
+        .map(i => Data(id = i, text = Random.nextString(4)))
         .through(writeSingleFile[IO].of[Data].write(path.append("data.parquet")))
         .append(fromParquet[IO].as[Data].read(path).printlns.drain)
     } yield ()

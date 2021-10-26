@@ -20,26 +20,26 @@ object IndefiniteFS2App extends IOApp.Simple {
   private type KafkaRecord = CommittableConsumerRecord[IO, String, String]
 
   private case class Data(
-                           year: String,
-                           month: String,
-                           day: String,
-                           timestamp: Timestamp,
-                           word: String
-                         )
+      year: String,
+      month: String,
+      day: String,
+      timestamp: Timestamp,
+      word: String
+  )
 
-  private sealed trait Fluctuation {
+  sealed private trait Fluctuation {
     def delay: FiniteDuration
   }
   private case class Up(delay: FiniteDuration) extends Fluctuation
   private case class Down(delay: FiniteDuration) extends Fluctuation
 
   private val MaxNumberOfRecordPerFile = 128
-  private val MaxDurationOfFileWrite = 10.seconds
-  private val WriterOptions = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
-  private val MinDelay = 1.milli
-  private val MaxDelay = 500.millis
-  private val StartDelay = 100.millis
-  private val Topic = "topic"
+  private val MaxDurationOfFileWrite   = 10.seconds
+  private val WriterOptions            = ParquetWriter.Options(compressionCodecName = CompressionCodecName.SNAPPY)
+  private val MinDelay                 = 1.milli
+  private val MaxDelay                 = 500.millis
+  private val StartDelay               = 100.millis
+  private val Topic                    = "topic"
   private val Words = Seq("Example", "how", "to", "setup", "indefinite", "stream", "with", "Parquet", "writer")
 
   private def nextWord(): String = Words(Random.nextInt(Words.size - 1))
@@ -90,8 +90,7 @@ object IndefiniteFS2App extends IOApp.Simple {
       .through(KafkaProducer.pipe(producerSettings))
       .drain
 
-  private def consumer(consumerSettings: ConsumerSettings[IO, String, String],
-                       writePath: Path): Stream[IO, INothing] =
+  private def consumer(consumerSettings: ConsumerSettings[IO, String, String], writePath: Path): Stream[IO, INothing] =
     KafkaConsumer[IO]
       .stream(consumerSettings)
       .evalTap(_.subscribeTo(Topic))
@@ -108,15 +107,20 @@ object IndefiniteFS2App extends IOApp.Simple {
       .maxCount(MaxNumberOfRecordPerFile)
       .maxDuration(MaxDurationOfFileWrite)
       .preWriteTransformation[Data] { kafkaRecord =>
-        kafkaRecord.record.timestamp.createTime.map(l => new Timestamp(l)).fold[Stream[IO, Data]](Stream.empty) { timestamp =>
-          val dateTime = timestamp.toLocalDateTime
-          Stream.emit(Data(
-            year = dateTime.getYear.toString,
-            month = dateTime.getMonth.getValue.toString,
-            day = dateTime.getDayOfMonth.toString,
-            timestamp = timestamp,
-            word = kafkaRecord.record.value
-          )).evalTap(data => IO.println(data))
+        kafkaRecord.record.timestamp.createTime.map(l => new Timestamp(l)).fold[Stream[IO, Data]](Stream.empty) {
+          timestamp =>
+            val dateTime = timestamp.toLocalDateTime
+            Stream
+              .emit(
+                Data(
+                  year      = dateTime.getYear.toString,
+                  month     = dateTime.getMonth.getValue.toString,
+                  day       = dateTime.getDayOfMonth.toString,
+                  timestamp = timestamp,
+                  word      = kafkaRecord.record.value
+                )
+              )
+              .evalTap(data => IO.println(data))
         }
       }
       .partitionBy(Col("year"), Col("month"), Col("day"))

@@ -17,12 +17,12 @@ object SingleFileParquetSink {
   }
 
   private[parquet4s] object ToParquetImpl extends ToParquet {
-    override def of[T: ParquetSchemaResolver : ParquetRecordEncoder]: Builder[T] =
+    override def of[T: ParquetSchemaResolver: ParquetRecordEncoder]: Builder[T] =
       BuilderImpl()
     override def generic(schema: MessageType): Builder[RowParquetRecord] =
       BuilderImpl()(
         schemaResolver = RowParquetRecord.genericParquetSchemaResolver(schema),
-        encoder = RowParquetRecord.genericParquetRecordEncoder
+        encoder        = RowParquetRecord.genericParquetRecordEncoder
       )
   }
 
@@ -32,29 +32,29 @@ object SingleFileParquetSink {
     def build(path: Path): Sink[T, Future[Done]]
   }
 
-  private case class BuilderImpl[T](options: ParquetWriter.Options = ParquetWriter.Options())
-                                   (implicit
-                                    schemaResolver: ParquetSchemaResolver[T],
-                                    encoder: ParquetRecordEncoder[T]
-                                   ) extends Builder[T] {
+  private case class BuilderImpl[T](options: ParquetWriter.Options = ParquetWriter.Options())(implicit
+      schemaResolver: ParquetSchemaResolver[T],
+      encoder: ParquetRecordEncoder[T]
+  ) extends Builder[T] {
     override def options(options: ParquetWriter.Options): Builder[T] = this.copy(options = options)
-    override def build(path: Path): Sink[T, Future[Done]] = apply(path, options)
+    override def build(path: Path): Sink[T, Future[Done]]            = apply(path, options)
   }
 
   private val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  private def apply[T: ParquetRecordEncoder : ParquetSchemaResolver](path: Path,
-                                                                     options: ParquetWriter.Options = ParquetWriter.Options()
-                                                                    ): Sink[T, Future[Done]] = {
-    val schema = ParquetSchemaResolver.resolveSchema[T]
-    val writer = ParquetWriter.internalWriter(path, schema, options)
+  private def apply[T: ParquetRecordEncoder: ParquetSchemaResolver](
+      path: Path,
+      options: ParquetWriter.Options = ParquetWriter.Options()
+  ): Sink[T, Future[Done]] = {
+    val schema                  = ParquetSchemaResolver.resolveSchema[T]
+    val writer                  = ParquetWriter.internalWriter(path, schema, options)
     val valueCodecConfiguration = ValueCodecConfiguration(options)
 
     def encode(data: T): RowParquetRecord = ParquetRecordEncoder.encode[T](data, valueCodecConfiguration)
 
     Flow[T]
       .map(encode)
-      .fold(0) { case (acc, record) => writer.write(record); acc + 1}
+      .fold(0) { case (acc, record) => writer.write(record); acc + 1 }
       .map { count =>
         if (logger.isDebugEnabled) logger.debug(s"$count records were successfully written to $path")
         writer.close()

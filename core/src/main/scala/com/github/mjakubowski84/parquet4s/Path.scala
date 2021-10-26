@@ -19,10 +19,9 @@ object Path {
 
 }
 
-/**
- * Represents path/URI to Parquet file or directory containing Parquet files.
- */
-class Path private(val hadoopPath: HadoopPath) {
+/** Represents path/URI to Parquet file or directory containing Parquet files.
+  */
+class Path private (val hadoopPath: HadoopPath) {
 
   def append(element: String): Path = new Path(new HadoopPath(hadoopPath, element))
 

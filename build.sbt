@@ -4,12 +4,11 @@ import Documentation._
 import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
-
-lazy val twoTwelve = "2.12.15"
-lazy val twoThirteen = "2.13.6"
-lazy val three = "3.0.2"
+lazy val twoTwelve              = "2.12.15"
+lazy val twoThirteen            = "2.13.6"
+lazy val three                  = "3.0.2"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
-lazy val akkaScalaVersions = Seq(twoTwelve, twoThirteen)
+lazy val akkaScalaVersions      = Seq(twoTwelve, twoThirteen)
 
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "2.0.0-RC1"
@@ -20,12 +19,13 @@ ThisBuild / resolvers := Seq(
   Opts.resolver.sonatypeReleases,
   Resolver.jcenterRepo
 )
-ThisBuild / makePomConfiguration := makePomConfiguration.value.withConfigurations(Configurations.defaultMavenConfigurations)
+ThisBuild / makePomConfiguration := makePomConfiguration.value.withConfigurations(
+  Configurations.defaultMavenConfigurations
+)
 ThisBuild / versionScheme := Some("semver-spec")
 Global / excludeLintKeys += run / cancelable
 Global / excludeLintKeys += IntegrationTest / publishArtifact
 Global / excludeLintKeys += makePomConfiguration
-
 
 lazy val compilationSettings = Seq(
   scalacOptions ++= {
@@ -34,13 +34,14 @@ lazy val compilationSettings = Seq(
       "UTF-8",
       "-feature",
       "-language:implicitConversions",
-      "-Xfatal-warnings",
+      "-Xfatal-warnings"
     ) ++ {
       CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) => Seq(
-          "-unchecked",
-          "-Xtarget:8"
-        )
+        case Some((3, _)) =>
+          Seq(
+            "-unchecked",
+            "-Xtarget:8"
+          )
         case _ =>
           Seq(
             "-deprecation",
@@ -54,25 +55,29 @@ lazy val compilationSettings = Seq(
 )
 
 lazy val itSettings = Defaults.itSettings ++
-  Project.inConfig(IntegrationTest)(Seq(
-    fork := true,
-    parallelExecution := false,
-    testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
-  )) ++
+  Project.inConfig(IntegrationTest)(
+    Seq(
+      fork := true,
+      parallelExecution := false,
+      testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
+    )
+  ) ++
   Project.inConfig(IntegrationTest)(BloopDefaults.configSettings)
 
-lazy val testReportSettings = Project.inConfig(Test)(Seq(
-  testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
-))
+lazy val testReportSettings = Project.inConfig(Test)(
+  Seq(
+    testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
+  )
+)
 
 // used only for testing in core module
 lazy val sparkDeps = Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "it"
-    exclude(org = "org.apache.hadoop", name = "hadoop-client")
-    exclude(org = "org.slf4j", name = "slf4j-api")
-    exclude(org = "org.apache.parquet", name = "parquet-hadoop"),
+    exclude (org = "org.apache.hadoop", name = "hadoop-client")
+    exclude (org = "org.slf4j", name = "slf4j-api")
+    exclude (org = "org.apache.parquet", name = "parquet-hadoop"),
   "org.apache.spark" %% "spark-sql" % sparkVersion % "it"
-    exclude(org = "org.apache.hadoop", name = "hadoop-client")
+    exclude (org = "org.apache.hadoop", name = "hadoop-client")
 )
 
 lazy val core = (project in file("core"))
@@ -82,7 +87,7 @@ lazy val core = (project in file("core"))
     crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.parquet" % "parquet-hadoop" % parquetVersion
-        exclude(org = "org.slf4j", name = "slf4j-api"),
+        exclude (org = "org.slf4j", name = "slf4j-api"),
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.5.0",

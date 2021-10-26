@@ -18,29 +18,31 @@ object WriteAndReadFilteredFS2App extends IOApp.Simple {
     val D = "D"
 
     val values: List[String] = List(A, B, C, D)
-    def random: String = values(Random.nextInt(values.length))
+    def random: String       = values(Random.nextInt(values.length))
   }
 
   case class Data(id: Int, dict: String)
 
-  private implicit val showData: Show[Data] = Show.fromToString
-  private val Count = 100
+  implicit private val showData: Show[Data] = Show.fromToString
+  private val Count                         = 100
 
   override def run: IO[Unit] = {
     val stream = for {
       path <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(fs2Path => Path(fs2Path.toNioPath))
-      _ <- Stream.range[IO, Int](start = 0, stopExclusive = Count)
-        .map { i => Data(id = i, dict = Dict.random) }
+      _ <- Stream
+        .range[IO, Int](start = 0, stopExclusive = Count)
+        .map(i => Data(id = i, dict = Dict.random))
         .through(writeSingleFile[IO].of[Data].write(path.append("data.parquet")))
         .append(Stream.exec(IO.println("""dict == "A"""")))
         .append(fromParquet[IO].as[Data].filter(Col("dict") === Dict.A).read(path).printlns.drain)
         .append(Stream.exec(IO.println("""id >= 20 && id < 40""")))
-        .append(fromParquet[IO]
-          .as[Data]
-          .filter(Col("id") >= 20 && Col("id") < 40)
-          .read(path)
-          .printlns
-          .drain
+        .append(
+          fromParquet[IO]
+            .as[Data]
+            .filter(Col("id") >= 20 && Col("id") < 40)
+            .read(path)
+            .printlns
+            .drain
         )
     } yield ()
 

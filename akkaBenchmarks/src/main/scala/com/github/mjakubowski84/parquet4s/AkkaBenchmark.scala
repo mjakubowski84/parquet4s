@@ -20,11 +20,10 @@ import scala.util.Random
 case class Embedded(fraction: Double, text: String)
 case class Record(i: Int, dict: String, embedded: Option[Embedded])
 
-
 object AkkaBenchmark {
 
   val Fractioner = 100.12
-  val Dict = List("a", "b", "c", "d")
+  val Dict       = List("a", "b", "c", "d")
   val Dispatcher = "akka.actor.single-thread-dispatcher"
 
   @State(Scope.Benchmark)
@@ -32,24 +31,27 @@ object AkkaBenchmark {
 
     // 512 * 1024
     @Param(Array("524288"))
-    var datasetSize: Int = _
-    var basePath: Path = _
+    var datasetSize: Int                    = _
+    var basePath: Path                      = _
     var records: immutable.Iterable[Record] = _
-    var actorSystem: ActorSystem = _
+    var actorSystem: ActorSystem            = _
 
     @Setup(Level.Trial)
     def setup(): Unit = {
       basePath = Path(Files.createTempDirectory("benchmark")).append(datasetSize.toString)
       records = (1 to datasetSize).map { i =>
         Record(
-          i = i,
+          i    = i,
           dict = Dict(Random.nextInt(Dict.size - 1)),
-          embedded = if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
-          else None
+          embedded =
+            if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
+            else None
         )
       }
-      actorSystem = ActorSystem("Benchmark", ConfigFactory.parseString(
-        """
+      actorSystem = ActorSystem(
+        "Benchmark",
+        ConfigFactory.parseString(
+          """
             akka.actor.single-thread-dispatcher {
                 type = PinnedDispatcher
                 executor = "thread-pool-executor"
@@ -58,35 +60,40 @@ object AkkaBenchmark {
                 }
             }
             """
-      ))
+        )
+      )
     }
 
     @TearDown(Level.Trial)
     def tearDown(): Unit = Await.ready(actorSystem.terminate(), Duration.Inf)
 
-    def delete(): NioPath = Files.walkFileTree(basePath.toNio, new FileVisitor[NioPath]() {
-      override def preVisitDirectory(dir: NioPath, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
-      override def visitFile(file: NioPath, attrs: BasicFileAttributes): FileVisitResult = {
-        Files.delete(file)
-        FileVisitResult.CONTINUE
+    def delete(): NioPath = Files.walkFileTree(
+      basePath.toNio,
+      new FileVisitor[NioPath]() {
+        override def preVisitDirectory(dir: NioPath, attrs: BasicFileAttributes): FileVisitResult =
+          FileVisitResult.CONTINUE
+        override def visitFile(file: NioPath, attrs: BasicFileAttributes): FileVisitResult = {
+          Files.delete(file)
+          FileVisitResult.CONTINUE
+        }
+        override def visitFileFailed(file: NioPath, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+        override def postVisitDirectory(dir: NioPath, exc: IOException): FileVisitResult = {
+          Files.delete(dir)
+          FileVisitResult.CONTINUE
+        }
       }
-      override def visitFileFailed(file: NioPath, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-      override def postVisitDirectory(dir: NioPath, exc: IOException): FileVisitResult = {
-        Files.delete(dir)
-        FileVisitResult.CONTINUE
-      }
-    })
+    )
 
   }
 
   trait BaseState {
-    var dataset: Dataset = _
-    var filePath: Path = _
+    var dataset: Dataset                  = _
+    var filePath: Path                    = _
     implicit var actorSystem: ActorSystem = _
 
     def fetchDataset(dataset: Dataset): Unit = {
-      this.dataset = dataset
-      this.filePath = dataset.basePath.append("file.parquet")
+      this.dataset     = dataset
+      this.filePath    = dataset.basePath.append("file.parquet")
       this.actorSystem = dataset.actorSystem
     }
   }
@@ -125,8 +132,7 @@ object AkkaBenchmark {
   class ReadState extends BaseState {
 
     private def readGraph =
-      ParquetStreams
-        .fromParquet
+      ParquetStreams.fromParquet
         .as[Record]
         .read(dataset.basePath)
         .toMat(Sink.last)(Keep.right)

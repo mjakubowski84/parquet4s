@@ -12,12 +12,13 @@ import java.time.LocalDate
 
 object WriteAndReadGenericAkkaApp extends App {
 
-  val ID = "id"
-  val Name = "name"
-  val Birthday = "birthday"
+  val ID         = "id"
+  val Name       = "name"
+  val Birthday   = "birthday"
   val SchemaName = "user_schema"
 
-  val Schema: MessageType = Types.buildMessage()
+  val Schema: MessageType = Types
+    .buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
@@ -30,7 +31,8 @@ object WriteAndReadGenericAkkaApp extends App {
     (2L, "Bob", LocalDate.of(1980, 2, 28)),
     (3L, "Cecilia", LocalDate.of(1977, 3, 15))
   ).map { case (id, name, birthday) =>
-    RowParquetRecord.emptyWithSchema(ID, Name, Birthday)
+    RowParquetRecord
+      .emptyWithSchema(ID, Name, Birthday)
       .updated(ID, id, Vcc)
       .updated(Name, name, Vcc)
       .updated(Birthday, birthday, Vcc)
