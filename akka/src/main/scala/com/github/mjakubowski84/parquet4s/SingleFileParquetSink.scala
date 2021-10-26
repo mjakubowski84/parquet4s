@@ -28,6 +28,7 @@ object SingleFileParquetSink {
 
   trait Builder[T] {
     def options(options: ParquetWriter.Options): Builder[T]
+    // TODO build or write?
     def build(path: Path): Sink[T, Future[Done]]
   }
 
