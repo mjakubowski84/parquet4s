@@ -78,7 +78,7 @@ jobs:
           path: workspace/repo
       - run:
           name: Style check
-          command: cat /dev/null | sbt +scalafmtSbtCheck +scalafmtCheckAll +it:scalafmtCheckAll
+          command: cat /dev/null | sbt scalafmtSbtCheck +scalafmtCheckAll +it:scalafmtCheckAll
           working_directory: workspace/repo
       - run:
           name: Compile
