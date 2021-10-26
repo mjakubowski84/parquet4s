@@ -17,6 +17,8 @@ Compatible with files generated with [Apache Spark](https://spark.apache.org/). 
 
 Based on official [Parquet library](https://github.com/apache/parquet-mr), [Hadoop Client](https://github.com/apache/hadoop) and [Shapeless](https://github.com/milessabin/shapeless) (Shapeless is not in use in a version for Scala 3).
 
+As it is based on Hadoop Client then you can connect to any Hadoop-compatible storage like AWS S3 or Google Cloud Storage. 
+
 Integrations for [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [FS2](https://fs2.io/).
 
-Released for 2.12.x and 2.13.x and Scala 3.1.x.
+Released for 2.12.x and 2.13.x and Scala 3.0.x.

@@ -105,7 +105,6 @@ import com.github.mjakubowski84.parquet4s.{ParquetStreams, ParquetWriter}
 import org.apache.parquet.hadoop.ParquetFileWriter
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import akka.actor.ActorSystem
-import akka.stream.{ActorMaterializer, Materializer}
 import akka.stream.scaladsl.Source
 import org.apache.hadoop.conf.Configuration
 import scala.concurrent.duration._
@@ -113,7 +112,6 @@ import scala.concurrent.duration._
 case class User(userId: String, name: String, created: java.sql.Timestamp)
 
 implicit val system: ActorSystem = ActorSystem()
-implicit val materializer: Materializer = ActorMaterializer()
 
 val users: Iterable[User] = ???
 

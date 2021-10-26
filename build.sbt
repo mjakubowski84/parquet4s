@@ -7,7 +7,7 @@ import sbt.util
 
 lazy val twoTwelve = "2.12.15"
 lazy val twoThirteen = "2.13.6"
-lazy val three = "3.1.0"
+lazy val three = "3.0.2"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 lazy val akkaScalaVersions = Seq(twoTwelve, twoThirteen)
 
@@ -246,7 +246,7 @@ lazy val documentation = (project in file("site"))
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
     )
   )
-  .dependsOn(core)
+  .dependsOn(core, akka, fs2)
   .enablePlugins(MicrositesPlugin)
 
 lazy val root = (project in file("."))

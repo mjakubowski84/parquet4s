@@ -5,5 +5,17 @@ options:
   - title: Quick Start
     url: docs/quick_start
 
+  - title: Integration with Akka Streams
+    url: docs/akka
+
+  - title: Integration with FS2
+    url: docs/fs2
+
+  - title: Supported Storage Types
+    url: docs/storage_types
+
+  - title: Records and Schema
+    url: docs/records_and_schema
+
   - title: Migration from 1.x
     url: docs/migration

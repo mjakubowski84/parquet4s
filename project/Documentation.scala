@@ -1,4 +1,5 @@
 import com.typesafe.sbt.site.SitePlugin.autoImport.makeSite
+import mdoc.MdocPlugin.autoImport._
 import microsites.MicrositeKeys._
 import sbt.Keys._
 import sbt.{Def, url}
@@ -22,7 +23,10 @@ object Documentation {
       micrositeGithubToken := sys.env.get("PARQUET4S_DOCS_GITHUB_TOKEN"),
       micrositePushSiteWith := GitHub4s,
       makeSite / includeFilter := "*.html" || "*.css" || "*.png" || "*.jpg" || "*.gif" || "*.js" || "*.md" || "*.svg",
-      micrositeDataDirectory := baseDirectory.value / "docs" / "data"
+      micrositeDataDirectory := baseDirectory.value / "docs" / "data",
+      mdocVariables := Map(
+        "VERSION" -> version.value
+      )
     )
 
 }
