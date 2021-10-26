@@ -24,9 +24,10 @@ object CustomType {
 
     // required for reading
     implicit val decoder: OptionalValueDecoder[Type] =
-      (value: Value, _: ValueCodecConfiguration) => value match {
-        case BinaryValue(binary) => valueOf(binary.toStringUsingUTF8)
-      }
+      (value: Value, _: ValueCodecConfiguration) =>
+        value match {
+          case BinaryValue(binary) => valueOf(binary.toStringUsingUTF8)
+        }
     // required for writing
     implicit val encoder: OptionalValueEncoder[Type] =
       (data: Type, _: ValueCodecConfiguration) => BinaryValue(data.toString)

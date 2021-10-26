@@ -48,7 +48,7 @@ case class DoubleValue(value: Double) extends AnyVal with PrimitiveValue[Double]
 
 object BinaryValue {
   def apply(bytes: Array[Byte]): BinaryValue = BinaryValue(Binary.fromReusedByteArray(bytes))
-  def apply(string: String): BinaryValue = BinaryValue(Binary.fromString(string))
+  def apply(string: String): BinaryValue     = BinaryValue(Binary.fromString(string))
 }
 
 case class BinaryValue(value: Binary) extends PrimitiveValue[Binary] {

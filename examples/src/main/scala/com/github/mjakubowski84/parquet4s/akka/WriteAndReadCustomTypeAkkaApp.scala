@@ -22,7 +22,9 @@ object WriteAndReadCustomTypeAkkaApp extends App {
 
   for {
     // write
-    _ <- Source.fromIterator(data).runWith(ParquetStreams.toParquetSingleFile.of[Data].build(path.append("data.parquet")))
+    _ <- Source
+      .fromIterator(data)
+      .runWith(ParquetStreams.toParquetSingleFile.of[Data].build(path.append("data.parquet")))
     // read
     // hint: you can filter by dict using string value, for example: filter = Col("dict") === "A"
     _ <- ParquetStreams.fromParquet.as[Data].read(path).runWith(Sink.foreach(println))

@@ -8,8 +8,8 @@ import com.github.mjakubowski84.parquet4s.ValueImplicits._
 
 class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
 
-  private val vcc = ValueCodecConfiguration.Default
-  private implicit val sequencing: Sequencing[ListParquetRecord] = Sequencing.sequencingNatureOfGenSeq[Value, Seq]
+  private val vcc                                                = ValueCodecConfiguration.Default
+  implicit private val sequencing: Sequencing[ListParquetRecord] = Sequencing.sequencingNatureOfGenSeq[Value, Seq]
 
   "RowParquetRecord" should "indicate that is empty" in {
     val record = RowParquetRecord.EmptyNoSchema
@@ -19,11 +19,12 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
 
   it should "fail to get field from invalid index" in {
     an[NoSuchElementException] should be thrownBy RowParquetRecord.EmptyNoSchema.head
-    an[IndexOutOfBoundsException] should be thrownBy RowParquetRecord("a"-> 1.value)(2)
+    an[IndexOutOfBoundsException] should be thrownBy RowParquetRecord("a" -> 1.value)(2)
   }
 
   it should "succeed to add and retrieve a field" in {
-    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+    val record = RowParquetRecord
+      .emptyWithSchema("a", "b", "c")
       .updated("a", "a", vcc)
       .updated("b", "b", vcc)
       .updated("c", "c", vcc)
@@ -35,7 +36,8 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "succeed to add and retrieve a field using a path" in {
-    val record = RowParquetRecord.emptyWithSchema("a", "x")
+    val record = RowParquetRecord
+      .emptyWithSchema("a", "x")
       .updated("a", "a", vcc)
       .updated(Col("x.y.z"), "xyz".value)
       .updated(Col("x.v"), NullValue)
@@ -52,7 +54,8 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "be updatable" in {
-    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+    val record = RowParquetRecord
+      .emptyWithSchema("a", "b", "c")
       .updated("a", "a", vcc)
       .updated("b", "b", vcc)
       .updated("c", "c", vcc)
@@ -68,7 +71,8 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "allow to remove fields by id" in {
-    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+    val record = RowParquetRecord
+      .emptyWithSchema("a", "b", "c")
       .updated("a", "a", vcc)
       .updated("b", "b", vcc)
       .updated("c", "c", vcc)
@@ -86,7 +90,8 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "allow to remove fields by name" in {
-    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+    val record = RowParquetRecord
+      .emptyWithSchema("a", "b", "c")
       .updated("a", "a", vcc)
       .updated("b", "b", vcc)
       .updated("c", "c", vcc)
@@ -128,7 +133,8 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "iterate over values" in {
-    val record = RowParquetRecord.emptyWithSchema("a", "b", "c")
+    val record = RowParquetRecord
+      .emptyWithSchema("a", "b", "c")
       .updated("a", "a", vcc)
       .updated("b", "b", vcc)
       .updated("c", "c", vcc)
@@ -164,8 +170,8 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "accumulate normal compound values" in {
-    val r1 = RowParquetRecord("a"-> 1.value, "b"-> 2.value)
-    val r2 = RowParquetRecord("c"-> 3.value, "d"-> 4.value)
+    val r1 = RowParquetRecord("a" -> 1.value, "b" -> 2.value)
+    val r2 = RowParquetRecord("c" -> 3.value, "d" -> 4.value)
     val lst = ListParquetRecord.Empty
       .add("list", RowParquetRecord("element" -> r1))
       .add("list", RowParquetRecord("element" -> r2))
@@ -173,24 +179,24 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
   }
 
   it should "accumulate legacy primitive values" in {
-    val b1 = "a string".value
-    val b2 = "another string".value
-    val lst = ListParquetRecord.Empty.add("array",  b1).add("array",  b2)
+    val b1  = "a string".value
+    val b2  = "another string".value
+    val lst = ListParquetRecord.Empty.add("array", b1).add("array", b2)
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
   it should "accumulate 3-levels legacy primitive values" in {
-    val b1 = "a string".value
-    val b2 = "another string".value
-    val r1 = RowParquetRecord("array" -> b1)
-    val r2 = RowParquetRecord("array" -> b2)
-    val lst = ListParquetRecord.Empty.add("bag",  r1).add("bag",  r2)
+    val b1  = "a string".value
+    val b2  = "another string".value
+    val r1  = RowParquetRecord("array" -> b1)
+    val r2  = RowParquetRecord("array" -> b2)
+    val lst = ListParquetRecord.Empty.add("bag", r1).add("bag", r2)
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 
   it should "accumulate legacy compound values" in {
-    val r1 = RowParquetRecord("a"-> 1.value, "b"-> 2.value)
-    val r2 = RowParquetRecord("c"-> 3.value, "d"-> 4.value)
+    val r1  = RowParquetRecord("a" -> 1.value, "b" -> 2.value)
+    val r2  = RowParquetRecord("c" -> 3.value, "d" -> 4.value)
     val lst = ListParquetRecord.Empty.add("array", r1).add("array", r2)
     lst should contain theSameElementsInOrderAs Seq(r1, r2)
   }

@@ -14,18 +14,19 @@ import java.time.LocalDate
 
 object WriteAndReadGenericFS2App extends IOApp.Simple {
 
-  private val ID = "id"
-  private val Name = "name"
-  private val Birthday = "birthday"
+  private val ID         = "id"
+  private val Name       = "name"
+  private val Birthday   = "birthday"
   private val SchemaName = "user_schema"
 
-  val schema: MessageType = Types.buildMessage()
+  val schema: MessageType = Types
+    .buildMessage()
     .addField(Types.primitive(INT64, REQUIRED).as(LogicalTypeAnnotation.intType(64, true)).named(ID))
     .addField(Types.primitive(BINARY, OPTIONAL).as(LogicalTypeAnnotation.stringType()).named(Name))
     .addField(Types.primitive(INT32, OPTIONAL).as(LogicalTypeAnnotation.dateType()).named(Birthday))
     .named(SchemaName)
 
-  private implicit val showRecords: Show[RowParquetRecord] = Show.fromToString
+  implicit private val showRecords: Show[RowParquetRecord] = Show.fromToString
 
   private val vcc = ValueCodecConfiguration.Default
 
@@ -34,17 +35,18 @@ object WriteAndReadGenericFS2App extends IOApp.Simple {
     (2L, "Bob", LocalDate.of(1980, 2, 28)),
     (3L, "Cecilia", LocalDate.of(1977, 3, 15))
   ).map { case (id, name, birthday) =>
-    RowParquetRecord.emptyWithSchema(ID, Name, Birthday)
+    RowParquetRecord
+      .emptyWithSchema(ID, Name, Birthday)
       .updated(ID, id, vcc)
       .updated(Name, name, vcc)
       .updated(Birthday, birthday, vcc)
   }
 
-
   override def run: IO[Unit] = {
     val stream = for {
       path <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(fs2Path => Path(fs2Path.toNioPath))
-      _ <- Stream.iterable[IO, RowParquetRecord](users)
+      _ <- Stream
+        .iterable[IO, RowParquetRecord](users)
         .through(writeSingleFile[IO].generic(schema).write(path.append("data.parquet")))
         .append(fromParquet[IO].generic.read(path).printlns.drain)
     } yield ()

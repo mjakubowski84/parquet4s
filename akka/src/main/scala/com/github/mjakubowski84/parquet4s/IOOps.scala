@@ -12,9 +12,9 @@ import scala.util.matching.Regex
 
 private[parquet4s] object IOOps {
 
-  private implicit class RemoteIteratorWrapper[T](wrapped: RemoteIterator[T]) extends Iterator[T] {
+  implicit private class RemoteIteratorWrapper[T](wrapped: RemoteIterator[T]) extends Iterator[T] {
     override def hasNext: Boolean = wrapped.hasNext
-    override def next(): T = wrapped.next()
+    override def next(): T        = wrapped.next()
   }
 
   private type Partition = (ColumnPath, String)
@@ -23,61 +23,61 @@ private[parquet4s] object IOOps {
 
 }
 
-/**
- * Utility functions that perform operations on HDFS.
- */
+/** Utility functions that perform operations on HDFS.
+  */
 trait IOOps {
 
   import IOOps._
 
   protected val logger: Logger
 
-  protected def validateWritePath(path: Path,
-                                  writeOptions: ParquetWriter.Options): Unit = {
+  protected def validateWritePath(path: Path, writeOptions: ParquetWriter.Options): Unit = {
     val hadoopPath = path.toHadoop
-    val fs = hadoopPath.getFileSystem(writeOptions.hadoopConf)
-    try {
-      if (fs.exists(hadoopPath)) {
-        if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
-          throw new AlreadyExistsException(s"File or directory already exists: $hadoopPath")
-        else {
-          if (logger.isDebugEnabled)
-            logger.debug(s"Deleting $hadoopPath in order to override with new data.")
-          fs.delete(hadoopPath, true)
-          ()
-        }
+    val fs         = hadoopPath.getFileSystem(writeOptions.hadoopConf)
+    try if (fs.exists(hadoopPath)) {
+      if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
+        throw new AlreadyExistsException(s"File or directory already exists: $hadoopPath")
+      else {
+        if (logger.isDebugEnabled)
+          logger.debug(s"Deleting $hadoopPath in order to override with new data.")
+        fs.delete(hadoopPath, true)
+        ()
       }
     } finally fs.close()
   }
 
-  protected def filesAtPath(path: Path, configuration: Configuration)
-                           (implicit ec: ExecutionContext): Future[List[String]] =
+  protected def filesAtPath(path: Path, configuration: Configuration)(implicit
+      ec: ExecutionContext
+  ): Future[List[String]] =
     Future {
       val hadoopPath = path.toHadoop
       scala.concurrent.blocking {
         val fs = hadoopPath.getFileSystem(configuration)
-        try {
-          fs.listFiles(hadoopPath, false)
-            .map(_.getPath.getName)
-            .toList
-        } finally fs.close()
+        try fs
+          .listFiles(hadoopPath, false)
+          .map(_.getPath.getName)
+          .toList
+        finally fs.close()
       }
     }
 
-  protected def findPartitionedPaths(path: Path,
-                                     configuration: Configuration): Either[Exception, PartitionedDirectory] = {
+  protected def findPartitionedPaths(
+      path: Path,
+      configuration: Configuration
+  ): Either[Exception, PartitionedDirectory] = {
     val fs = path.toHadoop.getFileSystem(configuration)
-    try {
-      findPartitionedPaths(fs, path, List.empty).fold(
-        PartitionedDirectory.failed,
-        PartitionedDirectory.apply
-      )
-    } finally fs.close()
+    try findPartitionedPaths(fs, path, List.empty).fold(
+      PartitionedDirectory.failed,
+      PartitionedDirectory.apply
+    )
+    finally fs.close()
   }
 
-  private def findPartitionedPaths(fs: FileSystem,
-                                   path: Path,
-                                   partitions: List[Partition]): Either[List[Path], List[PartitionedPath]] = {
+  private def findPartitionedPaths(
+      fs: FileSystem,
+      path: Path,
+      partitions: List[Partition]
+  ): Either[List[Path], List[PartitionedPath]] = {
     val (dirs, files) = fs.listStatus(path.toHadoop).toList.partition(_.isDirectory)
     if (dirs.nonEmpty && files.nonEmpty)
       Left(path :: Nil) // path is invalid because it contains both dirs and files
@@ -97,7 +97,7 @@ trait IOOps {
               left
             case (_, left: Left[_, _]) =>
               left
-        }
+          }
     }
   }
 

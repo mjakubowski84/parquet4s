@@ -4,7 +4,7 @@ import org.openjdk.jmh.annotations._
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{ Path => NioPath, _ }
+import java.nio.file.{Path => NioPath, _}
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.collection.immutable
@@ -13,19 +13,18 @@ import scala.util.Random
 case class Embedded(fraction: Double, text: String)
 case class Record(i: Int, dict: String, embedded: Option[Embedded])
 
-
 object CoreBenchmark {
 
   val Fractioner = 100.12
-  val Dict = List("a", "b", "c", "d")
+  val Dict       = List("a", "b", "c", "d")
 
   @State(Scope.Benchmark)
   class Dataset {
 
     // 512 * 1024
     @Param(Array("524288"))
-    var datasetSize: Int = _
-    var basePath: Path = _
+    var datasetSize: Int                    = _
+    var basePath: Path                      = _
     var records: immutable.Iterable[Record] = _
 
     @Setup(Level.Trial)
@@ -33,35 +32,40 @@ object CoreBenchmark {
       basePath = Path(Files.createTempDirectory("benchmark")).append(datasetSize.toString)
       records = (1 to datasetSize).map { i =>
         Record(
-          i = i,
+          i    = i,
           dict = Dict(Random.nextInt(Dict.size - 1)),
-          embedded = if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
-          else None
+          embedded =
+            if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
+            else None
         )
       }
     }
 
-    def delete(): NioPath = Files.walkFileTree(basePath.toNio, new FileVisitor[NioPath]() {
-      override def preVisitDirectory(dir: NioPath, attrs: BasicFileAttributes): FileVisitResult = FileVisitResult.CONTINUE
-      override def visitFile(file: NioPath, attrs: BasicFileAttributes): FileVisitResult = {
-        Files.delete(file)
-        FileVisitResult.CONTINUE
+    def delete(): NioPath = Files.walkFileTree(
+      basePath.toNio,
+      new FileVisitor[NioPath]() {
+        override def preVisitDirectory(dir: NioPath, attrs: BasicFileAttributes): FileVisitResult =
+          FileVisitResult.CONTINUE
+        override def visitFile(file: NioPath, attrs: BasicFileAttributes): FileVisitResult = {
+          Files.delete(file)
+          FileVisitResult.CONTINUE
+        }
+        override def visitFileFailed(file: NioPath, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
+        override def postVisitDirectory(dir: NioPath, exc: IOException): FileVisitResult = {
+          Files.delete(dir)
+          FileVisitResult.CONTINUE
+        }
       }
-      override def visitFileFailed(file: NioPath, exc: IOException): FileVisitResult = FileVisitResult.CONTINUE
-      override def postVisitDirectory(dir: NioPath, exc: IOException): FileVisitResult = {
-        Files.delete(dir)
-        FileVisitResult.CONTINUE
-      }
-    })
+    )
 
   }
 
   trait BaseState {
     var dataset: Dataset = _
-    var filePath: Path = _
+    var filePath: Path   = _
 
     def fetchDataset(dataset: Dataset): Unit = {
-      this.dataset = dataset
+      this.dataset  = dataset
       this.filePath = dataset.basePath.append("file.parquet")
     }
   }

@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-
 class ValueEncodingAndDecodingSpec extends AnyFlatSpec with Matchers {
 
   case class TestType(i: Int)
@@ -19,8 +18,8 @@ class ValueEncodingAndDecodingSpec extends AnyFlatSpec with Matchers {
       case IntValue(i) => TestType(i)
     }
 
-  val testType: TestType = TestType(42)
-  val testValue: IntValue = IntValue(testType.i)
+  val testType: TestType                     = TestType(42)
+  val testValue: IntValue                    = IntValue(testType.i)
   val configuration: ValueCodecConfiguration = ValueCodecConfiguration.Default
 
   "Required value encoder" should "encode non-null value" in {
@@ -28,7 +27,10 @@ class ValueEncodingAndDecodingSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "throw an exception when encoding null" in {
-    an[IllegalArgumentException] should be thrownBy requiredValueEncoder.encode(null.asInstanceOf[TestType], configuration)
+    an[IllegalArgumentException] should be thrownBy requiredValueEncoder.encode(
+      null.asInstanceOf[TestType],
+      configuration
+    )
   }
 
   "Required value decoder" should "decode non-null value" in {

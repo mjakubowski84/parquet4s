@@ -10,16 +10,15 @@ object WriteAndReadApp extends App {
   case class Data(id: Int, text: String)
 
   val count = 100
-  val data = (1 to count).map { i => Data(id = i, text = Random.nextString(4)) }
-  val path = Path(Files.createTempDirectory("example"))
+  val data  = (1 to count).map(i => Data(id = i, text = Random.nextString(4)))
+  val path  = Path(Files.createTempDirectory("example"))
 
   // write
   ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
   //read
   val readData = ParquetReader.as[Data].read(path)
-  try {
-    readData.foreach(println)
-  } finally readData.close()
+  try readData.foreach(println)
+  finally readData.close()
 
 }

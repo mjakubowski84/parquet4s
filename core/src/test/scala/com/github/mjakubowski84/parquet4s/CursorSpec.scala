@@ -73,7 +73,7 @@ class CursorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "be completed on start when path is empty" in {
-    val a = "a"
+    val a           = "a"
     val emptyCursor = Cursor.following(ColumnPath.Empty)
 
     emptyCursor.advanceByFieldName(a) should be(None)

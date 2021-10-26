@@ -17,7 +17,7 @@ private[parquet] object io {
 
   private type Partition = (ColumnPath, String)
 
-  private sealed trait StatusAccumulator
+  sealed private trait StatusAccumulator
   private case object Empty extends StatusAccumulator
   private object Dirs {
     def apply(partitionPath: (Path, Partition)): Dirs = Dirs(Vector(partitionPath))
@@ -27,10 +27,9 @@ private[parquet] object io {
 
   private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!\-_.*'()]+)""".r
 
-  def validateWritePath[F[_]](path: Path,
-                              writeOptions: ParquetWriter.Options,
-                              logger: Logger[F]
-                             )(implicit F: Sync[F]): F[Unit] = {
+  def validateWritePath[F[_]](path: Path, writeOptions: ParquetWriter.Options, logger: Logger[F])(implicit
+      F: Sync[F]
+  ): F[Unit] =
     Resource
       .fromAutoCloseable(F.blocking(path.toHadoop.getFileSystem(writeOptions.hadoopConf)))
       .use { fs =>
@@ -44,12 +43,12 @@ private[parquet] object io {
             F.unit
         }
       }
-  }
 
-  def findPartitionedPaths[F[_]](path: Path,
-                                 configuration: Configuration)
-                                (implicit F: Sync[F]): Stream[F, PartitionedDirectory] =
-    Stream.resource(Resource.fromAutoCloseable(F.blocking(path.toHadoop.getFileSystem(configuration))))
+  def findPartitionedPaths[F[_]](path: Path, configuration: Configuration)(implicit
+      F: Sync[F]
+  ): Stream[F, PartitionedDirectory] =
+    Stream
+      .resource(Resource.fromAutoCloseable(F.blocking(path.toHadoop.getFileSystem(configuration))))
       .flatMap(fs => findPartitionedPaths(fs, path, List.empty))
       .fold[Either[Seq[Path], Seq[PartitionedPath]]](Right(Vector.empty)) {
         case (Left(invalidPaths), Left(moreInvalidPaths)) =>
@@ -62,16 +61,16 @@ private[parquet] object io {
           left
       }
       .map {
-        case Left(invalidPaths) => PartitionedDirectory.failed(invalidPaths)
+        case Left(invalidPaths)      => PartitionedDirectory.failed(invalidPaths)
         case Right(partitionedPaths) => PartitionedDirectory(partitionedPaths)
       }
       .flatMap(Stream.fromEither[F].apply)
 
-  private def findPartitionedPaths[F[_]](fs: FileSystem,
-                                         path: Path,
-                                         partitions: List[Partition]
-                                        )(implicit F: Sync[F]): Stream[F, Either[Seq[Path], Seq[PartitionedPath]]] =
-    Stream.evalSeq(F.blocking(fs.listStatus(path.toHadoop).toVector))
+  private def findPartitionedPaths[F[_]](fs: FileSystem, path: Path, partitions: List[Partition])(implicit
+      F: Sync[F]
+  ): Stream[F, Either[Seq[Path], Seq[PartitionedPath]]] =
+    Stream
+      .evalSeq(F.blocking(fs.listStatus(path.toHadoop).toVector))
       .fold[StatusAccumulator](Empty) {
         case (Empty, status) if status.isDirectory =>
           matchPartition(status).fold[StatusAccumulator](Empty)(Dirs.apply)
@@ -88,8 +87,8 @@ private[parquet] object io {
       }
       .flatMap {
         case Dirs(partitionPaths) => // node of directory tree
-          Stream.emits(partitionPaths).flatMap {
-            case (subPath, partition) => findPartitionedPaths(fs, subPath, partitions :+ partition)
+          Stream.emits(partitionPaths).flatMap { case (subPath, partition) =>
+            findPartitionedPaths(fs, subPath, partitions :+ partition)
           }
         case Files => // leaf of directory tree
           Stream.emit(Right(Vector(PartitionedPath(path, partitions))))

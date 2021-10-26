@@ -2,13 +2,12 @@ package com.github.mjakubowski84.parquet4s
 
 import java.time.{LocalDate, LocalDateTime}
 
-/**
- * Provides simple conversion methods for primitives.
- */
+/** Provides simple conversion methods for primitives.
+  */
 object ValueImplicits {
-  
+
   import ValueCodecConfiguration._
-  
+
   implicit class IntWrapper(v: Int)(implicit encoder: ValueEncoder[Int]) {
     def value: Value = encoder.encode(v, Default)
   }
@@ -51,5 +50,5 @@ object ValueImplicits {
   implicit class DateWrapper(v: java.sql.Date)(implicit encoder: ValueEncoder[java.sql.Date]) {
     def value: Value = encoder.encode(v, Default)
   }
-  
+
 }

@@ -14,14 +14,14 @@ object WriteAndReadFilteredApp extends App {
     val D = "D"
 
     val values: List[String] = List(A, B, C, D)
-    def random: String = values(Random.nextInt(values.length))
+    def random: String       = values(Random.nextInt(values.length))
   }
 
   case class Data(id: Int, dict: String)
 
   val count = 100
-  val data = (1 to count).map { i => Data(id = i, dict = Dict.random) }
-  val path = Path(Files.createTempDirectory("example"))
+  val data  = (1 to count).map(i => Data(id = i, dict = Dict.random))
+  val path  = Path(Files.createTempDirectory("example"))
 
   // write
   ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
@@ -29,14 +29,12 @@ object WriteAndReadFilteredApp extends App {
   //read filtered
   println("""dict == "A"""")
   val dictIsOnlyA = ParquetReader.as[Data].filter(Col("dict") === Dict.A).read(path)
-  try {
-    dictIsOnlyA.foreach(println)
-  } finally dictIsOnlyA.close()
+  try dictIsOnlyA.foreach(println)
+  finally dictIsOnlyA.close()
 
   println("""id >= 20 && id < 40""")
   val idIsBetween10And90 = ParquetReader.as[Data].filter(Col("id") >= 20 && Col("id") < 40).read(path)
-  try {
-    idIsBetween10And90.foreach(println)
-  } finally idIsBetween10And90.close()
+  try idIsBetween10And90.foreach(println)
+  finally idIsBetween10And90.close()
 
 }

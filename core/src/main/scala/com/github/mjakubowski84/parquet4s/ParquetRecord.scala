@@ -8,18 +8,18 @@ import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.jdk.CollectionConverters._
 
-/**
-  * Special type of [[Value]] that represents a record in Parquet file.
-  * Mutable and <b>NOT</b> thread-safe.
-  * A record is a complex type of data that contains series of other value entries inside.
+/** Special type of [[Value]] that represents a record in Parquet file. Mutable and <b>NOT</b> thread-safe. A record is
+  * a complex type of data that contains series of other value entries inside.
   */
 sealed trait ParquetRecord[+A, This <: ParquetRecord[A, _]] extends Value with immutable.Iterable[A] {
 
-  /**
-    * Creates a new entry in record.
-    * @param name name of the entry
-    * @param value value of the entry
-    * @return a record with an entry added
+  /** Creates a new entry in record.
+    * @param name
+    *   name of the entry
+    * @param value
+    *   value of the entry
+    * @return
+    *   a record with an entry added
     */
   protected[parquet4s] def add(name: String, value: Value): This
 
@@ -33,12 +33,13 @@ object RowParquetRecord {
     def apply(names: Iterable[String]): Fields = new Fields(names.toSet, names.toVector)
   }
 
-  /**
-   * Represents the current state of schema of the record.
-   * @param names unique names of fields
-   * @param positions order of fields in the record
-   */
-  protected final class Fields private(names: Set[String], positions: Vector[String]) {
+  /** Represents the current state of schema of the record.
+    * @param names
+    *   unique names of fields
+    * @param positions
+    *   order of fields in the record
+    */
+  final protected class Fields private (names: Set[String], positions: Vector[String]) {
 
     def contains(name: String): Boolean = names.contains(name)
 
@@ -50,9 +51,9 @@ object RowParquetRecord {
       new Fields(names + name, positions.updated(idx, name))
 
     def remove(idx: Int): (String, Fields) = {
-      val name = positions(idx)
+      val name  = positions(idx)
       val front = positions.slice(0, idx)
-      val tail = positions.slice(idx + 1, size)
+      val tail  = positions.slice(idx + 1, size)
       (name, new Fields(names - name, front ++ tail))
     }
 
@@ -72,51 +73,57 @@ object RowParquetRecord {
     override def hashCode(): Int = positions.hashCode
   }
 
-  /**
-    * @param fields fields and their values to init the record with
-    * @return A new instance of [[RowParquetRecord]] initialized with given list of fields.
+  /** @param fields
+    *   fields and their values to init the record with
+    * @return
+    *   A new instance of [[RowParquetRecord]] initialized with given list of fields.
     */
   def apply(fields: Iterable[(String, Value)]): RowParquetRecord =
     fields.foldLeft(new RowParquetRecord(Map.empty, fields = RowParquetRecord.Fields(fields.map(_._1)))) {
       case (record, (fieldName, value)) => record.add(fieldName, value)
     }
 
-  /**
-   * @param fields fields and their values to init the record with
-   * @return A new instance of [[RowParquetRecord]] initialized with given list of fields.
-   */
+  /** @param fields
+    *   fields and their values to init the record with
+    * @return
+    *   A new instance of [[RowParquetRecord]] initialized with given list of fields.
+    */
   def apply(fields: (String, Value)*): RowParquetRecord =
     apply(fields)
 
-  /**
-   * @param columns columns and their values to init the record with
-   * @return A new instance of [[RowParquetRecord]] initialized with given list of columns.
-   */
+  /** @param columns
+    *   columns and their values to init the record with
+    * @return
+    *   A new instance of [[RowParquetRecord]] initialized with given list of columns.
+    */
   def fromColumns(columns: (ColumnPath, Value)*): RowParquetRecord =
-    columns.foldLeft(new RowParquetRecord(Map.empty, fields = RowParquetRecord.Fields(columns.map(_._1.elements.head)))) {
-      case (record, (path, value)) => record.updated(path, value)
+    columns.foldLeft(
+      new RowParquetRecord(Map.empty, fields = RowParquetRecord.Fields(columns.map(_._1.elements.head)))
+    ) { case (record, (path, value)) =>
+      record.updated(path, value)
     }
 
-  /**
-   * @param fields fields to init the record with
-   * @return A new instance of [[RowParquetRecord]] initialized with [[NullValue]] per each field.
-   */
+  /** @param fields
+    *   fields to init the record with
+    * @return
+    *   A new instance of [[RowParquetRecord]] initialized with [[NullValue]] per each field.
+    */
   def emptyWithSchema(fields: Iterable[String]): RowParquetRecord =
     new RowParquetRecord(
       fields.map(_ -> NullValue).toMap,
       RowParquetRecord.Fields(fields)
     )
 
-  /**
-   * @param fields fields to init the record with
-   * @return A new instance of [[RowParquetRecord]] initialized with [[NullValue]] per each field.
-   */
+  /** @param fields
+    *   fields to init the record with
+    * @return
+    *   A new instance of [[RowParquetRecord]] initialized with [[NullValue]] per each field.
+    */
   def emptyWithSchema(fields: String*): RowParquetRecord =
     emptyWithSchema(fields)
 
-  /**
-   * Empty record holding no field and no value.
-   */
+  /** Empty record holding no field and no value.
+    */
   val EmptyNoSchema: RowParquetRecord = new RowParquetRecord(Map.empty, RowParquetRecord.Fields(Iterable.empty))
 
   implicit val genericParquetRecordEncoder: ParquetRecordEncoder[RowParquetRecord] = (record, _, _) => record
@@ -125,7 +132,7 @@ object RowParquetRecord {
 
   implicit def genericParquetSchemaResolver(implicit message: MessageType): ParquetSchemaResolver[RowParquetRecord] =
     new ParquetSchemaResolver[RowParquetRecord] {
-      override def schemaName: Option[String] = Option(message.getName)
+      override def schemaName: Option[String]                = Option(message.getName)
       override def resolveSchema(cursor: Cursor): List[Type] = skipFields(cursor, message.getFields.asScala.toList)
 
       private def skipFields(cursor: Cursor, fields: List[Type]): List[Type] =
@@ -134,11 +141,12 @@ object RowParquetRecord {
             cursor.advanceByFieldName(groupField.getName).flatMap { newCursor =>
               val fields = skipFields(newCursor, groupField.getFields.asScala.toList)
               if (fields.isEmpty) None
-              else Some(
-                SchemaDef
-                  .group(fields:_*)
-                  .withRequired(groupField.getRepetition == Repetition.REQUIRED)(groupField.getName)
-              )
+              else
+                Some(
+                  SchemaDef
+                    .group(fields: _*)
+                    .withRequired(groupField.getRepetition == Repetition.REQUIRED)(groupField.getName)
+                )
             }
           case field =>
             cursor.advanceByFieldName(field.getName).map(_ => field)
@@ -147,21 +155,18 @@ object RowParquetRecord {
 
 }
 
-/**
-  * Represents a basic type of [[ParquetRecord]] - an object that contains a list of fields with other values
-  * associated with each of them. Used to represent a [[scala.Product]], e.g: case class.
-  * <b>Cannot be empty when being saved.</b>
-  * Immutable.
-  * During reading the record is initialised with list of fields defined Parquet metadata. First, all the values are
-  * [[NullValue]]. Subsequently nulls are replaced by the actual value stored in the file. The schema can be also
-  * adjusted in order to reflect partition values that are not originally stored in a file but in the directory
+/** Represents a basic type of [[ParquetRecord]] - an object that contains a list of fields with other values associated
+  * with each of them. Used to represent a [[scala.Product]], e.g: case class. <b>Cannot be empty when being saved.</b>
+  * Immutable. During reading the record is initialised with list of fields defined Parquet metadata. First, all the
+  * values are [[NullValue]]. Subsequently nulls are replaced by the actual value stored in the file. The schema can be
+  * also adjusted in order to reflect partition values that are not originally stored in a file but in the directory
   * structure.
   */
 final class RowParquetRecord private (
-                                       private val values: Map[String, Value],
-                                       protected val fields: RowParquetRecord.Fields
-                                     )
-  extends ParquetRecord[(String, Value), RowParquetRecord] with immutable.Seq[(String, Value)] {
+    private val values: Map[String, Value],
+    protected val fields: RowParquetRecord.Fields
+) extends ParquetRecord[(String, Value), RowParquetRecord]
+    with immutable.Seq[(String, Value)] {
 
   override protected[parquet4s] def add(name: String, value: Value): RowParquetRecord =
     // TODO consider removing this check as it is just safeguarding algorithm itself
@@ -171,14 +176,17 @@ final class RowParquetRecord private (
       throw new IllegalArgumentException(s"Field $name does not correspond to records schema: $fields.")
     }
 
-  /**
-   * Adds or updates a value at the given path. Creates intermediate records at the path if missing.
-   *
-   * @param path  [[ColumnPath]]
-   * @param value value to be set at the end of the path
-   * @return this record with the value added or updated
-   * @throws scala.IllegalArgumentException if the path is invalid
-   */
+  /** Adds or updates a value at the given path. Creates intermediate records at the path if missing.
+    *
+    * @param path
+    *   [[ColumnPath]]
+    * @param value
+    *   value to be set at the end of the path
+    * @return
+    *   this record with the value added or updated
+    * @throws scala.IllegalArgumentException
+    *   if the path is invalid
+    */
   def updated(path: ColumnPath, value: Value): RowParquetRecord =
     path match {
       case ColumnPath(name, ColumnPath.Empty) =>
@@ -187,7 +195,7 @@ final class RowParquetRecord private (
         this.get(name) match {
           case Some(NullValue) | None =>
             this.updated(name, RowParquetRecord.fromColumns(tail -> value))
-          case Some(existingSubRecord : RowParquetRecord) =>
+          case Some(existingSubRecord: RowParquetRecord) =>
             this.updated(name, existingSubRecord.updated(tail, value))
           case _ =>
             throw new IllegalArgumentException("Invalid path when setting value of nested record")
@@ -196,11 +204,11 @@ final class RowParquetRecord private (
         this
     }
 
-  /**
-   *
-   * @param fieldName field/column name
-   * @return [[scala.Some]] value associated with the field name or [[scala.None]] if the field is unknown
-   */
+  /** @param fieldName
+    *   field/column name
+    * @return
+    *   [[scala.Some]] value associated with the field name or [[scala.None]] if the field is unknown
+    */
   def get(fieldName: String): Option[Value] =
     if (fields.contains(fieldName)) {
       Some(values.getOrElse(fieldName, NullValue))
@@ -208,24 +216,28 @@ final class RowParquetRecord private (
       None
     }
 
-  /**
-    * Retrieves value from the record and decodes it.
-    * Decodes the value using provided implicit [[ValueDecoder]].
-    * @param fieldName field/column name
-    * @param valueCodecConfiguration codec configuration
-    * @param valueDecoder [[ValueDecoder]]
-    * @tparam T type of read value
-    * @return [[scala.Some]] decoded field value or [[scala.None]] if such field does not exist
+  /** Retrieves value from the record and decodes it. Decodes the value using provided implicit [[ValueDecoder]].
+    * @param fieldName
+    *   field/column name
+    * @param valueCodecConfiguration
+    *   codec configuration
+    * @param valueDecoder
+    *   [[ValueDecoder]]
+    * @tparam T
+    *   type of read value
+    * @return
+    *   [[scala.Some]] decoded field value or [[scala.None]] if such field does not exist
     */
-  def get[T](fieldName: String, valueCodecConfiguration: ValueCodecConfiguration)
-            (implicit valueDecoder: ValueDecoder[T]): Option[T] =
+  def get[T](fieldName: String, valueCodecConfiguration: ValueCodecConfiguration)(implicit
+      valueDecoder: ValueDecoder[T]
+  ): Option[T] =
     get(fieldName).map(valueDecoder.decode(_, valueCodecConfiguration))
 
-  /**
-   *
-   * @param path [[ColumnPath]]
-   * @return [[scala.Some]] value associated with given path or [[scala.None]] if such field does not exist
-   */
+  /** @param path
+    *   [[ColumnPath]]
+    * @return
+    *   [[scala.Some]] value associated with given path or [[scala.None]] if such field does not exist
+    */
   @tailrec
   def get(path: ColumnPath): Option[Value] =
     path match {
@@ -233,8 +245,8 @@ final class RowParquetRecord private (
         get(fieldName)
       case ColumnPath(fieldName, tail) =>
         get(fieldName) match {
-          case Some(subRecord : RowParquetRecord) => subRecord.get(tail)
-          case _ => None
+          case Some(subRecord: RowParquetRecord) => subRecord.get(tail)
+          case _                                 => None
         }
       case _ =>
         Some(this)
@@ -245,29 +257,38 @@ final class RowParquetRecord private (
 
   /** Get the field name and value at the specified index.
     *
-    * @param idx The index
-    * @return The field name and value
-    * @throws scala.IndexOutOfBoundsException if the index is not valid.
+    * @param idx
+    *   The index
+    * @return
+    *   The field name and value
+    * @throws scala.IndexOutOfBoundsException
+    *   if the index is not valid.
     */
   override def apply(idx: Int): (String, Value) =
     (fields.get _).andThen(name => name -> values(name))(idx)
 
   /** Replaces value at given index with a new value.
     *
-    *  @param idx      the index of the value to replace.
-    *  @param newVal   the new value.
-    *  @return         updated record
-    *  @throws scala.IndexOutOfBoundsException if the index is not valid.
+    * @param idx
+    *   the index of the value to replace.
+    * @param newVal
+    *   the new value.
+    * @return
+    *   updated record
+    * @throws scala.IndexOutOfBoundsException
+    *   if the index is not valid.
     */
   def updated(idx: Int, newVal: Value): RowParquetRecord =
     new RowParquetRecord(values.updated(fields.get(idx), newVal), fields)
 
-  /**
-   * Updates existing field or appends a new field to the record if it doesn't exist yet.
-   * @param fieldName the name of the field
-   * @param value the value of the field
-   * @return updated record
-   */
+  /** Updates existing field or appends a new field to the record if it doesn't exist yet.
+    * @param fieldName
+    *   the name of the field
+    * @param value
+    *   the value of the field
+    * @return
+    *   updated record
+    */
   def updated(fieldName: String, value: Value): RowParquetRecord =
     if (fields.contains(fieldName)) {
       new RowParquetRecord(values.updated(fieldName, value), fields)
@@ -275,44 +296,53 @@ final class RowParquetRecord private (
       new RowParquetRecord(values.updated(fieldName, value), fields.append(fieldName))
     }
 
-  /**
-   * Updates existing field or appends a new field to the record if it doesn't exist yet.
-   * Encodes the provided value using implicit [[ValueEncoder]].
-   * @param name the name of the field
-   * @param value the value of the field
-   * @param valueCodecConfiguration codec configuration
-   * @param valueEncoder [[ValueEncoder]]
-   * @tparam T the type of the value
-   * @return updated record
-   */
-  def updated[T](name: String, value: T, valueCodecConfiguration: ValueCodecConfiguration)
-                (implicit valueEncoder: ValueEncoder[T]): RowParquetRecord =
+  /** Updates existing field or appends a new field to the record if it doesn't exist yet. Encodes the provided value
+    * using implicit [[ValueEncoder]].
+    * @param name
+    *   the name of the field
+    * @param value
+    *   the value of the field
+    * @param valueCodecConfiguration
+    *   codec configuration
+    * @param valueEncoder
+    *   [[ValueEncoder]]
+    * @tparam T
+    *   the type of the value
+    * @return
+    *   updated record
+    */
+  def updated[T](name: String, value: T, valueCodecConfiguration: ValueCodecConfiguration)(implicit
+      valueEncoder: ValueEncoder[T]
+  ): RowParquetRecord =
     updated(name, valueEncoder.encode(value, valueCodecConfiguration))
 
   def updated(idx: Int, field: String, newVal: Value): RowParquetRecord = {
-    val oldField = fields.get(idx)
+    val oldField  = fields.get(idx)
     val newFields = fields.set(idx, field)
     new RowParquetRecord(MapCompat.remove(values, oldField).updated(field, newVal), newFields)
   }
 
-  /**
-   * Removes field at given index.
-   * @param idx index of the field to be removed
-   * @return a tuple of the name of removed field and its value associated with the resulting record
-   * @throws scala.IndexOutOfBoundsException if the index is not valid.
-   */
+  /** Removes field at given index.
+    * @param idx
+    *   index of the field to be removed
+    * @return
+    *   a tuple of the name of removed field and its value associated with the resulting record
+    * @throws scala.IndexOutOfBoundsException
+    *   if the index is not valid.
+    */
   def removed(idx: Int): ((String, Value), RowParquetRecord) = {
     val (field, newFields) = fields.remove(idx)
-    val value = values(field)
+    val value              = values(field)
     (field -> value, new RowParquetRecord(MapCompat.remove(values, field), newFields))
   }
 
-  /**
-   * Removes field of given name.
-   * @param fieldName name of the field to be removed
-   * @return [[scala.Some]] Value of the removed field or [[scala.None]] if no such a field exists, associated with
-   *         the resulting record
-   */
+  /** Removes field of given name.
+    * @param fieldName
+    *   name of the field to be removed
+    * @return
+    *   [[scala.Some]] Value of the removed field or [[scala.None]] if no such a field exists, associated with the
+    *   resulting record
+    */
   def removed(fieldName: String): (Option[Value], RowParquetRecord) =
     get(fieldName) match {
       case None =>
@@ -321,13 +351,14 @@ final class RowParquetRecord private (
         (value, new RowParquetRecord(MapCompat.remove(values, fieldName), fields.remove(fieldName)))
     }
 
-  /**
-   * Removes field at given path.
-   *
-   * @param path [[ColumnPath]]
-   * @return [[scala.Some]] value of the removed field or [[scala.None]] if path is invalid associated with the
-   *         resulting record
-   */
+  /** Removes field at given path.
+    *
+    * @param path
+    *   [[ColumnPath]]
+    * @return
+    *   [[scala.Some]] value of the removed field or [[scala.None]] if path is invalid associated with the resulting
+    *   record
+    */
   def removed(path: ColumnPath): (Option[Value], RowParquetRecord) =
     path match {
       case ColumnPath(fieldName, ColumnPath.Empty) =>
@@ -345,9 +376,8 @@ final class RowParquetRecord private (
         (Some(this), RowParquetRecord.EmptyNoSchema)
     }
 
-  /**
-    *
-    * @return The number of columns in this record
+  /** @return
+    *   The number of columns in this record
     */
   override def length: Int = fields.size
 
@@ -356,11 +386,13 @@ final class RowParquetRecord private (
       .map(name => s"$name=${values(name)}")
       .mkString(getClass.getSimpleName + " (", ",", ")")
 
-  /**
-    * Adds a new field to the front of the record.
-    * @param name the name of the field
-    * @param value [[Value]] of the field
-    * @return this record with the field prepended
+  /** Adds a new field to the front of the record.
+    * @param name
+    *   the name of the field
+    * @param value
+    *   [[Value]] of the field
+    * @return
+    *   this record with the field prepended
     */
   def prepended(name: String, value: Value): RowParquetRecord =
     new RowParquetRecord(values.updated(name, value), fields.prepend(name))
@@ -370,7 +402,7 @@ final class RowParquetRecord private (
     recordConsumer.startGroup()
     values.foreach {
       case (_, NullValue) =>
-        // we do not write nulls
+      // we do not write nulls
       case (name, value) =>
         val index = groupSchema.getFieldIndex(name)
         recordConsumer.startField(name, index)
@@ -397,36 +429,33 @@ final class RowParquetRecord private (
 
 object ListParquetRecord {
 
-  private val ListFieldName = "list"
-  private val ElementFieldName = "element"
+  private val ListFieldName          = "list"
+  private val ElementFieldName       = "element"
   private val LegacyElementFieldName = "array"
-  private val ElementNames = Set(ElementFieldName, LegacyElementFieldName)
+  private val ElementNames           = Set(ElementFieldName, LegacyElementFieldName)
 
-  /**
-    * @param elements to init the record with
-    * @return An instance of [[ListParquetRecord]] pre-filled with given elements
+  /** @param elements
+    *   to init the record with
+    * @return
+    *   An instance of [[ListParquetRecord]] pre-filled with given elements
     */
   def apply(elements: Value*): ListParquetRecord =
-    elements.foldLeft(ListParquetRecord.Empty) {
-      case (record, element) => record.add(ListFieldName, RowParquetRecord.apply(ElementFieldName -> element))
+    elements.foldLeft(ListParquetRecord.Empty) { case (record, element) =>
+      record.add(ListFieldName, RowParquetRecord.apply(ElementFieldName -> element))
     }
 
-  /**
-    * An empty instance of [[ListParquetRecord]]
+  /** An empty instance of [[ListParquetRecord]]
     */
   val Empty: ListParquetRecord = new ListParquetRecord(Vector.empty)
 
 }
 
-/**
-  * A type of [[ParquetRecord]] that represents a record holding a repeated amount of entries
-  * of the same type.
-  * Can be empty.
-  * Immutable.
+/** A type of [[ParquetRecord]] that represents a record holding a repeated amount of entries of the same type. Can be
+  * empty. Immutable.
   */
 final class ListParquetRecord private (private val values: Vector[Value])
-  extends ParquetRecord[Value, ListParquetRecord]
-    with immutable.Seq[Value]{
+    extends ParquetRecord[Value, ListParquetRecord]
+    with immutable.Seq[Value] {
   import ListParquetRecord._
 
   override protected[parquet4s] def add(name: String, value: Value): ListParquetRecord =
@@ -440,48 +469,69 @@ final class ListParquetRecord private (private val values: Vector[Value])
     }
 
   /** Appends value to the list.
-    * @param value the value to append
-    * @return this record with the value appended
+    * @param value
+    *   the value to append
+    * @return
+    *   this record with the value appended
     */
   def appended(value: Value): ListParquetRecord = new ListParquetRecord(values :+ value)
 
   /** Appends value to the list.
-    * @param value the value to append
-    * @param valueCodecConfiguration codec configuration
-    * @param valueEncoder [[ValueEncoder]]
-    * @tparam T type of the value
-    * @return this record with the value appended
+    * @param value
+    *   the value to append
+    * @param valueCodecConfiguration
+    *   codec configuration
+    * @param valueEncoder
+    *   [[ValueEncoder]]
+    * @tparam T
+    *   type of the value
+    * @return
+    *   this record with the value appended
     */
-  def appended[T](value: T, valueCodecConfiguration: ValueCodecConfiguration)
-                 (implicit valueEncoder: ValueEncoder[T]): ListParquetRecord =
+  def appended[T](value: T, valueCodecConfiguration: ValueCodecConfiguration)(implicit
+      valueEncoder: ValueEncoder[T]
+  ): ListParquetRecord =
     this.appended(valueEncoder.encode(value, valueCodecConfiguration))
 
   /** Gets the value at the specified index.
     *
-    * @param idx The index
-    * @return The value
-    * @throws scala.IndexOutOfBoundsException if the index is not valid
+    * @param idx
+    *   The index
+    * @return
+    *   The value
+    * @throws scala.IndexOutOfBoundsException
+    *   if the index is not valid
     */
   override def apply(idx: Int): Value = values(idx)
 
   /** Gets the value at the specified index.
     *
-    * @param idx The index
-    * @param valueCodecConfiguration codec configuration
-    * @param valueDecoder [[ValueDecoder]]
-    * @tparam T type of the value
-    * @return The value
-    * @throws scala.IndexOutOfBoundsException if the index is not valid
+    * @param idx
+    *   The index
+    * @param valueCodecConfiguration
+    *   codec configuration
+    * @param valueDecoder
+    *   [[ValueDecoder]]
+    * @tparam T
+    *   type of the value
+    * @return
+    *   The value
+    * @throws scala.IndexOutOfBoundsException
+    *   if the index is not valid
     */
   def apply[T](idx: Int, valueCodecConfiguration: ValueCodecConfiguration)(implicit valueDecoder: ValueDecoder[T]): T =
     valueDecoder.decode(this.apply(idx), valueCodecConfiguration)
 
   /** Replaces value at given index with a new value.
     *
-    * @param idx      the index of the element to replace
-    * @param newVal   the new value
-    * @return         updated record
-    * @throws scala.IndexOutOfBoundsException if the index is not valid.
+    * @param idx
+    *   the index of the element to replace
+    * @param newVal
+    *   the new value
+    * @return
+    *   updated record
+    * @throws scala.IndexOutOfBoundsException
+    *   if the index is not valid.
     */
   def updated(idx: Int, newVal: Value): ListParquetRecord = new ListParquetRecord(values.updated(idx, newVal))
 
@@ -496,8 +546,8 @@ final class ListParquetRecord private (private val values: Vector[Value])
 
     if (values.nonEmpty) {
       val groupSchema = schema.asGroupType()
-      val listSchema = groupSchema.getType(ListFieldName).asGroupType()
-      val listIndex = groupSchema.getFieldIndex(ListFieldName)
+      val listSchema  = groupSchema.getType(ListFieldName).asGroupType()
+      val listIndex   = groupSchema.getFieldIndex(ListFieldName)
 
       recordConsumer.startField(ListFieldName, listIndex)
 
@@ -529,28 +579,25 @@ final class ListParquetRecord private (private val values: Vector[Value])
 object MapParquetRecord {
 
   private val MapKeyValueFieldName = "key_value"
-  private val KeyFieldName = "key"
-  private val ValueFieldName = "value"
+  private val KeyFieldName         = "key"
+  private val ValueFieldName       = "value"
 
-  def apply(entries : (Value, Value)*): MapParquetRecord =
-    entries.foldLeft(MapParquetRecord.Empty) {
-      case (record, (key, value)) =>
-        record.add(MapKeyValueFieldName, RowParquetRecord.apply(KeyFieldName -> key, ValueFieldName -> value))
+  def apply(entries: (Value, Value)*): MapParquetRecord =
+    entries.foldLeft(MapParquetRecord.Empty) { case (record, (key, value)) =>
+      record.add(MapKeyValueFieldName, RowParquetRecord.apply(KeyFieldName -> key, ValueFieldName -> value))
     }
 
   val Empty: MapParquetRecord = new MapParquetRecord(Map.empty)
 
 }
 
-/**
-  * A type of [[ParquetRecord]] that represents a map from one entry type to another. Can be empty.
-  * A key entry cannot be null, a value entry can.
-  * Immutable.
+/** A type of [[ParquetRecord]] that represents a map from one entry type to another. Can be empty. A key entry cannot
+  * be null, a value entry can. Immutable.
   */
-final class MapParquetRecord private[parquet4s](protected val entries: Map[Value, Value])
+final class MapParquetRecord private[parquet4s] (protected val entries: Map[Value, Value])
     extends ParquetRecord[(Value, Value), MapParquetRecord]
-      with immutable.Map[Value, Value]
-      with MapCompat {
+    with immutable.Map[Value, Value]
+    with MapCompat {
   import MapParquetRecord._
 
   override protected[parquet4s] def add(name: String, value: Value): MapParquetRecord =
@@ -567,74 +614,106 @@ final class MapParquetRecord private[parquet4s](protected val entries: Map[Value
         throw new IllegalArgumentException(s"Expected $MapKeyValueFieldName but got $name: $value")
     }
 
-  /**
-   * Updates or adds a key-value entry.
-   * @param key the key
-   * @param value the value
-   * @return the modified record
-   */
+  /** Updates or adds a key-value entry.
+    * @param key
+    *   the key
+    * @param value
+    *   the value
+    * @return
+    *   the modified record
+    */
   def updated(key: Value, value: Value): MapParquetRecord = new MapParquetRecord(entries.updated(key, value))
 
-  /**
-   * Updates or adds a key-value entry. Encodes the key and the value suing the provided [[ValueEncoder]]s
-   * @param key the key
-   * @param value the value
-   * @param valueCodecConfiguration codec configuration
-   * @param kEncoder [[ValueEncoder]] for the key
-   * @param vEncoder [[ValueEncoder]] for the value
-   * @tparam K type of the key
-   * @tparam V type of the value
-   * @return the modified record
-   */
-  def updated[K, V](key: K, value: V, valueCodecConfiguration: ValueCodecConfiguration)
-                   (implicit kEncoder: ValueEncoder[K], vEncoder: ValueEncoder[V]): MapParquetRecord =
+  /** Updates or adds a key-value entry. Encodes the key and the value suing the provided [[ValueEncoder]]s
+    * @param key
+    *   the key
+    * @param value
+    *   the value
+    * @param valueCodecConfiguration
+    *   codec configuration
+    * @param kEncoder
+    *   [[ValueEncoder]] for the key
+    * @param vEncoder
+    *   [[ValueEncoder]] for the value
+    * @tparam K
+    *   type of the key
+    * @tparam V
+    *   type of the value
+    * @return
+    *   the modified record
+    */
+  def updated[K, V](key: K, value: V, valueCodecConfiguration: ValueCodecConfiguration)(implicit
+      kEncoder: ValueEncoder[K],
+      vEncoder: ValueEncoder[V]
+  ): MapParquetRecord =
     updated(kEncoder.encode(key, valueCodecConfiguration), vEncoder.encode(value, valueCodecConfiguration))
 
   /** Retrieves the value which is associated with the given key.
     *
-    *  @param  key the key
-    *  @return     the value associated with the given key, or the result of the
-    *              map's `default` method, if none exists.
-    *  @throws scala.NoSuchElementException if there is no entry for the given key
+    * @param key
+    *   the key
+    * @return
+    *   the value associated with the given key, or the result of the map's `default` method, if none exists.
+    * @throws scala.NoSuchElementException
+    *   if there is no entry for the given key
     */
   override def apply(key: Value): Value = entries(key)
 
   /** Retrieves the value which is associated with the given key.
     *
-    * @param key the key
-    * @param valueCodecConfiguration configuration used by some of codecs
-    * @param kEncoder key encoder
-    * @param vDecoder value decoder
-    * @tparam K type of the key
-    * @tparam V type of the value
-    * @return retrieved value
-    * @throws scala.NoSuchElementException if there is no entry for the given key
+    * @param key
+    *   the key
+    * @param valueCodecConfiguration
+    *   configuration used by some of codecs
+    * @param kEncoder
+    *   key encoder
+    * @param vDecoder
+    *   value decoder
+    * @tparam K
+    *   type of the key
+    * @tparam V
+    *   type of the value
+    * @return
+    *   retrieved value
+    * @throws scala.NoSuchElementException
+    *   if there is no entry for the given key
     */
-  def apply[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)
-                 (implicit kEncoder: ValueEncoder[K], vDecoder: ValueDecoder[V]): V =
+  def apply[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)(implicit
+      kEncoder: ValueEncoder[K],
+      vDecoder: ValueDecoder[V]
+  ): V =
     vDecoder.decode(this.apply(kEncoder.encode(key, valueCodecConfiguration)), valueCodecConfiguration)
-
 
   /** Optionally returns the value associated with a key.
     *
-    *  @param  key    the key value
-    *  @return an option value containing the value associated with `key` in this map,
-    *          or `None` if none exists.
+    * @param key
+    *   the key value
+    * @return
+    *   an option value containing the value associated with `key` in this map, or `None` if none exists.
     */
   override def get(key: Value): Option[Value] = entries.get(key)
 
   /** Retrieves the value which is associated with the given key.
     *
-    * @param key the key
-    * @param valueCodecConfiguration configuration used by some of codecs
-    * @param kEncoder key codec
-    * @param vDecoder value codec
-    * @tparam K type of the key
-    * @tparam V type of the value
-    * @return retrieved value or None if there is no value associated with the key
+    * @param key
+    *   the key
+    * @param valueCodecConfiguration
+    *   configuration used by some of codecs
+    * @param kEncoder
+    *   key codec
+    * @param vDecoder
+    *   value codec
+    * @tparam K
+    *   type of the key
+    * @tparam V
+    *   type of the value
+    * @return
+    *   retrieved value or None if there is no value associated with the key
     */
-  def get[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)
-               (implicit kEncoder: ValueEncoder[K], vDecoder: ValueDecoder[V]): Option[V] =
+  def get[K, V](key: K, valueCodecConfiguration: ValueCodecConfiguration)(implicit
+      kEncoder: ValueEncoder[K],
+      vDecoder: ValueDecoder[V]
+  ): Option[V] =
     this
       .get(kEncoder.encode(key, valueCodecConfiguration))
       .map(v => vDecoder.decode(v, valueCodecConfiguration))
@@ -643,16 +722,16 @@ final class MapParquetRecord private[parquet4s](protected val entries: Map[Value
 
   override def toString: String =
     entries
-      .map { case (key, value) => s"$key=$value"}
+      .map { case (key, value) => s"$key=$value" }
       .mkString(getClass.getSimpleName + " (", ",", ")")
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
     recordConsumer.startGroup()
 
     if (entries.nonEmpty) {
-      val groupSchema = schema.asGroupType()
+      val groupSchema       = schema.asGroupType()
       val mapKeyValueSchema = groupSchema.getType(MapKeyValueFieldName).asGroupType()
-      val mapKeyValueIndex = groupSchema.getFieldIndex(MapKeyValueFieldName)
+      val mapKeyValueIndex  = groupSchema.getFieldIndex(MapKeyValueFieldName)
 
       recordConsumer.startField(MapKeyValueFieldName, mapKeyValueIndex)
 
