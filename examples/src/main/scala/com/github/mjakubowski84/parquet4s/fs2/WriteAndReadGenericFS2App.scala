@@ -47,8 +47,8 @@ object WriteAndReadGenericFS2App extends IOApp.Simple {
       path <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(fs2Path => Path(fs2Path.toNioPath))
       _ <- Stream
         .iterable[IO, RowParquetRecord](users)
-        .through(writeSingleFile[IO].generic(schema).write(path.append("data.parquet")))
-        .append(fromParquet[IO].generic.read(path).printlns.drain)
+        .through(writeSingleFile[IO].generic(schema).build(path.append("data.parquet")))
+        .append(fromParquet[IO].generic.build(path).printlns.drain)
     } yield ()
 
     stream.compile.drain

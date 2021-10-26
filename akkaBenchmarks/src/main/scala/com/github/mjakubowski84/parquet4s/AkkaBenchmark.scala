@@ -5,11 +5,11 @@ import akka.actor.ActorSystem
 import akka.stream.ActorAttributes
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import com.typesafe.config.ConfigFactory
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{Path => NioPath, _}
+import java.nio.file.{Path as NioPath, _}
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.collection.immutable
@@ -157,7 +157,7 @@ object AkkaBenchmark {
 @Measurement(iterations = 12, time = 1, timeUnit = TimeUnit.SECONDS)
 class AkkaBenchmark {
 
-  import AkkaBenchmark._
+  import AkkaBenchmark.*
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))

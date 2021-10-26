@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.apache.parquet.column.statistics._
+import org.apache.parquet.column.statistics.*
 import org.apache.parquet.schema.MessageType
 
 /** Utilises statistics of Parquet files to provide number of records and minimum and maximum value of columns. Values
@@ -52,7 +52,7 @@ trait Stats {
       ordering: Ordering[V]
   ): Option[V]
 
-  protected def statsMinValue(statistics: Statistics[_]): Option[Value] =
+  protected def statsMinValue(statistics: Statistics[?]): Option[Value] =
     statistics match {
       case s if s.isEmpty       => Option.empty[Value]
       case s: IntStatistics     => Option(IntValue(s.genericGetMin))
@@ -63,7 +63,7 @@ trait Stats {
       case s: FloatStatistics   => Option(FloatValue(s.genericGetMin))
     }
 
-  protected def statsMaxValue(statistics: Statistics[_]): Option[Value] =
+  protected def statsMaxValue(statistics: Statistics[?]): Option[Value] =
     statistics match {
       case s if s.isEmpty       => Option.empty[Value]
       case s: IntStatistics     => Option(IntValue(s.genericGetMax))

@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.CompatibilityParty._
+import com.github.mjakubowski84.parquet4s.CompatibilityParty.*
 import org.scalatest.BeforeAndAfter
 import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers

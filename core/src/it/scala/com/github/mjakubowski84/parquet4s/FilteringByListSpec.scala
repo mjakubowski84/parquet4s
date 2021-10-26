@@ -78,16 +78,16 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
       .writeAndClose(filePath, data)
   }
 
-  def genericFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T)
-                                                                                             (implicit codec: FilterCodec[T, V, C]): Assertion = {
+  def genericFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnName: String, field: Data => T)
+                                                                                          (implicit codec: FilterCodec[T, V, C]): Assertion = {
     val actual = ParquetReader.as[Data].filter(Col(columnName) in everyOtherDatum.map(field)).read(filePath)
     try {
       actual.map(_.idx) should equal(everyOtherDatum.map(_.idx))
     } finally actual.close()
   }
 
-  def specificValueFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnName: String, field: Data => T, values: Vector[T])
-                                                                                                   (implicit codec: FilterCodec[T, V, C]): Assertion = {
+  def specificValueFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnName: String, field: Data => T, values: Vector[T])
+                                                                                                (implicit codec: FilterCodec[T, V, C]): Assertion = {
     val filteredRecords = ParquetReader.as[Data].filter(Col(columnName) in values).read(filePath)
     val unfilteredRecords = ParquetReader.as[Data].read(filePath)
 

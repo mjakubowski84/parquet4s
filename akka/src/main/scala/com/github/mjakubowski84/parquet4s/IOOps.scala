@@ -27,7 +27,7 @@ private[parquet4s] object IOOps {
   */
 trait IOOps {
 
-  import IOOps._
+  import IOOps.*
 
   protected val logger: Logger
 
@@ -93,9 +93,9 @@ trait IOOps {
               Left(invalidPaths ++ moreInvalidPaths)
             case (Right(partitionedPaths), Right(morePartitionedPaths)) =>
               Right(partitionedPaths ++ morePartitionedPaths)
-            case (left: Left[_, _], _) =>
+            case (left: Left[?, ?], _) =>
               left
-            case (_, left: Left[_, _]) =>
+            case (_, left: Left[?, ?]) =>
               left
           }
     }

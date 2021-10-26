@@ -46,7 +46,7 @@ object Example extends IOApp.Simple {
     writeSingleFile[IO]
       .of[User]
       .options(writeOptions)
-      .write(Path("file:///data/users/single.parquet"))
+      .build(Path("file:///data/users/single.parquet"))
 
   // Tailored for writing indefinite streams.
   // Writes file when chunk reaches size limit and when defined time period elapses.
@@ -58,7 +58,7 @@ object Example extends IOApp.Simple {
         .maxCount(writeOptions.rowGroupSize)
         .maxDuration(30.seconds)
         .options(writeOptions)
-        .write(Path("file:///data/users"))
+        .build(Path("file:///data/users"))
 
   // Reads a file, files from the directory or a partitioned directory. 
   // Please also have a look at the rest of parameters.
@@ -66,7 +66,7 @@ object Example extends IOApp.Simple {
     fromParquet[IO]
       .as[User]
       .options(ParquetReader.Options(hadoopConf = conf))
-      .read(Path("file:///data/users"))
+      .build(Path("file:///data/users"))
       .printlns
 
   def run: IO[Unit] =  

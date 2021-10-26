@@ -12,7 +12,15 @@ import scala.util.control.NonFatal
 object SingleFileParquetSink {
 
   trait ToParquet {
+
+    /** Creates a builder of pipe that processes data of given type
+      * @tparam T
+      *   Schema type
+      */
     def of[T: ParquetSchemaResolver: ParquetRecordEncoder]: Builder[T]
+
+    /** Creates a builder of pipe that processes generic records
+      */
     def generic(schema: MessageType): Builder[RowParquetRecord]
   }
 
@@ -27,8 +35,17 @@ object SingleFileParquetSink {
   }
 
   trait Builder[T] {
+
+    /** @param options
+      *   writer options
+      */
     def options(options: ParquetWriter.Options): Builder[T]
-    // TODO build or write?
+
+    /** @param path
+      *   at which data is supposed to be written
+      * @return
+      *   final [[akka.stream.scaladsl.Sink]]
+      */
     def build(path: Path): Sink[T, Future[Done]]
   }
 

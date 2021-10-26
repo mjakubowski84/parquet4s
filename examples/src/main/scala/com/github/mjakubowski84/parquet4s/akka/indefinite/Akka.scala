@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.akka.indefinite
 
 import akka.actor.ActorSystem
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext}
 
 trait Akka {

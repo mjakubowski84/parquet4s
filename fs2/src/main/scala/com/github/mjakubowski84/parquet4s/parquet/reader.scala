@@ -64,7 +64,7 @@ object reader {
       * @return
       *   final [[fs2.Stream]]
       */
-    def read(path: Path): Stream[F, T]
+    def build(path: Path): Stream[F, T]
   }
 
   private case class BuilderImpl[F[_]: Sync, T: ParquetRecordDecoder](
@@ -76,7 +76,7 @@ object reader {
 
     override def filter(filter: Filter): Builder[F, T] = this.copy(filter = filter)
 
-    override def read(path: Path): Stream[F, T] = reader.read(path, options, filter, projectedSchemaResolverOpt)
+    override def build(path: Path): Stream[F, T] = reader.read(path, options, filter, projectedSchemaResolverOpt)
   }
 
   private[parquet4s] def read[F[_], T: ParquetRecordDecoder](

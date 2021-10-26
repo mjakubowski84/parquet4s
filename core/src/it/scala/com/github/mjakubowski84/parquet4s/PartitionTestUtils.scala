@@ -22,11 +22,11 @@ trait PartitionTestUtils extends TableDrivenPropertyChecks {
 
   val ValidPartitionsTable: TableFor2[String, String] = Table(
     ("name", "value"),
-    validNames.flatMap(name => validValues.map(value => name -> value)): _*
+    validNames.flatMap(name => validValues.map(value => name -> value))*
   )
   val InvalidPartitionsTable: TableFor2[String, String] = Table(
     ("name", "value"),
-    invalidNames.flatMap(name => invalidValues.map(value => name -> value)): _*
+    invalidNames.flatMap(name => invalidValues.map(value => name -> value))*
   )
 
 }

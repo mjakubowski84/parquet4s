@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s.core
 
-import com.github.mjakubowski84.parquet4s.CustomType._
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver._
+import com.github.mjakubowski84.parquet4s.CustomType.*
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.*
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path}
 
 import java.nio.file.Files

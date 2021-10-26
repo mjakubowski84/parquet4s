@@ -5,7 +5,7 @@ import com.github.mjakubowski84.parquet4s.{ColumnPath, ParquetWriter, Partitione
 import org.apache.hadoop.fs.{FileStatus, FileSystem}
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
-import cats.implicits._
+import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import org.apache.hadoop.conf.Configuration
 import fs2.Stream
@@ -55,9 +55,9 @@ private[parquet] object io {
           Left(invalidPaths ++ moreInvalidPaths)
         case (Right(partitionedPaths), Right(morePartitionedPaths)) =>
           Right(partitionedPaths ++ morePartitionedPaths)
-        case (left: Left[_, _], _) =>
+        case (left: Left[?, ?], _) =>
           left
-        case (_, left: Left[_, _]) =>
+        case (_, left: Left[?, ?]) =>
           left
       }
       .map {

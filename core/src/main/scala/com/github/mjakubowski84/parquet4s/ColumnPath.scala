@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 /** Short alias for [[ColumnPath]].
   */

@@ -1,10 +1,10 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.openjdk.jmh.annotations._
+import org.openjdk.jmh.annotations.*
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{Path => NioPath, _}
+import java.nio.file.{Path as NioPath, _}
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.collection.immutable
@@ -108,7 +108,7 @@ object CoreBenchmark {
 @Measurement(iterations = 12, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 class CoreBenchmark {
 
-  import CoreBenchmark._
+  import CoreBenchmark.*
 
   @Benchmark
   @BenchmarkMode(Array(Mode.AverageTime))

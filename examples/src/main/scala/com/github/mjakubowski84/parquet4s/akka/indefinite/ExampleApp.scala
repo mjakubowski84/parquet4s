@@ -5,7 +5,7 @@ import akka.kafka.scaladsl.Consumer.DrainingControl
 import akka.stream.scaladsl.Keep
 
 import scala.concurrent.Await
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 object ExampleApp
     extends App

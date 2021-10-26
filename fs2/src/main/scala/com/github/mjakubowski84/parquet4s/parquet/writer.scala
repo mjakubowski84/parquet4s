@@ -53,7 +53,7 @@ private[parquet4s] object writer {
       * @return
       *   final [[fs2.Pipe]]
       */
-    def write(path: Path): Pipe[F, T, fs2.INothing]
+    def build(path: Path): Pipe[F, T, fs2.INothing]
   }
 
   private case class BuilderImpl[F[_], T](options: ParquetWriter.Options = ParquetWriter.Options())(implicit
@@ -62,7 +62,7 @@ private[parquet4s] object writer {
       sync: Sync[F]
   ) extends Builder[F, T] {
     override def options(options: ParquetWriter.Options): Builder[F, T] = this.copy(options = options)
-    override def write(path: Path): Pipe[F, T, fs2.INothing]            = pipe[F, T](path, options)
+    override def build(path: Path): Pipe[F, T, fs2.INothing]            = pipe[F, T](path, options)
   }
 
   private class Writer[T, F[_]](internalWriter: ParquetWriter.InternalWriter, encode: T => F[RowParquetRecord])(implicit

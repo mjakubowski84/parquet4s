@@ -1,17 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
-import org.apache.parquet.schema.LogicalTypeAnnotation.{
-  DateLogicalTypeAnnotation,
-  DecimalLogicalTypeAnnotation,
-  IntLogicalTypeAnnotation,
-  StringLogicalTypeAnnotation
-}
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
-import org.apache.parquet.schema.Type.Repetition
-import org.apache.parquet.schema._
-import shapeless._
-import shapeless.labelled._
+import org.apache.parquet.schema.*
+import shapeless.*
+import shapeless.labelled.*
 
 import scala.annotation.implicitNotFound
 import scala.language.higherKinds
@@ -44,7 +35,7 @@ trait ParquetSchemaResolver[T] {
 object ParquetSchemaResolver extends SchemaDefs {
 
   trait Tag[V]
-  type TypedSchemaDef[V] = SchemaDef with Tag[V]
+  type TypedSchemaDef[V] = SchemaDef & Tag[V]
 
   class TypedSchemaDefInvoker[K <: Symbol: Witness.Aux, V](schemaDef: TypedSchemaDef[V]) {
     private def fieldName                                      = implicitly[Witness.Aux[K]].value.name
@@ -58,12 +49,12 @@ object ParquetSchemaResolver extends SchemaDefs {
     *   iterable of [[ColumnPath]]s that should be skipped when generating the schema
     */
   def resolveSchema[T](toSkip: Iterable[ColumnPath])(implicit g: ParquetSchemaResolver[T]): MessageType =
-    Message(g.schemaName, g.resolveSchema(Cursor.skipping(toSkip)): _*)
+    Message(g.schemaName, g.resolveSchema(Cursor.skipping(toSkip))*)
 
   /** Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
     */
   def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType =
-    Message(g.schemaName, g.resolveSchema(Cursor.simple): _*)
+    Message(g.schemaName, g.resolveSchema(Cursor.simple)*)
 
   implicit val hnil: ParquetSchemaResolver[HNil] = _ => List.empty
 
@@ -106,7 +97,7 @@ object ParquetSchemaResolver extends SchemaDefs {
         case Nil =>
           None
         case fieldTypes =>
-          Option(invoker.productType(SchemaDef.group(fieldTypes: _*).typed[V]))
+          Option(invoker.productType(SchemaDef.group(fieldTypes*).typed[V]))
       }
 
 }

@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ValueImplicits.*
-import org.apache.parquet.schema.MessageType
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 

@@ -4,12 +4,12 @@ import org.apache.hadoop.fs.FileStatus
 import org.apache.parquet.ParquetReadOptions
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
-import org.apache.parquet.io.api._
+import org.apache.parquet.io.api.*
 import org.apache.parquet.io.{ColumnIOFactory, MessageColumnIO}
 import org.apache.parquet.schema.{GroupType, MessageType}
 
 import scala.annotation.tailrec
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 /** Calculates statistics from <b>filtered</b> Parquet files.
   */

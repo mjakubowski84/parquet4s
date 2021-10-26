@@ -40,8 +40,8 @@ class ParquetStreamsITSpec
     with BeforeAndAfter
     with BeforeAndAfterAll {
 
-  import ParquetRecordDecoder._
-  import ParquetStreamsITSpec._
+  import ParquetRecordDecoder.*
+  import ParquetStreamsITSpec.*
 
   override val logger: Logger = LoggerFactory.getLogger(this.getClass)
   implicit val system: ActorSystem = ActorSystem()
