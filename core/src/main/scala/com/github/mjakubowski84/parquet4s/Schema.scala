@@ -29,7 +29,7 @@ object Message {
   val DefaultName = "parquet4s_schema"
 
   def apply(name: Option[String], fields: Type*): MessageType =
-    Types.buildMessage().addFields(fields: _*).named(name.getOrElse(DefaultName))
+    Types.buildMessage().addFields(fields*).named(name.getOrElse(DefaultName))
 
 }
 
@@ -107,7 +107,7 @@ private case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends 
 
   override def apply(name: String): Type = {
     val builder = if (required) Types.requiredGroup() else Types.optionalGroup()
-    builder.addFields(fields: _*).named(name)
+    builder.addFields(fields*).named(name)
   }
 
   override def withRequired(required: Boolean): GroupSchemaDef = this.copy(required = required)
@@ -205,7 +205,7 @@ trait SchemaDefs {
     SchemaDef.primitive(INT96, required = false).typed[java.sql.Timestamp]
 
   implicit def productSchema[T](implicit parquetSchemaResolver: ParquetSchemaResolver[T]): TypedSchemaDef[T] =
-    SchemaDef.group(parquetSchemaResolver.resolveSchema(Cursor.simple): _*).typed[T]
+    SchemaDef.group(parquetSchemaResolver.resolveSchema(Cursor.simple)*).typed[T]
 
   implicit def optionSchema[T](implicit tSchemaDef: TypedSchemaDef[T]): TypedSchemaDef[Option[T]] =
     tSchemaDef.withRequired(false).typed[Option[T]]

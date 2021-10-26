@@ -113,7 +113,7 @@ object rotatingWriter {
 
     /** Builds final writer pipe.
       */
-    def write(basePath: Path, schema: MessageType): Pipe[F, RowParquetRecord, RowParquetRecord]
+    def build(basePath: Path, schema: MessageType): Pipe[F, RowParquetRecord, RowParquetRecord]
   }
 
   trait TypedBuilder[F[_], T, W] extends Builder[F, T, W, TypedBuilder[F, T, W]] {
@@ -127,7 +127,7 @@ object rotatingWriter {
 
     /** Builds final writer pipe.
       */
-    def write(basePath: Path)(implicit
+    def build(basePath: Path)(implicit
         schemaResolver: ParquetSchemaResolver[W],
         encoder: ParquetRecordEncoder[W]
     ): Pipe[F, T, T]
@@ -151,7 +151,7 @@ object rotatingWriter {
       copy(preWriteTransformation = transformation)
     override def postWriteHandler(postWriteHandler: PostWriteHandler[F, RowParquetRecord]): GenericBuilder[F] =
       copy(postWriteHandlerOpt = Option(postWriteHandler))
-    def write(basePath: Path, schema: MessageType): Pipe[F, RowParquetRecord, RowParquetRecord] =
+    def build(basePath: Path, schema: MessageType): Pipe[F, RowParquetRecord, RowParquetRecord] =
       rotatingWriter.write[F, RowParquetRecord, RowParquetRecord](
         basePath,
         Async[F].pure(schema),
@@ -188,7 +188,7 @@ object rotatingWriter {
       )
     override def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): TypedBuilder[F, T, W] =
       copy(postWriteHandlerOpt = Option(postWriteHandler))
-    override def write(
+    override def build(
         basePath: Path
     )(implicit schemaResolver: ParquetSchemaResolver[W], encoder: ParquetRecordEncoder[W]): Pipe[F, T, T] = {
       val schemaF = Sync[F].catchNonFatal(ParquetSchemaResolver.resolveSchema[W](partitionBy))

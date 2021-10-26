@@ -11,7 +11,7 @@ lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 lazy val akkaScalaVersions      = Seq(twoTwelve, twoThirteen)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.0.0-RC1"
+ThisBuild / version := "2.0.0-RC2"
 ThisBuild / isSnapshot := false
 ThisBuild / scalaVersion := twoThirteen
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")

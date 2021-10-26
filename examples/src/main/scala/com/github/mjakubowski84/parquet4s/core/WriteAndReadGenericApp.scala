@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s.core
 
-import com.github.mjakubowski84.parquet4s._
+import com.github.mjakubowski84.parquet4s.*
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32, INT64}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
 import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, Types}

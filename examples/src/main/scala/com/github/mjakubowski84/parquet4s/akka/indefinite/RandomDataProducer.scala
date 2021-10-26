@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, Cancellable, Props, Scheduler}
 import akka.pattern.ask
 import akka.util.Timeout
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext}
 import scala.util.Random
 
@@ -16,9 +16,9 @@ object RandomDataProducer {
 
 trait RandomDataProducer {
 
-  this: Akka with Logger with Kafka =>
+  this: Akka & Logger & Kafka =>
 
-  import RandomDataProducer._
+  import RandomDataProducer.*
 
   private def nextWord: String = words(Random.nextInt(words.size - 1))
   private def action(): Unit   = sendKafkaMessage(nextWord)
@@ -59,7 +59,7 @@ private object FluctuatingSchedulerActor {
 
 private class FluctuatingSchedulerActor(action: () => Unit) extends Actor {
 
-  import FluctuatingSchedulerActor._
+  import FluctuatingSchedulerActor.*
 
   implicit def executionContext: ExecutionContext = context.system.dispatcher
   def scheduler: Scheduler                        = context.system.scheduler

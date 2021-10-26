@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.filter2.predicate.Operators._
+import org.apache.parquet.filter2.predicate.Operators.*
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
 
@@ -50,7 +50,7 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> provided value
     */
-  def ===[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](in: In)(implicit
+  def ===[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.eqFilter(this, in)
@@ -58,7 +58,7 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>not equal to</b> provided value
     */
-  def !==[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](in: In)(implicit
+  def !==[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.neqFilter(this, in)
@@ -66,7 +66,7 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>greater than</b> provided value
     */
-  def >[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](in: In)(implicit
+  def >[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.gtFilter(this, in)
@@ -74,7 +74,7 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>greater than or equal to</b> provided value
     */
-  def >=[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](in: In)(implicit
+  def >=[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.gtEqFilter(this, in)
@@ -82,7 +82,7 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>less than</b> provided value
     */
-  def <[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](in: In)(implicit
+  def <[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.ltFilter(this, in)
@@ -90,7 +90,7 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>less than or equal to</b> provided value
     */
-  def <=[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](in: In)(implicit
+  def <=[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.ltEqFilter(this, in)
@@ -98,7 +98,7 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> one of the provided values
     */
-  def in[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](in: In, inx: In*)(implicit
+  def in[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: In, inx: In*)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.inFilter(this, Set(in) ++ inx.toSet)
@@ -106,7 +106,7 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> one of the provided values
     */
-  def in[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](in: Iterable[In])(implicit
+  def in[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: Iterable[In])(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.inFilter(this, in)
@@ -124,7 +124,7 @@ trait FilterOps {
 
 object Filter {
 
-  def eqFilter[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: ColumnPath, in: In)(implicit
+  def eqFilter[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnPath: ColumnPath, in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     new Filter {
@@ -132,7 +132,7 @@ object Filter {
         FilterApi.eq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
     }
 
-  def neqFilter[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: ColumnPath, in: In)(implicit
+  def neqFilter[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnPath: ColumnPath, in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     new Filter {
@@ -155,7 +155,7 @@ object Filter {
       FilterApi.not(filter.toPredicate(valueCodecConfiguration))
   }
 
-  def gtFilter[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
+  def gtFilter[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     new Filter {
@@ -163,7 +163,7 @@ object Filter {
         FilterApi.gt(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
     }
 
-  def gtEqFilter[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
+  def gtEqFilter[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     new Filter {
@@ -171,7 +171,7 @@ object Filter {
         FilterApi.gtEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
     }
 
-  def ltFilter[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
+  def ltFilter[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     new Filter {
@@ -179,7 +179,7 @@ object Filter {
         FilterApi.lt(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
     }
 
-  def ltEqFilter[In, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
+  def ltEqFilter[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
     new Filter {
@@ -187,7 +187,7 @@ object Filter {
         FilterApi.ltEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
     }
 
-  def inFilter[In, V <: Comparable[V], C <: Column[V] with SupportsEqNotEq](columnPath: ColumnPath, in: Iterable[In])(
+  def inFilter[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnPath: ColumnPath, in: Iterable[In])(
       implicit codec: FilterCodec[In, V, C]
   ): Filter =
     new Filter {

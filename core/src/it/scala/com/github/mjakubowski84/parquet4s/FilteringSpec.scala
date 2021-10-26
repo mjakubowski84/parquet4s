@@ -8,7 +8,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.{Assertion, BeforeAndAfterAll, Inspectors}
 
 import scala.util.Random
-import scala.collection.compat._
+import scala.collection.compat.*
 import immutable.LazyList
 
 class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
@@ -68,8 +68,8 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
     finally iter.close()
   }
 
-  def ltGtTest[T : Ordering, V <: Comparable[V], C <: Column[V] with SupportsLtGt](columnName: String, boundaryValue: T, field: Data => T)
-                                                                                  (implicit codec: FilterCodec[T, V, C]): Assertion = {
+  def ltGtTest[T : Ordering, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnName: String, boundaryValue: T, field: Data => T)
+                                                                               (implicit codec: FilterCodec[T, V, C]): Assertion = {
     forExactly(halfSize, read(Col(columnName) < boundaryValue)) { dataRecord =>
       field(dataRecord) should be < boundaryValue
     }

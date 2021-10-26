@@ -41,9 +41,9 @@ sealed trait EmptyRowParquetRecordResolver {
 }
 
 object EmptyRowParquetRecordResolver {
-  private[parquet4s] val Cache = scala.collection.concurrent.TrieMap.empty[Class[_], RowParquetRecord]
+  private[parquet4s] val Cache = scala.collection.concurrent.TrieMap.empty[Class[?], RowParquetRecord]
 
-  def apply(clazz: Class[_]): EmptyRowParquetRecordResolver =
+  def apply(clazz: Class[?]): EmptyRowParquetRecordResolver =
     Cache.get(clazz) match {
       case Some(record) => new Cached(record)
       case None         => new Builder(Vector.empty, clazz)
@@ -54,7 +54,7 @@ object EmptyRowParquetRecordResolver {
     override def resolveEmptyRowParquetRecord: RowParquetRecord        = rowParquetRecord
   }
 
-  private class Builder(fields: Vector[String], clazz: Class[_]) extends EmptyRowParquetRecordResolver {
+  private class Builder(fields: Vector[String], clazz: Class[?]) extends EmptyRowParquetRecordResolver {
     override def add(fieldName: String): EmptyRowParquetRecordResolver =
       new Builder(fields :+ fieldName, clazz)
     override def resolveEmptyRowParquetRecord: RowParquetRecord =

@@ -4,7 +4,7 @@ import java.math.MathContext
 import java.util
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
-import org.apache.parquet.io.api._
+import org.apache.parquet.io.api.*
 import org.apache.parquet.schema.LogicalTypeAnnotation.{
   DecimalLogicalTypeAnnotation,
   IntLogicalTypeAnnotation,
@@ -12,9 +12,9 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.{
   MapLogicalTypeAnnotation,
   StringLogicalTypeAnnotation
 }
-import org.apache.parquet.schema._
+import org.apache.parquet.schema.*
 
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 private[parquet4s] class ParquetReadSupport(projectedSchemaOpt: Option[MessageType] = None)
     extends ReadSupport[RowParquetRecord] {
@@ -42,10 +42,10 @@ private[parquet4s] class ParquetRecordMaterializer(schema: MessageType) extends 
 
 }
 
-abstract private class ParquetRecordConverter[R <: ParquetRecord[_, R]](
+abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](
     schema: GroupType,
     name: Option[String],
-    parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_, _]]]
+    parent: Option[ParquetRecordConverter[? <: ParquetRecord[?, ?]]]
 ) extends GroupConverter {
 
   protected var record: R = _
@@ -138,7 +138,7 @@ abstract private class ParquetRecordConverter[R <: ParquetRecord[_, R]](
 private class RowParquetRecordConverter(
     schema: GroupType,
     name: Option[String],
-    parent: Option[ParquetRecordConverter[_ <: ParquetRecord[_, _]]]
+    parent: Option[ParquetRecordConverter[? <: ParquetRecord[?, ?]]]
 ) extends ParquetRecordConverter[RowParquetRecord](schema, name, parent) {
 
   /* Initial record has all fields (according to schema) set with NullValues.
@@ -157,7 +157,7 @@ private class RowParquetRecordConverter(
 
 }
 
-private class ListParquetRecordConverter[P <: ParquetRecord[_, P]](
+private class ListParquetRecordConverter[P <: ParquetRecord[?, P]](
     schema: GroupType,
     name: String,
     parent: ParquetRecordConverter[P]
@@ -168,7 +168,7 @@ private class ListParquetRecordConverter[P <: ParquetRecord[_, P]](
 
 }
 
-private class MapParquetRecordConverter[P <: ParquetRecord[_, P]](
+private class MapParquetRecordConverter[P <: ParquetRecord[?, P]](
     schema: GroupType,
     name: String,
     parent: ParquetRecordConverter[P]

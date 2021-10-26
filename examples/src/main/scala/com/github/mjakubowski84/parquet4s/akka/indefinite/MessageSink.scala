@@ -13,7 +13,7 @@ import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import java.nio.file.Files
 import java.sql.Timestamp
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 object MessageSink {
 
@@ -33,10 +33,10 @@ object MessageSink {
 
 trait MessageSink {
 
-  this: Akka with Logger =>
+  this: Akka & Logger =>
 
-  import MessageSink._
-  import MessageSource._
+  import MessageSink.*
+  import MessageSource.*
 
   protected val baseWritePath: Path = Path(Files.createTempDirectory("example")).append(WriteDirectoryName)
 

@@ -6,12 +6,12 @@ import org.apache.parquet.schema.{GroupType, MessageType, Type}
 
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 /** Special type of [[Value]] that represents a record in Parquet file. Mutable and <b>NOT</b> thread-safe. A record is
   * a complex type of data that contains series of other value entries inside.
   */
-sealed trait ParquetRecord[+A, This <: ParquetRecord[A, _]] extends Value with immutable.Iterable[A] {
+sealed trait ParquetRecord[+A, This <: ParquetRecord[A, ?]] extends Value with immutable.Iterable[A] {
 
   /** Creates a new entry in record.
     * @param name
@@ -144,7 +144,7 @@ object RowParquetRecord {
               else
                 Some(
                   SchemaDef
-                    .group(fields: _*)
+                    .group(fields*)
                     .withRequired(groupField.getRepetition == Repetition.REQUIRED)(groupField.getName)
                 )
             }
@@ -456,7 +456,7 @@ object ListParquetRecord {
 final class ListParquetRecord private (private val values: Vector[Value])
     extends ParquetRecord[Value, ListParquetRecord]
     with immutable.Seq[Value] {
-  import ListParquetRecord._
+  import ListParquetRecord.*
 
   override protected[parquet4s] def add(name: String, value: Value): ListParquetRecord =
     value match {
@@ -598,7 +598,7 @@ final class MapParquetRecord private[parquet4s] (protected val entries: Map[Valu
     extends ParquetRecord[(Value, Value), MapParquetRecord]
     with immutable.Map[Value, Value]
     with MapCompat {
-  import MapParquetRecord._
+  import MapParquetRecord.*
 
   override protected[parquet4s] def add(name: String, value: Value): MapParquetRecord =
     value match {

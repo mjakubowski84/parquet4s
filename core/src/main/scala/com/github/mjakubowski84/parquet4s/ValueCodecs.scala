@@ -2,8 +2,8 @@ package com.github.mjakubowski84.parquet4s
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.sql.{Date, Timestamp}
-import java.time._
-import scala.collection.compat._
+import java.time.*
+import scala.collection.compat.*
 import scala.reflect.ClassTag
 
 import scala.language.higherKinds

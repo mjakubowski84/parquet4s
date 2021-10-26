@@ -130,7 +130,6 @@ object ParquetPartitioningFlow {
       */
     def preWriteTransformation[X](transformation: T => X): TypedBuilder[T, X]
 
-    // TODO build or write?
     /** Builds a final flow
       */
     def build(

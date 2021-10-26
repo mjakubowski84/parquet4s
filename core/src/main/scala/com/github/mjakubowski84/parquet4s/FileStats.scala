@@ -7,8 +7,8 @@ import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.schema.MessageType
 
-import scala.collection.compat._
-import scala.jdk.CollectionConverters._
+import scala.collection.compat.*
+import scala.jdk.CollectionConverters.*
 
 /** Calculates statistics from <b>unfiltered</b> Parquet files.
   */
@@ -38,7 +38,7 @@ private[parquet4s] class FileStats(
   ) extends StatsReader {
     private val dotString = columnPath.toString
 
-    private def extreme(statsValue: Statistics[_] => IterableOnce[Value], choose: (V, V) => V) =
+    private def extreme(statsValue: Statistics[?] => IterableOnce[Value], choose: (V, V) => V) =
       reader.getRowGroups.asScala.iterator
         .map(block => block.getColumns.asScala.find(_.getPath.toDotString == dotString))
         .collect { case Some(column) => column }

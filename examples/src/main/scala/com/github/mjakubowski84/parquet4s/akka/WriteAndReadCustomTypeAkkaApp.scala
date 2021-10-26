@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.akka
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
-import com.github.mjakubowski84.parquet4s.CustomType._
+import com.github.mjakubowski84.parquet4s.CustomType.*
 import com.github.mjakubowski84.parquet4s.{ParquetStreams, Path}
 
 import java.nio.file.Files

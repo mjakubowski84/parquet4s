@@ -15,9 +15,9 @@ object MessageSource {
 
 trait MessageSource {
 
-  this: Akka with Kafka =>
+  this: Akka & Kafka =>
 
-  import MessageSource._
+  import MessageSource.*
 
   private val consumerSettings = ConsumerSettings(system, new StringDeserializer(), new StringDeserializer())
     .withBootstrapServers(kafkaAddress)

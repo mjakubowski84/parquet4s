@@ -123,7 +123,7 @@ trait PartitionedDirectory {
 
 private[parquet4s] object PartitionFilter {
 
-  import PartitionFilterRewriter._
+  import PartitionFilterRewriter.*
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -263,9 +263,9 @@ private[parquet4s] object PartitionFilterRewriter {
 
 private class PartitionFilterRewriter(schema: PartitioningSchema) extends FilterPredicate.Visitor[FilterPredicate] {
 
-  import PartitionFilterRewriter._
+  import PartitionFilterRewriter.*
 
-  private def isPartitionFilter(column: Column[_]): Boolean =
+  private def isPartitionFilter(column: Column[?]): Boolean =
     schema.contains(ColumnPath(column.getColumnPath))
 
   override def visit[T <: Comparable[T]](eq: Operators.Eq[T]): FilterPredicate =
@@ -353,9 +353,9 @@ private[parquet4s] object FilterRewriter {
 
 private class FilterRewriter(partitionedPath: PartitionedPath) extends FilterPredicate.Visitor[FilterPredicate] {
 
-  import FilterRewriter._
+  import FilterRewriter.*
 
-  private def isPartitionFilter(column: Column[_]): Boolean =
+  private def isPartitionFilter(column: Column[?]): Boolean =
     partitionedPath.schema.contains(ColumnPath(column.getColumnPath))
 
   private def evaluate(filterPredicate: FilterPredicate): FilterPredicate =

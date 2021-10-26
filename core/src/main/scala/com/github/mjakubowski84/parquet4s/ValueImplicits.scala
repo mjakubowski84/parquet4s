@@ -6,7 +6,7 @@ import java.time.{LocalDate, LocalDateTime}
   */
 object ValueImplicits {
 
-  import ValueCodecConfiguration._
+  import ValueCodecConfiguration.*
 
   implicit class IntWrapper(v: Int)(implicit encoder: ValueEncoder[Int]) {
     def value: Value = encoder.encode(v, Default)

@@ -1,9 +1,9 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.apache.hadoop.fs.{Path => HadoopPath}
+import org.apache.hadoop.fs.Path as HadoopPath
 
 import java.net.URI
-import java.nio.file.{Paths, Path => NioPath}
+import java.nio.file.{Paths, Path as NioPath}
 
 object Path {
 
