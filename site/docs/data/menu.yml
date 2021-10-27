@@ -11,10 +11,10 @@ options:
   - title: Integration with FS2
     url: docs/fs2
 
-  - title: Supported Storage Types
+  - title: Supported storage types
     url: docs/storage_types
 
-  - title: Records and Schema
+  - title: Records, types and schema
     url: docs/records_and_schema
 
   - title: Migration from 1.x
