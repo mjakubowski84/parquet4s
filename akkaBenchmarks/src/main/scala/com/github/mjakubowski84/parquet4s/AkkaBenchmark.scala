@@ -103,12 +103,12 @@ object AkkaBenchmark {
 
     private def writeGraph =
       Source(dataset.records)
-        .toMat(ParquetStreams.toParquetSingleFile.of[Record].build(filePath))(Keep.right)
+        .toMat(ParquetStreams.toParquetSingleFile.of[Record].write(filePath))(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))
 
     private def writePartitionedGraph =
       Source(dataset.records)
-        .via(ParquetStreams.viaParquet.of[Record].partitionBy(ColumnPath("dict")).build(dataset.basePath))
+        .via(ParquetStreams.viaParquet.of[Record].partitionBy(ColumnPath("dict")).write(dataset.basePath))
         .toMat(Sink.last)(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))
 

@@ -71,7 +71,7 @@ class ParquetStreamsITSpec
 
     val write = () =>
       Source(data).runWith(
-        ParquetStreams.toParquetSingleFile.of[Data].options(writeOptions).build(tempPath.append(outputFileName))
+        ParquetStreams.toParquetSingleFile.of[Data].options(writeOptions).write(tempPath.append(outputFileName))
       )
 
     for {
@@ -102,7 +102,7 @@ class ParquetStreamsITSpec
 
     val write = () =>
       Source(data).runWith(
-        ParquetStreams.toParquetSingleFile.of[Data].options(writeOptions).build(tempPath.append(outputFileName))
+        ParquetStreams.toParquetSingleFile.of[Data].options(writeOptions).write(tempPath.append(outputFileName))
       )
 
     for {
@@ -122,7 +122,7 @@ class ParquetStreamsITSpec
         ParquetStreams.toParquetSingleFile
           .of[Data]
           .options(writeOptions)
-          .build(tempPath.append(s"a=$a/b=$b/$outputFileName"))
+          .write(tempPath.append(s"a=$a/b=$b/$outputFileName"))
       )
 
     for {
@@ -148,7 +148,7 @@ class ParquetStreamsITSpec
         ParquetStreams.toParquetSingleFile
           .of[Data]
           .options(writeOptions)
-          .build(tempPath.append(s"$midPath/$outputFileName"))
+          .write(tempPath.append(s"$midPath/$outputFileName"))
       )
 
     for {
@@ -172,7 +172,7 @@ class ParquetStreamsITSpec
         ParquetStreams.toParquetSingleFile
           .of[Data]
           .options(writeOptions)
-          .build(tempPath.append(s"$midPath/$outputFileName"))
+          .write(tempPath.append(s"$midPath/$outputFileName"))
       )
 
     val fut = for {
@@ -191,7 +191,7 @@ class ParquetStreamsITSpec
 
     val write = () =>
       Source(data).runWith(
-        ParquetStreams.toParquetSingleFile.of[Data].options(writeOptions).build(tempPath.append(outputFileName))
+        ParquetStreams.toParquetSingleFile.of[Data].options(writeOptions).write(tempPath.append(outputFileName))
       )
 
     for {
@@ -217,7 +217,7 @@ class ParquetStreamsITSpec
       .maxCount(writeOptions.rowGroupSize)
       .maxDuration(100.millis)
       .partitionBy(Col("address.country"), Col("address.postCode"))
-      .build(tempPath)
+      .write(tempPath)
 
     val users = Seq(
       User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456"))
@@ -271,7 +271,7 @@ class ParquetStreamsITSpec
           state.flush()
         }
       }
-      .build(tempPath)
+      .write(tempPath)
 
     val users = ((1 to usersToWrite) map genUser).toList
 
@@ -330,7 +330,7 @@ class ParquetStreamsITSpec
       .maxCount(writeOptions.rowGroupSize)
       .maxDuration(100.millis)
       .partitionBy(Col("address.country"), Col("address.postcode"))
-      .build(tempPath)
+      .write(tempPath)
 
     val users = Seq(
       User(name = "John", address = Address("123456", "ABC"))
@@ -355,7 +355,7 @@ class ParquetStreamsITSpec
       .maxCount(writeOptions.rowGroupSize)
       .maxDuration(100.millis)
       .partitionBy(Col("name"))
-      .build(tempPath)
+      .write(tempPath)
 
     val users = Seq(User(name = "John")).toList
 
@@ -373,7 +373,7 @@ class ParquetStreamsITSpec
       .options(writeOptions)
       .maxCount(writeOptions.rowGroupSize)
       .maxDuration(100.millis)
-      .build(tempPath)
+      .write(tempPath)
 
     val users = Seq(
       User(name = "John", address    = Address("123456", "ABC")),
@@ -402,7 +402,7 @@ class ParquetStreamsITSpec
       .maxCount(writeOptions.rowGroupSize)
       .maxDuration(100.millis)
       .partitionBy(Col("address.country"), Col("address.postCode"))
-      .build(tempPath, ParquetSchemaResolver.resolveSchema[User])
+      .write(tempPath, ParquetSchemaResolver.resolveSchema[User])
 
     val genericUsers = Seq(
       RowParquetRecord
@@ -447,7 +447,7 @@ class ParquetStreamsITSpec
     val flow = ParquetStreams.viaParquet
       .of[Data]
       .options(writeOptions)
-      .build(tempPath)
+      .write(tempPath)
 
     for {
       _        <- failingSource.via(flow).runWith(Sink.ignore).recover { case _ => Done }
@@ -466,7 +466,7 @@ class ParquetStreamsITSpec
     val flow = ParquetStreams.viaParquet
       .of[Data]
       .options(writeOptions)
-      .build(tempPath)
+      .write(tempPath)
 
     for {
       _        <- Source(data).via(flow).runWith(failingSink).recover { case _ => Done }
@@ -486,7 +486,7 @@ class ParquetStreamsITSpec
         case _ =>
           ()
       }
-      .build(tempPath)
+      .write(tempPath)
 
     for {
       _        <- Source(data).via(parquetFlow).runWith(Sink.ignore).recover { case _ => Done }
@@ -514,7 +514,7 @@ class ParquetStreamsITSpec
       .maxCount(maxCount = maxCount)
       .maxDuration(maxDuration = maxDuration)
       .partitionBy(Col("id_part"))
-      .build(tempPath)
+      .write(tempPath)
 
     val users = ((1 to usersToWrite) map genUser).toList
 
@@ -574,7 +574,7 @@ class ParquetStreamsITSpec
       .maxCount(maxCount = maxCount)
       .maxDuration(maxDuration = maxDuration / filesPerPartition)
       .partitionBy(Col("id_part"))
-      .build(tempPath)
+      .write(tempPath)
 
     val users = ((1 to usersToWrite) map genUser).toList
 

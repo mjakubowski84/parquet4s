@@ -17,5 +17,11 @@ options:
   - title: Records, types and schema
     url: docs/records_and_schema
 
+  - title: Projection
+    url: docs/projection
+
+  - title: Filtering
+    url: docs/filtering
+
   - title: Migration from 1.x
     url: docs/migration

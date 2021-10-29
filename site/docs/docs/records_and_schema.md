@@ -59,7 +59,7 @@ Complex types can be arbitrarily nested.
 
 Parquet4s is built using Scala's type class system. That allows you to extend Parquet4s by defining your own implementations of type classes.
 
-For example, you may define a codec for your own type so that it can be **read from or written** to Parquet. Assuming that you have your own type:
+For example, you may define a codec for your own type so that it can be read from or written to Parquet. Assuming that you have your own type:
 
 ```scala
 case class CustomType(i: Int)

@@ -117,7 +117,7 @@ object ParquetPartitioningFlow {
 
     /** Builds a final flow
       */
-    def build(basePath: Path, schema: MessageType): GraphStage[FlowShape[RowParquetRecord, RowParquetRecord]]
+    def write(basePath: Path, schema: MessageType): GraphStage[FlowShape[RowParquetRecord, RowParquetRecord]]
   }
 
   trait TypedBuilder[T, W] extends Builder[T, W, TypedBuilder[T, W]] {
@@ -131,7 +131,7 @@ object ParquetPartitioningFlow {
 
     /** Builds a final flow
       */
-    def build(
+    def write(
         basePath: Path
     )(implicit schemaResolver: ParquetSchemaResolver[W], encoder: ParquetRecordEncoder[W]): GraphStage[FlowShape[T, T]]
   }
@@ -154,7 +154,7 @@ object ParquetPartitioningFlow {
     override def postWriteHandler(handler: PostWriteState[RowParquetRecord] => Unit): GenericBuilder =
       copy(postWriteHandler = Some(handler))
 
-    override def build(
+    override def write(
         basePath: Path,
         schema: MessageType
     ): GraphStage[FlowShape[RowParquetRecord, RowParquetRecord]] = {
@@ -201,7 +201,7 @@ object ParquetPartitioningFlow {
     override def postWriteHandler(handler: PostWriteState[T] => Unit): TypedBuilder[T, W] =
       copy(postWriteHandler = Some(handler))
 
-    override def build(basePath: Path)(implicit
+    override def write(basePath: Path)(implicit
         schemaResolver: ParquetSchemaResolver[W],
         encoder: ParquetRecordEncoder[W]
     ): GraphStage[FlowShape[T, T]] = {

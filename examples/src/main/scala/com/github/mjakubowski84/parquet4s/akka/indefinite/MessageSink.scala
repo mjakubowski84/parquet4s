@@ -71,6 +71,6 @@ trait MessageSink {
       .postWriteHandler { state =>
         logger.info(s"Batch of ${state.count} collected.")
       }
-      .build(baseWritePath)
+      .write(baseWritePath)
 
 }

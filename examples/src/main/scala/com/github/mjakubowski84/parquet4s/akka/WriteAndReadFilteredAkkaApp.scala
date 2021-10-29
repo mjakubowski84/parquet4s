@@ -33,7 +33,7 @@ object WriteAndReadFilteredAkkaApp extends App {
 
   for {
     // write
-    _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile.of[Data].build(path.append("data.parquet")))
+    _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile.of[Data].write(path.append("data.parquet")))
     // read filtered
     _ <- Future(println("""dict == "A""""))
     _ <- ParquetStreams.fromParquet.as[Data].filter(Col("dict") === Dict.A).read(path).runWith(printingSink)

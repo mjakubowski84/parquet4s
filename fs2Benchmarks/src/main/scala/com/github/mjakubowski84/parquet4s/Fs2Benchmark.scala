@@ -104,7 +104,7 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       operation = Stream
         .iterable(dataset.records)
-        .through(parquet.writeSingleFile[IO].of[Record].build(filePath))
+        .through(parquet.writeSingleFile[IO].of[Record].write(filePath))
         .compile
         .drain
     }
@@ -128,7 +128,7 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       operation = Stream
         .iterable(dataset.records)
-        .through(parquet.viaParquet[IO].of[Record].partitionBy(ColumnPath("dict")).build(dataset.basePath))
+        .through(parquet.viaParquet[IO].of[Record].partitionBy(ColumnPath("dict")).write(dataset.basePath))
         .compile
         .lastOrError
     }
@@ -154,7 +154,7 @@ object Fs2Benchmark {
       operation = parquet
         .fromParquet[IO]
         .as[Record]
-        .build(dataset.basePath)
+        .read(dataset.basePath)
         .compile
         .lastOrError
     }
