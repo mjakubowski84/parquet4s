@@ -16,7 +16,6 @@ object ParquetPartitioningFlow {
 
   val DefaultMaxCount: Long              = HadoopParquetWriter.DEFAULT_BLOCK_SIZE
   val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
-  private val TimerKey                   = "ParquetPartitioningFlow.Rotation"
 
   trait ViaParquet {
 
@@ -222,7 +221,12 @@ object ParquetPartitioningFlow {
     }
   }
 
-  case class PostWriteState[T](count: Long, lastProcessed: T, partitions: Set[Path], flush: () => Unit)
+  case class PostWriteState[T](
+      partition: Path,
+      count: Long,
+      lastProcessed: T,
+      flush: () => Unit
+  )
 
 }
 
@@ -244,8 +248,12 @@ private class ParquetPartitioningFlow[T, W](
   private val vcc            = ValueCodecConfiguration(writeOptions)
 
   private class Logic extends TimerGraphStageLogic(shape) with InHandler with OutHandler {
-    private var writers: scala.collection.immutable.Map[Path, ParquetWriter.InternalWriter] = Map.empty
-    private var count                                                                       = 0L
+    case class WriterState(
+        writer: ParquetWriter.InternalWriter,
+        var written: Long
+    )
+
+    private var writers: Map[Path, WriterState] = Map.empty
 
     setHandlers(in, out, this)
 
@@ -266,51 +274,75 @@ private class ParquetPartitioningFlow[T, W](
         }
       }
 
-    private def write(msg: T): Unit = {
+    private def scheduleNextRotation(path: Path, delay: FiniteDuration): Unit =
+      scheduleOnce(timerKey = path, delay = delay)
+
+    private def write(msg: T): (Path, WriterState) = {
       val valueToWrite                    = preWriteTransformation(msg)
       val record                          = encode(valueToWrite, vcc)
       val (writerPath, partitionedRecord) = partition(record)
-      val writer = writers.get(writerPath) match {
-        case Some(writer) =>
-          writer
+
+      val state = writers.get(writerPath) match {
+        case Some(state) =>
+          state
+
         case None =>
-          if (logger.isDebugEnabled()) logger.debug(s"Creating writer to write to: " + writerPath)
+          logger.debug("Creating writer to write to [{}]", writerPath)
+
           val writer = ParquetWriter.internalWriter(
             path    = Path(writerPath, newFileName),
             schema  = schema,
             options = writeOptions
           )
-          writers = writers.updated(writerPath, writer)
-          writer
+
+          val state = WriterState(
+            writer  = writer,
+            written = 0L
+          )
+
+          writers += writerPath -> state
+          scheduleNextRotation(writerPath, maxDuration)
+          state
       }
-      writer.write(partitionedRecord)
+
+      state.writer.write(partitionedRecord)
+      state.written += 1
+
+      writerPath -> state
     }
 
-    private def close(): Unit = {
-      writers.valuesIterator.foreach(_.close())
-      writers = Map.empty
-      count   = 0
+    private def close(path: Path, state: WriterState): Unit = {
+      cancelTimer(path)
+      state.writer.close()
+      writers -= path
     }
-
-    override def preStart(): Unit =
-      scheduleWithFixedDelay(TimerKey, maxDuration, maxDuration)
 
     override def onTimer(timerKey: Any): Unit =
-      if (TimerKey == timerKey) {
-        close()
+      writers.find(_._1 == timerKey) match {
+        case Some((path, state)) =>
+          close(path, state)
+
+        case None =>
+          logger.debug("Timer with key [{}] triggered but no state was found", timerKey)
       }
 
     override def onPush(): Unit = {
-      val msg = grab(in)
-      write(msg)
-      count += 1
+      val msg                = grab(in)
+      val (partition, state) = write(msg)
 
       postWriteHandler.foreach(
-        _.apply(PostWriteState(count, lastProcessed = msg, partitions = writers.keySet, flush = () => close()))
+        _.apply(
+          PostWriteState(
+            partition     = partition,
+            count         = state.written,
+            lastProcessed = msg,
+            flush         = () => close(partition, state)
+          )
+        )
       )
 
-      if (count >= maxCount) {
-        close()
+      if (state.written >= maxCount) {
+        close(partition, state)
       }
 
       push(out, msg)
@@ -322,7 +354,13 @@ private class ParquetPartitioningFlow[T, W](
       }
 
     override def postStop(): Unit = {
-      close()
+      writers.foreach { case (path, state) =>
+        cancelTimer(path)
+        state.writer.close()
+      }
+
+      writers = Map.empty
+
       super.postStop()
     }
 
