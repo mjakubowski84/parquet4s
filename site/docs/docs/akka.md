@@ -46,7 +46,7 @@ Source.fromIterator(users).runWith(
     .toParquetSingleFile
     .of[User]
     .options(writeOptions)
-    .build(Path("file:///data/users/user-303.parquet"))
+    .write(Path("file:///data/users/user-303.parquet"))
 )
 
 // Tailored for writing indefinite streams.
@@ -60,7 +60,7 @@ Source.fromIterator(users).via(
     .maxCount(writeOptions.rowGroupSize)
     .maxDuration(30.seconds)
     .options(writeOptions)
-    .build(Path("file:///data/users"))
+    .write(Path("file:///data/users"))
 ).runForeach(user => println(s"Just wrote user ${user.userId}..."))
   
 // Reads a file, files from the directory or a partitioned directory. 

@@ -67,7 +67,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
 
   def read[T: ParquetRecordDecoder](path: Path): Stream[IO, Vector[T]] =
-    parquet.fromParquet[IO].as[T].build(path).fold(Vector.empty[T])(_ :+ _)
+    parquet.fromParquet[IO].as[T].read(path).fold(Vector.empty[T])(_ :+ _)
 
   def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
     Files[IO]
@@ -81,7 +81,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     def write(path: Path): Stream[IO, fs2.INothing] =
       Stream
         .iterable(data)
-        .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).build(path.append(outputFileName)))
+        .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).write(path.append(outputFileName)))
 
     val testStream =
       for {
@@ -97,7 +97,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     def write(path: Path): Stream[IO, fs2.INothing] =
       Stream
         .iterable(data)
-        .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).build(path.append(outputFileName)))
+        .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).write(path.append(outputFileName)))
 
     implicit val projectedSchema: MessageType = Types
       .buildMessage()
@@ -107,7 +107,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       .named("projected-schema")
 
     def readProjected[T: ParquetRecordDecoder: ParquetSchemaResolver](path: Path): Stream[IO, Vector[T]] =
-      parquet.fromParquet[IO].projectedAs[T].build(path).fold(Vector.empty[T])(_ :+ _)
+      parquet.fromParquet[IO].projectedAs[T].read(path).fold(Vector.empty[T])(_ :+ _)
 
     val expectedRecords = data.map(d => RowParquetRecord.emptyWithSchema("i").updated("i", d.i, vcc))
 
@@ -128,7 +128,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         .iterable(data)
         .take(numberOfProcessedElementsBeforeFailure)
         .append(Stream.raiseError[IO](new RuntimeException("test exception")))
-        .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).build(path.append(outputFileName)))
+        .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).write(path.append(outputFileName)))
         .handleErrorWith(_ => Stream.empty)
 
     val testStream =
@@ -153,7 +153,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .of[Data]
             .maxCount(maxCount)
             .options(writeOptions)
-            .build(path)
+            .write(path)
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
@@ -183,7 +183,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .maxDuration(25.millis)
             .maxCount(count)
             .options(writeOptions)
-            .build(path)
+            .write(path)
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
@@ -220,7 +220,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
               case _ => IO.unit
             }
             .options(writeOptions)
-            .build(path)
+            .write(path)
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
@@ -253,7 +253,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .maxCount(count)
             .partitionBy(Col("a"), Col("b"))
             .options(writeOptions)
-            .build(path)
+            .write(path)
         )
         .fold(Vector.empty[DataPartitioned])(_ :+ _)
 
@@ -311,7 +311,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             }
             .partitionBy(Col("partition"))
             .options(writeOptions)
-            .build(path)
+            .write(path)
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
@@ -319,7 +319,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       parquet
         .fromParquet[IO]
         .projectedAs[DataTransformed]
-        .build(path)
+        .read(path)
         .map { case DataTransformed(i, s, partition) => Map(partition -> Vector(Data(i, s))) }
         .reduceSemigroup
 
@@ -360,7 +360,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
               case _ =>
                 IO.unit
             }
-            .build(path)
+            .write(path)
         )
         .handleErrorWith(_ => Stream.empty)
         .fold(Vector.empty[Data])(_ :+ _)
@@ -390,7 +390,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .of[Data]
             .options(writeOptions)
             .partitionBy(Col("s"))
-            .build(path)
+            .write(path)
         )
         .take(numberOfProcessedElementsBeforeStop)
         .handleErrorWith(_ => Stream.empty)

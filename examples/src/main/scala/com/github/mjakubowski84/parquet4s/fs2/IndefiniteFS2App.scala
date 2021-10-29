@@ -124,6 +124,6 @@ object IndefiniteFS2App extends IOApp.Simple {
         }
       }
       .partitionBy(Col("year"), Col("month"), Col("day"))
-      .build(path)
+      .write(path)
 
 }

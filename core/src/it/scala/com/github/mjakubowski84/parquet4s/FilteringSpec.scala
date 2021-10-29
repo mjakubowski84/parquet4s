@@ -13,23 +13,22 @@ import immutable.LazyList
 
 class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
 
-
   case class Embedded(x: Int)
   case class Data(
-                   idx: Int,
-                   float: Float,
-                   double: Double,
-                   `enum`: String,
-                   flag: Boolean,
-                   date: LocalDate,
-                   decimal: BigDecimal,
-                   embedded: Embedded
-                 )
+      idx: Int,
+      float: Float,
+      double: Double,
+      `enum`: String,
+      flag: Boolean,
+      date: LocalDate,
+      decimal: BigDecimal,
+      embedded: Embedded
+  )
 
   val `enum`: Seq[String] = List("a", "b", "c", "d")
-  val dataSize: Int = 4096
-  val halfSize: Int = dataSize / 2
-  val filePath: Path = Path(Path(Files.createTempDirectory("example")), "file.parquet")
+  val dataSize: Int       = 4096
+  val halfSize: Int       = dataSize / 2
+  val filePath: Path      = Path(Path(Files.createTempDirectory("example")), "file.parquet")
   val zeroDate: LocalDate = LocalDate.of(1900, 1, 1)
 
   implicit val localDateOrdering: Ordering[LocalDate] = new Ordering[LocalDate] {
@@ -39,13 +38,13 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
   def data: LazyList[Data] =
     LazyList.range(0, dataSize).map { i =>
       Data(
-        idx = i,
-        float = (BigDecimal("0.01") * BigDecimal(i)).toFloat,
-        double = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
-        `enum` = `enum`(Random.nextInt(`enum`.size)),
-        flag = Random.nextBoolean(),
-        date = zeroDate.plusDays(i),
-        decimal = BigDecimal.valueOf(0.001 * (i - halfSize)),
+        idx      = i,
+        float    = (BigDecimal("0.01") * BigDecimal(i)).toFloat,
+        double   = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
+        `enum`   = `enum`(Random.nextInt(`enum`.size)),
+        flag     = Random.nextBoolean(),
+        date     = zeroDate.plusDays(i),
+        decimal  = BigDecimal.valueOf(0.001 * (i - halfSize)),
         embedded = Embedded(i)
       )
     }
@@ -54,11 +53,13 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
     super.beforeAll()
     ParquetWriter
       .of[Data]
-      .options(ParquetWriter.Options(
-        rowGroupSize = 512 * 1024,
-        pageSize = 128 * 1024,
-        dictionaryPageSize = 128 * 1024
-      ))
+      .options(
+        ParquetWriter.Options(
+          rowGroupSize       = 512 * 1024,
+          pageSize           = 128 * 1024,
+          dictionaryPageSize = 128 * 1024
+        )
+      )
       .writeAndClose(filePath, data)
   }
 
@@ -68,8 +69,11 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
     finally iter.close()
   }
 
-  def ltGtTest[T : Ordering, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnName: String, boundaryValue: T, field: Data => T)
-                                                                               (implicit codec: FilterCodec[T, V, C]): Assertion = {
+  def ltGtTest[T: Ordering, V <: Comparable[V], C <: Column[V] & SupportsLtGt](
+      columnName: String,
+      boundaryValue: T,
+      field: Data => T
+  )(implicit codec: FilterCodec[T, V, C]): Assertion = {
     forExactly(halfSize, read(Col(columnName) < boundaryValue)) { dataRecord =>
       field(dataRecord) should be < boundaryValue
     }
@@ -93,7 +97,11 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
 
   it should "filter data by float" in ltGtTest[Float, java.lang.Float, FloatColumn]("float", 0.01f * halfSize, _.float)
 
-  it should "filter data by double" in ltGtTest[Double, java.lang.Double, DoubleColumn]("double", 0.00000001d * halfSize, _.double)
+  it should "filter data by double" in ltGtTest[Double, java.lang.Double, DoubleColumn](
+    "double",
+    0.00000001d * halfSize,
+    _.double
+  )
 
   it should "filter data by text" in {
     val boundaryValue = "c"
@@ -119,12 +127,12 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
 
   it should "filter data by boolean" in {
     val trueData = read(Col("flag") === true)
-    trueData.headOption should be (defined)
-    forAll(trueData) { _.flag should be(true) }
+    trueData.headOption should be(defined)
+    forAll(trueData)(_.flag should be(true))
 
     val falseData = read(Col("flag") === false)
-    falseData.headOption should be (defined)
-    forAll(falseData) { _.flag should be(false) }
+    falseData.headOption should be(defined)
+    forAll(falseData)(_.flag should be(false))
   }
 
   it should "filter data by date" in ltGtTest("date", zeroDate.plusDays(halfSize), _.date)
@@ -141,7 +149,7 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
 
   it should "filter by udp" in {
     object IntDividesBy10 extends UDP[Int] {
-      private val Ten = 10
+      private val Ten                        = 10
       override def keep(value: Int): Boolean = value % Ten == 0
       @inline
       override def canDrop(statistics: FilterStatistics[Int]): Boolean = {
@@ -150,7 +158,7 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
         (statistics.max - statistics.min < Ten) && maxMod >= minMod
       }
       override def inverseCanDrop(statistics: FilterStatistics[Int]): Boolean = !canDrop(statistics)
-      override def name: String = "IntDividesBy10"
+      override val name: String                                               = "IntDividesBy10"
     }
 
     forExactly((dataSize / 10) + 1, read(Col("idx").udp(IntDividesBy10))) { dataRecord =>

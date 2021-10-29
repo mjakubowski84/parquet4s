@@ -46,7 +46,7 @@ object SingleFileParquetSink {
       * @return
       *   final [[akka.stream.scaladsl.Sink]]
       */
-    def build(path: Path): Sink[T, Future[Done]]
+    def write(path: Path): Sink[T, Future[Done]]
   }
 
   private case class BuilderImpl[T](options: ParquetWriter.Options = ParquetWriter.Options())(implicit
@@ -54,7 +54,7 @@ object SingleFileParquetSink {
       encoder: ParquetRecordEncoder[T]
   ) extends Builder[T] {
     override def options(options: ParquetWriter.Options): Builder[T] = this.copy(options = options)
-    override def build(path: Path): Sink[T, Future[Done]]            = apply(path, options)
+    override def write(path: Path): Sink[T, Future[Done]]            = apply(path, options)
   }
 
   private val logger: Logger = LoggerFactory.getLogger(this.getClass)
