@@ -8,7 +8,7 @@ permalink: docs/filtering/
 
 One of the best features of Parquet is an efficient way of filtering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Parquet4s allows to define a filter predicates in order to push filtering out from Scala collections and Akka or FS2 stream down to a point before file content is even read.
 
-In Akka and FS2 filter applies both to content of files and `partitions`.
+In Akka and FS2 filter applies both to content of files and [partitions]({% link docs/partitioning.md %})).
 
 You define your filters using simple algebra as follows:
 

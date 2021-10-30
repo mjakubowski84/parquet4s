@@ -6,7 +6,7 @@ permalink: docs/storage_types/
 
 # Supported storage types
 
-As it is based on Hadoop Client, Parquet4S can read and write from a variety of file systems:
+As it is based on Hadoop Client, Parquet4s can read and write from a variety of file systems:
 
 - Local files
 - HDFS

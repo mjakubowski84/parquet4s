@@ -8,13 +8,13 @@ permalink: docs/records_and_schema/
 A data entry in Parquet is called a `record`. Record can represent a `row` of data, or it can be a nested complex field in another `row`. Another types of record are a `map` and a `list`. Stored data must be organised in `row`s. Neither primitive type nor `map` or `list` are allowed as a root data type.
 In Parquet4s those concepts are represented by types that extend `ParquetRecord`: `RowParquetRecord`, `MapParquetRecord` and `ListParquetRecord`. `ParquetRecord` extends Scala's immutable `Iterable` and allows iteration (next to many other operations) over its content: fields of a `row`, key-value entries of a `map` and elements of a `list`. When using the library you have an option to use those data structures directly, or you can use regular Scala classes that are encoded/decoded by instances of `ValueCodec` to/from `ParqutRecord`.
 
-Parquet organizes row records into `pages` and pages into `row groups`. Row groups and pages are data blocks accompanied by metadata such as `statistics` and `dictionaries`. Metadata is leveraged during reading and filtering - so that some data blocks are skipped during reading if the metadata proves that the related data does not match provided filter predicate.
+Parquet organizes row records into `pages` and pages into `row groups`. Row groups and pages are data blocks accompanied by metadata such as `statistics` and `dictionaries`. Metadata is leveraged during [filtering]({% link docs/filtering.md %})) - so that some data blocks are skipped during reading if the metadata proves that the related data does not match provided filter predicate.
 
 For more information about data structures in Parquet please refer to [official documentation](https://parquet.apache.org/documentation/latest/).
 
 # Schema
 
-Each Parquet file contains the schema of the data it stores. The schema defines structure of records, names and types of fields, optionality, etc. Schema is required for writing Parquet files and can be optionally used during reading (if you do not want to read all stored columns).
+Each Parquet file contains the schema of the data it stores. The schema defines structure of records, names and types of fields, optionality, etc. Schema is required for writing Parquet files and can be optionally used during reading for [projection]({% link docs/projection.md %}).
 
 Official Parquet library, that Parquet4s is based on, defines the schema in Java type called `MessageType`. As it is quite tedious to define the schema and map it to your data types, Parquet4s comes with a handy mechanism that derives it automatically from Scala case classes. Please follow this documentation to learn which Scala types are supported out of the box and how to define custom encoders and decoders.
 
@@ -74,9 +74,10 @@ case class CustomType(i: Int)
 
 implicit val customTypeCodec: OptionalValueCodec[CustomType] = 
   new OptionalValueCodec[CustomType] {
-    override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): CustomType = value match {
-      case IntValue(i) => CustomType(i)
-    }
+    override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): CustomType =
+      value match {
+        case IntValue(i) => CustomType(i)
+      }
     override protected def encodeNonNull(data: CustomType, configuration: ValueCodecConfiguration): Value =
       IntValue(data.i)
 }
