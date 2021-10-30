@@ -23,5 +23,8 @@ options:
   - title: Filtering
     url: docs/filtering
 
+  - title: Partitioning
+    url: docs/partitioning
+
   - title: Migration from 1.x
     url: docs/migration

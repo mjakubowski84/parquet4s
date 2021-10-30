@@ -13,9 +13,10 @@ Parquet4s has an integration module that allows you to read and write Parquet fi
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
-`ParquetStreams` has a single `Source` for reading single file or a directory (can be partitioned), a `Sink`s for writing a single file and a sophisticated `Flow` for performing complex writes.
+`ParquetStreams` has a single `Source` for reading single file or a directory (can be [partitioned]({% link docs/partitioning.md %})), a `Sink`s for writing a single file and a sophisticated `Flow` for performing complex writes.
 
 ```scala mdoc:compile-only
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Source
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetStreams, ParquetWriter, Path}
@@ -29,7 +30,7 @@ case class User(userId: String, name: String, created: java.sql.Timestamp)
 
 implicit val system: ActorSystem = ActorSystem()
 
-val users: () => Iterator[User] = ???
+val users: Source[User, NotUsed] = ???
 
 val conf: Configuration = ??? // Set Hadoop configuration programmatically
 
@@ -41,7 +42,7 @@ val writeOptions = ParquetWriter.Options(
 )
 
 // Writes a single file.
-Source.fromIterator(users).runWith(
+users.runWith(
   ParquetStreams
     .toParquetSingleFile
     .of[User]
@@ -53,7 +54,7 @@ Source.fromIterator(users).runWith(
 // Writes file when chunk reaches size limit and when defined time period elapses.
 // Can also partition files!
 // Check all the parameters and example usage in project sources.
-Source.fromIterator(users).via(
+users.via(
   ParquetStreams
     .viaParquet
     .of[User]

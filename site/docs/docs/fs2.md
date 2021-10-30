@@ -13,7 +13,7 @@ FS2 integration allows you to read and write Parquet using functional streams. F
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
-`parquet` object has a single `Stream` for reading single file or a directory (can be partitioned), a `Pipe` for writing a single file and a sophisticated `Pipe` for performing complex writes.
+`parquet` object has a single `Stream` for reading single file or a directory (can be [partitioned]({% link docs/partitioning.md %})), a `Pipe` for writing a single file and a sophisticated `Pipe` for performing complex writes.
 
 ```scala mdoc:compile-only
 import cats.effect.{IO, IOApp}
@@ -53,12 +53,12 @@ object Example extends IOApp.Simple {
   // Can also partition files!
   // Check all the parameters and example usage in project sources.
   val writeRotatedPipe =
-      viaParquet[IO]
-        .of[User]
-        .maxCount(writeOptions.rowGroupSize)
-        .maxDuration(30.seconds)
-        .options(writeOptions)
-        .write(Path("file:///data/users"))
+    viaParquet[IO]
+      .of[User]
+      .maxCount(writeOptions.rowGroupSize)
+      .maxDuration(30.seconds)
+      .options(writeOptions)
+      .write(Path("file:///data/users"))
 
   // Reads a file, files from the directory or a partitioned directory. 
   // Please also have a look at the rest of parameters.
