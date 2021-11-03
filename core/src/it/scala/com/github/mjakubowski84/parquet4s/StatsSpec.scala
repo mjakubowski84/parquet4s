@@ -14,23 +14,23 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
 
   case class Embedded(x: Int)
   case class Data(
-                   idx: Int,
-                   float: Float,
-                   double: Double,
-                   `enum`: String,
-                   bool: Boolean,
-                   date: LocalDate,
-                   decimal: BigDecimal,
-                   embedded: Embedded,
-                   optional: Option[Int],
-                   random: String
-                 )
+      idx: Int,
+      float: Float,
+      double: Double,
+      `enum`: String,
+      bool: Boolean,
+      date: LocalDate,
+      decimal: BigDecimal,
+      embedded: Embedded,
+      optional: Option[Int],
+      random: String
+  )
 
-  val `enum`: Seq[String] = List("a", "b", "c", "d")
-  val dataSize: Int = 256 * 256
-  val halfSize: Int = dataSize / 2
-  val path: Path = Path(Files.createTempDirectory("example"))
-  val zeroDate: LocalDate = LocalDate.of(1900, 1, 1)
+  val `enum`: Seq[String]         = List("a", "b", "c", "d")
+  val dataSize: Int               = 256 * 256
+  val halfSize: Int               = dataSize / 2
+  val path: Path                  = Path(Files.createTempDirectory("example"))
+  val zeroDate: LocalDate         = LocalDate.of(1900, 1, 1)
   def decimal(i: Int): BigDecimal = BigDecimal.valueOf(0.001 * (i - halfSize))
 
   implicit val localDateOrdering: Ordering[LocalDate] = new Ordering[LocalDate] {
@@ -41,26 +41,26 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   lazy val data: LazyList[Data] =
     LazyList.range(0, dataSize).map { i =>
       Data(
-        idx = i,
-        float = (BigDecimal("0.01") * BigDecimal(i)).toFloat,
-        double = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
-        `enum` = `enum`(Random.nextInt(`enum`.size)),
-        bool = Random.nextBoolean(),
-        date = zeroDate.plusDays(i),
-        decimal = decimal(i),
+        idx      = i,
+        float    = (BigDecimal("0.01") * BigDecimal(i)).toFloat,
+        double   = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
+        `enum`   = `enum`(Random.nextInt(`enum`.size)),
+        bool     = Random.nextBoolean(),
+        date     = zeroDate.plusDays(i),
+        decimal  = decimal(i),
         embedded = Embedded(i),
         optional = if (i % 2 == 0) None else Some(i),
-        random = UUID.randomUUID().toString
+        random   = UUID.randomUUID().toString
       )
     }
-  val filterByRandom: Filter = Col("random") >= "a" && Col("random") <= "b"
+  val filterByRandom: Filter                = Col("random") >= "a" && Col("random") <= "b"
   lazy val filteredByRandom: LazyList[Data] = data.filter(v => v.random >= "a" && v.random <= "b")
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     val writeOptions = ParquetWriter.Options(
-      rowGroupSize = dataSize / 16,
-      pageSize = 16 * 256,
+      rowGroupSize       = dataSize / 16,
+      pageSize           = 16 * 256,
       dictionaryPageSize = 16 * 256
     )
     val window = dataSize / 4
@@ -74,27 +74,29 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   }
 
   "recordCount" should "be valid for a single file" in {
-    Stats(path.append("0.parquet")).recordCount should be(dataSize / 4)
+    Stats.builder.stats(path.append("0.parquet")).recordCount should be(dataSize / 4)
   }
 
   it should "be valid for a whole dataset" in {
-    Stats(path).recordCount should be(dataSize)
+    Stats.builder.stats(path).recordCount should be(dataSize)
   }
 
   it should "be valid when filtering an interval out of monotonic value " in {
-    val lowerBound = 16
-    val upperBound = 116
+    val lowerBound   = 16
+    val upperBound   = 116
     val expectedSize = upperBound - lowerBound
-    Stats(path, filter = Col("idx") > lowerBound && Col("idx") <= upperBound).recordCount should be(expectedSize)
+    Stats.builder.filter(Col("idx") > lowerBound && Col("idx") <= upperBound).stats(path).recordCount should be(
+      expectedSize
+    )
   }
 
   it should "be valid when filtering over random data" in {
     val expectedSize = filteredByRandom.size
-    Stats(path, filter = filterByRandom).recordCount should be(expectedSize)
+    Stats.builder.filter(filterByRandom).stats(path).recordCount should be(expectedSize)
   }
 
   "min & max" should "should provide proper value for a single file" in {
-    val stats = Stats(path.append("0.parquet"))
+    val stats = Stats.builder.stats(path.append("0.parquet"))
     stats.min[Int](Col("idx")) should be(Some(0))
     stats.max[Int](Col("idx")) should be(Some((dataSize / 4) - 1))
   }
@@ -102,7 +104,8 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   it should "should provide proper value for a single file when filtering" in {
     val expectedMin = 16
     val expectedMax = 128
-    val stats = Stats(path.append("0.parquet"), filter = Col("idx") >= expectedMin && Col("idx") <= expectedMax)
+    val stats =
+      Stats.builder.filter(Col("idx") >= expectedMin && Col("idx") <= expectedMax).stats(path.append("0.parquet"))
     stats.min[Int](Col("idx")) should be(Some(expectedMin))
     stats.max[Int](Col("idx")) should be(Some(expectedMax))
   }
@@ -111,14 +114,14 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
     val expectedMax = Option(filteredByRandom.maxBy(_.random).random)
     val expectedMin = Option(filteredByRandom.minBy(_.random).random)
 
-    val stats = Stats(path, filter = filterByRandom)
+    val stats = Stats.builder.filter(filterByRandom).stats(path)
     stats.max[String](Col("random")) should be(expectedMax)
     stats.min[String](Col("random")) should be(expectedMin)
   }
 
   it should "should provide proper value for each column" in {
     val maxIdx = dataSize - 1
-    val stats = Stats(path)
+    val stats  = Stats.builder.stats(path)
 
     stats.min[Int](Col("idx")) should be(Some(0))
     stats.max[Int](Col("idx")) should be(Some(maxIdx))

@@ -78,47 +78,47 @@ trait Stats {
 
 object Stats {
 
-  /** @param path
-    *   [[Path]] to Parquet files
-    * @param options
-    *   [[ParquetReader.Options]]
-    * @param filter
-    *   optional [[Filter]] that is considered during calculation of [[Stats]]
-    * @return
-    *   [[Stats]] of Parquet files
+  /** Builds an instance of [[Stats]].
     */
-  def apply(
-      path: Path,
-      options: ParquetReader.Options = ParquetReader.Options(),
-      filter: Filter                 = Filter.noopFilter
-  ): Stats =
-    this.apply(path = path, options = options, projectionSchemaOpt = None, filter = filter)
+  trait Builder {
 
-  /** If you are not interested in Stats of all columns then consider using projection to make the operation faster. If
-    * you are going to use a filter mind that your projection has to contain columns that filter refers to.
-    *
-    * @param path
-    *   [[Path]] to Parquet files
-    * @param options
-    *   [[ParquetReader.Options]]
-    * @param filter
-    *   optional [[Filter]] that is considered during calculation of [[Stats]]
-    * @tparam T
-    *   projected type
-    * @return
-    *   [[Stats]] of Parquet files
-    */
-  def withProjection[T: ParquetSchemaResolver](
-      path: Path,
-      options: ParquetReader.Options = ParquetReader.Options(),
-      filter: Filter                 = Filter.noopFilter
-  ): Stats =
-    this.apply(
-      path                = path,
-      options             = options,
-      projectionSchemaOpt = Option(ParquetSchemaResolver.resolveSchema[T]),
-      filter              = filter
-    )
+    /** @param options
+      *   configuration of how Parquet files should be read
+      */
+    def options(options: ParquetReader.Options): Builder
+
+    /** @param filter
+      *   optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
+      */
+    def filter(filter: Filter): Builder
+
+    /** If you are not interested in Stats of all columns then consider using projection to make the operation faster.
+      * If you are going to use a filter mind that your projection has to contain columns that filter refers to
+      * @tparam T
+      *   projection schema
+      */
+    def projection[T: ParquetSchemaResolver]: Builder
+
+    /** @param path
+      *   [[Path]] to Parquet files, e.g.: {{{Path("file:///data/users")}}}
+      * @return
+      *   final [[Stats]]
+      */
+    def stats(path: Path): Stats
+  }
+
+  private case class BuilderImpl(
+      options: ParquetReader.Options           = ParquetReader.Options(),
+      filter: Filter                           = Filter.noopFilter,
+      projectionSchemaOpt: Option[MessageType] = None
+  ) extends Builder {
+    override def options(options: ParquetReader.Options): Builder = this.copy(options = options)
+    override def filter(filter: Filter): Builder                  = this.copy(filter = filter)
+    override def projection[T: ParquetSchemaResolver]: Builder =
+      this.copy(projectionSchemaOpt = Option(ParquetSchemaResolver.resolveSchema[T]))
+    override def stats(path: Path): Stats =
+      apply(path = path, options = options, projectionSchemaOpt = projectionSchemaOpt, filter = filter)
+  }
 
   private[parquet4s] def apply(
       path: Path,
@@ -126,6 +126,8 @@ object Stats {
       projectionSchemaOpt: Option[MessageType],
       filter: Filter
   ): Stats = new LazyDelegateStats(path, options, projectionSchemaOpt, filter)
+
+  def builder: Builder = BuilderImpl()
 
 }
 

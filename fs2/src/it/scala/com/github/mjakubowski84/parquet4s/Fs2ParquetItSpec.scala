@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import cats.effect.testing.scalatest.AsyncIOSpec
-
 import cats.effect.{IO, Ref}
 import cats.implicits.*
 import fs2.Stream
@@ -68,6 +67,9 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
   def read[T: ParquetRecordDecoder](path: Path): Stream[IO, Vector[T]] =
     parquet.fromParquet[IO].as[T].read(path).fold(Vector.empty[T])(_ :+ _)
+
+  def readSize[T: ParquetRecordDecoder](path: Path): Stream[IO, Long] =
+    parquet.fromParquet[IO].as[T].read(path).fold(0L) { case (acc, _) => acc + 1L }
 
   def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
     Files[IO]
@@ -175,12 +177,13 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   it should "write files and rotate by max write duration" in {
     def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
-        .iterable(data)
+        .iterable[IO, Data](data)
+        .metered(50.nanos)
         .through(
           parquet
             .viaParquet[IO]
             .of[Data]
-            .maxDuration(25.millis)
+            .maxDuration(50.millis)
             .maxCount(count)
             .options(writeOptions)
             .write(path)
@@ -202,7 +205,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     testStream.compile.lastOrError
   }
 
-  it should "apply postWriteHandlerWhenWriting" in {
+  it should "apply postWriteHandler" in {
     val expectedNumberOfFiles = 8
     val countOverride         = count / expectedNumberOfFiles
 
@@ -214,10 +217,13 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .viaParquet[IO]
             .of[Data]
             .maxCount(count)
-            .postWriteHandler {
-              case state if state.count >= countOverride =>
-                gaugeRef.update(_ :+ state.count) >> state.flush
-              case _ => IO.unit
+            .postWriteHandler { state =>
+              state.modifiedPartitions.toList.traverse_ {
+                case (path, count) if count >= countOverride =>
+                  gaugeRef.update(_.appended(count)) >> state.flush(path)
+                case _ =>
+                  IO.unit
+              }
             }
             .options(writeOptions)
             .write(path)
@@ -345,7 +351,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   it should "flush already processed files on failure when using rotating writer" in {
     val numberOfProcessedElementsBeforeFailure = 25
 
-    def write(path: Path): Stream[IO, Vector[Data]] =
+    def write(path: Path, counter: Ref[IO, Long]): Stream[IO, Vector[Data]] =
       Stream
         .iterable(data)
         .through(
@@ -354,24 +360,28 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .of[Data]
             .options(writeOptions)
             .partitionBy(Col("s"))
-            .postWriteHandler {
-              case state if state.count >= numberOfProcessedElementsBeforeFailure =>
-                IO.raiseError(new RuntimeException("test exception"))
-              case _ =>
-                IO.unit
-            }
             .write(path)
         )
+        .evalTap { _ =>
+          counter.updateAndGet(_ + 1L).flatMap {
+            case count if count >= numberOfProcessedElementsBeforeFailure =>
+              IO.raiseError(new RuntimeException("test exception"))
+            case _ =>
+              IO.unit
+          }
+        }
         .handleErrorWith(_ => Stream.empty)
         .fold(Vector.empty[Data])(_ :+ _)
 
     val testStream =
       for {
-        path        <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
-        writtenData <- write(path)
-        readData    <- read[Data](path)
+        counter    <- Stream.eval(Ref.of[IO, Long](0L))
+        path       <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        outputData <- write(path, counter)
+        readData   <- read[Data](path)
       } yield {
-        writtenData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure)
+        // element that failed is not in the output but is written and can be read
+        outputData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure - 1)
         readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure)
       }
 
@@ -404,6 +414,91 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       } yield {
         writtenData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
         readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
+      }
+
+    testStream.compile.lastOrError
+  }
+
+  it should "write files and rotate by max file size for each partition" in {
+    val maxCount                   = 512
+    val expectedNumberOfPartitions = dictS.length
+
+    case class I(i: Int)
+
+    def write(path: Path): Stream[IO, Vector[Data]] =
+      Stream
+        .iterable(data)
+        .through(
+          parquet
+            .viaParquet[IO]
+            .of[Data]
+            .maxCount(maxCount)
+            .options(writeOptions)
+            .partitionBy(Col("s"))
+            .write(path)
+        )
+        .fold(Vector.empty[Data])(_ :+ _)
+
+    def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
+      Files[IO]
+        .walk(path)
+        .map(_.toPath)
+        .filter(_.name.endsWith(".parquet"))
+        .fold(Vector.empty[Path])(_ :+ _)
+
+    val testStream =
+      for {
+        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        _            <- write(path)
+        parquetFiles <- listParquetFiles(path)
+        count <- Stream.iterable(parquetFiles).evalMap { path =>
+          read[I](path).compile.count
+        }
+      } yield {
+        parquetFiles.length should be > expectedNumberOfPartitions
+        count.toInt should ((be <= maxCount) and be >= 1)
+      }
+
+    testStream.compile.lastOrError
+  }
+
+  it should "write files and rotate by max duration for each partition" in {
+    val expectedNumberOfPartitions = dictS.length
+
+    case class I(i: Int)
+
+    def write(path: Path): Stream[IO, Vector[Data]] =
+      Stream
+        .iterable[IO, Data](data)
+        .metered(50.nanos)
+        .through(
+          parquet
+            .viaParquet[IO]
+            .of[Data]
+            .maxCount(count)
+            .maxDuration(50.millis)
+            .options(writeOptions)
+            .partitionBy(Col("s"))
+            .write(path)
+        )
+        .fold(Vector.empty[Data])(_ :+ _)
+
+    def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
+      Files[IO]
+        .walk(path)
+        .map(_.toPath)
+        .filter(_.name.endsWith(".parquet"))
+        .fold(Vector.empty[Path])(_ :+ _)
+
+    val testStream =
+      for {
+        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        _            <- write(path)
+        parquetFiles <- listParquetFiles(path)
+        total        <- readSize[I](path)
+      } yield {
+        parquetFiles.length should be > expectedNumberOfPartitions
+        total should be(count)
       }
 
     testStream.compile.lastOrError

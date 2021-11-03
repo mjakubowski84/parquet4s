@@ -1,6 +1,8 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.*
+import cats.effect.std.Queue
+import cats.effect.syntax.all.*
 import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.*
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
@@ -95,6 +97,9 @@ object rotatingWriter {
 
     /** Adds a handler after record writes, exposing some of the internal state of the flow. Intended for lower level
       * monitoring and control.
+      *
+      * Please note that the handler is invoked for each input element is processed and not after each write. It is so
+      * because <i>postWriteHandler</i> may produce multiple records for a single input element.
       *
       * @param postWriteHandler
       *   an effect called after writing a record, receiving a snapshot of the internal state of the flow as a
@@ -206,66 +211,117 @@ object rotatingWriter {
   }
 
   type PostWriteHandler[F[_], T] = PostWriteState[F, T] => F[Unit]
-  case class PostWriteState[F[_], T](count: Long, lastProcessed: T, partitions: Iterable[Path], flush: F[Unit])
 
-  sealed private trait WriterEvent[T, W]
-  private case class DataEvent[T, W](data: W) extends WriterEvent[T, W]
-  private case class RotateEvent[T, W](reason: String) extends WriterEvent[T, W]
-  private case class OutputEvent[T, W](out: T) extends WriterEvent[T, W]
-  private case class StopEvent[T, W]() extends WriterEvent[T, W]
+  /** Represent the state of writer after processing of `processedData`.
+    * @param processedData
+    *   Processed input element
+    * @param modifiedPartitions
+    *   State of partitions that has been written in effect of processing the element <i>T</i>. More than one partition
+    *   can be modified due to <i>preWriteTransformation<i>. The map contains value representing total number of writes
+    *   to a single file (number of writes to the partition after last rotation).
+    * @param flush
+    *   Flushes all writes to given partition and rotates the file.
+    * @tparam F
+    *   effect type
+    * @tparam T
+    *   type of input data
+    */
+  case class PostWriteState[F[_], T](processedData: T, modifiedPartitions: Map[Path, Long], flush: Path => F[Unit])
+
+  sealed private trait WriterEvent[F[_], T, W]
+  private case class DataEvent[F[_], T, W](data: Stream[F, W], out: T) extends WriterEvent[F, T, W]
+  private case class RotateEvent[F[_], T, W](partition: Path) extends WriterEvent[F, T, W]
+  private case class StopEvent[F[_], T, W]() extends WriterEvent[F, T, W]
 
   private object RecordWriter {
-    def apply[F[_]](path: Path, schema: MessageType, options: ParquetWriter.Options)(implicit
-        F: Sync[F]
-    ): F[RecordWriter[F]] =
-      F.blocking(ParquetWriter.internalWriter(path, schema, options)).map(iw => new RecordWriter(iw))
+
+    private def newFileName(options: ParquetWriter.Options): String = {
+      val compressionExtension = options.compressionCodecName.getExtension
+      UUID.randomUUID().toString + compressionExtension + ".parquet"
+    }
+
+    def apply[F[_], T, W](
+        basePath: Path,
+        schema: MessageType,
+        options: ParquetWriter.Options,
+        eventQueue: Queue[F, WriterEvent[F, T, W]],
+        maxDuration: FiniteDuration
+    )(implicit F: Async[F]): F[RecordWriter[F]] =
+      F.uncancelable { _ =>
+        for {
+          internalWrite <- F.blocking(
+            ParquetWriter.internalWriter(basePath.append(newFileName(options)), schema, options)
+          )
+          rotationFiber <- F.delayBy(eventQueue.offer(RotateEvent[F, T, W](basePath)), maxDuration).start
+        } yield new RecordWriter(internalWrite, rotationFiber)
+      }
   }
 
-  private class RecordWriter[F[_]: Sync](internalWriter: ParquetWriter.InternalWriter)(implicit F: Sync[F]) {
+  private class RecordWriter[F[_]: Sync](
+      internalWriter: ParquetWriter.InternalWriter,
+      rotationFiber: Fiber[F, Throwable, Unit]
+  )(implicit F: Async[F]) {
 
-    def write(record: RowParquetRecord): F[Unit] = F.blocking(internalWriter.write(record))
+    var count: Long = 0
 
-    def dispose: F[Unit] = F.blocking(internalWriter.close())
+    def write(record: RowParquetRecord): F[Long] = F.blocking {
+      internalWriter.write(record)
+      count = count + 1
+      count
+    }
 
+    def dispose: F[Unit] =
+      F.uncancelable { _ =>
+        rotationFiber.cancel >> F.blocking(internalWriter.close())
+      }
   }
 
   private class RotatingWriter[T, W, F[_]](
       basePath: Path,
       options: ParquetWriter.Options,
       maxCount: Long,
+      maxDuration: FiniteDuration,
       partitionBy: List[ColumnPath],
       schema: MessageType,
       encode: W => F[RowParquetRecord],
+      eventQueue: Queue[F, WriterEvent[F, T, W]],
       logger: Logger[F],
       postWriteHandlerOpt: Option[PostWriteHandler[F, T]]
-  )(implicit F: Sync[F]) {
+  )(implicit F: Async[F]) {
 
     private val writers = TrieMap.empty[Path, RecordWriter[F]]
 
-    private def writePull(entity: W): Pull[F, T, Unit] =
-      Pull.eval(write(entity))
-
-    private def newFileName: String = {
-      val compressionExtension = options.compressionCodecName.getExtension
-      UUID.randomUUID().toString + compressionExtension + ".parquet"
-    }
+    private def writeEntitiesPull(
+        entityStream: Stream[F, W],
+        modifiedPartitions: Map[Path, Long]
+    ): Pull[F, T, Map[Path, Long]] =
+      entityStream.pull.uncons1.flatMap {
+        case Some((entity, tail)) =>
+          Pull.eval(write(entity)).flatMap { case (partition, count) =>
+            writeEntitiesPull(tail, modifiedPartitions.updated(partition, count))
+          }
+        case None =>
+          Pull.pure(modifiedPartitions)
+      }
 
     private def getOrCreateWriter(basePath: Path): F[RecordWriter[F]] =
       writers.get(basePath) match {
         case Some(writer) =>
           F.pure(writer)
         case None =>
-          for {
-            writer            <- RecordWriter(basePath.append(newFileName), schema, options)
-            existingWriterOpt <- F.delay(writers.putIfAbsent(basePath, writer))
-            resultingWriter <- existingWriterOpt match {
-              case Some(existing) => writer.dispose.as(existing)
-              case None           => F.pure(writer)
-            }
-          } yield resultingWriter
+          F.uncancelable { _ =>
+            for {
+              writer            <- RecordWriter(basePath, schema, options, eventQueue, maxDuration)
+              existingWriterOpt <- F.delay(writers.putIfAbsent(basePath, writer))
+              resultingWriter <- existingWriterOpt match {
+                case Some(existing) => writer.dispose.as(existing) // should not happen
+                case None           => F.pure(writer)
+              }
+            } yield resultingWriter
+          }
       }
 
-    private def write(entity: W): F[Unit] =
+    private def write(entity: W): F[(Path, Long)] =
       for {
         record <- encode(entity)
         partitioning <- partitionBy.foldLeft(F.pure(basePath -> record)) { case (f, currentPartition) =>
@@ -277,8 +333,14 @@ object rotatingWriter {
         }
         (path, partitionedRecord) = partitioning
         writer <- getOrCreateWriter(path)
-        _      <- writer.write(partitionedRecord)
-      } yield ()
+        count  <- writer.write(partitionedRecord)
+        _ <-
+          if (count >= maxCount) {
+            F.uncancelable(_ => dispose(path))
+          } else {
+            F.unit
+          }
+      } yield path -> count
 
     private def partition(
         record: RowParquetRecord,
@@ -293,59 +355,65 @@ object rotatingWriter {
           F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning."))
       }
 
-    private def dispose: F[Unit] =
-      Stream
-        .suspend(Stream.iterable(writers.values))
-        .evalMap(_.dispose)
-        .onFinalize(F.delay(writers.clear()))
-        .compile
-        .drain
+    private def disposeAll: F[Unit] =
+      F.uncancelable { _ =>
+        Stream
+          .suspend(Stream.iterable(writers.values))
+          .evalMap(_.dispose)
+          .onFinalize(F.delay(writers.clear()))
+          .compile
+          .drain
+      }
 
-    private def rotatePull(reason: String): Pull[F, T, Unit] =
-      Pull.eval(logger.debug(s"Rotating on $reason")) >> Pull.eval(dispose)
+    private def dispose(partition: Path): F[Unit] =
+      F.uncancelable { _ =>
+        writers.remove(partition).traverse_(_.dispose)
+      }
+
+    private def rotatePull(partitions: Iterable[Path]): Pull[F, T, Unit] =
+      partitions
+        .map(partition => Pull.eval(logger.debug(s"Rotating $partition")) >> Pull.eval(dispose(partition)))
+        .reduceOption(_ >> _)
+        .getOrElse(Pull.done)
 
     private def postWriteHandlerPull(
         out: T,
-        count: Long,
-        partitions: => Iterable[Path]
-    ): Pull[F, T, Option[WriterEvent[T, W]]] =
-      postWriteHandlerOpt.fold(Pull.eval[F, Option[WriterEvent[T, W]]](F.pure(None)))(handler =>
+        partitionsState: Map[Path, Long]
+    ): Pull[F, T, List[Path]] =
+      postWriteHandlerOpt.fold(Pull.eval[F, List[Path]](F.pure(List.empty)))(handler =>
         Pull.eval {
           for {
-            eventRef <- Ref.of[F, Option[WriterEvent[T, W]]](None)
+            partitionsToFlushRef <- Ref.of[F, List[Path]](List.empty)
             state = PostWriteState[F, T](
-              count         = count,
-              lastProcessed = out,
-              partitions    = partitions,
-              flush         = eventRef.set(Some(RotateEvent("flush on request")))
+              processedData      = out,
+              modifiedPartitions = partitionsState,
+              flush              = partition => partitionsToFlushRef.update(_.prepended(partition))
             )
-            _        <- handler(state)
-            eventOpt <- eventRef.get
-          } yield eventOpt
+            _                 <- handler(state)
+            partitionsToFlush <- partitionsToFlushRef.get
+          } yield partitionsToFlush
         }
       )
 
-    private def writeAllPull(in: Stream[F, WriterEvent[T, W]], count: Long): Pull[F, T, Unit] =
+    private def writeAllEventsPull(in: Stream[F, WriterEvent[F, T, W]]): Pull[F, T, Unit] =
       in.pull.uncons1.flatMap {
-        case Some((DataEvent(data), tail)) if count < maxCount =>
-          writePull(data) >> writeAllPull(tail, count + 1)
-        case Some((DataEvent(data), tail)) =>
-          writePull(data) >> rotatePull("max count reached") >> writeAllPull(tail, count = 0)
-        case Some((RotateEvent(reason), tail)) =>
-          rotatePull(reason) >> writeAllPull(tail, count = 0)
-        case Some((OutputEvent(out), tail)) if postWriteHandlerOpt.isEmpty =>
-          Pull.output1(out) >> writeAllPull(tail, count)
-        case Some((OutputEvent(out), tail)) =>
-          Pull.output1(out) >> postWriteHandlerPull(out, count, writers.keys).flatMap {
-            case None         => writeAllPull(tail, count)
-            case Some(rotate) => writeAllPull(Stream.emit(rotate) ++ tail, count)
+        case Some((DataEvent(dataStream, out), tail)) if postWriteHandlerOpt.isEmpty =>
+          writeEntitiesPull(dataStream, Map.empty) >> Pull.output1(out) >> writeAllEventsPull(tail)
+        case Some((DataEvent(dataStream, out), tail)) =>
+          writeEntitiesPull(dataStream, Map.empty).flatMap { modifiedPartitions =>
+            postWriteHandlerPull(out, modifiedPartitions).flatMap {
+              case Nil                => Pull.output1(out) >> writeAllEventsPull(tail)
+              case partitionsToRotate => rotatePull(partitionsToRotate) >> Pull.output1(out) >> writeAllEventsPull(tail)
+            }
           }
+        case Some((RotateEvent(partition), tail)) =>
+          rotatePull(Iterable(partition)) >> writeAllEventsPull(tail)
         case _ =>
           Pull.done
       }
 
-    def writeAll(in: Stream[F, WriterEvent[T, W]]): Stream[F, T] =
-      writeAllPull(in, count = 0).stream.onFinalize(dispose)
+    def writeAllEvents(in: Stream[F, WriterEvent[F, T, W]]): Stream[F, T] =
+      writeAllEventsPull(in).stream.onFinalize(disposeAll)
   }
 
   private def write[F[_], T, W: ParquetRecordEncoder](
@@ -363,30 +431,31 @@ object rotatingWriter {
         schema                  <- Stream.eval(schemaF)
         valueCodecConfiguration <- Stream.eval(F.catchNonFatal(ValueCodecConfiguration(options)))
         encode = { (entity: W) => F.catchNonFatal(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
-        logger <- Stream.eval(logger[F](this.getClass))
+        logger     <- Stream.eval(logger[F](this.getClass))
+        eventQueue <- Stream.eval(Queue.unbounded[F, WriterEvent[F, T, W]])
         rotatingWriter <- Stream.emit(
           new RotatingWriter[T, W, F](
             basePath            = basePath,
             options             = options,
             maxCount            = maxCount,
+            maxDuration         = maxDuration,
             partitionBy         = partitionBy.toList,
             schema              = schema,
             encode              = encode,
+            eventQueue          = eventQueue,
             logger              = logger,
             postWriteHandlerOpt = postWriteHandlerOpt
           )
         )
         eventStream = Stream(
-          Stream.awakeEvery[F](maxDuration).map[WriterEvent[T, W]](_ => RotateEvent[T, W]("write timeout")),
+          Stream.fromQueueUnterminated(eventQueue),
           in
-            .flatMap { inputElement =>
-              prewriteTransformation(inputElement)
-                .map(DataEvent.apply[T, W])
-                .append(Stream.emit(OutputEvent[T, W](inputElement)))
+            .map { inputElement =>
+              DataEvent[F, T, W](prewriteTransformation(inputElement), inputElement)
             }
-            .append(Stream.emit(StopEvent[T, W]()))
+            .append(Stream.emit(StopEvent[F, T, W]()))
         ).parJoin(maxOpen = 2)
-        out <- rotatingWriter.writeAll(eventStream)
+        out <- rotatingWriter.writeAllEvents(eventStream)
       } yield out
 
 }
