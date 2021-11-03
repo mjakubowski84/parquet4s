@@ -26,5 +26,8 @@ options:
   - title: Partitioning
     url: docs/partitioning
 
+  - title: Statistics
+    url: docs/statistics
+
   - title: Migration from 1.x
     url: docs/migration
