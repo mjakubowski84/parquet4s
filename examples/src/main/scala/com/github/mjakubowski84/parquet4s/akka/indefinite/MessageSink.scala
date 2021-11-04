@@ -56,12 +56,14 @@ trait MessageSink {
       .preWriteTransformation { message =>
         val timestamp     = new Timestamp(message.record.timestamp())
         val localDateTime = timestamp.toLocalDateTime
-        Data(
-          year      = localDateTime.getYear.toString,
-          month     = localDateTime.getMonthValue.toString,
-          day       = localDateTime.getDayOfMonth.toString,
-          timestamp = timestamp,
-          word      = message.record.value()
+        Some(
+          Data(
+            year      = localDateTime.getYear.toString,
+            month     = localDateTime.getMonthValue.toString,
+            day       = localDateTime.getDayOfMonth.toString,
+            timestamp = timestamp,
+            word      = message.record.value()
+          )
         )
       }
       .partitionBy(Col("year"), Col("month"), Col("day"))
@@ -69,7 +71,7 @@ trait MessageSink {
       .maxDuration(ChunkWriteTimeWindow)
       .options(writerOptions)
       .postWriteHandler { state =>
-        logger.info(s"Batch of ${state.count} collected.")
+        logger.info(s"Just wrote to ${state.modifiedPartitions}")
       }
       .write(baseWritePath)
 

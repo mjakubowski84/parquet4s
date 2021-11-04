@@ -5,7 +5,7 @@ import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
 lazy val twoTwelve              = "2.12.15"
-lazy val twoThirteen            = "2.13.6"
+lazy val twoThirteen            = "2.13.7"
 lazy val three                  = "3.0.2"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 lazy val akkaScalaVersions      = Seq(twoTwelve, twoThirteen)
@@ -99,9 +99,8 @@ lazy val core = (project in file("core"))
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
       CrossVersion.partialVersion(scalaBinaryVersion.value) match {
-        case Some((2, 12)) => sparkDeps :+ ("com.chuusai" %% "shapeless" % shapelessVersion)
-        case Some((2, _))  => Seq("com.chuusai" %% "shapeless" % shapelessVersion)
-        case _             => Seq.empty
+        case Some((2, 12 | 13)) => sparkDeps :+ ("com.chuusai" %% "shapeless" % shapelessVersion)
+        case _                  => Seq.empty
       }
     },
     excludeDependencies ++= Seq(

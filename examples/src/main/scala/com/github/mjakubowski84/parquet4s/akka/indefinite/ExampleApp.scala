@@ -1,11 +1,9 @@
 package com.github.mjakubowski84.parquet4s.akka.indefinite
 
 import akka.Done
+import akka.actor.CoordinatedShutdown
 import akka.kafka.scaladsl.Consumer.DrainingControl
 import akka.stream.scaladsl.Keep
-
-import scala.concurrent.Await
-import scala.concurrent.duration.*
 
 object ExampleApp
     extends App
@@ -25,17 +23,9 @@ object ExampleApp
     .mapMaterializedValue(DrainingControl.apply[Done])
     .run()
 
-  def stopStream(): Unit = {
+  coordinatedShutdown.addTask(CoordinatedShutdown.PhaseServiceStop, "Stopping stream") { () =>
     logger.info("Stopping stream...")
-    Await.ready(streamControl.drainAndShutdown(), 10.second)
-    ()
+    streamControl.drainAndShutdown()
   }
 
-  sys.addShutdownHook {
-    stopDataProducer()
-    stopStream()
-    stopAkka()
-    stopKafka()
-    logger.info("Exiting...")
-  }
 }

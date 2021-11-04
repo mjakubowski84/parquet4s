@@ -36,7 +36,7 @@ object ParquetPartitioningFlow {
     override def of[T]: TypedBuilder[T, T] = TypedBuilderImpl(
       maxCount               = DefaultMaxCount,
       maxDuration            = DefaultMaxDuration,
-      preWriteTransformation = identity,
+      preWriteTransformation = t => Iterable(t),
       partitionBy            = Seq.empty,
       writeOptions           = ParquetWriter.Options(),
       postWriteHandler       = None
@@ -44,7 +44,7 @@ object ParquetPartitioningFlow {
     override def generic: GenericBuilder = GenericBuilderImpl(
       maxCount               = DefaultMaxCount,
       maxDuration            = DefaultMaxDuration,
-      preWriteTransformation = identity,
+      preWriteTransformation = record => Iterable(record),
       partitionBy            = Seq.empty,
       options                = ParquetWriter.Options(),
       postWriteHandler       = None
@@ -100,6 +100,9 @@ object ParquetPartitioningFlow {
     /** Adds a handler after record writes, exposing some of the internal state of the flow. Intended for lower level
       * monitoring and control.
       *
+      * Please note that the handler is invoked after each input element is processed and not after each write. It is so
+      * because <i>postWriteHandler</i> may produce multiple records for a single input element.
+      *
       * @param handler
       *   a function called after writing a record, receiving a snapshot of the internal state of the flow as a
       *   parameter.
@@ -113,7 +116,7 @@ object ParquetPartitioningFlow {
     /** @param transformation
       *   function that is called by flow in order to transform record to final write format. Identity by default.
       */
-    def preWriteTransformation(transformation: RowParquetRecord => RowParquetRecord): GenericBuilder
+    def preWriteTransformation(transformation: RowParquetRecord => Iterable[RowParquetRecord]): GenericBuilder
 
     /** Builds a final flow
       */
@@ -127,7 +130,7 @@ object ParquetPartitioningFlow {
       * @tparam X
       *   Schema type
       */
-    def preWriteTransformation[X](transformation: T => X): TypedBuilder[T, X]
+    def preWriteTransformation[X](transformation: T => Iterable[X]): TypedBuilder[T, X]
 
     /** Builds a final flow
       */
@@ -139,7 +142,7 @@ object ParquetPartitioningFlow {
   private case class GenericBuilderImpl(
       maxCount: Long,
       maxDuration: FiniteDuration,
-      preWriteTransformation: RowParquetRecord => RowParquetRecord,
+      preWriteTransformation: RowParquetRecord => Iterable[RowParquetRecord],
       partitionBy: Seq[ColumnPath],
       options: ParquetWriter.Options,
       postWriteHandler: Option[PostWriteState[RowParquetRecord] => Unit]
@@ -149,7 +152,9 @@ object ParquetPartitioningFlow {
     override def maxDuration(maxDuration: FiniteDuration): GenericBuilder = copy(maxDuration = maxDuration)
     override def options(options: ParquetWriter.Options): GenericBuilder  = copy(options = options)
     override def partitionBy(partitionBy: ColumnPath*): GenericBuilder    = copy(partitionBy = partitionBy)
-    override def preWriteTransformation(transformation: RowParquetRecord => RowParquetRecord): GenericBuilder =
+    override def preWriteTransformation(
+        transformation: RowParquetRecord => Iterable[RowParquetRecord]
+    ): GenericBuilder =
       copy(preWriteTransformation = transformation)
     override def postWriteHandler(handler: PostWriteState[RowParquetRecord] => Unit): GenericBuilder =
       copy(postWriteHandler = Some(handler))
@@ -179,7 +184,7 @@ object ParquetPartitioningFlow {
   private case class TypedBuilderImpl[T, W](
       maxCount: Long,
       maxDuration: FiniteDuration,
-      preWriteTransformation: T => W,
+      preWriteTransformation: T => Iterable[W],
       partitionBy: Seq[ColumnPath],
       writeOptions: ParquetWriter.Options,
       postWriteHandler: Option[PostWriteState[T] => Unit]
@@ -189,7 +194,7 @@ object ParquetPartitioningFlow {
     override def maxDuration(maxDuration: FiniteDuration): TypedBuilder[T, W] = copy(maxDuration = maxDuration)
     override def options(options: ParquetWriter.Options): TypedBuilder[T, W]  = copy(writeOptions = options)
     override def partitionBy(partitionBy: ColumnPath*): TypedBuilder[T, W]    = copy(partitionBy = partitionBy)
-    override def preWriteTransformation[X](transformation: T => X): TypedBuilder[T, X] =
+    override def preWriteTransformation[X](transformation: T => Iterable[X]): TypedBuilder[T, X] =
       TypedBuilderImpl(
         maxCount,
         maxDuration,
@@ -221,12 +226,19 @@ object ParquetPartitioningFlow {
     }
   }
 
-  case class PostWriteState[T](
-      partition: Path,
-      count: Long,
-      lastProcessed: T,
-      flush: () => Unit
-  )
+  /** Represent the state of writer after processing of `processedData`.
+    * @param processedData
+    *   Processed input element
+    * @param modifiedPartitions
+    *   State of partitions that has been written in effect of processing the element <i>T</i>. More than one partition
+    *   can be modified due to <i>preWriteTransformation</i>. The map contains values representing total number of
+    *   writes to a single file (number of writes to the partition after last rotation).
+    * @param flush
+    *   Flushes all writes to given partition and rotates the file.
+    * @tparam T
+    *   type of input data
+    */
+  case class PostWriteState[T](processedData: T, modifiedPartitions: Map[Path, Long], flush: Path => Unit)
 
 }
 
@@ -234,7 +246,7 @@ private class ParquetPartitioningFlow[T, W](
     basePath: Path,
     maxCount: Long,
     maxDuration: FiniteDuration,
-    preWriteTransformation: T => W,
+    preWriteTransformation: T => Iterable[W],
     partitionBy: Seq[ColumnPath],
     encode: (W, ValueCodecConfiguration) => RowParquetRecord,
     schema: MessageType,
@@ -277,72 +289,78 @@ private class ParquetPartitioningFlow[T, W](
     private def scheduleNextRotation(path: Path, delay: FiniteDuration): Unit =
       scheduleOnce(timerKey = path, delay = delay)
 
-    private def write(msg: T): (Path, WriterState) = {
-      val valueToWrite                    = preWriteTransformation(msg)
-      val record                          = encode(valueToWrite, vcc)
-      val (writerPath, partitionedRecord) = partition(record)
+    private def write(msg: T): Map[Path, Long] = {
+      val valuesToWrite              = preWriteTransformation(msg)
+      val records                    = valuesToWrite.map(value => encode(value, vcc))
+      val pathsAndPartitionedRecords = records.map(partition)
 
-      val state = writers.get(writerPath) match {
-        case Some(state) =>
-          state
+      pathsAndPartitionedRecords.foldLeft(Map.empty[Path, Long]) {
+        case (modifiedPartitions, (writerPath, partitionedRecord)) =>
+          val state = writers.get(writerPath) match {
+            case Some(state) =>
+              state
 
-        case None =>
-          logger.debug("Creating writer to write to [{}]", writerPath)
+            case None =>
+              logger.debug("Creating writer to write to [{}]", writerPath)
 
-          val writer = ParquetWriter.internalWriter(
-            path    = Path(writerPath, newFileName),
-            schema  = schema,
-            options = writeOptions
-          )
+              val writer = ParquetWriter.internalWriter(
+                path    = Path(writerPath, newFileName),
+                schema  = schema,
+                options = writeOptions
+              )
 
-          val state = WriterState(
-            writer  = writer,
-            written = 0L
-          )
+              val state = WriterState(
+                writer  = writer,
+                written = 0L
+              )
 
-          writers += writerPath -> state
-          scheduleNextRotation(writerPath, maxDuration)
-          state
+              writers += writerPath -> state
+              scheduleNextRotation(writerPath, maxDuration)
+              state
+          }
+
+          state.writer.write(partitionedRecord)
+          state.written += 1
+
+          modifiedPartitions.updated(writerPath, state.written)
       }
-
-      state.writer.write(partitionedRecord)
-      state.written += 1
-
-      writerPath -> state
     }
 
-    private def close(path: Path, state: WriterState): Unit = {
+    private def close(path: Path): Unit = {
       cancelTimer(path)
-      state.writer.close()
-      writers -= path
+      writers.get(path) match {
+        case Some(writerState) =>
+          writerState.writer.close()
+          writers -= path
+        case None =>
+          logger.debug("Trying to close a writer for a path [{}] no state was found", path)
+      }
     }
 
     override def onTimer(timerKey: Any): Unit =
-      writers.find(_._1 == timerKey) match {
-        case Some((path, state)) =>
-          close(path, state)
-
-        case None =>
-          logger.debug("Timer with key [{}] triggered but no state was found", timerKey)
+      timerKey match {
+        case path: Path => close(path)
+        case _          => // ignore
       }
 
     override def onPush(): Unit = {
       val msg                = grab(in)
-      val (partition, state) = write(msg)
+      val modifiedPartitions = write(msg)
 
       postWriteHandler.foreach(
         _.apply(
           PostWriteState(
-            partition     = partition,
-            count         = state.written,
-            lastProcessed = msg,
-            flush         = () => close(partition, state)
+            processedData      = msg,
+            modifiedPartitions = modifiedPartitions,
+            flush              = partition => close(partition)
           )
         )
       )
 
-      if (state.written >= maxCount) {
-        close(partition, state)
+      modifiedPartitions.foreach {
+        case (path, count) if count >= maxCount =>
+          close(path)
+        case _ => // ignore
       }
 
       push(out, msg)

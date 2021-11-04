@@ -263,12 +263,14 @@ class ParquetStreamsITSpec
       .partitionBy(Col("id_part"))
       .postWriteHandler { state =>
         // use-case 1 : monitoring internal counter
-        gauge(state.partition, state.count, state.lastProcessed.id)
+        state.modifiedPartitions.foreach { case (partition, count) =>
+          gauge(partition, count, state.processedData.id)
+        }
 
         // use-case 2 : on demand flush. e.g: the last two records must be in separate files
         //              so the partitions should be flushed before the last two messages are written
-        if (state.lastProcessed.id > usersToWrite - partitions - lastToFlushOnDemand) {
-          state.flush()
+        if (state.processedData.id > usersToWrite - partitions - lastToFlushOnDemand) {
+          state.modifiedPartitions.keys.foreach(state.flush)
         }
       }
       .write(tempPath)
@@ -481,7 +483,7 @@ class ParquetStreamsITSpec
       .of[Data]
       .options(writeOptions)
       .postWriteHandler {
-        case state if state.count >= numberOfSuccessfulWrites =>
+        case state if state.modifiedPartitions.exists(_._2 >= numberOfSuccessfulWrites) =>
           throw new RuntimeException("test exception")
         case _ =>
           ()

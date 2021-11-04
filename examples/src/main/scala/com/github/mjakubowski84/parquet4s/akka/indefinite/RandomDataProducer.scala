@@ -1,11 +1,12 @@
 package com.github.mjakubowski84.parquet4s.akka.indefinite
 
-import akka.actor.{Actor, ActorRef, Cancellable, Props, Scheduler}
+import akka.Done
+import akka.actor.{Actor, ActorRef, Cancellable, CoordinatedShutdown, Props, Scheduler}
 import akka.pattern.ask
 import akka.util.Timeout
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
-import scala.concurrent.{Await, ExecutionContext}
 import scala.util.Random
 
 object RandomDataProducer {
@@ -29,12 +30,10 @@ trait RandomDataProducer {
   def startDataProducer(): Unit = {
     logger.info("Starting scheduler that sends messages to Kafka...")
     scheduler ! FluctuatingSchedulerActor.Start
-  }
-
-  def stopDataProducer(): Unit = {
-    logger.info("Stopping scheduler...")
-    Await.ready(scheduler.ask(FluctuatingSchedulerActor.Stop), Duration.Inf)
-    ()
+    coordinatedShutdown.addTask(CoordinatedShutdown.PhaseServiceUnbind, "Stopping scheduler") { () =>
+      logger.info("Stopping scheduler...")
+      scheduler.ask(FluctuatingSchedulerActor.Stop).mapTo[Done]
+    }
   }
 
 }
@@ -93,6 +92,7 @@ private class FluctuatingSchedulerActor(action: () => Unit) extends Actor {
     case Stop =>
       scheduled.foreach(_.cancel())
       context.stop(self)
+      sender() ! Done
   }
 
 }
