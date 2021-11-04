@@ -1,9 +1,8 @@
 package com.github.mjakubowski84.parquet4s.akka.indefinite
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, CoordinatedShutdown}
 
-import scala.concurrent.duration.*
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.ExecutionContext
 
 trait Akka {
 
@@ -11,10 +10,6 @@ trait Akka {
 
   implicit lazy val system: ActorSystem           = ActorSystem()
   implicit def executionContext: ExecutionContext = system.dispatcher
+  val coordinatedShutdown: CoordinatedShutdown    = CoordinatedShutdown(system)
 
-  def stopAkka(): Unit = {
-    logger.info("Stopping Akka...")
-    Await.ready(system.terminate(), 1.second)
-    ()
-  }
 }

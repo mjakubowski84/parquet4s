@@ -1,10 +1,14 @@
 package com.github.mjakubowski84.parquet4s.akka.indefinite
 
+import akka.Done
+import akka.actor.CoordinatedShutdown
 import io.github.embeddedkafka.EmbeddedKafka
+
+import scala.concurrent.Future
 
 trait Kafka {
 
-  this: Logger =>
+  this: Logger & Akka =>
 
   private lazy val broker = {
     logger.info("Starting Kafka...")
@@ -19,12 +23,13 @@ trait Kafka {
 
   def startKafka(): Unit = {
     broker
-    ()
-  }
-
-  def stopKafka(): Unit = {
-    logger.info("Stopping Kafka...")
-    EmbeddedKafka.stop()
+    coordinatedShutdown.addTask(CoordinatedShutdown.PhaseBeforeActorSystemTerminate, "Stop kafka") { () =>
+      Future {
+        logger.info("Stopping Kafka...")
+        EmbeddedKafka.stop()
+        Done
+      }
+    }
   }
 
 }

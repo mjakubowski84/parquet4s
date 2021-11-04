@@ -98,7 +98,7 @@ object rotatingWriter {
     /** Adds a handler after record writes, exposing some of the internal state of the flow. Intended for lower level
       * monitoring and control.
       *
-      * Please note that the handler is invoked for each input element is processed and not after each write. It is so
+      * Please note that the handler is invoked after each input element is processed and not after each write. It is so
       * because <i>postWriteHandler</i> may produce multiple records for a single input element.
       *
       * @param postWriteHandler
@@ -217,8 +217,8 @@ object rotatingWriter {
     *   Processed input element
     * @param modifiedPartitions
     *   State of partitions that has been written in effect of processing the element <i>T</i>. More than one partition
-    *   can be modified due to <i>preWriteTransformation<i>. The map contains value representing total number of writes
-    *   to a single file (number of writes to the partition after last rotation).
+    *   can be modified due to <i>preWriteTransformation</i>. The map contains values representing total number of
+    *   writes to a single file (number of writes to the partition after last rotation).
     * @param flush
     *   Flushes all writes to given partition and rotates the file.
     * @tparam F
@@ -387,7 +387,7 @@ object rotatingWriter {
             state = PostWriteState[F, T](
               processedData      = out,
               modifiedPartitions = partitionsState,
-              flush              = partition => partitionsToFlushRef.update(_.prepended(partition))
+              flush              = partition => partitionsToFlushRef.update(partitions => partition +: partitions)
             )
             _                 <- handler(state)
             partitionsToFlush <- partitionsToFlushRef.get

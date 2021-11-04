@@ -220,7 +220,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .postWriteHandler { state =>
               state.modifiedPartitions.toList.traverse_ {
                 case (path, count) if count >= countOverride =>
-                  gaugeRef.update(_.appended(count)) >> state.flush(path)
+                  gaugeRef.update(_ :+ count) >> state.flush(path)
                 case _ =>
                   IO.unit
               }
