@@ -29,9 +29,9 @@ object ParquetStreams {
 
   /** Builds a flow that: <ol> <li>Is designed to write Parquet files indefinitely</li> <li>Is able to (optionally)
     * partition data by a list of provided fields</li> <li>Flushes and rotates files after given number of rows is
-    * written or given time period elapses</li> <li>Outputs incoming message after it is written but can write an effect
-    * of provided message transformation.</li> </ol> <br/> Provides explicit API for both custom data types and generic
-    * records.
+    * written to the partition or given time period elapses</li> <li>Outputs incoming message after it is written but
+    * can write an effect of provided message transformation.</li> </ol> <br/> Provides explicit API for both custom
+    * data types and generic records.
     * @return
     *   Builder of the flow.
     */

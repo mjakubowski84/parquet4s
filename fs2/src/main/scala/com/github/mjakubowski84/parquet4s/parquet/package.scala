@@ -36,9 +36,9 @@ package object parquet {
 
   /** Builds a [[fs2.Pipe]] that: <ol> <li>Is designed to write Parquet files indefinitely</li> <li>Is able to
     * (optionally) partition data by a list of provided fields</li> <li>Flushes and rotates files after given number of
-    * rows is written or given time period elapses</li> <li>Outputs incoming message after it is written but can write
-    * an effect of provided message transformation.</li> </ol> <br/> Builder allows to create a pipe for given data type
-    * or for generic records.
+    * rows is written to the partition or a given time period elapses</li> <li>Outputs incoming message after it is
+    * written but can write an effect of provided message transformation.</li> </ol> <br/> Builder allows to create a
+    * pipe for given data type or for generic records.
     * @tparam F
     *   effect type
     * @return
