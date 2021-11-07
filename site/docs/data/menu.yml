@@ -29,5 +29,8 @@ options:
   - title: Statistics
     url: docs/statistics
 
+  - title: Examples
+    url: docs/examples
+
   - title: Migration from 1.x
     url: docs/migration
