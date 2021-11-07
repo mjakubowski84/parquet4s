@@ -83,6 +83,8 @@ implicit val customTypeCodec: OptionalValueCodec[CustomType] =
 }
 ```
 
+`ValueCodec` composes `ValueEncoder` and `ValueDecoder` so if you need only to read or only to write your type then it is enough if you implement only one of them.
+
 Additionally, if you want to write your custom type, you have to define the schema for it:
 
 ```scala mdoc:compile-only
