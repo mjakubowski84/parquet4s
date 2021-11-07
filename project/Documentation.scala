@@ -1,5 +1,6 @@
 import com.typesafe.sbt.site.SitePlugin.autoImport.makeSite
 import mdoc.MdocPlugin.autoImport._
+import microsites.MicrositeFavicon
 import microsites.MicrositeKeys._
 import sbt.Keys._
 import sbt.{Def, url}
@@ -24,6 +25,16 @@ object Documentation {
       micrositePushSiteWith := GitHub4s,
       makeSite / includeFilter := "*.html" || "*.css" || "*.png" || "*.jpg" || "*.gif" || "*.js" || "*.md" || "*.svg",
       micrositeDataDirectory := baseDirectory.value / "docs" / "data",
+      micrositeImgDirectory := baseDirectory.value / "docs" / "images",
+      micrositePalette := Map(
+        "brand-primary" -> "#F1606A",
+        "brand-secondary" -> "#F1606A",
+        "white-color" -> "#FFFFFF"
+      ),
+      micrositeFavicons := Seq(
+        MicrositeFavicon("favicon-16x16.png", "16x16"),
+        MicrositeFavicon("favicon-32x32.png", "32x32")
+      ),
       mdocVariables := Map(
         "VERSION" -> version.value
       )
