@@ -8,6 +8,7 @@ lazy val twoTwelve              = "2.12.15"
 lazy val twoThirteen            = "2.13.7"
 lazy val three                  = "3.0.2"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
+lazy val akkaScalaVersions      = Seq(twoTwelve, twoThirteen)
 
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "2.0.0"
@@ -115,7 +116,7 @@ lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-akka",
-    crossScalaVersions := supportedScalaVersions,
+    crossScalaVersions := akkaScalaVersions,
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided
@@ -154,7 +155,7 @@ lazy val fs2 = (project in file("fs2"))
 lazy val examples = (project in file("examples"))
   .settings(
     name := "parquet4s-examples",
-    crossScalaVersions := supportedScalaVersions,
+    crossScalaVersions := akkaScalaVersions,
     publish / skip := true,
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
@@ -202,7 +203,7 @@ lazy val akkaBenchmarks = (project in file("akkaBenchmarks"))
     name := "parquet4s-akka-benchmarks",
     publish / skip := true,
     publishLocal / skip := true,
-    crossScalaVersions := supportedScalaVersions,
+    crossScalaVersions := akkaScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
