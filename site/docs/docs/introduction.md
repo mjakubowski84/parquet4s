@@ -4,9 +4,6 @@ title: Introduction
 permalink: docs/
 ---
 
-This page is a work in progress. It is dedicated to the latest release candidate version of Parquet4s.
-For a documentation of stable version 1.x of the library please refer to [Readme](https://github.com/mjakubowski84/Parquet4s).
-
 # Introduction
 
 Parquet4s is a simple I/O for [Parquet](https://parquet.apache.org/). Allows you to easily read and write Parquet files in [Scala](https://www.scala-lang.org/).
