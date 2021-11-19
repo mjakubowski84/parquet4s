@@ -1,23 +1,23 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.math.MathContext
-import java.util
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.{InitContext, ReadSupport}
 import org.apache.parquet.io.api.*
+import org.apache.parquet.schema.*
 import org.apache.parquet.schema.LogicalTypeAnnotation.{
   DecimalLogicalTypeAnnotation,
-  IntLogicalTypeAnnotation,
   ListLogicalTypeAnnotation,
-  MapLogicalTypeAnnotation,
-  StringLogicalTypeAnnotation
+  MapLogicalTypeAnnotation
 }
-import org.apache.parquet.schema.*
 
+import java.math.MathContext
+import java.util
 import scala.jdk.CollectionConverters.*
 
-private[parquet4s] class ParquetReadSupport(projectedSchemaOpt: Option[MessageType] = None)
-    extends ReadSupport[RowParquetRecord] {
+private[parquet4s] class ParquetReadSupport(
+    projectedSchemaOpt: Option[MessageType] = None,
+    lookups: Seq[Lookup]                    = Seq.empty
+) extends ReadSupport[RowParquetRecord] {
 
   override def prepareForRead(
       configuration: Configuration,
@@ -25,16 +25,19 @@ private[parquet4s] class ParquetReadSupport(projectedSchemaOpt: Option[MessageTy
       fileSchema: MessageType,
       readContext: ReadSupport.ReadContext
   ): RecordMaterializer[RowParquetRecord] =
-    new ParquetRecordMaterializer(readContext.getRequestedSchema)
+    new ParquetRecordMaterializer(readContext.getRequestedSchema, lookups)
 
   override def init(context: InitContext): ReadSupport.ReadContext =
     new ReadSupport.ReadContext(projectedSchemaOpt.foldLeft(context.getFileSchema)(ReadSupport.getSchemaForRead))
 
 }
 
-private[parquet4s] class ParquetRecordMaterializer(schema: MessageType) extends RecordMaterializer[RowParquetRecord] {
+private[parquet4s] class ParquetRecordMaterializer(
+    schema: MessageType,
+    lookups: Seq[Lookup]
+) extends RecordMaterializer[RowParquetRecord] {
 
-  private val root = new RowParquetRecordConverter(schema)
+  private val root = new RootRowParquetRecordConverter(schema, lookups)
 
   override def getCurrentRecord: RowParquetRecord = root.getCurrentRecord
 
@@ -42,49 +45,40 @@ private[parquet4s] class ParquetRecordMaterializer(schema: MessageType) extends 
 
 }
 
-abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](
-    schema: GroupType,
-    name: Option[String],
-    parent: Option[ParquetRecordConverter[? <: ParquetRecord[?, ?]]]
-) extends GroupConverter {
+abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](schema: GroupType) extends GroupConverter {
 
   protected var record: R = _
 
   private val converters: List[Converter] = schema.getFields.asScala.toList.map(createConverter)
 
-  private def createConverter(field: Type): Converter =
+  private def createConverter(field: Type): Converter = {
+
+    val fieldName = field.getName
+
     Option(field.getLogicalTypeAnnotation) match {
-      case Some(_: StringLogicalTypeAnnotation) =>
-        new StringConverter(field.getName)
       case Some(ann: DecimalLogicalTypeAnnotation) =>
         new DecimalConverter(
-          name      = field.getName,
+          name      = fieldName,
           scale     = ann.getScale,
           precision = ann.getPrecision
         )
-      case Some(ann: IntLogicalTypeAnnotation) if ann.getBitWidth == 8 =>
-        new ByteConverter(field.getName)
-      case Some(ann: IntLogicalTypeAnnotation) if ann.getBitWidth == 16 =>
-        new ShortConverter(field.getName)
       case _ if field.isPrimitive =>
-        new ParquetPrimitiveConverter(field.getName)
+        new ParquetPrimitiveConverter(fieldName)
       case Some(_: MapLogicalTypeAnnotation) =>
-        new MapParquetRecordConverter(field.asGroupType(), field.getName, this)
+        new MapParquetRecordConverter(field.asGroupType(), fieldName, parent = this)
       case Some(_: ListLogicalTypeAnnotation) =>
-        new ListParquetRecordConverter(field.asGroupType(), field.getName, this)
+        new ListParquetRecordConverter(field.asGroupType(), fieldName, parent = this)
       case _ =>
-        new RowParquetRecordConverter(field.asGroupType(), Option(field.getName), Some(this))
+        new ChildRowParquetRecordConverter(field.asGroupType(), fieldName, parent = this)
     }
+  }
 
   override def getConverter(fieldIndex: Int): Converter = converters(fieldIndex)
 
   def getCurrentRecord: R = record
 
-  protected def update(name: String, value: Value): Unit =
+  def update(name: String, value: Value): Unit =
     this.record = this.record.add(name, value)
-
-  override def end(): Unit =
-    parent.foreach(_.update(name.get, record))
 
   private class ParquetPrimitiveConverter(name: String) extends PrimitiveConverter {
     override def addBinary(value: Binary): Unit =
@@ -106,21 +100,6 @@ abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](
       record = record.add(name, LongValue(value))
   }
 
-  private class StringConverter(name: String) extends ParquetPrimitiveConverter(name) {
-    override def addBinary(value: Binary): Unit =
-      record = record.add(name, BinaryValue(value))
-  }
-
-  private class ShortConverter(name: String) extends ParquetPrimitiveConverter(name) {
-    override def addInt(value: Int): Unit =
-      record = record.add(name, IntValue(value))
-  }
-
-  private class ByteConverter(name: String) extends ParquetPrimitiveConverter(name) {
-    override def addInt(value: Int): Unit =
-      record = record.add(name, IntValue(value))
-  }
-
   private class DecimalConverter(name: String, scale: Int, precision: Int) extends ParquetPrimitiveConverter(name) {
     private lazy val mathContext = new MathContext(precision)
     private val shouldRescale    = scale != Decimals.Scale || precision != Decimals.Precision
@@ -135,25 +114,48 @@ abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](
 
 }
 
-private class RowParquetRecordConverter(
-    schema: GroupType,
-    name: Option[String],
-    parent: Option[ParquetRecordConverter[? <: ParquetRecord[?, ?]]]
-) extends ParquetRecordConverter[RowParquetRecord](schema, name, parent) {
+abstract private class RowParquetRecordConverter(schema: GroupType)
+    extends ParquetRecordConverter[RowParquetRecord](schema) {
 
-  /* Initial record has all fields (according to schema) set with NullValues.
+  /* Initial record has all fields (according to the schema) set with NullValues.
      During reading those nulls are replaced with a real value from a file.
      Missing values stay null.
      Thanks to that generic record preserves null representation for missing values.
    */
-  private lazy val initial = RowParquetRecord.emptyWithSchema(schema.getFields.asScala.map(_.getName))
+  private lazy val initial = RowParquetRecord.emptyWithSchema(
+    schema.getFields.asScala.map(_.getName)
+  )
 
-  def this(schema: GroupType) = {
-    this(schema, None, None)
-  }
+  override def start(): Unit = record = initial
 
-  override def start(): Unit =
-    record = initial
+}
+
+private class RootRowParquetRecordConverter(schema: GroupType, lookups: Seq[Lookup])
+    extends RowParquetRecordConverter(schema) {
+
+  override def end(): Unit =
+    lookups.foreach { case Lookup(columnPath, ordinal, aliasOpt) =>
+      record.get(columnPath) match {
+        case Some(value) if columnPath.elements.length > 1 =>
+          record = record.updated(ordinal, aliasOpt.getOrElse(columnPath.elements.last), value)
+        case Some(_) =>
+          aliasOpt.foreach { alias =>
+            record = record.rename(ordinal, alias)
+          }
+        case None =>
+          throw new IllegalArgumentException(s"""Invalid lookup: "$columnPath".""")
+      }
+    }
+
+}
+
+private class ChildRowParquetRecordConverter(
+    schema: GroupType,
+    name: String,
+    parent: ParquetRecordConverter[? <: ParquetRecord[?, ?]]
+) extends RowParquetRecordConverter(schema) {
+
+  override def end(): Unit = parent.update(name, record)
 
 }
 
@@ -161,10 +163,12 @@ private class ListParquetRecordConverter[P <: ParquetRecord[?, P]](
     schema: GroupType,
     name: String,
     parent: ParquetRecordConverter[P]
-) extends ParquetRecordConverter[ListParquetRecord](schema, Option(name), Option(parent)) {
+) extends ParquetRecordConverter[ListParquetRecord](schema) {
 
   override def start(): Unit =
     this.record = ListParquetRecord.Empty
+
+  override def end(): Unit = parent.update(name, record)
 
 }
 
@@ -172,9 +176,11 @@ private class MapParquetRecordConverter[P <: ParquetRecord[?, P]](
     schema: GroupType,
     name: String,
     parent: ParquetRecordConverter[P]
-) extends ParquetRecordConverter[MapParquetRecord](schema, Option(name), Option(parent)) {
+) extends ParquetRecordConverter[MapParquetRecord](schema) {
 
   override def start(): Unit =
     this.record = MapParquetRecord.Empty
+
+  override def end(): Unit = parent.update(name, record)
 
 }

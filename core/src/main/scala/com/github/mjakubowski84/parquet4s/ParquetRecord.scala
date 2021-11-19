@@ -43,12 +43,16 @@ object RowParquetRecord {
 
     def contains(name: String): Boolean = names.contains(name)
 
-    def get(idx: Int): String = positions(idx)
+    def get(idx: Int): String = positions.apply(idx)
 
     def size: Int = positions.length
 
-    def set(idx: Int, name: String): Fields =
-      new Fields(names + name, positions.updated(idx, name))
+    def set(idx: Int, name: String, removeOldField: Boolean): Fields = {
+      val modifiedNames =
+        if (removeOldField) names - positions.apply(idx) + name
+        else names + name
+      new Fields(modifiedNames, positions.updated(idx, name))
+    }
 
     def remove(idx: Int): (String, Fields) = {
       val name  = positions(idx)
@@ -67,6 +71,8 @@ object RowParquetRecord {
       new Fields(names + name, positions :+ name)
 
     def iterator: Iterator[String] = positions.iterator
+
+    def count(name: String): Int = positions.count(_ == name)
 
     override def toString: String = positions.mkString("[", ",", "]")
 
@@ -316,10 +322,20 @@ final class RowParquetRecord private (
   ): RowParquetRecord =
     updated(name, valueEncoder.encode(value, valueCodecConfiguration))
 
+  // TODO docs
   def updated(idx: Int, field: String, newVal: Value): RowParquetRecord = {
-    val oldField  = fields.get(idx)
-    val newFields = fields.set(idx, field)
-    new RowParquetRecord(MapCompat.remove(values, oldField).updated(field, newVal), newFields)
+    val oldField = fields.get(idx)
+    val count    = fields.count(oldField)
+    if (count == 1)
+      new RowParquetRecord(
+        values = MapCompat.remove(values, oldField).updated(field, newVal),
+        fields = fields.set(idx, field, removeOldField = true)
+      )
+    else
+      new RowParquetRecord(
+        values = values.updated(field, newVal),
+        fields = fields.set(idx, field, removeOldField = false)
+      )
   }
 
   /** Removes field at given index.
@@ -411,6 +427,39 @@ final class RowParquetRecord private (
     }
     recordConsumer.endGroup()
   }
+
+  /** Decodes this record to given class.
+    * @param configuration
+    *   decoding configuration
+    */
+  def as[T: ParquetRecordDecoder](configuration: ValueCodecConfiguration): T =
+    ParquetRecordDecoder.decode(this, configuration)
+
+  /** Renames a field in the record
+    * @param idx
+    *   idx of the field
+    * @param newField
+    *   field name to change to
+    * @return
+    *   a record with the name changed
+    * @throws IndexOutOfBoundsException
+    *   when there's no field at given index
+    */
+  def rename(idx: Int, newField: String): RowParquetRecord = {
+    val oldField = fields.get(idx)
+    val count    = fields.count(oldField)
+    val value    = values(oldField)
+    if (count == 1)
+      new RowParquetRecord(
+        MapCompat.remove(values, oldField).updated(newField, value),
+        fields.set(idx, newField, removeOldField = true)
+      )
+    else
+      new RowParquetRecord(values.updated(newField, value), fields.set(idx, newField, removeOldField = false))
+  }
+
+  // TODO docs
+  def contains(fieldName: String): Boolean = fields.contains(fieldName)
 
   override def canEqual(other: Any): Boolean = other.isInstanceOf[RowParquetRecord]
 
