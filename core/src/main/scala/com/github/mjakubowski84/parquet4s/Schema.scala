@@ -7,22 +7,12 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.{
   IntLogicalTypeAnnotation,
   StringLogicalTypeAnnotation
 }
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{
-  BINARY,
-  BOOLEAN,
-  DOUBLE,
-  FIXED_LEN_BYTE_ARRAY,
-  FLOAT,
-  INT32,
-  INT64,
-  INT96
-}
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.*
 import org.apache.parquet.schema.Type.Repetition
-import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, PrimitiveType, Type, Types}
-
-import scala.reflect.ClassTag
+import org.apache.parquet.schema.*
 
 import scala.language.higherKinds
+import scala.reflect.ClassTag
 
 object Message {
 
@@ -30,6 +20,29 @@ object Message {
 
   def apply(name: Option[String], fields: Type*): MessageType =
     Types.buildMessage().addFields(fields*).named(name.getOrElse(DefaultName))
+
+  /** Merges the fields before creating a schema. Merge is done by unifying types of columns that are define in a
+    * projection more than once. Type of the first mentioned column is chosen for each duplicate.
+    * @param fields
+    *   fields to be merged and then used for defining the schema
+    * @return
+    *   schema created
+    */
+  private[parquet4s] def merge(fields: Seq[Type]): MessageType =
+    Message(name = None, fields = mergeFields(fields)*)
+
+  private def mergeFields(fields: Seq[Type]): Seq[Type] =
+    fields
+      .foldLeft(Map.empty[String, Type], Vector.empty[Type]) { case ((register, merged), tpe) =>
+        val fieldName = tpe.getName
+        register.get(fieldName) match {
+          case Some(firstSeen) =>
+            register -> (merged :+ firstSeen)
+          case None =>
+            register.updated(fieldName, tpe) -> (merged :+ tpe)
+        }
+      }
+      ._2
 
 }
 

@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
-import org.apache.parquet.schema.MessageType
+import org.apache.parquet.schema.{MessageType, Type}
 
 import java.io.Closeable
 import java.util.TimeZone
@@ -40,7 +40,8 @@ object ParquetReader {
   private case class BuilderImpl[T](
       options: ParquetReader.Options          = ParquetReader.Options(),
       filter: Filter                          = Filter.noopFilter,
-      projectedSchemaOpt: Option[MessageType] = None
+      projectedSchemaOpt: Option[MessageType] = None,
+      lookups: Seq[Lookup]                    = Seq.empty
   ) extends Builder[T] {
     override def options(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
@@ -52,7 +53,7 @@ object ParquetReader {
       val valueCodecConfiguration = ValueCodecConfiguration(options)
       newParquetIterable(
         builder = HadoopParquetReader
-          .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), path.toHadoop)
+          .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, lookups), path.toHadoop)
           .withConf(options.hadoopConf)
           .withFilter(filter.toFilterCompat(valueCodecConfiguration)),
         valueCodecConfiguration = valueCodecConfiguration,
@@ -123,6 +124,26 @@ object ParquetReader {
   def projectedGeneric(projectedSchema: MessageType): Builder[RowParquetRecord] = BuilderImpl(
     projectedSchemaOpt = Option(projectedSchema)
   )
+
+  /** TODO docs
+    * @param col
+    * @param cols
+    * @return
+    */
+  def projectedGeneric(col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Builder[RowParquetRecord] = {
+    val (fields, lookups) =
+      (col +: cols.toList).zipWithIndex
+        .foldLeft((Vector.empty[Type], Vector.empty[Lookup])) { case ((fields, lookups), (columnPath, ordinal)) =>
+          val updatedFields  = fields :+ columnPath.toType
+          val updatedLookups = lookups :+ Lookup(columnPath, ordinal)
+          updatedFields -> updatedLookups
+        }
+    BuilderImpl(
+      projectedSchemaOpt = Option(Message.merge(fields)),
+      lookups            = lookups
+    )
+  }
+
 }
 
 /** Allows to iterate over Parquet file(s). Remember to call `close()` when you are done.

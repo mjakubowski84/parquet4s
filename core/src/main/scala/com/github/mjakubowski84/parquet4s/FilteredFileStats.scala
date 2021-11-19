@@ -84,7 +84,11 @@ private[parquet4s] class FilteredFileStats(
     private def extremeOfRowGroup(currentExtremeOpt: Option[V], choose: (V, V) => V) = {
       val store = reader.readNextFilteredRowGroup()
       val recordReader =
-        columnIO.getRecordReader(store, new ParquetRecordMaterializer(requestedSchema), filter.toFilterCompat(vcc))
+        columnIO.getRecordReader(
+          store,
+          new ParquetRecordMaterializer(schema = requestedSchema, lookups = Seq.empty),
+          filter.toFilterCompat(vcc)
+        )
       (0L until store.getRowCount.longValue()).iterator
         .map(_ => Option(recordReader.read()))
         .collect { case Some(record) =>

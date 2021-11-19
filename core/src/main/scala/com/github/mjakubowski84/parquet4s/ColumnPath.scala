@@ -1,5 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
+import org.apache.parquet.schema.Type
+
 import scala.jdk.CollectionConverters.*
 
 /** Short alias for [[ColumnPath]].
@@ -50,7 +53,7 @@ object ColumnPath {
   * @example
   *   {{{Col("user.address.postcode") === "00000"}}}
   */
-class ColumnPath private (val elements: Seq[String]) extends FilterOps {
+class ColumnPath protected (val elements: Seq[String]) extends FilterOps {
   override def toString: String = elements.mkString(ColumnPath.Separator.toString)
 
   def isEmpty: Boolean = elements.isEmpty
@@ -61,6 +64,8 @@ class ColumnPath private (val elements: Seq[String]) extends FilterOps {
 
   def canEqual(other: Any): Boolean = other.isInstanceOf[ColumnPath]
 
+  def as[T: TypedSchemaDef]: TypedColumnPath[T] = TypedColumnPath(this)
+
   override def equals(other: Any): Boolean = other match {
     case that: ColumnPath =>
       (that canEqual this) &&
@@ -69,4 +74,36 @@ class ColumnPath private (val elements: Seq[String]) extends FilterOps {
   }
 
   override def hashCode(): Int = elements.hashCode()
+}
+
+object TypedColumnPath {
+
+  def apply[T: TypedSchemaDef](columnPath: ColumnPath): TypedColumnPath[T] = new TypedColumnPath[T](columnPath.elements)
+
+}
+
+class TypedColumnPath[T] private (elements: Seq[String], val alias: Option[String] = None)(implicit
+    schema: TypedSchemaDef[T]
+) extends ColumnPath(elements) {
+
+  /** Turns the column to Parquet [[org.apache.parquet.schema.Type]]
+    */
+  def toType: Type = toType(elements, schema)
+
+  private def toType(elements: Seq[String], leafSchema: TypedSchemaDef[T]): Type =
+    elements match {
+      case head :: Nil =>
+        leafSchema.apply(head)
+      case head :: tail =>
+        GroupSchemaDef(Seq(toType(tail, leafSchema)), required = false).apply(head)
+    }
+
+  /** Sets an alias for this column path. Alias changes the name of the column during reading.
+    * @param alias
+    *   a new name of the column
+    * @return
+    *   This column path with a new alias.
+    */
+  def alias(alias: String): TypedColumnPath[T] = new TypedColumnPath[T](elements, Some(alias))
+
 }
