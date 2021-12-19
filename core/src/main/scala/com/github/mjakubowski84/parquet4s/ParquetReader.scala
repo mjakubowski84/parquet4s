@@ -4,12 +4,9 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
 import org.apache.parquet.schema.{MessageType, Type}
 
-import java.io.Closeable
 import java.util.TimeZone
 
 object ParquetReader {
-
-  private[parquet4s] type HadoopBuilder = HadoopParquetReader.Builder[RowParquetRecord]
 
   /** Builds an instance of [[ParquetIterable]]
     * @tparam T
@@ -51,11 +48,14 @@ object ParquetReader {
 
     override def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
       val valueCodecConfiguration = ValueCodecConfiguration(options)
-      newParquetIterable(
-        builder = HadoopParquetReader
-          .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, lookups), path.toHadoop)
-          .withConf(options.hadoopConf)
-          .withFilter(filter.toFilterCompat(valueCodecConfiguration)),
+      ParquetIterable.apply(
+        iteratorFactory = () =>
+          new ParquetIterator(
+            HadoopParquetReader
+              .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, lookups), path.toHadoop)
+              .withConf(options.hadoopConf)
+              .withFilter(filter.toFilterCompat(valueCodecConfiguration))
+          ),
         valueCodecConfiguration = valueCodecConfiguration,
         stats                   = Stats(path, options, projectedSchemaOpt, filter)
       )
@@ -70,13 +70,6 @@ object ParquetReader {
     *   use it to programmatically override Hadoop's [[org.apache.hadoop.conf.Configuration]]
     */
   case class Options(timeZone: TimeZone = TimeZone.getDefault, hadoopConf: Configuration = new Configuration())
-
-  private[parquet4s] def newParquetIterable[T: ParquetRecordDecoder](
-      builder: HadoopBuilder,
-      valueCodecConfiguration: ValueCodecConfiguration,
-      stats: Stats
-  ): ParquetIterable[T] =
-    new ParquetIterableImpl(builder, valueCodecConfiguration, stats)
 
   /** Creates new [[ParquetIterable]] over data from given path. <br/> Path can represent local file or directory, HDFS,
     * AWS S3, Google Storage, Azure, etc. Please refer to Hadoop client documentation or your data provider in order to
@@ -127,8 +120,9 @@ object ParquetReader {
 
   /** TODO docs
     * @param col
+    *   first column projection
     * @param cols
-    * @return
+    *   next column projections
     */
   def projectedGeneric(col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Builder[RowParquetRecord] = {
     val (fields, lookups) =
@@ -143,90 +137,5 @@ object ParquetReader {
       lookups            = lookups
     )
   }
-
-}
-
-/** Allows to iterate over Parquet file(s). Remember to call `close()` when you are done.
-  * @tparam T
-  *   type that represents schema of Parquet file
-  */
-trait ParquetIterable[T] extends Iterable[T] with Closeable {
-
-  /** Returns min value of underlying dataset at given path
-    *
-    * @param columnPath
-    *   [[ColumnPath]]
-    * @tparam V
-    *   type of data at given path
-    * @return
-    *   min value or [[scala.None]] if there is no matching data or path is invalid
-    */
-  def min[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V]
-
-  /** Returns max value of underlying dataset at given path
-    *
-    * @param columnPath
-    *   [[ColumnPath]]
-    * @tparam V
-    *   type of data at given path
-    * @return
-    *   max value or [[scala.None]] if there is no matching data or path is invalid
-    */
-  def max[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V]
-
-}
-
-private class ParquetIterableImpl[T: ParquetRecordDecoder](
-    builder: ParquetReader.HadoopBuilder,
-    valueCodecConfiguration: ValueCodecConfiguration,
-    stats: Stats
-) extends ParquetIterable[T] {
-
-  private val openCloseables = new scala.collection.mutable.ArrayBuffer[Closeable]()
-
-  override def iterator: Iterator[T] = new Iterator[T] {
-    private val reader = builder.build()
-
-    openCloseables.synchronized(openCloseables.append(reader))
-
-    private var recordPreRead         = false
-    private var nextRecord: Option[T] = None
-
-    override def hasNext: Boolean = {
-      if (!recordPreRead) {
-        nextRecord = Option(reader.read()).map((ParquetRecordDecoder.decode[T] _).curried(_)(valueCodecConfiguration))
-        recordPreRead = true
-      }
-      nextRecord.nonEmpty
-    }
-
-    override def next(): T = {
-      if (!recordPreRead) {
-        nextRecord = Option(reader.read()).map((ParquetRecordDecoder.decode[T] _).curried(_)(valueCodecConfiguration))
-        recordPreRead = true
-      }
-
-      nextRecord match {
-        case None =>
-          throw new NoSuchElementException
-        case Some(record) =>
-          nextRecord    = None
-          recordPreRead = false
-          record
-      }
-    }
-  }
-
-  override def close(): Unit =
-    openCloseables.synchronized {
-      openCloseables.foreach(_.close())
-      openCloseables.clear()
-    }
-
-  override def min[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V] = stats.min(columnPath)
-
-  override def max[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V] = stats.max(columnPath)
-
-  override def size: Int = stats.recordCount.toInt
 
 }

@@ -461,6 +461,12 @@ final class RowParquetRecord private (
   // TODO docs
   def contains(fieldName: String): Boolean = fields.contains(fieldName)
 
+  // TODO docs
+  def merge(other: RowParquetRecord): RowParquetRecord =
+    other.foldLeft(this) { case (record, (fieldName, fieldValue)) =>
+      record.updated(fieldName, fieldValue)
+    }
+
   override def canEqual(other: Any): Boolean = other.isInstanceOf[RowParquetRecord]
 
   override def equals(other: Any): Boolean = other match {

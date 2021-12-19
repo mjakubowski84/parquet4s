@@ -26,7 +26,7 @@ object WriteAndReadFilteredApp extends App {
   // write
   ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
-  //read filtered
+  // read filtered
   println("""dict == "A"""")
   val dictIsOnlyA = ParquetReader.as[Data].filter(Col("dict") === Dict.A).read(path)
   try dictIsOnlyA.foreach(println)

@@ -16,7 +16,7 @@ object WriteAndReadApp extends App {
   // write
   ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
-  //read
+  // read
   val readData = ParquetReader.as[Data].read(path)
   try readData.foreach(println)
   finally readData.close()
