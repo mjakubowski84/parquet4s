@@ -18,7 +18,7 @@ object WriteIncrementallyAndReadApp extends App {
   try data.foreach(entity => writer.write(entity))
   finally writer.close()
 
-  //read
+  // read
   val readData = ParquetReader.as[Data].read(path)
   try readData.foreach(println)
   finally readData.close()

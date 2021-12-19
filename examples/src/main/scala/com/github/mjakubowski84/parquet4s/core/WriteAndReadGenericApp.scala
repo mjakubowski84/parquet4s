@@ -40,7 +40,7 @@ object WriteAndReadGenericApp extends App {
 
   ParquetWriter.generic(schema).writeAndClose(path.append("users.parquet"), users)
 
-  //read
+  // read
   val readData = ParquetReader.generic.read(path)
   try readData.foreach { record =>
     val id       = record.get[Long](ID, vcc)

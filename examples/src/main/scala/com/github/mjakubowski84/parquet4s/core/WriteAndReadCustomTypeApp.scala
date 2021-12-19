@@ -19,7 +19,7 @@ object WriteAndReadCustomTypeApp extends App {
   // write
   ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
-  //read
+  // read
   val readData = ParquetReader.as[Data].read(path)
   // hint: you can filter by dict using string value, for example: filter = Col("dict") === "A"
   try readData.foreach(println)
