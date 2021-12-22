@@ -19,10 +19,28 @@ object ParquetIterable {
 
   implicit class RowParquetRecordIterableOps(iterable: ParquetIterable[RowParquetRecord]) {
 
-    // TODO docs
+    /** Creates a new instance of [[ParquetIterable]] with a new [[ParquetRecordDecoder]] applied. Especially useful for
+      * decoding whole dataset of [[RowParquetRecord]] to the desired class.
+      * @tparam U
+      *   a type that the dataset shall be decoded to
+      */
     def as[U: ParquetRecordDecoder]: ParquetIterable[U] = iterable.changeDecoder[U]
 
-    // TODO docs
+    /** Joins this dataset with `right` dataset using left join. Joins records from this dataset and `right` one that
+      * have `onLeft` column and `onRight` column equal respectively. <br/> <br/> <b>Take note</b> that, while this
+      * dataset is going to be iterated over, the whole `right` dataset is going to be loaded into memory before.
+      * Therefore, it is recommended to run this operation only if the `right` dataset is small enough to fit into
+      * memory. You may consider to use `rightJoin` and swap the datasets - if this dataset is actually smaller than
+      * `right` one.
+      * @param right
+      *   the dataset to join with
+      * @param onLeft
+      *   join column in this dataset
+      * @param onRight
+      *   join column in `right` dataset
+      * @return
+      *   [[ParquetIterable]] with joined records
+      */
     @experimental
     def leftJoin(
         right: ParquetIterable[RowParquetRecord],
@@ -30,6 +48,21 @@ object ParquetIterable {
         onRight: ColumnPath
     ): ParquetIterable[RowParquetRecord] = Join.left(iterable, right, onLeft, onRight)
 
+    /** Joins this dataset with `right` dataset using right join. Joins records from this dataset and `right` one that
+      * have `onLeft` column and `onRight` column equal respectively. <br/> <br/> <b>Take note</b> that, while this
+      * dataset is going to be iterated over, the whole `right` dataset is going to be loaded into memory before.
+      * Therefore, it is recommended to run this operation only if the `right` dataset is small enough to fit into
+      * memory. You may consider to use `leftJoin` and swap the datasets - if this dataset is actually smaller than
+      * `right` one.
+      * @param right
+      *   the dataset to join with
+      * @param onLeft
+      *   join column in this dataset
+      * @param onRight
+      *   join column in `right` dataset
+      * @return
+      *   [[ParquetIterable]] with joined records
+      */
     @experimental
     def rightJoin(
         right: ParquetIterable[RowParquetRecord],
@@ -37,6 +70,20 @@ object ParquetIterable {
         onRight: ColumnPath
     ): ParquetIterable[RowParquetRecord] = Join.right(iterable, right, onLeft, onRight)
 
+    /** Joins this dataset with `right` dataset using inner join. Joins records from this dataset and `right` one that
+      * have `onLeft` column and `onRight` column equal respectively. <br/> <br/> <b>Take note</b> that, while this
+      * dataset is going to be iterated over, the whole `right` dataset is going to be loaded into memory before.
+      * Therefore, it is recommended to run this operation only if the `right` dataset is small enough to fit into
+      * memory. You may consider to swap the datasets - if this dataset is actually smaller than `right` one.
+      * @param right
+      *   the dataset to join with
+      * @param onLeft
+      *   join column in this dataset
+      * @param onRight
+      *   join column in `right` dataset
+      * @return
+      *   [[ParquetIterable]] with joined records
+      */
     @experimental
     def innerJoin(
         right: ParquetIterable[RowParquetRecord],
@@ -44,6 +91,20 @@ object ParquetIterable {
         onRight: ColumnPath
     ): ParquetIterable[RowParquetRecord] = Join.inner(iterable, right, onLeft, onRight)
 
+    /** Joins this dataset with `right` dataset using full join. Joins records from this dataset and `right` one that
+      * have `onLeft` column and `onRight` column equal respectively. <br/> <br/> <b>Take note</b> that, while this
+      * dataset is going to be iterated over, the whole `right` dataset is going to be loaded into memory before.
+      * Therefore, it is recommended to run this operation only if the `right` dataset is small enough to fit into
+      * memory. You may consider to swap the datasets - if this dataset is actually smaller than `right` one.
+      * @param right
+      *   the dataset to join with
+      * @param onLeft
+      *   join column in this dataset
+      * @param onRight
+      *   join column in `right` dataset
+      * @return
+      *   [[ParquetIterable]] with joined records
+      */
     @experimental
     def fullJoin(
         right: ParquetIterable[RowParquetRecord],
@@ -83,10 +144,15 @@ trait ParquetIterable[T] extends Iterable[T] with Closeable {
     */
   def max[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V] = stats.max(columnPath)
 
-  // TODO docs
+  /** Returns the size of the underlying dataset. Filter is considered during calculation. Tries to leverage Parquet
+    * metadata and statistics in order to avoid full traverse over the dataset.
+    */
   override def size: Int = stats.recordCount.toInt
 
-  // TODO docs
+  /** Appends `other` dataset to this one. `Other` is not read until this dataset is not fully iterated over.
+    * @param other
+    *   dataset to be concatenated with this
+    */
   @experimental
   def concat(other: ParquetIterable[T]): ParquetIterable[T] = new CompoundParquetIterable(Seq(this, other))
 
