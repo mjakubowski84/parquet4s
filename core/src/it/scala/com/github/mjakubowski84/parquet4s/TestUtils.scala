@@ -8,10 +8,10 @@ import java.nio.file.Files
 
 trait TestUtils {
 
-  protected val tempPath: Path = Path(Path(Files.createTempDirectory("example")), "testOutputPath")
-  protected lazy val configuration = new Configuration()
+  protected val tempPath: Path              = Path(Path(Files.createTempDirectory("example")), "testOutputPath")
+  protected lazy val configuration          = new Configuration()
   protected lazy val fileSystem: FileSystem = tempPath.toHadoop.getFileSystem(configuration)
-  private val tempDir = new File(tempPath.toUri)
+  private val tempDir                       = new File(tempPath.toUri)
 
   def clearTemp(): Unit = {
     FileUtil.fullyDelete(tempDir)
