@@ -17,33 +17,33 @@ object Case {
 
   type CaseDef = Case[? <: Product]
 
-  def apply[T <: Product: ParquetRecordDecoder: ParquetRecordEncoder: ParquetSchemaResolver](description: String,
-                                                                                             data: Seq[T],
-                                                                                             compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
-                                                                                            ): Case[T] =
+  def apply[T <: Product: ParquetRecordDecoder: ParquetRecordEncoder: ParquetSchemaResolver](
+      description: String,
+      data: Seq[T],
+      compatibilityParties: Set[CompatibilityParty] = CompatibilityParty.All
+  ): Case[T] =
     new Case(
-      description = description,
+      description          = description,
       compatibilityParties = compatibilityParties,
-      _data = data,
-      _decoder = implicitly[ParquetRecordDecoder[T]],
-      _encoder = implicitly[ParquetRecordEncoder[T]],
-      _resolver = implicitly[ParquetSchemaResolver[T]]
+      _data                = data,
+      _decoder             = implicitly[ParquetRecordDecoder[T]],
+      _encoder             = implicitly[ParquetRecordEncoder[T]],
+      _resolver            = implicitly[ParquetSchemaResolver[T]]
     )
 }
 
-
 class Case[T <: Product](
-                          val description: String,
-                          val compatibilityParties: Set[CompatibilityParty],
-                          _data: Seq[T],
-                          _decoder: ParquetRecordDecoder[T],
-                          _encoder: ParquetRecordEncoder[T],
-                          _resolver: ParquetSchemaResolver[T]
-                        ) {
+    val description: String,
+    val compatibilityParties: Set[CompatibilityParty],
+    _data: Seq[T],
+    _decoder: ParquetRecordDecoder[T],
+    _encoder: ParquetRecordEncoder[T],
+    _resolver: ParquetSchemaResolver[T]
+) {
   opaque type DataType = T
-  def data: Seq[DataType] = _data
-  def decoder: ParquetRecordDecoder[DataType] = _decoder
-  def encoder: ParquetRecordEncoder[DataType] = _encoder
+  def data: Seq[DataType]                       = _data
+  def decoder: ParquetRecordDecoder[DataType]   = _decoder
+  def encoder: ParquetRecordEncoder[DataType]   = _encoder
   def resolver: ParquetSchemaResolver[DataType] = _resolver
 }
 
