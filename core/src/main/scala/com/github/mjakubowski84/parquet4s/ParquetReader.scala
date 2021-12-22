@@ -118,15 +118,28 @@ object ParquetReader {
     projectedSchemaOpt = Option(projectedSchema)
   )
 
-  /** TODO docs
+  // format: off
+  /** Creates [[Builder]] of Parquet reader returning <i>projected</i> generic records. Due to projection reader does
+    * not attempt to read all existing columns of the file but applies enforced projection schema. Besides simple
+    * projection one can use aliases and lookups that, in a way similar to SQL, are allowed by [[TypedColumnPath]].
+    * <br/> <br/>
+    * @example
+    *   <pre> 
+    *projectedGeneric(
+    *  Col("foo").as[Int], // selects Int column "foo"
+    *  Col("bar.baz".as[String]), // lookup to String field "bar.baz", creates column "baz" wih a value of "baz"
+    *  Col("bar.baz".as[String].alias("bar_baz")) // lookup to String field "bar.baz", creates column "bar_baz" wih a value of "baz"
+    *)
+    *   </pre>  
     * @param col
     *   first column projection
     * @param cols
     *   next column projections
     */
+  // format: on  
   def projectedGeneric(col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Builder[RowParquetRecord] = {
     val (fields, lookups) =
-      (col +: cols.toList).zipWithIndex
+      (col +: cols.toVector).zipWithIndex
         .foldLeft((Vector.empty[Type], Vector.empty[Lookup])) { case ((fields, lookups), (columnPath, ordinal)) =>
           val updatedFields  = fields :+ columnPath.toType
           val updatedLookups = lookups :+ Lookup(columnPath, ordinal)

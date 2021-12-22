@@ -3,7 +3,7 @@ version: 2.1
 executors:
   jdk:
     docker:
-      - image: circleci/openjdk:8-jdk
+      - image: cimg/openjdk:8.0
         auth:
           username: $DOCKERHUB_USER
           password: $DOCKERHUB_PASSWORD

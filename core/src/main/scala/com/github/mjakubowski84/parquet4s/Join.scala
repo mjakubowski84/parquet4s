@@ -45,8 +45,8 @@ private trait Join {
   protected val onLeft: ColumnPath
   protected val onRight: ColumnPath
 
-  protected val rightMapping: Map[Option[Value], Iterable[RowParquetRecord]] = right.groupBy(_.get(onRight))
-  protected val emptyRightRecord: RowParquetRecord = rightMapping.headOption
+  protected lazy val rightMapping: Map[Option[Value], Iterable[RowParquetRecord]] = right.groupBy(_.get(onRight))
+  protected lazy val emptyRightRecord: RowParquetRecord = rightMapping.headOption
     .map(_._2.head.iterator.map(_._1).toList)
     .fold(RowParquetRecord.EmptyNoSchema)(RowParquetRecord.emptyWithSchema)
   private var emptyLeftRecordOpt: Option[RowParquetRecord] = None

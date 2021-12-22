@@ -322,7 +322,18 @@ final class RowParquetRecord private (
   ): RowParquetRecord =
     updated(name, valueEncoder.encode(value, valueCodecConfiguration))
 
-  // TODO docs
+  /** Updates existing field at given index with a new name and a new value.
+    * @param idx
+    *   index of the field
+    * @param field
+    *   a new name of the field
+    * @param newVal
+    *   a new value of the field
+    * @return
+    *   record with the field updated
+    * @throws scala.IndexOutOfBoundsException
+    *   when the index is invalid
+    */
   def updated(idx: Int, field: String, newVal: Value): RowParquetRecord = {
     val oldField = fields.get(idx)
     val count    = fields.count(oldField)
@@ -442,7 +453,7 @@ final class RowParquetRecord private (
     *   field name to change to
     * @return
     *   a record with the name changed
-    * @throws IndexOutOfBoundsException
+    * @throws scala.IndexOutOfBoundsException
     *   when there's no field at given index
     */
   def rename(idx: Int, newField: String): RowParquetRecord = {
@@ -458,10 +469,20 @@ final class RowParquetRecord private (
       new RowParquetRecord(values.updated(newField, value), fields.set(idx, newField, removeOldField = false))
   }
 
-  // TODO docs
+  /** Allows to check if the schema of the record defines a field with given name. That is, there might `NullValue`
+    * assigned to the field but as long as the schema contains the field the function returns true.
+    * @return
+    *   true if a field with given name is defined for this record
+    */
   def contains(fieldName: String): Boolean = fields.contains(fieldName)
 
-  // TODO docs
+  /** Appends fields from `other` record to this one. If this record already contains a field with given name then the
+    * existing value is replaced with a value from `other` record.
+    * @param other
+    *   the record to be merged this one
+    * @return
+    *   a new record with fields coming from this and `other` records
+    */
   def merge(other: RowParquetRecord): RowParquetRecord =
     other.foldLeft(this) { case (record, (fieldName, fieldValue)) =>
       record.updated(fieldName, fieldValue)
