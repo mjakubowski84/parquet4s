@@ -152,7 +152,15 @@ class JoinSpec extends AnyFlatSpec with Matchers {
       )
     )
 
-    left.fullJoin(right, onLeft = Col("onLeft"), onRight = Col("onRight")).toSet should be(
+    val joined = left.fullJoin(right, onLeft = Col("onLeft"), onRight = Col("onRight"))
+
+    joined.size should be(6)
+    joined.min[String](Col("left")) should be(Some("A"))
+    joined.max[String](Col("left")) should be(Some("C"))
+    joined.min[String](Col("right")) should be(Some("X"))
+    joined.max[String](Col("right")) should be(Some("Z"))
+
+    joined.toSet should be(
       Set(
         RowParquetRecord("left" -> "A".value, "onLeft" -> 11.value, "right" -> NullValue, "onRight" -> NullValue),
         RowParquetRecord("left" -> "B".value, "onLeft" -> 2.value, "right" -> "Y".value, "onRight" -> 2.value),
