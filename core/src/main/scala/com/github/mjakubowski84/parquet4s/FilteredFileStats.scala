@@ -86,7 +86,7 @@ private[parquet4s] class FilteredFileStats(
       val recordReader =
         columnIO.getRecordReader(
           store,
-          new ParquetRecordMaterializer(schema = requestedSchema, lookups = Seq.empty),
+          new ParquetRecordMaterializer(schema = requestedSchema, columnProjections = Seq.empty),
           filter.toFilterCompat(vcc)
         )
       (0L until store.getRowCount.longValue()).iterator

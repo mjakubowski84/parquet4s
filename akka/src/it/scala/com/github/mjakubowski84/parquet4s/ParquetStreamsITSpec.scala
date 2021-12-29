@@ -615,6 +615,26 @@ class ParquetStreamsITSpec
     }
   }
 
+  it should "read files using generic column projection" in {
+    val outputFileName = "data.parquet"
+
+    val write = () =>
+      Source(data).runWith(
+        ParquetStreams.toParquetSingleFile.of[Data].options(writeOptions).write(tempPath.append(outputFileName))
+      )
+
+    for {
+      _        <- write()
+      readData <- ParquetStreams.fromParquet.projectedGeneric(Col("s").as[String]).read(tempPath).runWith(Sink.seq)
+    } yield {
+      readData should have size count
+      forAll(readData) { record =>
+        record should have size 1
+        record.get[String]("s", ValueCodecConfiguration.Default) should contain oneElementOf dict
+      }
+    }
+  }
+
   override def afterAll(): Unit = {
     Await.ready(system.terminate(), Duration.Inf)
     super.afterAll()

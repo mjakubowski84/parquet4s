@@ -35,10 +35,10 @@ object ParquetReader {
   }
 
   private case class BuilderImpl[T](
-      options: ParquetReader.Options          = ParquetReader.Options(),
-      filter: Filter                          = Filter.noopFilter,
-      projectedSchemaOpt: Option[MessageType] = None,
-      lookups: Seq[Lookup]                    = Seq.empty
+      options: ParquetReader.Options           = ParquetReader.Options(),
+      filter: Filter                           = Filter.noopFilter,
+      projectedSchemaOpt: Option[MessageType]  = None,
+      columnProjections: Seq[ColumnProjection] = Seq.empty
   ) extends Builder[T] {
     override def options(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
@@ -52,7 +52,7 @@ object ParquetReader {
         iteratorFactory = () =>
           new ParquetIterator(
             HadoopParquetReader
-              .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, lookups), path.toHadoop)
+              .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, columnProjections), path.toHadoop)
               .withConf(options.hadoopConf)
               .withFilter(filter.toFilterCompat(valueCodecConfiguration))
           ),
@@ -119,16 +119,16 @@ object ParquetReader {
   )
 
   // format: off
-  /** Creates [[Builder]] of Parquet reader returning <i>projected</i> generic records. Due to projection reader does
+  /** Creates [[Builder]] of Parquet reader returning <i>projected</i> generic records. Due to projection, reader does
     * not attempt to read all existing columns of the file but applies enforced projection schema. Besides simple
-    * projection one can use aliases and lookups that, in a way similar to SQL, are allowed by [[TypedColumnPath]].
+    * projection one can use aliases and extract values from nested fields - in a way similar to SQL.
     * <br/> <br/>
     * @example
     *   <pre> 
     *projectedGeneric(
     *  Col("foo").as[Int], // selects Int column "foo"
-    *  Col("bar.baz".as[String]), // lookup to String field "bar.baz", creates column "baz" wih a value of "baz"
-    *  Col("bar.baz".as[String].alias("bar_baz")) // lookup to String field "bar.baz", creates column "bar_baz" wih a value of "baz"
+    *  Col("bar.baz".as[String]), // selects String field "bar.baz", creates column "baz" wih a value of "baz"
+    *  Col("bar.baz".as[String].alias("bar_baz")) // selects String field "bar.baz", creates column "bar_baz" wih a value of "baz"
     *)
     *   </pre>  
     * @param col
@@ -138,16 +138,17 @@ object ParquetReader {
     */
   // format: on  
   def projectedGeneric(col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Builder[RowParquetRecord] = {
-    val (fields, lookups) =
+    val (fields, columnProjections) =
       (col +: cols.toVector).zipWithIndex
-        .foldLeft((Vector.empty[Type], Vector.empty[Lookup])) { case ((fields, lookups), (columnPath, ordinal)) =>
-          val updatedFields  = fields :+ columnPath.toType
-          val updatedLookups = lookups :+ Lookup(columnPath, ordinal)
-          updatedFields -> updatedLookups
+        .foldLeft((Vector.empty[Type], Vector.empty[ColumnProjection])) {
+          case ((fields, projections), (columnPath, ordinal)) =>
+            val updatedFields      = fields :+ columnPath.toType
+            val updatedProjections = projections :+ ColumnProjection(columnPath, ordinal)
+            updatedFields -> updatedProjections
         }
     BuilderImpl(
       projectedSchemaOpt = Option(Message.merge(fields)),
-      lookups            = lookups
+      columnProjections  = columnProjections
     )
   }
 

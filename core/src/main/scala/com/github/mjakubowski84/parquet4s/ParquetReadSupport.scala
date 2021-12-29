@@ -15,8 +15,8 @@ import java.util
 import scala.jdk.CollectionConverters.*
 
 private[parquet4s] class ParquetReadSupport(
-    projectedSchemaOpt: Option[MessageType] = None,
-    lookups: Seq[Lookup]                    = Seq.empty
+    projectedSchemaOpt: Option[MessageType]  = None,
+    columnProjections: Seq[ColumnProjection] = Seq.empty
 ) extends ReadSupport[RowParquetRecord] {
 
   override def prepareForRead(
@@ -25,7 +25,7 @@ private[parquet4s] class ParquetReadSupport(
       fileSchema: MessageType,
       readContext: ReadSupport.ReadContext
   ): RecordMaterializer[RowParquetRecord] =
-    new ParquetRecordMaterializer(readContext.getRequestedSchema, lookups)
+    new ParquetRecordMaterializer(readContext.getRequestedSchema, columnProjections)
 
   override def init(context: InitContext): ReadSupport.ReadContext =
     new ReadSupport.ReadContext(projectedSchemaOpt.foldLeft(context.getFileSchema)(ReadSupport.getSchemaForRead))
@@ -34,10 +34,10 @@ private[parquet4s] class ParquetReadSupport(
 
 private[parquet4s] class ParquetRecordMaterializer(
     schema: MessageType,
-    lookups: Seq[Lookup]
+    columnProjections: Seq[ColumnProjection]
 ) extends RecordMaterializer[RowParquetRecord] {
 
-  private val root = new RootRowParquetRecordConverter(schema, lookups)
+  private val root = new RootRowParquetRecordConverter(schema, columnProjections)
 
   override def getCurrentRecord: RowParquetRecord = root.getCurrentRecord
 
@@ -130,11 +130,11 @@ abstract private class RowParquetRecordConverter(schema: GroupType)
 
 }
 
-private class RootRowParquetRecordConverter(schema: GroupType, lookups: Seq[Lookup])
+private class RootRowParquetRecordConverter(schema: GroupType, columnProjections: Seq[ColumnProjection])
     extends RowParquetRecordConverter(schema) {
 
   override def end(): Unit =
-    lookups.foreach { case Lookup(columnPath, ordinal, aliasOpt) =>
+    columnProjections.foreach { case ColumnProjection(columnPath, ordinal, aliasOpt) =>
       record.get(columnPath) match {
         case Some(value) if columnPath.elements.length > 1 =>
           record = record.updated(ordinal, aliasOpt.getOrElse(columnPath.elements.last), value)
@@ -143,7 +143,7 @@ private class RootRowParquetRecordConverter(schema: GroupType, lookups: Seq[Look
             record = record.rename(ordinal, alias)
           }
         case None =>
-          throw new IllegalArgumentException(s"""Invalid lookup: "$columnPath".""")
+          throw new IllegalArgumentException(s"""Invalid column projection: "$columnPath".""")
       }
     }
 

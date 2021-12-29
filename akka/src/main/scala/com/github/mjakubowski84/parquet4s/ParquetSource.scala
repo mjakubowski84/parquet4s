@@ -5,7 +5,7 @@ import akka.stream.scaladsl.Source
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
-import org.apache.parquet.schema.MessageType
+import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
 
 object ParquetSource extends IOOps {
@@ -31,6 +31,27 @@ object ParquetSource extends IOOps {
       * attempt to read all existing columns of the file but applies enforced projection schema.
       */
     def projectedGeneric(projectedSchema: MessageType): Builder[RowParquetRecord]
+
+    // format: off
+    /** Creates [[Builder]] of Parquet reader returning <i>projected</i> generic records. Due to projection, reader does
+     * not attempt to read all existing columns of the file but applies enforced projection schema. Besides simple
+     * projection one can use aliases and extract values from nested fields - in a way similar to SQL.
+     * <br/> <br/>
+     * @example
+     *   <pre> 
+     *projectedGeneric(
+     *  Col("foo").as[Int], // selects Int column "foo"
+     *  Col("bar.baz".as[String]), // selects String field "bar.baz", creates column "baz" wih a value of "baz"
+     *  Col("bar.baz".as[String].alias("bar_baz")) // selects String field "bar.baz", creates column "bar_baz" wih a value of "baz"
+     *)
+     *   </pre>  
+     * @param col
+     *   first column projection
+     * @param cols
+     *   next column projections
+     */
+    // format: on  
+    def projectedGeneric(col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Builder[RowParquetRecord]
   }
 
   private[parquet4s] object FromParquetImpl extends FromParquet {
@@ -43,6 +64,20 @@ object ParquetSource extends IOOps {
       BuilderImpl[RowParquetRecord](
         projectedSchemaResolverOpt = Option(RowParquetRecord.genericParquetSchemaResolver(projectedSchema))
       )
+    override def projectedGeneric(col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Builder[RowParquetRecord] = {
+      val (fields, columnProjections) =
+        (col +: cols.toVector).zipWithIndex
+          .foldLeft((Vector.empty[Type], Vector.empty[ColumnProjection])) {
+            case ((fields, projections), (columnPath, ordinal)) =>
+              val updatedFields      = fields :+ columnPath.toType
+              val updatedProjections = projections :+ ColumnProjection(columnPath, ordinal)
+              updatedFields -> updatedProjections
+          }
+      BuilderImpl(
+        projectedSchemaResolverOpt = Option(RowParquetRecord.genericParquetSchemaResolver(Message.merge(fields))),
+        columnProjections          = columnProjections
+      )
+    }
   }
 
   /** Builds instance of Parquet [[akka.stream.scaladsl.Source]]
@@ -72,7 +107,8 @@ object ParquetSource extends IOOps {
   private case class BuilderImpl[T: ParquetRecordDecoder](
       options: ParquetReader.Options                               = ParquetReader.Options(),
       filter: Filter                                               = Filter.noopFilter,
-      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None
+      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None,
+      columnProjections: Seq[ColumnProjection]                     = Seq.empty
   ) extends Builder[T] {
     override def options(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
