@@ -1,7 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import scala.collection.mutable
-
 private[parquet4s] object Join {
 
   def left(
@@ -97,7 +95,10 @@ private trait RightJoin extends Join {
   override def apply(left: ParquetIterable[RowParquetRecord]): ParquetIterable[RowParquetRecord] =
     super[Join].apply(left).concat {
       new InMemoryParquetIterable[RowParquetRecord](
-        data = rightMapping.view.filter { case (key, _) => !matchedKeys.contains(key) }.flatMap(_._2),
+        data = rightMapping.flatMap {
+          case (key, _) if matchedKeys.contains(key) => Iterable.empty
+          case (_, records)                          => records
+        },
         valueCodecConfiguration = right.valueCodecConfiguration,
         transformations         = Seq(record => Option(emptyLeftRecord.merge(record)))
       )
