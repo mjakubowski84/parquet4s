@@ -11,8 +11,8 @@ lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 lazy val akkaScalaVersions      = Seq(twoTwelve, twoThirteen)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.1.0-SNAPSHOT"
-ThisBuild / isSnapshot := true
+ThisBuild / version := "2.1.0"
+ThisBuild / isSnapshot := false
 ThisBuild / scalaVersion := twoThirteen
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ThisBuild / resolvers := Seq(
@@ -93,9 +93,9 @@ lazy val core = (project in file("core"))
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.6.0",
 
       // tests
-      "org.mockito" % "mockito-core" % "4.1.0" % "test",
+      "org.mockito" % "mockito-core" % "4.2.0" % "test",
       "org.scalatest" %% "scalatest" % "3.2.10" % "test,it",
-      "ch.qos.logback" % "logback-classic" % "1.2.8" % "test,it",
+      "ch.qos.logback" % "logback-classic" % "1.2.10" % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
       CrossVersion.partialVersion(scalaBinaryVersion.value) match {
@@ -161,7 +161,7 @@ lazy val examples = (project in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "io.github.embeddedkafka" %% "embedded-kafka" % "3.0.0",
-      "ch.qos.logback" % "logback-classic" % "1.2.7",
+      "ch.qos.logback" % "logback-classic" % "1.2.10",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % "2.1.1",
       "com.github.fd4s" %% "fs2-kafka" % "2.2.0",
