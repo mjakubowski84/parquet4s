@@ -8,7 +8,7 @@ executors:
           username: $DOCKERHUB_USER
           password: $DOCKERHUB_PASSWORD
     environment:
-      JVM_OPTS: -Xmx1024m
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=90.0
       TERM: dumb
     working_directory: /tmp
 
