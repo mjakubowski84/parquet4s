@@ -122,6 +122,35 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     testStream.compile.lastOrError
   }
 
+  it should "write and read single parquet file using generic column projection" in {
+    val outputFileName = "data.parquet"
+    def write(path: Path): Stream[IO, fs2.INothing] =
+      Stream
+        .iterable(data)
+        .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).write(path.append(outputFileName)))
+
+    def readProjected(path: Path): Stream[IO, Vector[RowParquetRecord]] =
+      parquet
+        .fromParquet[IO]
+        .projectedGeneric(Col("s").as[String])
+        .read(path)
+        .fold(Vector.empty[RowParquetRecord])(_ :+ _)
+
+    val testStream =
+      for {
+        path     <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        readData <- write(path) ++ readProjected(path)
+      } yield {
+        readData should have size count
+        forAll(readData) { record =>
+          record should have size 1
+          record.get[String]("s", ValueCodecConfiguration.Default) should contain oneElementOf dictS
+        }
+      }
+
+    testStream.compile.lastOrError
+  }
+
   it should "flush already processed data to file on failure" in {
     val numberOfProcessedElementsBeforeFailure = 5
     val outputFileName                         = "data.parquet"
