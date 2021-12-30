@@ -34,3 +34,6 @@ options:
 
   - title: Migration from 1.x
     url: docs/migration
+
+  - title: (Experimental) Joins and Concat
+    url: docs/experimental

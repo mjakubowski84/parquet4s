@@ -14,8 +14,6 @@ object JoinApp extends App {
   val ownerPath = path.append("owners.parquet")
   val petsPath  = path.append("pets.parquet")
 
-  val vcc = ValueCodecConfiguration.Default
-
   val owners = List(
     Owner(1L, "Alice"),
     Owner(2L, "Bob"),
