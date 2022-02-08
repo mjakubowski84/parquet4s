@@ -1,11 +1,11 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.compat
 
-object MapCompat {
-  @inline
-  def remove[K, V](map: Map[K, V], key: K): Map[K, V] = map.removed(key)
-}
+import com.github.mjakubowski84.parquet4s.{MapParquetRecord, Value}
 
-trait MapCompat {
+object MapCompat:
+  inline def remove[K, V](map: Map[K, V], key: K): Map[K, V] = map.removed(key)
+
+trait MapCompat:
 
   this: MapParquetRecord =>
 
@@ -31,4 +31,4 @@ trait MapCompat {
   override def updated[V1 >: Value](key: Value, value: V1): Map[Value, V1] =
     entries.updated(key, value)
 
-}
+end MapCompat

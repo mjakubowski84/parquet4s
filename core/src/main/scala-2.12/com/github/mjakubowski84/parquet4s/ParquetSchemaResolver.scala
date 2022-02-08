@@ -37,10 +37,13 @@ object ParquetSchemaResolver extends SchemaDefs {
   trait Tag[V]
   type TypedSchemaDef[V] = SchemaDef & Tag[V]
 
-  class TypedSchemaDefInvoker[K <: Symbol: Witness.Aux, V](schemaDef: TypedSchemaDef[V]) {
-    private def fieldName                                      = implicitly[Witness.Aux[K]].value.name
-    def `type`: Type                                           = schemaDef(fieldName)
-    def productType(productSchemaDef: TypedSchemaDef[V]): Type = productSchemaDef(fieldName)
+  class TypedSchemaDefInvoker[V](val schema: TypedSchemaDef[V], fieldName: String) extends (() => Type) {
+    override def apply(): Type = schema(fieldName)
+  }
+
+  trait SchemaVisitor[V] extends Cursor.Visitor[TypedSchemaDefInvoker[V], Option[Type]] {
+    override def onCompleted(cursor: Cursor, invoker: TypedSchemaDefInvoker[V]): Option[Type] =
+      throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
   }
 
   /** Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
@@ -60,14 +63,16 @@ object ParquetSchemaResolver extends SchemaDefs {
 
   implicit def hcons[K <: Symbol, V, T <: HList](implicit
       witness: Witness.Aux[K],
-      schemaDef: TypedSchemaDef[V],
-      visitor: SchemaVisitor[K, V] = defaultSchemaVisitor[K, V],
+      typedSchemaDef: TypedSchemaDef[V],
+      visitor: SchemaVisitor[V] = defaultSchemaVisitor[V],
       rest: ParquetSchemaResolver[T]
   ): ParquetSchemaResolver[FieldType[K, V] :: T] =
     cursor =>
       cursor
         .advance[K]
-        .flatMap(newCursor => newCursor.accept(new TypedSchemaDefInvoker(schemaDef), visitor)) match {
+        .flatMap(newCursor =>
+          newCursor.accept(new TypedSchemaDefInvoker(typedSchemaDef, witness.value.name), visitor)
+        ) match {
         case Some(head) =>
           head +: rest.resolveSchema(cursor)
         case None =>
@@ -83,21 +88,26 @@ object ParquetSchemaResolver extends SchemaDefs {
     override def schemaName: Option[String]                = Option(classTag.runtimeClass.getCanonicalName)
   }
 
-  trait SchemaVisitor[K <: Symbol, V] extends Cursor.Visitor[TypedSchemaDefInvoker[K, V], Option[Type]] {
-    override def onCompleted(cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]): Option[Type] =
-      throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
-  }
+  def defaultSchemaVisitor[V]: SchemaVisitor[V] =
+    (_, invoker: TypedSchemaDefInvoker[V]) => Option(invoker())
 
-  def defaultSchemaVisitor[K <: Symbol, V]: SchemaVisitor[K, V] =
-    (_, invoker: TypedSchemaDefInvoker[K, V]) => Option(invoker.`type`)
-
-  implicit def productSchemaVisitor[K <: Symbol, V](implicit resolver: ParquetSchemaResolver[V]): SchemaVisitor[K, V] =
-    (cursor: Cursor, invoker: TypedSchemaDefInvoker[K, V]) =>
-      resolver.resolveSchema(cursor) match {
-        case Nil =>
-          None
-        case fieldTypes =>
-          Option(invoker.productType(SchemaDef.group(fieldTypes*).typed[V]))
+  /** Purpose of productSchemaVisitor is to filter product fields so that those that are used for partitioning are not
+    * present in final schema. It is only applied to products that are not nested in Options and collections as optional
+    * fields and elements of collections are not valid for partitioning.
+    */
+  implicit def productSchemaVisitor[V](implicit resolver: ParquetSchemaResolver[V]): SchemaVisitor[V] =
+    (cursor: Cursor, invoker: TypedSchemaDefInvoker[V]) =>
+      invoker.schema match {
+        // override fields only in generated groups (records), custom ones provided by users are not processed
+        case _: GroupSchemaDef if invoker.schema.metadata.contains(SchemaDef.Meta.Generated) =>
+          resolver.resolveSchema(cursor) match {
+            case Nil =>
+              None
+            case fieldTypes =>
+              Option(invoker().asGroupType().withNewFields(fieldTypes*))
+          }
+        case _ =>
+          Option(invoker())
       }
 
 }

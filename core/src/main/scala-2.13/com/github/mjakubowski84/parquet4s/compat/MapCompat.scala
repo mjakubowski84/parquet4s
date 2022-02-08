@@ -1,7 +1,10 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.compat
+
+import com.github.mjakubowski84.parquet4s.{MapParquetRecord, Value}
 
 object MapCompat {
-  inline def remove[K, V](map: Map[K, V], key: K): Map[K, V] = map.removed(key)
+  @inline
+  def remove[K, V](map: Map[K, V], key: K): Map[K, V] = map.removed(key)
 }
 
 trait MapCompat {

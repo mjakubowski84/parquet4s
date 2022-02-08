@@ -95,7 +95,7 @@ class TypedColumnPath[T] private (elements: Seq[String], val alias: Option[Strin
       case head :: Nil =>
         leafSchema.apply(head)
       case head :: tail =>
-        GroupSchemaDef(Seq(toType(tail, leafSchema)), required = false).apply(head)
+        SchemaDef.group(toType(tail, leafSchema)).apply(head)
     }
 
   /** Sets an alias for this column path. Alias changes the name of the column during reading.

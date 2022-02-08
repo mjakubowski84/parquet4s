@@ -1,4 +1,6 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.compat
+
+import com.github.mjakubowski84.parquet4s.{MapParquetRecord, Value}
 
 object MapCompat {
   @inline
