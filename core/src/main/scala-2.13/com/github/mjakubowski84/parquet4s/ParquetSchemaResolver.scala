@@ -1,6 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.schema.*
+import org.slf4j.LoggerFactory
 import shapeless.*
 import shapeless.labelled.*
 
@@ -46,6 +47,8 @@ object ParquetSchemaResolver extends SchemaDefs {
       throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
   }
 
+  private val logger = LoggerFactory.getLogger(this.getClass)
+
   /** Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
     *
     * @param toSkip
@@ -85,7 +88,16 @@ object ParquetSchemaResolver extends SchemaDefs {
       classTag: ClassTag[T]
   ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {
     override def resolveSchema(cursor: Cursor): List[Type] = rest.value.resolveSchema(cursor)
-    override def schemaName: Option[String]                = Option(classTag.runtimeClass.getCanonicalName)
+    override def schemaName: Option[String] =
+      Option(
+        try classTag.runtimeClass.getCanonicalName
+        catch {
+          case e: Throwable =>
+            logger
+              .warn("Failed to resolve class name. Consider placing your class in static and less nested structure", e)
+            null
+        }
+      )
   }
 
   def defaultSchemaVisitor[V]: SchemaVisitor[V] =

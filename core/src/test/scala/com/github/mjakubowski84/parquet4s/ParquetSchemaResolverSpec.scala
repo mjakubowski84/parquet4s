@@ -1,13 +1,19 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.LogicalTypes._
+import com.github.mjakubowski84.parquet4s.LogicalTypes.*
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.resolveSchema
-import com.github.mjakubowski84.parquet4s.TestCases._
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
-import org.apache.parquet.schema.Type.Repetition._
+import com.github.mjakubowski84.parquet4s.TestCases.*
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.*
+import org.apache.parquet.schema.Type.Repetition.*
 import org.apache.parquet.schema.Types
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+
+object ParquetSchemaResolverSpec {
+  object Malformed {
+    case class Clazz()
+  }
+}
 
 class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
 
@@ -247,6 +253,20 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
           .named("nested")
       )
     )
+  }
+
+  it should "resolve schema name from class name" in {
+    resolveSchema[Empty].getName should be("com.github.mjakubowski84.parquet4s.TestCases.Empty")
+  }
+
+  it should "use default schema name when fails to resolve a class name" in {
+    case class Clazz()
+    resolveSchema[Clazz].getName should be(Message.DefaultName)
+  }
+
+  it should "use default schema name when processing a class that JVM treats as malformed" in {
+    val resolved = resolveSchema[ParquetSchemaResolverSpec.Malformed.Clazz]
+    resolved.getName should be(Message.DefaultName)
   }
 
 }
