@@ -1,6 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
+import org.apache.parquet.schema.*
 import org.apache.parquet.schema.LogicalTypeAnnotation.{
   DateLogicalTypeAnnotation,
   DecimalLogicalTypeAnnotation,
@@ -9,7 +10,6 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.{
 }
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.*
 import org.apache.parquet.schema.Type.Repetition
-import org.apache.parquet.schema.*
 
 import scala.language.higherKinds
 import scala.reflect.ClassTag
@@ -56,27 +56,38 @@ trait SchemaDef {
 
   def typed[V]: ParquetSchemaResolver.TypedSchemaDef[V] = this.asInstanceOf[TypedSchemaDef[V]]
 
+  private[parquet4s] def metadata: Set[SchemaDef.Meta.Property]
+
+  private[parquet4s] def withMetadata(meta: SchemaDef.Meta.Property): Self
+
 }
 
 object SchemaDef {
+
+  private[parquet4s] object Meta {
+    sealed trait Property
+    case object Generated extends Property
+  }
+
   def primitive(
       primitiveType: PrimitiveType.PrimitiveTypeName,
       logicalTypeAnnotation: Option[LogicalTypeAnnotation] = None,
       required: Boolean                                    = true,
       length: Option[Int]                                  = None
   ): SchemaDef =
-    PrimitiveSchemaDef(primitiveType, logicalTypeAnnotation, required, length)
+    PrimitiveSchemaDef(primitiveType, logicalTypeAnnotation, required, length, Set.empty)
 
   def group(fields: Type*): SchemaDef =
-    GroupSchemaDef(fields, required = false)
+    GroupSchemaDef(fields, required = false, metadata = Set.empty)
 
   def list(elementSchemaDef: SchemaDef): SchemaDef =
-    ListSchemaDef(elementSchemaDef(ListSchemaDef.ElementName), required = false)
+    ListSchemaDef(elementSchemaDef(ListSchemaDef.ElementName), required = false, metadata = Set.empty)
 
   def map(keySchemaDef: SchemaDef, valueSchemaDef: SchemaDef): SchemaDef = MapSchemaDef(
     keySchemaDef(MapSchemaDef.KeyName),
     valueSchemaDef(MapSchemaDef.ValueName),
-    required = false
+    required = false,
+    metadata = Set.empty
   )
 }
 
@@ -94,7 +105,8 @@ private case class PrimitiveSchemaDef(
     primitiveType: PrimitiveType.PrimitiveTypeName,
     logicalTypeAnnotation: Option[LogicalTypeAnnotation],
     required: Boolean,
-    length: Option[Int]
+    length: Option[Int],
+    metadata: Set[SchemaDef.Meta.Property]
 ) extends SchemaDef {
 
   override type Self = PrimitiveSchemaDef
@@ -112,9 +124,12 @@ private case class PrimitiveSchemaDef(
 
   override def withRequired(required: Boolean): PrimitiveSchemaDef = this.copy(required = required)
 
+  override def withMetadata(meta: SchemaDef.Meta.Property): PrimitiveSchemaDef = this.copy(metadata = metadata + meta)
+
 }
 
-private case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends SchemaDef {
+private case class GroupSchemaDef(fields: Seq[Type], required: Boolean, metadata: Set[SchemaDef.Meta.Property])
+    extends SchemaDef {
 
   override type Self = GroupSchemaDef
 
@@ -125,13 +140,16 @@ private case class GroupSchemaDef(fields: Seq[Type], required: Boolean) extends 
 
   override def withRequired(required: Boolean): GroupSchemaDef = this.copy(required = required)
 
+  override def withMetadata(meta: SchemaDef.Meta.Property): GroupSchemaDef = this.copy(metadata = metadata + meta)
+
 }
 
 private object ListSchemaDef {
   val ElementName = "element"
 }
 
-private case class ListSchemaDef(element: Type, required: Boolean) extends SchemaDef {
+private case class ListSchemaDef(element: Type, required: Boolean, metadata: Set[SchemaDef.Meta.Property])
+    extends SchemaDef {
 
   override type Self = ListSchemaDef
 
@@ -142,6 +160,8 @@ private case class ListSchemaDef(element: Type, required: Boolean) extends Schem
 
   override def withRequired(required: Boolean): ListSchemaDef = this.copy(required = required)
 
+  override def withMetadata(meta: SchemaDef.Meta.Property): ListSchemaDef = this.copy(metadata = metadata + meta)
+
 }
 
 private object MapSchemaDef {
@@ -149,7 +169,8 @@ private object MapSchemaDef {
   val ValueName = "value"
 }
 
-private case class MapSchemaDef(key: Type, value: Type, required: Boolean) extends SchemaDef {
+private case class MapSchemaDef(key: Type, value: Type, required: Boolean, metadata: Set[SchemaDef.Meta.Property])
+    extends SchemaDef {
 
   override type Self = MapSchemaDef
 
@@ -160,36 +181,57 @@ private case class MapSchemaDef(key: Type, value: Type, required: Boolean) exten
 
   override def withRequired(required: Boolean): MapSchemaDef = this.copy(required = required)
 
+  override def withMetadata(meta: SchemaDef.Meta.Property): MapSchemaDef = this.copy(metadata = metadata + meta)
+
 }
 
-trait SchemaDefs {
+trait SchemaDefs extends PrimitiveSchemaDefs with TimeValueSchemaDefs with ComplexSchemaDefs
 
+trait PrimitiveSchemaDefs {
   implicit val stringSchema: TypedSchemaDef[String] =
-    SchemaDef.primitive(BINARY, required = false, logicalTypeAnnotation = Option(LogicalTypes.StringType)).typed[String]
+    SchemaDef
+      .primitive(BINARY, required = false, logicalTypeAnnotation = Option(LogicalTypes.StringType))
+      .withMetadata(SchemaDef.Meta.Generated)
+      .typed[String]
 
   implicit val charSchema: TypedSchemaDef[Char] =
-    SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int32Type)).typed[Char]
+    SchemaDef
+      .primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int32Type))
+      .withMetadata(SchemaDef.Meta.Generated)
+      .typed[Char]
 
   implicit val intSchema: TypedSchemaDef[Int] =
-    SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int32Type)).typed[Int]
+    SchemaDef
+      .primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int32Type))
+      .withMetadata(SchemaDef.Meta.Generated)
+      .typed[Int]
 
   implicit val longSchema: TypedSchemaDef[Long] =
-    SchemaDef.primitive(INT64, logicalTypeAnnotation = Option(LogicalTypes.Int64Type)).typed[Long]
+    SchemaDef
+      .primitive(INT64, logicalTypeAnnotation = Option(LogicalTypes.Int64Type))
+      .withMetadata(SchemaDef.Meta.Generated)
+      .typed[Long]
 
   implicit val floatSchema: TypedSchemaDef[Float] =
-    SchemaDef.primitive(FLOAT).typed[Float]
+    SchemaDef.primitive(FLOAT).withMetadata(SchemaDef.Meta.Generated).typed[Float]
 
   implicit val doubleSchema: TypedSchemaDef[Double] =
-    SchemaDef.primitive(DOUBLE).typed[Double]
+    SchemaDef.primitive(DOUBLE).withMetadata(SchemaDef.Meta.Generated).typed[Double]
 
   implicit val booleanSchema: TypedSchemaDef[Boolean] =
-    SchemaDef.primitive(BOOLEAN).typed[Boolean]
+    SchemaDef.primitive(BOOLEAN).withMetadata(SchemaDef.Meta.Generated).typed[Boolean]
 
   implicit val shortSchema: TypedSchemaDef[Short] =
-    SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int16Type)).typed[Short]
+    SchemaDef
+      .primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int16Type))
+      .withMetadata(SchemaDef.Meta.Generated)
+      .typed[Short]
 
   implicit val byteSchema: TypedSchemaDef[Byte] =
-    SchemaDef.primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int8Type)).typed[Byte]
+    SchemaDef
+      .primitive(INT32, logicalTypeAnnotation = Option(LogicalTypes.Int8Type))
+      .withMetadata(SchemaDef.Meta.Generated)
+      .typed[Byte]
 
   implicit val decimalSchema: TypedSchemaDef[BigDecimal] =
     SchemaDef
@@ -199,27 +241,31 @@ trait SchemaDefs {
         logicalTypeAnnotation = Option(LogicalTypes.DecimalType),
         length                = Some(Decimals.ByteArrayLength)
       )
+      .withMetadata(SchemaDef.Meta.Generated)
       .typed[BigDecimal]
+}
 
+trait TimeValueSchemaDefs {
   implicit val localDateSchema: TypedSchemaDef[java.time.LocalDate] =
     SchemaDef
       .primitive(INT32, required = false, logicalTypeAnnotation = Option(LogicalTypes.DateType))
+      .withMetadata(SchemaDef.Meta.Generated)
       .typed[java.time.LocalDate]
 
   implicit val sqlDateSchema: TypedSchemaDef[java.sql.Date] =
     SchemaDef
       .primitive(INT32, required = false, logicalTypeAnnotation = Option(LogicalTypes.DateType))
+      .withMetadata(SchemaDef.Meta.Generated)
       .typed[java.sql.Date]
 
   implicit val localDateTimeSchema: TypedSchemaDef[java.time.LocalDateTime] =
-    SchemaDef.primitive(INT96, required = false).typed[java.time.LocalDateTime]
+    SchemaDef.primitive(INT96, required = false).withMetadata(SchemaDef.Meta.Generated).typed[java.time.LocalDateTime]
 
   implicit val sqlTimestampSchema: TypedSchemaDef[java.sql.Timestamp] =
-    SchemaDef.primitive(INT96, required = false).typed[java.sql.Timestamp]
+    SchemaDef.primitive(INT96, required = false).withMetadata(SchemaDef.Meta.Generated).typed[java.sql.Timestamp]
+}
 
-  implicit def productSchema[T](implicit parquetSchemaResolver: ParquetSchemaResolver[T]): TypedSchemaDef[T] =
-    SchemaDef.group(parquetSchemaResolver.resolveSchema(Cursor.simple)*).typed[T]
-
+trait ComplexSchemaDefs extends ProductSchemaDefs {
   implicit def optionSchema[T](implicit tSchemaDef: TypedSchemaDef[T]): TypedSchemaDef[Option[T]] =
     tSchemaDef.withRequired(false).typed[Option[T]]
 
@@ -227,7 +273,7 @@ trait SchemaDefs {
       elementSchema: TypedSchemaDef[E],
       ev: Col[E] <:< Iterable[E]
   ): TypedSchemaDef[Col[E]] =
-    SchemaDef.list(elementSchema).typed[Col[E]]
+    SchemaDef.list(elementSchema).withMetadata(SchemaDef.Meta.Generated).typed[Col[E]]
 
   implicit def arraySchema[E, Col[_]](implicit
       elementSchema: TypedSchemaDef[E],
@@ -235,15 +281,17 @@ trait SchemaDefs {
       classTag: ClassTag[E]
   ): TypedSchemaDef[Col[E]] =
     if (classTag.runtimeClass == classOf[Byte])
-      SchemaDef.primitive(BINARY, required = false).typed[Col[E]]
+      SchemaDef.primitive(BINARY, required = false).withMetadata(SchemaDef.Meta.Generated).typed[Col[E]]
     else
-      SchemaDef.list(elementSchema).typed[Col[E]]
+      SchemaDef.list(elementSchema).withMetadata(SchemaDef.Meta.Generated).typed[Col[E]]
 
   implicit def mapSchema[MapKey, MapValue](implicit
       keySchema: TypedSchemaDef[MapKey],
       valueSchema: TypedSchemaDef[MapValue]
   ): TypedSchemaDef[Map[MapKey, MapValue]] =
     // type of the map key must be required
-    SchemaDef.map(keySchema.withRequired(true), valueSchema).typed[Map[MapKey, MapValue]]
-
+    SchemaDef
+      .map(keySchema.withRequired(true), valueSchema)
+      .withMetadata(SchemaDef.Meta.Generated)
+      .typed[Map[MapKey, MapValue]]
 }

@@ -4,9 +4,8 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.sql.{Date, Timestamp}
 import java.time.*
 import scala.collection.compat.*
-import scala.reflect.ClassTag
-
 import scala.language.higherKinds
+import scala.reflect.ClassTag
 
 trait PrimitiveValueDecoders {
 
@@ -250,7 +249,7 @@ trait TimeValueEncoders {
 
 }
 
-trait ComplexValueDecoders {
+trait ComplexValueDecoders extends ProductDecoders {
 
   implicit def collectionDecoder[T, Col[_]](implicit
       evidence: Col[T] <:< Iterable[T],
@@ -305,17 +304,9 @@ trait ComplexValueDecoders {
         }
     }
 
-  implicit def productDecoder[T](implicit decoder: ParquetRecordDecoder[T]): OptionalValueDecoder[T] =
-    new OptionalValueDecoder[T] {
-      def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): T =
-        value match {
-          case record: RowParquetRecord => decoder.decode(record, configuration)
-        }
-    }
-
 }
 
-trait ComplexValueEncoders {
+trait ComplexValueEncoders extends ProductEncoders {
 
   implicit def collectionEncoder[T, Col[_]](implicit
       evidence: Col[T] <:< Iterable[T],
@@ -364,12 +355,6 @@ trait ComplexValueEncoders {
           require(key != null, "Map cannot have null keys")
           record.updated(key, value, configuration)
         }
-    }
-
-  implicit def productEncoder[T](implicit encoder: ParquetRecordEncoder[T]): OptionalValueEncoder[T] =
-    new OptionalValueEncoder[T] {
-      def encodeNonNull(data: T, configuration: ValueCodecConfiguration): Value =
-        encoder.encode(data, null, configuration)
     }
 
 }

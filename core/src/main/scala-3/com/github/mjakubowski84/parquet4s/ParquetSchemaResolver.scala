@@ -1,20 +1,13 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
-import org.apache.parquet.schema.LogicalTypeAnnotation.{
-  DateLogicalTypeAnnotation,
-  DecimalLogicalTypeAnnotation,
-  IntLogicalTypeAnnotation,
-  StringLogicalTypeAnnotation
-}
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
-import org.apache.parquet.schema.Type.Repetition
-import org.apache.parquet.schema._
+import org.apache.parquet.schema.*
 
 import scala.annotation.implicitNotFound
 import scala.deriving.Mirror
 import scala.language.higherKinds
 import scala.reflect.ClassTag
+import scala.util.NotGiven
 
 /** Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
   * @tparam T
@@ -45,10 +38,9 @@ object ParquetSchemaResolver extends SchemaDefs:
 
   final abstract private[ParquetSchemaResolver] class Fields[Labels <: Tuple, Values <: Tuple]
 
-  class TypedSchemaDefInvoker[L <: String & Singleton: ValueOf, V](schemaDef: TypedSchemaDef[V]):
-    private def fieldName                                      = summon[ValueOf[L]].value
-    def `type`: Type                                           = schemaDef(fieldName)
-    def productType(productSchemaDef: TypedSchemaDef[V]): Type = productSchemaDef(fieldName)
+  trait SchemaVisitor[V] extends Cursor.Visitor[String, Option[Type]]:
+    override def onCompleted(cursor: Cursor, fieldName: String): Option[Type] =
+      throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
 
   /** Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
     *
@@ -66,16 +58,14 @@ object ParquetSchemaResolver extends SchemaDefs:
   given ParquetSchemaResolver[Fields[EmptyTuple, EmptyTuple]] with
     def resolveSchema(cursor: Cursor): List[Type] = List.empty
 
-  given [L <: String & Singleton: ValueOf, LT <: Tuple, V: TypedSchemaDef, VT <: Tuple](using
-      visitor: SchemaVisitor[L, V],
+  given [L <: String & Singleton: ValueOf, LT <: Tuple, V, VT <: Tuple](using
+      visitor: SchemaVisitor[V],
       rest: ParquetSchemaResolver[Fields[LT, VT]]
   ): ParquetSchemaResolver[Fields[L *: LT, V *: VT]] with
     def resolveSchema(cursor: Cursor): List[Type] =
       cursor
         .advance[L]
-        .flatMap(newCursor =>
-          newCursor.accept(new TypedSchemaDefInvoker[L, V](summon[TypedSchemaDef[V]]), visitor)
-        ) match
+        .flatMap(newCursor => newCursor.accept(summon[ValueOf[L]].value, visitor)) match
         case Some(head) =>
           head +: rest.resolveSchema(cursor)
         case None =>
@@ -89,19 +79,25 @@ object ParquetSchemaResolver extends SchemaDefs:
     def resolveSchema(cursor: Cursor): List[Type] = rest.resolveSchema(cursor)
     override def schemaName: Option[String]       = Option(classTag.runtimeClass.getCanonicalName)
 
-  trait SchemaVisitor[L <: String & Singleton, V] extends Cursor.Visitor[TypedSchemaDefInvoker[L, V], Option[Type]]:
-    override def onCompleted(cursor: Cursor, invoker: TypedSchemaDefInvoker[L, V]): Option[Type] =
-      throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
+  given defaultSchemaVisitor[V: TypedSchemaDef](using NotGiven[ParquetSchemaResolver[V]]): SchemaVisitor[V] with
+    def onActive(cursor: Cursor, fieldName: String): Option[Type] =
+      Option(summon[TypedSchemaDef[V]](fieldName))
 
-  given defaultSchemaVisitor[L <: String & Singleton, V]: SchemaVisitor[L, V] with
-    def onActive(cursor: Cursor, invoker: TypedSchemaDefInvoker[L, V]): Option[Type] = Option(invoker.`type`)
-
-  given [L <: String & Singleton, V <: Product: ParquetSchemaResolver]: SchemaVisitor[L, V] with
-    def onActive(cursor: Cursor, invoker: TypedSchemaDefInvoker[L, V]): Option[Type] =
-      summon[ParquetSchemaResolver[V]].resolveSchema(cursor) match
-        case Nil =>
-          None
-        case fieldTypes =>
-          Option(invoker.productType(SchemaDef.group(fieldTypes: _*).typed[V]))
+  /** Purpose of productSchemaVisitor is to filter product fields so that those that are used for partitioning are not
+    * present in final schema. It is only applied to products that are not nested in Options and collections as optional
+    * fields and elements of collections are not valid for partitioning.
+    */
+  given productSchemaVisitor[V <: Product: ParquetSchemaResolver: TypedSchemaDef]: SchemaVisitor[V] with
+    def onActive(cursor: Cursor, fieldName: String): Option[Type] =
+      summon[TypedSchemaDef[V]] match
+        // override fields only in generated groups (records), custom ones provided by users are not processed
+        case schema: GroupSchemaDef if schema.metadata.contains(SchemaDef.Meta.Generated) =>
+          summon[ParquetSchemaResolver[V]].resolveSchema(cursor) match
+            case Nil =>
+              None
+            case fieldTypes =>
+              Option(schema(fieldName).asGroupType().withNewFields(fieldTypes*))
+        case schema =>
+          Option(schema(fieldName))
 
 end ParquetSchemaResolver

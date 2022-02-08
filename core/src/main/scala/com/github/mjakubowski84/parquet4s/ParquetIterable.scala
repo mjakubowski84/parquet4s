@@ -131,7 +131,7 @@ trait ParquetIterable[T] extends Iterable[T] with Closeable {
     * @return
     *   min value or [[scala.None]] if there is no matching data or path is invalid
     */
-  def min[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V] = stats.min(columnPath)
+  def min[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V] = stats.min[V](columnPath)
 
   /** Returns max value of underlying dataset at given path
     *
@@ -142,7 +142,7 @@ trait ParquetIterable[T] extends Iterable[T] with Closeable {
     * @return
     *   max value or [[scala.None]] if there is no matching data or path is invalid
     */
-  def max[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V] = stats.max(columnPath)
+  def max[V: Ordering: ValueDecoder](columnPath: ColumnPath): Option[V] = stats.max[V](columnPath)
 
   /** Returns the size of the underlying dataset. Filter is considered during calculation. Tries to leverage Parquet
     * metadata and statistics in order to avoid full traverse over the dataset.

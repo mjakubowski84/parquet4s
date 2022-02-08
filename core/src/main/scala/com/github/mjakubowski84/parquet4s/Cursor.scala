@@ -1,5 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.compat.CursorCompat
+
 /** Auxiliary construct that facilitates traversal over tree of case classes. Apart from pointing if program should
   * advance the tree it implements visitor pattern that allows to process the content of the tree in context of cursor's
   * state.

@@ -27,7 +27,7 @@ trait Stats {
     *   Minimum value across Parquet data. [[Filter]] is considered during calculation.
     */
   def min[V](columnPath: ColumnPath)(implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] =
-    min(columnPath, None)
+    min[V](columnPath, None)
 
   /** @param columnPath
     *   [[ColumnPath]]
@@ -41,7 +41,7 @@ trait Stats {
     *   Maximum value across Parquet data. [[Filter]] is considered during calculation.
     */
   def max[V](columnPath: ColumnPath)(implicit decoder: ValueDecoder[V], ordering: Ordering[V]): Option[V] =
-    max(columnPath, None)
+    max[V](columnPath, None)
 
   protected[parquet4s] def min[V](columnPath: ColumnPath, currentMin: Option[V])(implicit
       decoder: ValueDecoder[V],

@@ -1,5 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.compat.MapCompat
 import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.Type.Repetition
 import org.apache.parquet.schema.{GroupType, MessageType, Type}

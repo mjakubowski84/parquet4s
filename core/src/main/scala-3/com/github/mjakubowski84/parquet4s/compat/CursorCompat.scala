@@ -1,6 +1,8 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.compat
 
-trait CursorCompat {
+import com.github.mjakubowski84.parquet4s.Cursor
+
+trait CursorCompat:
 
   this: Cursor =>
 
@@ -12,4 +14,4 @@ trait CursorCompat {
   def advance[FieldName <: String & Singleton: ValueOf]: Option[Cursor] =
     advanceByFieldName(summon[ValueOf[FieldName]].value)
 
-}
+end CursorCompat
