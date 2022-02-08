@@ -2,6 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
 import org.apache.parquet.schema.*
+import org.slf4j.LoggerFactory
 
 import scala.annotation.implicitNotFound
 import scala.deriving.Mirror
@@ -42,6 +43,8 @@ object ParquetSchemaResolver extends SchemaDefs:
     override def onCompleted(cursor: Cursor, fieldName: String): Option[Type] =
       throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
 
+  private val logger = LoggerFactory.getLogger(this.getClass)
+
   /** Builds full Parquet file schema ([[org.apache.parquet.schema.MessageType]]) from <i>T</i>.
     *
     * @param toSkip
@@ -77,7 +80,15 @@ object ParquetSchemaResolver extends SchemaDefs:
       classTag: ClassTag[P]
   ): ParquetSchemaResolver[P] with
     def resolveSchema(cursor: Cursor): List[Type] = rest.resolveSchema(cursor)
-    override def schemaName: Option[String]       = Option(classTag.runtimeClass.getCanonicalName)
+    override def schemaName: Option[String] =
+      Option(
+        try classTag.runtimeClass.getCanonicalName
+        catch
+          case e: Throwable =>
+            logger
+              .warn("Failed to resolve class name. Consider placing your class in static and less nested structure", e)
+            null
+      )
 
   given defaultSchemaVisitor[V: TypedSchemaDef](using NotGiven[ParquetSchemaResolver[V]]): SchemaVisitor[V] with
     def onActive(cursor: Cursor, fieldName: String): Option[Type] =

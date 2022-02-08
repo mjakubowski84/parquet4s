@@ -412,7 +412,7 @@ final class RowParquetRecord private (
   override def toString: String =
     fields.iterator
       .map(name => s"$name=${values(name)}")
-      .mkString(getClass.getSimpleName + " (", ",", ")")
+      .mkString("RowParquetRecord(", ",", ")")
 
   /** Adds a new field to the front of the record.
     * @param name
@@ -616,7 +616,7 @@ final class ListParquetRecord private (private val values: Vector[Value])
 
   override def iterator: Iterator[Value] = values.iterator
 
-  override def toString: String = values.mkString("ListParquetRecord (", ",", ")")
+  override def toString: String = values.mkString("ListParquetRecord(", ",", ")")
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
     recordConsumer.startGroup()
@@ -800,7 +800,7 @@ final class MapParquetRecord private[parquet4s] (protected val entries: Map[Valu
   override def toString: String =
     entries
       .map { case (key, value) => s"$key=$value" }
-      .mkString(getClass.getSimpleName + " (", ",", ")")
+      .mkString("MapParquetRecord(", ",", ")")
 
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = {
     recordConsumer.startGroup()
