@@ -12,7 +12,10 @@ Reading partitions is handled by default by `fromParquet` function. Before data 
 
 Writing partitioned data is available in `viaParquet`. You can specify by which columns data shall be partitioned and Parquet4s will automatically create proper directory structure and it will remove the fields from the written records (so that there is no data redundancy).
 
-**Take note**: partition field must be a String.
+**Take note!** 
+ - Partition field must be a String. 
+ - The field cannot be null, be an Option or belong to the collection.
+ - Parquet4s takes care of building proper schemas for partitioned data. However, when you use a custom type and custom schema definition remember to not include the partition field in the schema - because it is supposed to be encoded as a directory name.
 
 In Akka:
 ```scala mdoc:compile-only
