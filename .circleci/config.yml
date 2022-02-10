@@ -47,11 +47,28 @@ commands:
         type: string
     steps:
       - store_test_results:
-          path: << parameters.path >>/target/junit/2.11
-      - store_test_results:
           path: << parameters.path >>/target/junit/2.12
       - store_test_results:
           path: << parameters.path >>/target/junit/2.13
+      - store_test_results:
+          path: << parameters.path >>/target/junit/3
+
+  run_tests_in_project:
+    parameters:
+      path:
+        description: repo directory
+        type: string
+      project:
+        description: repo directory
+        type: string
+    steps:
+      - run:
+          name: Test
+          command: cat /dev/null | sbt "project << parameters.project >>" +test +it:test
+          when: always
+          working_directory: << parameters.path >>
+      - save_test_results:
+          path: << parameters.path >>
 
   setup_gpg:
     steps:
@@ -86,17 +103,26 @@ jobs:
           working_directory: workspace/repo
       - cache_dependencies:
           path: workspace/repo
-      - run:
-          name: Test
-          command: cat /dev/null | sbt +test +it:test
-          when: always
-          working_directory: workspace/repo
       - persist_to_workspace:
           root: workspace
           paths:
             - repo
-      - save_test_results:
+
+  test:
+    resource_class: large
+    executor:
+      name: jdk
+    parameters:
+      project:
+        type: string
+    steps:
+      - attach_workspace:
+          at: workspace
+      - download_cached_dependencies:
           path: workspace/repo
+      - run_tests_in_project:
+          path: workspace/repo
+          project: << parameters.project >>
 
   release:
     resource_class: large
@@ -128,6 +154,21 @@ workflows:
           filters:
             tags:
               ignore: /.*/
+      - test:
+          name: test_core
+          project: core
+          requires:
+            - build
+      - test:
+          name: test_akka
+          project: akka
+          requires:
+            - build
+      - test:
+          name: test_fs2
+          project: fs2
+          requires:
+            - build
 
   build-and-release:
     jobs:
@@ -137,12 +178,24 @@ workflows:
               only: /^v.*/
             branches:
               ignore: /.*/
-      - release:
+      - test:
+          name: test_core
+          project: core
           requires:
             - build
-          filters:
-            tags:
-              only: /^v.*/
-            branches:
-              ignore: /.*/
+      - test:
+          name: test_akka
+          project: akka
+          requires:
+            - build
+      - test:
+          name: test_fs2
+          project: fs2
+          requires:
+            - build
+      - release:
+          requires:
+            - test_core
+            - test_akka
+            - test_fs2
 
