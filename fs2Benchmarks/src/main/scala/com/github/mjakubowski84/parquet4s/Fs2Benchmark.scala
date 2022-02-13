@@ -50,7 +50,7 @@ object Fs2Benchmark {
       val threadPool          = Executors.newSingleThreadExecutor()
       val executionContext    = ExecutionContext.fromExecutor(threadPool)
       val schedulerThreadPool = Executors.newSingleThreadScheduledExecutor()
-      val scheduler           = Scheduler.fromScheduledExecutor(Executors.newSingleThreadScheduledExecutor())
+      val scheduler           = Scheduler.fromScheduledExecutor(schedulerThreadPool)
       ioRuntime = IORuntime(
         compute   = executionContext,
         blocking  = executionContext,

@@ -142,21 +142,26 @@ object reader {
         .flatMap(Stream.iterable)
       (partitionFilter, partitionedPath) = partitionData
       reader <- Stream.resource(readerResource(partitionedPath.path, options, partitionFilter, projectedSchemaOpt))
-      entity <- readerStream(reader)
-        .evalMap { record =>
-          partitionedPath.partitions.foldLeft(F.pure(record)) { case (f, (columnPath, value)) =>
-            f.flatMap { r =>
-              F.catchNonFatal(r.updated(columnPath, BinaryValue(value)))
-            }
-          }
-        }
-        .evalMap(decode)
+      entity <- readerStream(reader, partitionedPath).evalMap(decode)
     } yield entity
 
-  private def readerStream[T, F[_]: Sync](reader: HadoopParquetReader[RowParquetRecord])(implicit
-      F: Sync[F]
-  ): Stream[F, RowParquetRecord] =
-    Stream.repeatEval(F.blocking(reader.read())).takeWhile(_ != null)
+  private def readerStream[F[_]](
+      reader: HadoopParquetReader[RowParquetRecord],
+      partitionedPath: PartitionedPath
+  )(implicit F: Sync[F]): Stream[F, RowParquetRecord] = {
+    val stream = Stream.repeatEval(F.delay(scala.concurrent.blocking(reader.read()))).takeWhile(_ != null)
+    if (partitionedPath.partitions.nonEmpty) {
+      stream.evalMap { record =>
+        partitionedPath.partitions.foldLeft(F.pure(record)) { case (f, (columnPath, value)) =>
+          f.flatMap { r =>
+            F.catchNonFatal(r.updated(columnPath, BinaryValue(value)))
+          }
+        }
+      }
+    } else {
+      stream
+    }
+  }
 
   private def readerResource[F[_]: Sync](
       path: Path,
@@ -165,12 +170,14 @@ object reader {
       projectionSchemaOpt: Option[MessageType]
   ): Resource[F, HadoopParquetReader[RowParquetRecord]] =
     Resource.fromAutoCloseable(
-      Sync[F].blocking(
-        HadoopParquetReader
-          .builder[RowParquetRecord](new ParquetReadSupport(projectionSchemaOpt), path.toHadoop)
-          .withConf(options.hadoopConf)
-          .withFilter(filter)
-          .build()
+      Sync[F].delay(
+        scala.concurrent.blocking(
+          HadoopParquetReader
+            .builder[RowParquetRecord](new ParquetReadSupport(projectionSchemaOpt), path.toHadoop)
+            .withConf(options.hadoopConf)
+            .withFilter(filter)
+            .build()
+        )
       )
     )
 

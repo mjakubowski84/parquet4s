@@ -121,7 +121,7 @@ object ParquetSource extends IOOps {
 
   }
 
-  override protected lazy val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  override protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   private def apply[T: ParquetRecordDecoder](
       path: Path,

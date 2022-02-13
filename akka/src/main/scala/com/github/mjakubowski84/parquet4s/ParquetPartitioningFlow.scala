@@ -163,9 +163,10 @@ object ParquetPartitioningFlow {
         basePath: Path,
         schema: MessageType
     ): GraphStage[FlowShape[RowParquetRecord, RowParquetRecord]] = {
-      val finalSchema = ParquetSchemaResolver
-        .resolveSchema(toSkip = partitionBy)(RowParquetRecord.genericParquetSchemaResolver(schema))
-      val encode = (record: RowParquetRecord, _: ValueCodecConfiguration) => record
+      implicit val resolver: ParquetSchemaResolver[RowParquetRecord] =
+        RowParquetRecord.genericParquetSchemaResolver(schema)
+      val finalSchema = ParquetSchemaResolver.resolveSchema[RowParquetRecord](toSkip = partitionBy)
+      val encode      = (record: RowParquetRecord, _: ValueCodecConfiguration) => record
 
       new ParquetPartitioningFlow[RowParquetRecord, RowParquetRecord](
         basePath,
