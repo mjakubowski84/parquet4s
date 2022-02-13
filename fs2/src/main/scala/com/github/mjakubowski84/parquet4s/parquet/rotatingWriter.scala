@@ -249,8 +249,10 @@ object rotatingWriter {
     )(implicit F: Async[F]): F[RecordWriter[F]] =
       F.uncancelable { _ =>
         for {
-          internalWrite <- F.blocking(
-            ParquetWriter.internalWriter(basePath.append(newFileName(options)), schema, options)
+          internalWrite <- F.delay(
+            scala.concurrent.blocking(
+              ParquetWriter.internalWriter(basePath.append(newFileName(options)), schema, options)
+            )
           )
           rotationFiber <- F.delayBy(eventQueue.offer(RotateEvent[F, T, W](basePath)), maxDuration).start
         } yield new RecordWriter(internalWrite, rotationFiber)
@@ -264,15 +266,15 @@ object rotatingWriter {
 
     var count: Long = 0
 
-    def write(record: RowParquetRecord): F[Long] = F.blocking {
+    def write(record: RowParquetRecord): F[Long] = F.delay(scala.concurrent.blocking {
       internalWriter.write(record)
       count = count + 1
       count
-    }
+    })
 
     def dispose: F[Unit] =
       F.uncancelable { _ =>
-        rotationFiber.cancel >> F.blocking(internalWriter.close())
+        rotationFiber.cancel >> F.delay(scala.concurrent.blocking(internalWriter.close()))
       }
   }
 
@@ -336,7 +338,7 @@ object rotatingWriter {
         count  <- writer.write(partitionedRecord)
         _ <-
           if (count >= maxCount) {
-            F.uncancelable(_ => dispose(path))
+            dispose(path)
           } else {
             F.unit
           }

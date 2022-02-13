@@ -6,14 +6,13 @@ import sbt.util
 
 lazy val twoTwelve              = "2.12.15"
 lazy val twoThirteen            = "2.13.8"
-lazy val three                  = "3.0.2"
+lazy val three                  = "3.1.1"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
-lazy val akkaScalaVersions      = Seq(twoTwelve, twoThirteen)
 
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "2.3.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
-ThisBuild / scalaVersion := twoThirteen
+ThisBuild / scalaVersion := three
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ThisBuild / resolvers := Seq(
   Opts.resolver.sonatypeReleases,
@@ -119,7 +118,7 @@ lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-akka",
-    crossScalaVersions := akkaScalaVersions,
+    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided
@@ -141,9 +140,10 @@ lazy val fs2 = (project in file("fs2"))
     crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "co.fs2" %% "fs2-core" % fs2Version,
+      "org.typelevel" %% "cats-effect" % catsEffectVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "co.fs2" %% "fs2-io" % fs2Version % "it",
-      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.3.0" % "it"
+      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.4.0" % "it"
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
@@ -158,7 +158,7 @@ lazy val fs2 = (project in file("fs2"))
 lazy val examples = (project in file("examples"))
   .settings(
     name := "parquet4s-examples",
-    crossScalaVersions := akkaScalaVersions,
+    scalaVersion := twoThirteen,
     publish / skip := true,
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
@@ -167,7 +167,7 @@ lazy val examples = (project in file("examples"))
       "ch.qos.logback" % "logback-classic" % "1.2.10",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % "2.1.1",
-      "com.github.fd4s" %% "fs2-kafka" % "2.2.0",
+      "com.github.fd4s" %% "fs2-kafka" % "2.3.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(
@@ -206,7 +206,7 @@ lazy val akkaBenchmarks = (project in file("akkaBenchmarks"))
     name := "parquet4s-akka-benchmarks",
     publish / skip := true,
     publishLocal / skip := true,
-    crossScalaVersions := akkaScalaVersions,
+    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,

@@ -72,7 +72,7 @@ private[parquet4s] object writer {
     def write(elem: T): F[Unit] =
       for {
         record <- encode(elem)
-        _      <- F.blocking(internalWriter.write(record))
+        _      <- F.delay(scala.concurrent.blocking(internalWriter.write(record)))
       } yield ()
 
     def writePull(chunk: Chunk[T]): Pull[F, Nothing, Unit] =
@@ -109,7 +109,7 @@ private[parquet4s] object writer {
       for {
         schema                  <- F.catchNonFatal(ParquetSchemaResolver.resolveSchema[T])
         valueCodecConfiguration <- F.catchNonFatal(ValueCodecConfiguration(options))
-        internalWriter          <- F.blocking(ParquetWriter.internalWriter(path, schema, options))
+        internalWriter <- F.delay(scala.concurrent.blocking(ParquetWriter.internalWriter(path, schema, options)))
         encode = { (entity: T) => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)) }
       } yield new Writer[T, F](internalWriter, encode)
     )
