@@ -183,19 +183,39 @@ workflows:
           project: core
           requires:
             - build
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
       - test:
           name: test_akka
           project: akka
           requires:
             - build
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
       - test:
           name: test_fs2
           project: fs2
           requires:
             - build
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
       - release:
           requires:
             - test_core
             - test_akka
             - test_fs2
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
 
