@@ -74,4 +74,4 @@ ParquetStreams
   .runForeach(println)
 ```
 
-Please check [examples](https://github.com/mjakubowski84/parquet4s/tree/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/fs2) to learn more.
+Please check [examples](https://github.com/mjakubowski84/parquet4s/tree/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/akka) to learn more.
