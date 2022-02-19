@@ -10,7 +10,7 @@ lazy val three                  = "3.1.1"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.3.0-SNAPSHOT"
+ThisBuild / version := "2.3.0"
 ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := three
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -96,7 +96,7 @@ lazy val core = (project in file("core"))
 
       // tests
       "org.mockito" % "mockito-core" % "4.3.1" % "test",
-      "org.scalatest" %% "scalatest" % "3.2.10" % "test,it",
+      "org.scalatest" %% "scalatest" % "3.2.11" % "test,it",
       "ch.qos.logback" % "logback-classic" % "1.2.10" % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
@@ -166,7 +166,7 @@ lazy val examples = (project in file("examples"))
       "io.github.embeddedkafka" %% "embedded-kafka" % "3.1.0",
       "ch.qos.logback" % "logback-classic" % "1.2.10",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.typesafe.akka" %% "akka-stream-kafka" % "2.1.1",
+      "com.typesafe.akka" %% "akka-stream-kafka" % "3.0.0",
       "com.github.fd4s" %% "fs2-kafka" % "2.3.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
