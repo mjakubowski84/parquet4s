@@ -297,6 +297,7 @@ object rotatingWriter {
         entityStream: Stream[F, W],
         modifiedPartitions: Map[Path, Long]
     ): Pull[F, T, Map[Path, Long]] =
+      // TODO uncons chunks!
       entityStream.pull.uncons1.flatMap {
         case Some((entity, tail)) =>
           Pull.eval(write(entity)).flatMap { case (partition, count) =>
@@ -398,6 +399,7 @@ object rotatingWriter {
       )
 
     private def writeAllEventsPull(in: Stream[F, WriterEvent[F, T, W]]): Pull[F, T, Unit] =
+      // TODO uncons chunks, join dataStreams from DataEvents into single stream and outs into chunks from chunked output
       in.pull.uncons1.flatMap {
         case Some((DataEvent(dataStream, out), tail)) if postWriteHandlerOpt.isEmpty =>
           writeEntitiesPull(dataStream, Map.empty) >> Pull.output1(out) >> writeAllEventsPull(tail)
@@ -432,7 +434,7 @@ object rotatingWriter {
       for {
         schema                  <- Stream.eval(schemaF)
         valueCodecConfiguration <- Stream.eval(F.catchNonFatal(ValueCodecConfiguration(options)))
-        encode = { (entity: W) => F.catchNonFatal(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
+        encode = { (entity: W) => F.delay(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
         logger     <- Stream.eval(logger[F](this.getClass))
         eventQueue <- Stream.eval(Queue.unbounded[F, WriterEvent[F, T, W]])
         rotatingWriter <- Stream.emit(

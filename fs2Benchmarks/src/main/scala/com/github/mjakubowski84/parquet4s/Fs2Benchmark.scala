@@ -104,6 +104,8 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       operation = Stream
         .iterable(dataset.records)
+        .chunkN(16)
+        .flatMap(Stream.chunk)
         .through(parquet.writeSingleFile[IO].of[Record].write(filePath))
         .compile
         .drain
@@ -128,6 +130,8 @@ object Fs2Benchmark {
       fetchDataset(dataset)
       operation = Stream
         .iterable(dataset.records)
+        .chunkN(16)
+        .flatMap(Stream.chunk)
         .through(parquet.viaParquet[IO].of[Record].partitionBy(ColumnPath("dict")).write(dataset.basePath))
         .compile
         .lastOrError
@@ -183,18 +187,18 @@ class Fs2Benchmark {
   def write(state: WriteState): Unit =
     state.write()
 
-  @Benchmark
-  @BenchmarkMode(Array(Mode.AverageTime))
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
-  def read(state: ReadState): Record =
-    state.read()
+  // @Benchmark
+  // @BenchmarkMode(Array(Mode.AverageTime))
+  // @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  // @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
+  // def read(state: ReadState): Record =
+  //   state.read()
 
-  @Benchmark
-  @BenchmarkMode(Array(Mode.AverageTime))
-  @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
-  def writePartitioned(state: WritePartitionedState): Record =
-    state.writePartitioned()
+  // @Benchmark
+  // @BenchmarkMode(Array(Mode.AverageTime))
+  // @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  // @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
+  // def writePartitioned(state: WritePartitionedState): Record =
+  //   state.writePartitioned()
 
 }
