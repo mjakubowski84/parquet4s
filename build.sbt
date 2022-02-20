@@ -12,7 +12,7 @@ lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "2.4.0-SNAPSHOT"
 ThisBuild / isSnapshot := false
-ThisBuild / scalaVersion := three
+ThisBuild / scalaVersion := twoThirteen
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ThisBuild / resolvers := Seq(
   Opts.resolver.sonatypeReleases,

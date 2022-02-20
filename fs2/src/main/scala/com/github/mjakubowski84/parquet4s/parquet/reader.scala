@@ -9,6 +9,8 @@ import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
 import org.apache.parquet.schema.{MessageType, Type}
 
 import scala.language.higherKinds
+import fs2.Pull
+import fs2.Chunk
 
 object reader {
 
@@ -129,7 +131,7 @@ object reader {
   )(implicit F: Sync[F]): Stream[F, T] =
     for {
       vcc <- Stream.eval(F.pure(ValueCodecConfiguration(options)))
-      decode = (record: RowParquetRecord) => F.catchNonFatal(ParquetRecordDecoder.decode(record, vcc))
+      decode = (record: RowParquetRecord) => F.delay(ParquetRecordDecoder.decode(record, vcc))
       partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf)
       projectedSchemaOpt <- Stream.eval(
         projectedSchemaResolverOpt
@@ -142,16 +144,38 @@ object reader {
         .flatMap(Stream.iterable)
       (partitionFilter, partitionedPath) = partitionData
       reader <- Stream.resource(readerResource(partitionedPath.path, options, partitionFilter, projectedSchemaOpt))
-      entity <- readerStream(reader, partitionedPath).evalMap(decode)
+      entity <- readerStream(reader, partitionedPath).evalMapChunk(decode)
     } yield entity
 
   private def readerStream[F[_]](
       reader: HadoopParquetReader[RowParquetRecord],
       partitionedPath: PartitionedPath
   )(implicit F: Sync[F]): Stream[F, RowParquetRecord] = {
-    val stream = Stream.repeatEval(F.delay(scala.concurrent.blocking(reader.read()))).takeWhile(_ != null)
+
+    val stream = Pull.loop[F, RowParquetRecord, HadoopParquetReader[RowParquetRecord]] {
+      reader =>
+        // TODO make 16 (chunk size) configurable
+        val readChunkF = F.iterateWhileM(16 -> Chunk.empty[RowParquetRecord]) {
+          case (i, chunk) =>
+            F.delay(scala.concurrent.blocking {
+              Option(reader.read()) match {
+                case None =>
+                  0 -> chunk
+                case Some(record) =>
+                  (i - 1) -> (chunk.appendK(record))  
+              }})
+        }(_._1 != 0).map(_._2)
+
+        Pull.eval(readChunkF).flatMap {
+          case chunk if chunk.isEmpty => 
+            Pull.pure(None)
+          case chunk =>
+            Pull.output(chunk) >> Pull.pure(Some(reader))  
+        }
+    }.apply(reader).stream
+
     if (partitionedPath.partitions.nonEmpty) {
-      stream.evalMap { record =>
+      stream.evalMapChunk { record =>
         partitionedPath.partitions.foldLeft(F.pure(record)) { case (f, (columnPath, value)) =>
           f.flatMap { r =>
             F.catchNonFatal(r.updated(columnPath, BinaryValue(value)))
