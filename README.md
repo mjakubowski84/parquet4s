@@ -14,8 +14,7 @@ As it is based on Hadoop Client then you can connect to any Hadoop-compatible st
 
 Integrations for [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [FS2](https://fs2.io/).
 
-Released for Scala 2.12.x, 2.13.x and 3.0.x.\
-Akka module is available for Scala 2.12.x and 2.13.x.
+Released for Scala 2.12.x, 2.13.x and 3.1.x.
 
 ## Documentation
 
