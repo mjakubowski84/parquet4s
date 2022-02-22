@@ -187,18 +187,18 @@ class Fs2Benchmark {
   def write(state: WriteState): Unit =
     state.write()
 
-  // @Benchmark
-  // @BenchmarkMode(Array(Mode.AverageTime))
-  // @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  // @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
-  // def read(state: ReadState): Record =
-  //   state.read()
+  @Benchmark
+  @BenchmarkMode(Array(Mode.AverageTime))
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
+  def read(state: ReadState): Record =
+    state.read()
 
-  // @Benchmark
-  // @BenchmarkMode(Array(Mode.AverageTime))
-  // @OutputTimeUnit(TimeUnit.MILLISECONDS)
-  // @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
-  // def writePartitioned(state: WritePartitionedState): Record =
-  //   state.writePartitioned()
+  @Benchmark
+  @BenchmarkMode(Array(Mode.AverageTime))
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  @Fork(jvmArgsAppend = Array("-Dcats.effect.stackTracingMode=disabled"))
+  def writePartitioned(state: WritePartitionedState): Record =
+    state.writePartitioned()
 
 }

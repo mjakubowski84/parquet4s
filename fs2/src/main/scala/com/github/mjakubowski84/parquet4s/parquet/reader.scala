@@ -14,6 +14,8 @@ import fs2.Chunk
 
 object reader {
 
+  val DefaultChunkSize = 16
+
   /** Factory of builders of Parquet readers.
     */
   trait FromParquet[F[_]] {
@@ -102,6 +104,12 @@ object reader {
       */
     def filter(filter: Filter): Builder[F, T]
 
+    /** For sake of better performance reader processes records in chunks. Default value is `16`.
+      * @param chunkSize
+      *   default value override
+      */
+    def chunkSize(chunkSize: Int): Builder[F, T]
+
     /** @param path
       *   [[Path]] to Parquet files, e.g.: {{{Path("file:///data/users")}}}
       * @return
@@ -113,6 +121,7 @@ object reader {
   private case class BuilderImpl[F[_]: Sync, T: ParquetRecordDecoder](
       options: ParquetReader.Options                               = ParquetReader.Options(),
       filter: Filter                                               = Filter.noopFilter,
+      chunkSize: Int                                               = DefaultChunkSize,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None,
       columnProjections: Seq[ColumnProjection]                     = Seq.empty
   ) extends Builder[F, T] {
@@ -120,13 +129,17 @@ object reader {
 
     override def filter(filter: Filter): Builder[F, T] = this.copy(filter = filter)
 
-    override def read(path: Path): Stream[F, T] = reader.read(path, options, filter, projectedSchemaResolverOpt)
+    override def chunkSize(chunkSize: Int): Builder[F, T] = this.copy(chunkSize = chunkSize)
+
+    override def read(path: Path): Stream[F, T] =
+      reader.read(path, options, filter, chunkSize, projectedSchemaResolverOpt)
   }
 
   private[parquet4s] def read[F[_], T: ParquetRecordDecoder](
       basePath: Path,
       options: ParquetReader.Options,
       filter: Filter,
+      chunkSize: Int,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
   )(implicit F: Sync[F]): Stream[F, T] =
     for {
@@ -144,35 +157,38 @@ object reader {
         .flatMap(Stream.iterable)
       (partitionFilter, partitionedPath) = partitionData
       reader <- Stream.resource(readerResource(partitionedPath.path, options, partitionFilter, projectedSchemaOpt))
-      entity <- readerStream(reader, partitionedPath).evalMapChunk(decode)
+      entity <- readerStream(reader, partitionedPath, chunkSize).evalMapChunk(decode)
     } yield entity
 
   private def readerStream[F[_]](
       reader: HadoopParquetReader[RowParquetRecord],
-      partitionedPath: PartitionedPath
+      partitionedPath: PartitionedPath,
+      chunkSize: Int
   )(implicit F: Sync[F]): Stream[F, RowParquetRecord] = {
-
-    val stream = Pull.loop[F, RowParquetRecord, HadoopParquetReader[RowParquetRecord]] {
-      reader =>
-        // TODO make 16 (chunk size) configurable
-        val readChunkF = F.iterateWhileM(16 -> Chunk.empty[RowParquetRecord]) {
-          case (i, chunk) =>
+    val stream = Pull
+      .loop[F, RowParquetRecord, HadoopParquetReader[RowParquetRecord]] { reader =>
+        val readChunkF = F
+          .iterateWhileM(chunkSize -> Chunk.empty[RowParquetRecord]) { case (i, chunk) =>
             F.delay(scala.concurrent.blocking {
               Option(reader.read()) match {
                 case None =>
                   0 -> chunk
                 case Some(record) =>
-                  (i - 1) -> (chunk.appendK(record))  
-              }})
-        }(_._1 != 0).map(_._2)
+                  (i - 1) -> (chunk.appendK(record))
+              }
+            })
+          }(_._1 != 0)
+          .map(_._2)
 
         Pull.eval(readChunkF).flatMap {
-          case chunk if chunk.isEmpty => 
+          case chunk if chunk.isEmpty =>
             Pull.pure(None)
           case chunk =>
-            Pull.output(chunk) >> Pull.pure(Some(reader))  
+            Pull.output(chunk) >> Pull.pure(Some(reader))
         }
-    }.apply(reader).stream
+      }
+      .apply(reader)
+      .stream
 
     if (partitionedPath.partitions.nonEmpty) {
       stream.evalMapChunk { record =>
