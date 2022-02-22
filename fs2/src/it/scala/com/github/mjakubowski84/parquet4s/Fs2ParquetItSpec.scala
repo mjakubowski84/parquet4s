@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Ref}
 import cats.implicits.*
+import com.github.mjakubowski84.parquet4s.parquet.rotatingWriter
 import fs2.Stream
 import fs2.io.file.Files
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
@@ -378,7 +379,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   }
 
   it should "flush already processed files on failure when using rotating writer" in {
-    val numberOfProcessedElementsBeforeFailure = 25
+    val numberOfProcessedElementsBeforeFailure = rotatingWriter.DefaultChunkSize - 2
 
     def write(path: Path, counter: Ref[IO, Long]): Stream[IO, Vector[Data]] =
       Stream
@@ -411,14 +412,15 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       } yield {
         // element that failed is not in the output but is written and can be read
         outputData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure - 1)
-        readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeFailure)
+        // writer writes data in chunks so the whole chunk is written before it is passed to the output
+        readData should contain theSameElementsAs data.take(rotatingWriter.DefaultChunkSize)
       }
 
     testStream.compile.lastOrError
   }
 
   it should "flush already processed files on premature completion downstream when using rotating writer" in {
-    val numberOfProcessedElementsBeforeStop = 25
+    val numberOfProcessedElementsBeforeStop = rotatingWriter.DefaultChunkSize - 2
 
     def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
@@ -442,7 +444,8 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         readData    <- read[Data](path)
       } yield {
         writtenData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
-        readData should contain theSameElementsAs data.take(numberOfProcessedElementsBeforeStop)
+        // writer writes data in chunks so the whole chunk is written before it is passed to the output
+        readData should contain theSameElementsAs data.take(rotatingWriter.DefaultChunkSize)
       }
 
     testStream.compile.lastOrError

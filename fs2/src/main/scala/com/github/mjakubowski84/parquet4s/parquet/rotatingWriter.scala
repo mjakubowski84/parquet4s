@@ -15,11 +15,13 @@ import java.util.concurrent.TimeUnit
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
+import fs2.Chunk
 
 object rotatingWriter {
 
   val DefaultMaxCount: Long              = HadoopParquetWriter.DEFAULT_BLOCK_SIZE
   val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
+  val DefaultChunkSize                   = 16
 
   trait ViaParquet[F[_]] {
 
@@ -38,6 +40,7 @@ object rotatingWriter {
 
   private[parquet4s] class ViaParquetImpl[F[_]: Async] extends ViaParquet[F] {
     override def of[T]: TypedBuilder[F, T, T] = TypedBuilderImpl[F, T, T](
+      chunkSize              = DefaultChunkSize,
       maxCount               = DefaultMaxCount,
       maxDuration            = DefaultMaxDuration,
       preWriteTransformation = t => Stream.emit(t),
@@ -46,6 +49,7 @@ object rotatingWriter {
       writeOptions           = ParquetWriter.Options()
     )
     override def generic: GenericBuilder[F] = GenericBuilderImpl(
+      chunkSize              = DefaultChunkSize,
       maxCount               = DefaultMaxCount,
       maxDuration            = DefaultMaxDuration,
       preWriteTransformation = Stream.emit,
@@ -95,17 +99,23 @@ object rotatingWriter {
       */
     def partitionBy(partitionBy: ColumnPath*): Self
 
-    /** Adds a handler after record writes, exposing some of the internal state of the flow. Intended for lower level
-      * monitoring and control.
+    /** Adds a handler that is invoked after write of each chunk of records. Handler exposes some of the internal state
+      * of the flow. Intended for lower level monitoring and control.
       *
-      * Please note that the handler is invoked after each input element is processed and not after each write. It is so
-      * because <i>postWriteHandler</i> may produce multiple records for a single input element.
+      * <br/> If you wish to have postWriteHandler invoked after write of each single element than change the size of
+      * chunk by changing a value of `chunkSize` property.
       *
       * @param postWriteHandler
-      *   an effect called after writing a record, receiving a snapshot of the internal state of the flow as a
+      *   an effect called after writing a chunk of records, receiving a snapshot of the internal state of the flow as a
       *   parameter.
       */
     def postWriteHandler(postWriteHandler: PostWriteHandler[F, T]): Self
+
+    /** For sake of better performance writer processes data in chunks rather than one by one. Default value is `16`.
+      * @param chunkSize
+      *   default value override
+      */
+    def chunkSize(chunkSize: Int): Self
 
   }
 
@@ -139,6 +149,7 @@ object rotatingWriter {
   }
 
   private case class GenericBuilderImpl[F[_]: Async](
+      chunkSize: Int,
       maxCount: Long,
       maxDuration: FiniteDuration,
       preWriteTransformation: RowParquetRecord => Stream[F, RowParquetRecord],
@@ -146,6 +157,7 @@ object rotatingWriter {
       postWriteHandlerOpt: Option[PostWriteHandler[F, RowParquetRecord]],
       writeOptions: ParquetWriter.Options
   ) extends GenericBuilder[F] {
+    override def chunkSize(chunkSize: Int): GenericBuilder[F]                    = this.copy(chunkSize = chunkSize)
     override def maxCount(maxCount: Long): GenericBuilder[F]                     = copy(maxCount = maxCount)
     override def maxDuration(maxDuration: FiniteDuration): GenericBuilder[F]     = copy(maxDuration = maxDuration)
     override def options(writeOptions: ParquetWriter.Options): GenericBuilder[F] = copy(writeOptions = writeOptions)
@@ -160,6 +172,7 @@ object rotatingWriter {
       rotatingWriter.write[F, RowParquetRecord, RowParquetRecord](
         basePath,
         Async[F].pure(schema),
+        chunkSize,
         maxCount,
         maxDuration,
         partitionBy,
@@ -170,6 +183,7 @@ object rotatingWriter {
   }
 
   private case class TypedBuilderImpl[F[_]: Async, T, W](
+      chunkSize: Int,
       maxCount: Long,
       maxDuration: FiniteDuration,
       preWriteTransformation: T => Stream[F, W],
@@ -177,13 +191,14 @@ object rotatingWriter {
       postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
       writeOptions: ParquetWriter.Options
   ) extends TypedBuilder[F, T, W] {
-
+    override def chunkSize(chunkSize: Int): TypedBuilder[F, T, W]                    = this.copy(chunkSize = chunkSize)
     override def maxCount(maxCount: Long): TypedBuilder[F, T, W]                     = copy(maxCount = maxCount)
     override def maxDuration(maxDuration: FiniteDuration): TypedBuilder[F, T, W]     = copy(maxDuration = maxDuration)
     override def options(writeOptions: ParquetWriter.Options): TypedBuilder[F, T, W] = copy(writeOptions = writeOptions)
     override def partitionBy(partitionBy: ColumnPath*): TypedBuilder[F, T, W]        = copy(partitionBy = partitionBy)
     override def preWriteTransformation[X](transformation: T => Stream[F, X]): TypedBuilder[F, T, X] =
       TypedBuilderImpl(
+        chunkSize              = chunkSize,
         maxCount               = maxCount,
         maxDuration            = maxDuration,
         preWriteTransformation = transformation,
@@ -200,6 +215,7 @@ object rotatingWriter {
       rotatingWriter.write[F, T, W](
         basePath,
         schemaF,
+        chunkSize,
         maxCount,
         maxDuration,
         partitionBy,
@@ -226,7 +242,11 @@ object rotatingWriter {
     * @tparam T
     *   type of input data
     */
-  case class PostWriteState[F[_], T](processedData: T, modifiedPartitions: Map[Path, Long], flush: Path => F[Unit])
+  case class PostWriteState[F[_], T](
+      processedData: Chunk[T],
+      modifiedPartitions: Map[Path, Long],
+      flush: Path => F[Unit]
+  )
 
   sealed private trait WriterEvent[F[_], T, W]
   private case class DataEvent[F[_], T, W](data: Stream[F, W], out: T) extends WriterEvent[F, T, W]
@@ -281,6 +301,7 @@ object rotatingWriter {
   private class RotatingWriter[T, W, F[_]](
       basePath: Path,
       options: ParquetWriter.Options,
+      chunkSize: Int,
       maxCount: Long,
       maxDuration: FiniteDuration,
       partitionBy: List[ColumnPath],
@@ -293,18 +314,24 @@ object rotatingWriter {
 
     private val writers = TrieMap.empty[Path, RecordWriter[F]]
 
-    private def writeEntitiesPull(
+    private def writeEntitiesAndOutputPull(
         entityStream: Stream[F, W],
-        modifiedPartitions: Map[Path, Long]
+        outChunk: Chunk[T],
+        modifiedPartitions: Map[Path, Long] = Map.empty
     ): Pull[F, T, Map[Path, Long]] =
-      // TODO uncons chunks!
-      entityStream.pull.uncons1.flatMap {
-        case Some((entity, tail)) =>
-          Pull.eval(write(entity)).flatMap { case (partition, count) =>
-            writeEntitiesPull(tail, modifiedPartitions.updated(partition, count))
+      entityStream.pull.uncons.flatMap {
+        case Some((chunk, tail)) =>
+          Pull.eval(write(chunk)).flatMap { chunkModifiedPartitions =>
+            writeEntitiesAndOutputPull(tail, outChunk, modifiedPartitions.combine(chunkModifiedPartitions))
           }
+        case None if postWriteHandlerOpt.isEmpty =>
+          Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
         case None =>
-          Pull.pure(modifiedPartitions)
+          postWriteHandlerPull(outChunk, modifiedPartitions).flatMap {
+            case Nil => Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
+            case partitionsToRotate =>
+              rotatePull(partitionsToRotate) >> Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
+          }
       }
 
     private def getOrCreateWriter(basePath: Path): F[RecordWriter[F]] =
@@ -322,6 +349,13 @@ object rotatingWriter {
               }
             } yield resultingWriter
           }
+      }
+
+    private def write(chunk: Chunk[W]): F[Map[Path, Long]] =
+      chunk.foldM(Map.empty[Path, Long]) { case (map, entity) =>
+        write(entity).map { case (path, count) =>
+          map.updated(path, count)
+        }
       }
 
     private def write(entity: W): F[(Path, Long)] =
@@ -362,7 +396,7 @@ object rotatingWriter {
       F.uncancelable { _ =>
         Stream
           .suspend(Stream.iterable(writers.values))
-          .evalMap(_.dispose)
+          .evalMapChunk(_.dispose)
           .onFinalize(F.delay(writers.clear()))
           .compile
           .drain
@@ -380,7 +414,7 @@ object rotatingWriter {
         .getOrElse(Pull.done)
 
     private def postWriteHandlerPull(
-        out: T,
+        out: Chunk[T],
         partitionsState: Map[Path, Long]
     ): Pull[F, T, List[Path]] =
       postWriteHandlerOpt.fold(Pull.eval[F, List[Path]](F.pure(List.empty)))(handler =>
@@ -398,21 +432,41 @@ object rotatingWriter {
         }
       )
 
+    sealed private trait Acc
+    private case class DataAcc(data: Stream[F, W], chunk: Chunk[T], pull: Pull[F, T, Unit]) extends Acc
+    private case class StopAcc(data: Stream[F, W], chunk: Chunk[T], pull: Pull[F, T, Unit]) extends Acc
+
+    implicit private class SteamWrapper(stream: Stream[F, W]) {
+      def rechunk: Stream[F, W] = stream.chunkMin(chunkSize).flatMap(Stream.chunk)
+    }
+
     private def writeAllEventsPull(in: Stream[F, WriterEvent[F, T, W]]): Pull[F, T, Unit] =
-      // TODO uncons chunks, join dataStreams from DataEvents into single stream and outs into chunks from chunked output
-      in.pull.uncons1.flatMap {
-        case Some((DataEvent(dataStream, out), tail)) if postWriteHandlerOpt.isEmpty =>
-          writeEntitiesPull(dataStream, Map.empty) >> Pull.output1(out) >> writeAllEventsPull(tail)
-        case Some((DataEvent(dataStream, out), tail)) =>
-          writeEntitiesPull(dataStream, Map.empty).flatMap { modifiedPartitions =>
-            postWriteHandlerPull(out, modifiedPartitions).flatMap {
-              case Nil                => Pull.output1(out) >> writeAllEventsPull(tail)
-              case partitionsToRotate => rotatePull(partitionsToRotate) >> Pull.output1(out) >> writeAllEventsPull(tail)
-            }
+      in.pull.unconsLimit(chunkSize).flatMap {
+        case Some((eventChunk, tail)) =>
+          eventChunk.foldLeft[Acc](DataAcc(Stream.empty, Chunk.empty, Pull.done)) {
+            case (DataAcc(dataStream, outChunk, pull), DataEvent(data, out)) =>
+              DataAcc(dataStream ++ data, outChunk.appendK(out), pull)
+            case (DataAcc(dataStream, outChunk, pull), RotateEvent(partition)) =>
+              DataAcc(
+                Stream.empty,
+                Chunk.empty[T],
+                pull >> writeEntitiesAndOutputPull(dataStream.rechunk, outChunk) >> rotatePull(Iterable(partition))
+              )
+            case (DataAcc(dataStream, outChunk, pull), StopEvent()) =>
+              StopAcc(dataStream, outChunk, pull)
+            case (stop: StopAcc, _) =>
+              stop
+          } match {
+            case StopAcc(_, outChunk, pull) if outChunk.isEmpty =>
+              pull
+            case StopAcc(dataStream, outChunk, pull) =>
+              pull >> writeEntitiesAndOutputPull(dataStream.rechunk, outChunk) >> Pull.done
+            case DataAcc(_, outChunk, pull) if outChunk.isEmpty =>
+              pull >> writeAllEventsPull(tail)
+            case DataAcc(dataStream, outChunk, pull) =>
+              pull >> writeEntitiesAndOutputPull(dataStream.rechunk, outChunk) >> writeAllEventsPull(tail)
           }
-        case Some((RotateEvent(partition), tail)) =>
-          rotatePull(Iterable(partition)) >> writeAllEventsPull(tail)
-        case _ =>
+        case None =>
           Pull.done
       }
 
@@ -423,6 +477,7 @@ object rotatingWriter {
   private def write[F[_], T, W: ParquetRecordEncoder](
       basePath: Path,
       schemaF: F[MessageType],
+      chunkSize: Int,
       maxCount: Long,
       maxDuration: FiniteDuration,
       partitionBy: Seq[ColumnPath],
@@ -441,6 +496,7 @@ object rotatingWriter {
           new RotatingWriter[T, W, F](
             basePath            = basePath,
             options             = options,
+            chunkSize           = chunkSize,
             maxCount            = maxCount,
             maxDuration         = maxDuration,
             partitionBy         = partitionBy.toList,
