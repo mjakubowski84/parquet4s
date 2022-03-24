@@ -13,6 +13,9 @@ ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "2.4.0-SNAPSHOT"
 ThisBuild / isSnapshot := false
 ThisBuild / scalaVersion := twoThirteen
+
+val akkaStreamKafkaVersion:String =if(scalaVersion == twoThirteen) {"3.0.0"} else {"2.1.1"}
+
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 ThisBuild / resolvers := Seq(
   Opts.resolver.sonatypeReleases,
@@ -158,7 +161,7 @@ lazy val fs2 = (project in file("fs2"))
 lazy val examples = (project in file("examples"))
   .settings(
     name := "parquet4s-examples",
-    scalaVersion := twoThirteen,
+    crossScalaVersions := supportedScalaVersions,
     publish / skip := true,
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
@@ -166,7 +169,7 @@ lazy val examples = (project in file("examples"))
       "io.github.embeddedkafka" %% "embedded-kafka" % "3.1.0",
       "ch.qos.logback" % "logback-classic" % "1.2.10",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.typesafe.akka" %% "akka-stream-kafka" % "3.0.0",
+      "com.typesafe.akka" %% "akka-stream-kafka" % akkaStreamKafkaVersion,
       "com.github.fd4s" %% "fs2-kafka" % "2.3.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),

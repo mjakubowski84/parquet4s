@@ -1,5 +1,5 @@
 addSbtPlugin("org.xerial.sbt" % "sbt-sonatype" % "3.9.12")
-addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "latest.release")
+addSbtPlugin("com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "3.0.2")
 addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.4.3")
 addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.6")
 addSbtPlugin("com.47deg" % "sbt-microsites" % "1.3.4")
