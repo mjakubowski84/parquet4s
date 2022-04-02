@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
+import com.github.mjakubowski84.parquet4s.{TypedSchemaDef => TSD}
 import org.apache.parquet.schema.*
 import org.slf4j.LoggerFactory
 
@@ -31,11 +31,9 @@ trait ParquetSchemaResolver[T]:
     */
   def schemaName: Option[String] = None
 
-object ParquetSchemaResolver extends SchemaDefs:
+object ParquetSchemaResolver:
 
-  final abstract class Tag[V]
-  opaque type Tagged[+T] = Any
-  type TypedSchemaDef[V] = SchemaDef & Tagged[Tag[V]]
+  type TypedSchemaDef[V] = TSD[V]
 
   final abstract private[ParquetSchemaResolver] class Fields[Labels <: Tuple, Values <: Tuple]
 
@@ -90,17 +88,17 @@ object ParquetSchemaResolver extends SchemaDefs:
             null
       )
 
-  given defaultSchemaVisitor[V: TypedSchemaDef](using NotGiven[ParquetSchemaResolver[V]]): SchemaVisitor[V] with
+  given defaultSchemaVisitor[V: TSD](using NotGiven[ParquetSchemaResolver[V]]): SchemaVisitor[V] with
     def onActive(cursor: Cursor, fieldName: String): Option[Type] =
-      Option(summon[TypedSchemaDef[V]](fieldName))
+      Option(summon[TSD[V]](fieldName))
 
   /** Purpose of productSchemaVisitor is to filter product fields so that those that are used for partitioning are not
-    * present in final schema. It is only applied to products that are not nested in Options and collections as optional
-    * fields and elements of collections are not valid for partitioning.
+    * present in the final schema. It is only applied to products that are not nested in Options and collections - as
+    * optional fields and elements of collections are not valid for partitioning.
     */
-  given productSchemaVisitor[V <: Product: ParquetSchemaResolver: TypedSchemaDef]: SchemaVisitor[V] with
+  given productSchemaVisitor[V <: Product: ParquetSchemaResolver: TSD]: SchemaVisitor[V] with
     def onActive(cursor: Cursor, fieldName: String): Option[Type] =
-      summon[TypedSchemaDef[V]] match
+      summon[TSD[V]].wrapped match
         // override fields only in generated groups (records), custom ones provided by users are not processed
         case schema: GroupSchemaDef if schema.metadata.contains(SchemaDef.Meta.Generated) =>
           summon[ParquetSchemaResolver[V]].resolveSchema(cursor) match

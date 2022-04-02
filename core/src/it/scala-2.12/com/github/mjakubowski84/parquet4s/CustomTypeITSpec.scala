@@ -1,6 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
 import com.github.mjakubowski84.parquet4s.ValueImplicits.*
 import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, PrimitiveType}
 import org.scalatest.BeforeAndAfter
@@ -29,7 +28,7 @@ class CustomTypeITSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
     override def hashCode(): Int = value.hashCode
     override def equals(obj: Any): Boolean =
       if (!obj.isInstanceOf[SimpleClass]) false
-      else this.value == (obj.asInstanceOf[SimpleClass].value)
+      else this.value == obj.asInstanceOf[SimpleClass].value
     override def toString: String = value
   }
 

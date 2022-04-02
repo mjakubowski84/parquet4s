@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
+import com.github.mjakubowski84.parquet4s.TypedSchemaDef
 import com.github.mjakubowski84.parquet4s.ValueImplicits.*
 import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, PrimitiveType}
 import org.scalatest.BeforeAndAfter

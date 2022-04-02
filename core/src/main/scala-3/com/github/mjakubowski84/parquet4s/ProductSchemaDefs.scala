@@ -1,7 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
-
 import scala.reflect.{ClassTag, classTag}
 import scala.util.NotGiven
 
