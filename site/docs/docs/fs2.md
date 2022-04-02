@@ -80,6 +80,11 @@ object Example extends IOApp.Simple {
 }
 ```
 
-> What differs FS2 from Akka is that for better performance FS2 processes stream elements in chunks. Therefore, `viaParquet` and `fromParquet` have `chunkSize` property that allow custom definition of the chunk size. Default value is `16`. Override the value to set up own balance between memory consumption and performance.
+
+---
+What differs FS2 from Akka is that for better performance FS2 processes stream elements in chunks. Therefore, `viaParquet` and `fromParquet` have `chunkSize` property that allow custom definition of the chunk size. Default value is `16`. Override the value to set up own balance between memory consumption and performance.
+
+---
+
 
 Please check [examples](https://github.com/mjakubowski84/parquet4s/tree/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/fs2) to learn more.
