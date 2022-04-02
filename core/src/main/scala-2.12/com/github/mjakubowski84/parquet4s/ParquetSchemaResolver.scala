@@ -1,5 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.{TypedSchemaDef => TSD}
 import org.apache.parquet.schema.*
 import org.slf4j.LoggerFactory
 import shapeless.*
@@ -35,9 +36,10 @@ trait ParquetSchemaResolver[T] {
 
 object ParquetSchemaResolver {
 
-  type TypedSchemaDef[V] = com.github.mjakubowski84.parquet4s.TypedSchemaDef[V]
+  @deprecated("2.4.0", "use com.github.mjakubowski84.parquet4s.TypedSchemaDef directly instead")
+  type TypedSchemaDef[V] = TSD[V]
 
-  class TypedSchemaDefInvoker[V](val schema: TypedSchemaDef[V], fieldName: String) extends (() => Type) {
+  class TypedSchemaDefInvoker[V](val schema: TSD[V], fieldName: String) extends (() => Type) {
     override def apply(): Type = schema(fieldName)
   }
 
@@ -65,7 +67,7 @@ object ParquetSchemaResolver {
 
   implicit def hcons[K <: Symbol, V, T <: HList](implicit
       witness: Witness.Aux[K],
-      typedSchemaDef: TypedSchemaDef[V],
+      typedSchemaDef: TSD[V],
       visitor: SchemaVisitor[V] = defaultSchemaVisitor[V],
       rest: ParquetSchemaResolver[T]
   ): ParquetSchemaResolver[FieldType[K, V] :: T] =

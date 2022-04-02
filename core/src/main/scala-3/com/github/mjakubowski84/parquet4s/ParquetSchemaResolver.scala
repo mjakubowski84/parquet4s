@@ -33,6 +33,7 @@ trait ParquetSchemaResolver[T]:
 
 object ParquetSchemaResolver:
 
+  @deprecated("2.4.0", "use com.github.mjakubowski84.parquet4s.TypedSchemaDef directly instead")
   type TypedSchemaDef[V] = TSD[V]
 
   final abstract private[ParquetSchemaResolver] class Fields[Labels <: Tuple, Values <: Tuple]

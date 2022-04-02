@@ -46,7 +46,7 @@ object Message {
 
 }
 
-/** Defines Parquet schema. Produces Parquet [[Type]] for a field of given name.
+/** Defines Parquet schema. Produces Parquet [[org.apache.parquet.schema.Type]] for a field of given name.
   */
 trait SchemaDef {
 
@@ -187,7 +187,7 @@ private case class MapSchemaDef(key: Type, value: Type, required: Boolean, metad
 
 }
 
-/** [[SchemaDef]] for type [[V]].
+/** [[SchemaDef]] for type `V`.
   */
 trait TypedSchemaDef[V] extends SchemaDef {
   private[parquet4s] def wrapped: SchemaDef
