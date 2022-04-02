@@ -89,7 +89,7 @@ Additionally, if you want to write your custom type, you have to define the sche
 
 ```scala mdoc:compile-only
 import org.apache.parquet.schema.{LogicalTypeAnnotation, PrimitiveType}
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
+import com.github.mjakubowski84.parquet4s.TypedSchemaDef
 import com.github.mjakubowski84.parquet4s.{LogicalTypes, SchemaDef}
 
 case class CustomType(i: Int)

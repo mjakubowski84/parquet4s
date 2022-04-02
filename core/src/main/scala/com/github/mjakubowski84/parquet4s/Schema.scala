@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.TypedSchemaDef
+import com.github.mjakubowski84.parquet4s.SchemaDef.Meta
 import org.apache.parquet.schema.*
 import org.apache.parquet.schema.LogicalTypeAnnotation.{
   DateLogicalTypeAnnotation,
@@ -46,6 +46,8 @@ object Message {
 
 }
 
+/** Defines Parquet schema. Produces Parquet [[Type]] for a field of given name.
+  */
 trait SchemaDef {
 
   type Self <: SchemaDef
@@ -54,7 +56,7 @@ trait SchemaDef {
 
   def withRequired(required: Boolean): Self
 
-  def typed[V]: ParquetSchemaResolver.TypedSchemaDef[V] = this.asInstanceOf[TypedSchemaDef[V]]
+  def typed[V]: TypedSchemaDef[V] = TypedSchemaDef.wrap[V](this)
 
   private[parquet4s] def metadata: Set[SchemaDef.Meta.Property]
 
@@ -185,9 +187,27 @@ private case class MapSchemaDef(key: Type, value: Type, required: Boolean, metad
 
 }
 
-trait SchemaDefs extends PrimitiveSchemaDefs with TimeValueSchemaDefs with ComplexSchemaDefs
+/** [[SchemaDef]] for type [[V]].
+  */
+trait TypedSchemaDef[V] extends SchemaDef {
+  private[parquet4s] def wrapped: SchemaDef
+}
+
+object TypedSchemaDef extends PrimitiveSchemaDefs with TimeValueSchemaDefs with ComplexSchemaDefs {
+  private[parquet4s] def wrap[V](schemaDef: SchemaDef): TypedSchemaDef[V] =
+    new TypedSchemaDef[V] {
+      override val wrapped: SchemaDef = schemaDef
+      override type Self = TypedSchemaDef[V]
+      override def apply(name: String): Type                                 = schemaDef.apply(name)
+      override def withRequired(required: Boolean): Self                     = wrap[V](schemaDef.withRequired(required))
+      override private[parquet4s] val metadata: Set[SchemaDef.Meta.Property] = schemaDef.metadata
+      override private[parquet4s] def withMetadata(meta: Meta.Property): Self =
+        wrap[V](schemaDef.withMetadata(meta))
+    }
+}
 
 trait PrimitiveSchemaDefs {
+
   implicit val stringSchema: TypedSchemaDef[String] =
     SchemaDef
       .primitive(BINARY, required = false, logicalTypeAnnotation = Option(LogicalTypes.StringType))

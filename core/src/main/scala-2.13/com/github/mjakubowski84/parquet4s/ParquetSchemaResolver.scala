@@ -33,10 +33,9 @@ trait ParquetSchemaResolver[T] {
 
 }
 
-object ParquetSchemaResolver extends SchemaDefs {
+object ParquetSchemaResolver {
 
-  trait Tag[V]
-  type TypedSchemaDef[V] = SchemaDef & Tag[V]
+  type TypedSchemaDef[V] = com.github.mjakubowski84.parquet4s.TypedSchemaDef[V]
 
   class TypedSchemaDefInvoker[V](val schema: TypedSchemaDef[V], fieldName: String) extends (() => Type) {
     override def apply(): Type = schema(fieldName)
@@ -109,7 +108,7 @@ object ParquetSchemaResolver extends SchemaDefs {
     */
   implicit def productSchemaVisitor[V](implicit resolver: ParquetSchemaResolver[V]): SchemaVisitor[V] =
     (cursor: Cursor, invoker: TypedSchemaDefInvoker[V]) =>
-      invoker.schema match {
+      invoker.schema.wrapped match {
         // override fields only in generated groups (records), custom ones provided by users are not processed
         case _: GroupSchemaDef if invoker.schema.metadata.contains(SchemaDef.Meta.Generated) =>
           resolver.resolveSchema(cursor) match {
