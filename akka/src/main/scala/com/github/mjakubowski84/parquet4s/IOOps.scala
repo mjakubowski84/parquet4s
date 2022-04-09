@@ -19,7 +19,7 @@ private[parquet4s] object IOOps {
 
   private type Partition = (ColumnPath, String)
 
-  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!\-_.*'()]+)""".r
+  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!\-_.*'()$]+)""".r
 
 }
 
