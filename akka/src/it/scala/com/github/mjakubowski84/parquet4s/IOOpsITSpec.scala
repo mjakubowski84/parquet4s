@@ -4,18 +4,10 @@ import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter.Mode
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.{BeforeAndAfter, EitherValues, Inside}
+import org.scalatest.{BeforeAndAfter, EitherValues}
 import org.slf4j.{Logger, LoggerFactory}
 
-class IOOpsSpec
-    extends AnyFlatSpec
-    with Matchers
-    with IOOps
-    with TestUtils
-    with PartitionTestUtils
-    with BeforeAndAfter
-    with EitherValues
-    with Inside {
+class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils with BeforeAndAfter with EitherValues {
 
   override protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
@@ -69,17 +61,26 @@ class IOOpsSpec
     fileSystem.exists(tempPath.toHadoop) should be(false)
   }
 
-  "findPartitionedPaths" should "return single path without partitions for empty directory" in {
+  "findPartitionedPaths" should "return no paths and no partitions for empty directory" in {
     fileSystem.mkdirs(tempPath.toHadoop)
 
     val dir = findPartitionedPaths(tempPath, configuration).value
-    dir.paths should be(List(PartitionedPath(tempPath, List.empty)))
+    dir.paths should be(empty)
     dir.schema should be(empty)
   }
 
-  it should "create single element partition in" in {
+  it should "return no paths and no partitions for a directory with empty partition" in {
     val pathX1 = tempPath.append("x=1")
     fileSystem.mkdirs(pathX1.toHadoop)
+
+    val dir = findPartitionedPaths(tempPath, configuration).value
+    dir.paths should be(empty)
+    dir.schema should be(empty) // ???
+  }
+
+  it should "create single element partition in a path" in {
+    val pathX1 = tempPath.append("x=1")
+    fileSystem.createNewFile(pathX1.append("file.parquet").toHadoop)
 
     val dir = findPartitionedPaths(tempPath, configuration).value
     dir.paths should be(List(PartitionedPath(pathX1, (Col("x") -> "1") :: Nil)))
@@ -91,10 +92,10 @@ class IOOpsSpec
     val path2 = tempPath.append("x=1/y=b/z=1_2")
     val path3 = tempPath.append("x=1/y=c/z=1_3")
     val path4 = tempPath.append("x=2/y=b/z=0_9")
-    fileSystem.mkdirs(path1.toHadoop)
-    fileSystem.mkdirs(path2.toHadoop)
-    fileSystem.mkdirs(path3.toHadoop)
-    fileSystem.mkdirs(path4.toHadoop)
+    fileSystem.createNewFile(path1.append("file.parquet").toHadoop)
+    fileSystem.createNewFile(path2.append("file.parquet").toHadoop)
+    fileSystem.createNewFile(path3.append("file.parquet").toHadoop)
+    fileSystem.createNewFile(path4.append("file.parquet").toHadoop)
 
     val dir = findPartitionedPaths(tempPath, configuration).value
     dir.paths should contain theSameElementsAs List(
@@ -107,43 +108,21 @@ class IOOpsSpec
   }
 
   it should "fail to create partitions from inconsistent directory [case1]" in {
-    val path1 = tempPath.append("x=1/y=a")
-    val path2 = tempPath.append("y=1/x=b")
-    fileSystem.mkdirs(path1.toHadoop)
-    fileSystem.mkdirs(path2.toHadoop)
+    val path1 = tempPath.append("x=1/y=a/file.parquet")
+    val path2 = tempPath.append("y=1/x=b/file.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
 
     findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
   }
 
   it should "fail to create partitions from inconsistent directory [case2]" in {
-    val path1 = tempPath.append("x=1/y=a")
-    val path2 = tempPath.append("x=1")
-    fileSystem.mkdirs(path1.toHadoop)
-    fileSystem.mkdirs(path2.toHadoop)
-    fileSystem.create(path2.append("not_in_a_leaf.file").toHadoop)
+    val path1 = tempPath.append("x=1/y=a/file_in_a_leaf_dir.parquet")
+    val path2 = tempPath.append("x=1/file_in_a_node_dir.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
 
     findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
   }
 
-  "PartitionRegexp" should "match valid partition names and values" in {
-    forAll(ValidPartitionsTable) { case (name, value) =>
-      inside(s"$name=$value") { case IOOps.PartitionRegexp(`name`, `value`) =>
-        succeed
-      }
-    }
-  }
-
-  it should "not match invalid partition names and values" in {
-    forAll(InvalidPartitionsTable) { case (name, value) =>
-      s"$name=$value" match {
-        case IOOps.PartitionRegexp(capturedName, capturedValue) =>
-          fail(
-            s"Expected no match for name [$name] and value [$value] " +
-              s"but one was found: [$capturedName, $capturedValue]"
-          )
-        case _ =>
-          succeed
-      }
-    }
-  }
 }

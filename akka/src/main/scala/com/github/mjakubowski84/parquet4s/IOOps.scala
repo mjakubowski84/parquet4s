@@ -19,7 +19,7 @@ private[parquet4s] object IOOps {
 
   private type Partition = (ColumnPath, String)
 
-  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!\-_.*'()]+)""".r
+  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!?\-+_.,*'()&$@:;/ ]+)""".r
 
 }
 
@@ -81,10 +81,12 @@ trait IOOps {
     val (dirs, files) = fs.listStatus(path.toHadoop).toList.partition(_.isDirectory)
     if (dirs.nonEmpty && files.nonEmpty)
       Left(path :: Nil) // path is invalid because it contains both dirs and files
-    else { // TODO do not return leaf nodes that are empty
+    else {
       val partitionedDirs = dirs.flatMap(matchPartition)
-      if (partitionedDirs.isEmpty)
-        Right(List(PartitionedPath(path, partitions))) // leaf dir
+      if (partitionedDirs.isEmpty && files.isEmpty)
+        Right(List.empty) // empty leaf dir
+      else if (partitionedDirs.isEmpty)
+        Right(List(PartitionedPath(path, partitions))) // leaf dir with files
       else
         partitionedDirs
           .map { case (subPath, partition) => findPartitionedPaths(fs, subPath, partitions :+ partition) }

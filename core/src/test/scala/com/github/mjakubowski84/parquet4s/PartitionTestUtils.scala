@@ -6,8 +6,10 @@ trait PartitionTestUtils extends TableDrivenPropertyChecks {
   private val allChars: Seq[Char]          = (Byte.MinValue to Byte.MaxValue).map(_.toChar)
   private val alphaNumericChars: Seq[Char] = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')
 
-  private val allowedPartitionNameChars: Seq[Char]  = alphaNumericChars ++ Seq('.', '_')
-  private val allowedPartitionValueChars: Seq[Char] = alphaNumericChars ++ Seq('!', '-', '_', '.', '*', '\'', '(', ')')
+  private val allowedPartitionNameChars: Seq[Char] = alphaNumericChars ++ Seq('.', '_')
+  private val allowedPartitionValueChars: Seq[Char] = alphaNumericChars ++ Seq(
+    '!', '?', '-', '+', '_', '.', ',', '*', '\'', '(', ')', '&', '@', ':', ';', '/', ' '
+  )
 
   private val disallowedPartitionNameChars: Seq[Char]  = allChars.filterNot(allowedPartitionNameChars.contains)
   private val disallowedPartitionValueChars: Seq[Char] = allChars.filterNot(allowedPartitionValueChars.contains)
