@@ -10,8 +10,8 @@ lazy val three                  = "3.1.1"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.5.0-SNAPSHOT"
-ThisBuild / isSnapshot := true
+ThisBuild / version := "2.4.1"
+ThisBuild / isSnapshot := false
 ThisBuild / scalaVersion := twoThirteen
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -132,7 +132,7 @@ lazy val akka = (project in file("akka"))
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
-  .dependsOn(core % "compile->compile;it->it")
+  .dependsOn(core % "compile->compile;test->test;it->it")
 
 lazy val fs2 = (project in file("fs2"))
   .configs(IntegrationTest)
@@ -154,7 +154,7 @@ lazy val fs2 = (project in file("fs2"))
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
-  .dependsOn(core % "compile->compile;it->it")
+  .dependsOn(core % "compile->compile;test->test")
 
 lazy val examples = (project in file("examples"))
   .settings(

@@ -25,7 +25,7 @@ private[parquet] object io {
   private case class Dirs(partitionPaths: Vector[(Path, Partition)]) extends StatusAccumulator
   private case object Files extends StatusAccumulator
 
-  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!\-_.*'()]+)""".r
+  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!?\-+_.,*'()&$@:;/ ]+)""".r
 
   def validateWritePath[F[_]](path: Path, writeOptions: ParquetWriter.Options, logger: Logger[F])(implicit
       F: Sync[F]

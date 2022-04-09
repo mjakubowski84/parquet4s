@@ -2,18 +2,17 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
-import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, PartitionTestUtils, PartitionedPath, Path}
+import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, PartitionedPath, Path}
 import fs2.Stream
 import fs2.io.file.*
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
-import org.scalatest.Inside
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.language.implicitConversions
 
-class IoSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with PartitionTestUtils with Inside {
+class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
 
   implicit def parquetPathToFs2Path(path: Path): fs2.io.file.Path = fs2.io.file.Path.fromNioPath(path.toNio)
 
@@ -90,11 +89,8 @@ class IoSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with Partition
   it should "return proper PartitionedDirectory for unpartitioned path with parquet content" in {
     val testStream = for {
       basePath <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
-      _ <- Stream.resource(
-        Files[IO]
-          .tempFile(dir = Option(parquetPathToFs2Path(basePath)), suffix = ".parquet", prefix = "", permissions = None)
-      )
-      dir <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
+      _        <- createTempFileAtPath(basePath)
+      dir      <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
     } yield {
       dir.schema should be(empty)
       dir.paths should be(Vector(PartitionedPath(basePath, List.empty)))
@@ -159,26 +155,4 @@ class IoSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with Partition
     testStream.compile.lastOrError.assertThrows[IllegalArgumentException]
   }
 
-  "PartitionRegexp" should "match valid partition names and values" in {
-    forAll(ValidPartitionsTable) { case (name, value) =>
-      inside(s"$name=$value") { case io.PartitionRegexp(`name`, `value`) =>
-        succeed
-      }
-    }
-  }
-
-  it should "not match invalid partition names and values" in {
-    forAll(InvalidPartitionsTable) { case (name, value) =>
-      s"$name=$value" match {
-        case io.PartitionRegexp(capturedName, capturedValue) =>
-          fail(
-            s"Expected no match for name [$name] and value [$value] " +
-              s"but one was found: [$capturedName, $capturedValue]"
-          )
-
-        case _ =>
-          succeed
-      }
-    }
-  }
 }
