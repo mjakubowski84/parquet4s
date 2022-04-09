@@ -6,5 +6,5 @@ object DependecyVersions {
   val slf4jVersion      = "1.7.36"
   val akkaVersion       = "2.6.19"
   val fs2Version        = "3.2.7"
-  val catsEffectVersion = "3.3.9"
+  val catsEffectVersion = "3.3.11"
 }

@@ -11,3 +11,4 @@ target
 spark-warehouse
 project/.plugins.sbt.swp
 project/project
+project/metals.sbt

@@ -10,7 +10,7 @@ lazy val three                  = "3.1.1"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.5.0"
+ThisBuild / version := "2.5.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
 
@@ -96,7 +96,7 @@ lazy val core = (project in file("core"))
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.7.0",
 
       // tests
-      "org.mockito" % "mockito-core" % "4.3.1" % "test",
+      "org.mockito" % "mockito-core" % "4.4.0" % "test",
       "org.scalatest" %% "scalatest" % "3.2.11" % "test,it",
       "ch.qos.logback" % "logback-classic" % "1.2.11" % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
@@ -252,7 +252,7 @@ lazy val documentation = (project in file("site"))
   .settings(
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "mdoc" % "2.3.1",
+      "org.scalameta" %% "mdoc" % "2.3.2",
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
