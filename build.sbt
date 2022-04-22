@@ -132,7 +132,7 @@ lazy val akka = (project in file("akka"))
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
-  .dependsOn(core % "compile->compile;test->test;it->it")
+  .dependsOn(core % "compile->compile;it->it")
 
 lazy val fs2 = (project in file("fs2"))
   .configs(IntegrationTest)

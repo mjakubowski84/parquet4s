@@ -1,21 +1,21 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.etl
 
+import com.github.mjakubowski84.parquet4s.{Col, NullValue, ParquetIterable, RowParquetRecord}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
-import ValueImplicits.*
+import com.github.mjakubowski84.parquet4s.ValueImplicits.*
 
 class JoinSpec extends AnyFlatSpec with Matchers {
 
   "leftJoin" should "perform left join on two datasets" in {
-    val left = new InMemoryParquetIterable[RowParquetRecord](
+    val left = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(
         RowParquetRecord("left" -> "A".value, "onLeft" -> 1.value),
         RowParquetRecord("left" -> "B".value, "onLeft" -> 2.value),
         RowParquetRecord("left" -> "C".value, "onLeft" -> 3.value)
       )
     )
-    val right = new InMemoryParquetIterable[RowParquetRecord](
+    val right = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(
         RowParquetRecord("right" -> "X".value, "onRight" -> 11.value),
         RowParquetRecord("right" -> "Y".value, "onRight" -> 2.value),
@@ -34,13 +34,13 @@ class JoinSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "perform left join on empty datasets" in {
-    val nonEmptyLeft = new InMemoryParquetIterable[RowParquetRecord](
+    val nonEmptyLeft = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(RowParquetRecord("left" -> "A".value, "onLeft" -> 1.value))
     )
-    val nonEmptyRight = new InMemoryParquetIterable[RowParquetRecord](
+    val nonEmptyRight = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(RowParquetRecord("right" -> "X".value, "onRight" -> 2.value))
     )
-    val emptyDataset = new InMemoryParquetIterable[RowParquetRecord](data = Iterable.empty)
+    val emptyDataset = ParquetIterable.inMemory[RowParquetRecord](data = Iterable.empty)
 
     nonEmptyLeft.leftJoin(nonEmptyRight, onLeft = Col("onLeft"), onRight = Col("onRight")).toSeq should be(
       Seq(RowParquetRecord("left" -> "A".value, "onLeft" -> 1.value, "right" -> NullValue, "onRight" -> NullValue))
@@ -53,14 +53,14 @@ class JoinSpec extends AnyFlatSpec with Matchers {
   }
 
   "rightJoin" should "perform right join on two datasets" in {
-    val left = new InMemoryParquetIterable[RowParquetRecord](
+    val left = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(
         RowParquetRecord("left" -> "A".value, "onLeft" -> 11.value),
         RowParquetRecord("left" -> "B".value, "onLeft" -> 2.value),
         RowParquetRecord("left" -> "C".value, "onLeft" -> 2.value)
       )
     )
-    val right = new InMemoryParquetIterable[RowParquetRecord](
+    val right = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(
         RowParquetRecord("right" -> "X".value, "onRight" -> 1.value),
         RowParquetRecord("right" -> "Y".value, "onRight" -> 2.value),
@@ -79,13 +79,13 @@ class JoinSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "perform right join on empty datasets" in {
-    val nonEmptyLeft = new InMemoryParquetIterable[RowParquetRecord](
+    val nonEmptyLeft = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(RowParquetRecord("left" -> "A".value, "onLeft" -> 1.value))
     )
-    val nonEmptyRight = new InMemoryParquetIterable[RowParquetRecord](
+    val nonEmptyRight = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(RowParquetRecord("right" -> "X".value, "onRight" -> 2.value))
     )
-    val emptyDataset = new InMemoryParquetIterable[RowParquetRecord](data = Iterable.empty)
+    val emptyDataset = ParquetIterable.inMemory[RowParquetRecord](data = Iterable.empty)
 
     nonEmptyLeft.rightJoin(nonEmptyRight, onLeft = Col("onLeft"), onRight = Col("onRight")).toSeq should be(
       Seq(RowParquetRecord("left" -> NullValue, "onLeft" -> NullValue, "right" -> "X".value, "onRight" -> 2.value))
@@ -98,14 +98,14 @@ class JoinSpec extends AnyFlatSpec with Matchers {
   }
 
   "innerJoin" should "perform inner join on two datasets" in {
-    val left = new InMemoryParquetIterable[RowParquetRecord](
+    val left = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(
         RowParquetRecord("left" -> "A".value, "onLeft" -> 1.value),
         RowParquetRecord("left" -> "B".value, "onLeft" -> 2.value),
         RowParquetRecord("left" -> "C".value, "onLeft" -> 3.value)
       )
     )
-    val right = new InMemoryParquetIterable[RowParquetRecord](
+    val right = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(
         RowParquetRecord("right" -> "X".value, "onRight" -> 11.value),
         RowParquetRecord("right" -> "Y".value, "onRight" -> 2.value),
@@ -122,13 +122,13 @@ class JoinSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "perform inner join on empty datasets" in {
-    val nonEmptyLeft = new InMemoryParquetIterable[RowParquetRecord](
+    val nonEmptyLeft = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(RowParquetRecord("left" -> "A".value, "onLeft" -> 1.value))
     )
-    val nonEmptyRight = new InMemoryParquetIterable[RowParquetRecord](
+    val nonEmptyRight = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(RowParquetRecord("right" -> "X".value, "onRight" -> 2.value))
     )
-    val emptyDataset = new InMemoryParquetIterable[RowParquetRecord](data = Iterable.empty)
+    val emptyDataset = ParquetIterable.inMemory[RowParquetRecord](data = Iterable.empty)
 
     nonEmptyLeft.innerJoin(nonEmptyRight, onLeft = Col("onLeft"), onRight = Col("onRight")).toSeq should be(empty)
     nonEmptyLeft.innerJoin(emptyDataset, onLeft = Col("onLeft"), onRight = Col("onRight")).toSeq should be(empty)
@@ -137,14 +137,14 @@ class JoinSpec extends AnyFlatSpec with Matchers {
   }
 
   "fullJoin" should "perform full join on two datasets" in {
-    val left = new InMemoryParquetIterable[RowParquetRecord](
+    val left = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(
         RowParquetRecord("left" -> "A".value, "onLeft" -> 11.value),
         RowParquetRecord("left" -> "B".value, "onLeft" -> 2.value),
         RowParquetRecord("left" -> "C".value, "onLeft" -> 2.value)
       )
     )
-    val right = new InMemoryParquetIterable[RowParquetRecord](
+    val right = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(
         RowParquetRecord("right" -> "X".value, "onRight" -> 1.value),
         RowParquetRecord("right" -> "Y".value, "onRight" -> 2.value),
@@ -172,13 +172,13 @@ class JoinSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "perform full join on empty datasets" in {
-    val nonEmptyLeft = new InMemoryParquetIterable[RowParquetRecord](
+    val nonEmptyLeft = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(RowParquetRecord("left" -> "A".value, "onLeft" -> 1.value))
     )
-    val nonEmptyRight = new InMemoryParquetIterable[RowParquetRecord](
+    val nonEmptyRight = ParquetIterable.inMemory[RowParquetRecord](
       data = Seq(RowParquetRecord("right" -> "X".value, "onRight" -> 2.value))
     )
-    val emptyDataset = new InMemoryParquetIterable[RowParquetRecord](data = Iterable.empty)
+    val emptyDataset = ParquetIterable.inMemory[RowParquetRecord](data = Iterable.empty)
 
     nonEmptyLeft.fullJoin(nonEmptyRight, onLeft = Col("onLeft"), onRight = Col("onRight")).toSeq should be(
       Seq(

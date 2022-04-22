@@ -1,5 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.etl.{CompoundParquetIterable, InMemoryParquetIterable, Join}
+
 import java.io.Closeable
 
 object ParquetIterable {
@@ -14,6 +16,16 @@ object ParquetIterable {
       valueCodecConfiguration = valueCodecConfiguration,
       stats                   = stats,
       transformations         = Seq.empty,
+      decode                  = record => ParquetRecordDecoder.decode(record, valueCodecConfiguration)
+    )
+
+  def inMemory[T: ParquetRecordDecoder](
+      data: => Iterable[RowParquetRecord],
+      valueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration.Default
+  ): ParquetIterable[T] =
+    new InMemoryParquetIterable[T](
+      data                    = data,
+      valueCodecConfiguration = valueCodecConfiguration,
       decode                  = record => ParquetRecordDecoder.decode(record, valueCodecConfiguration)
     )
 
@@ -217,64 +229,4 @@ private[parquet4s] class ParquetIterableImpl[T](
       decode = (record: RowParquetRecord) => ParquetRecordDecoder.decode(record, valueCodecConfiguration)
     )
 
-}
-
-private class CompoundParquetIterable[T](components: Seq[ParquetIterable[T]]) extends ParquetIterable[T] {
-
-  override val stats = new CompoundStats(components.map(_.stats))
-  override lazy val valueCodecConfiguration: ValueCodecConfiguration =
-    components.headOption.map(_.valueCodecConfiguration).getOrElse(ValueCodecConfiguration.Default)
-
-  override def iterator: Iterator[T] =
-    components.foldLeft[Iterator[T]](Iterator.empty)(_ ++ _.iterator)
-
-  override def close(): Unit = components.foreach(_.close())
-
-  override private[parquet4s] def appendTransformation(transformation: RowParquetRecord => Iterable[RowParquetRecord]) =
-    new CompoundParquetIterable[T](components.map(_.appendTransformation(transformation)))
-
-  override private[parquet4s] def changeDecoder[U: ParquetRecordDecoder]: ParquetIterable[U] =
-    new CompoundParquetIterable[U](components.map(_.changeDecoder[U]))
-
-  override def concat(other: ParquetIterable[T]): ParquetIterable[T] =
-    new CompoundParquetIterable(components :+ other)
-}
-
-private[parquet4s] class InMemoryParquetIterable[T](
-    data: => Iterable[RowParquetRecord],
-    override val valueCodecConfiguration: ValueCodecConfiguration        = ValueCodecConfiguration.Default,
-    transformations: Seq[RowParquetRecord => Iterable[RowParquetRecord]] = Seq.empty,
-    decode: RowParquetRecord => T                                        = identity[RowParquetRecord] _
-) extends ParquetIterable[T] {
-
-  override private[parquet4s] def appendTransformation(transformation: RowParquetRecord => Iterable[RowParquetRecord]) =
-    new InMemoryParquetIterable[T](
-      data                    = data,
-      valueCodecConfiguration = valueCodecConfiguration,
-      transformations         = transformations :+ transformation,
-      decode                  = decode
-    )
-
-  override private[parquet4s] def changeDecoder[U: ParquetRecordDecoder] =
-    new InMemoryParquetIterable[U](
-      data                    = data,
-      valueCodecConfiguration = valueCodecConfiguration,
-      transformations         = transformations,
-      decode                  = record => ParquetRecordDecoder.decode[U](record, valueCodecConfiguration)
-    )
-
-  override private[parquet4s] lazy val stats = new InMemoryStats(data, valueCodecConfiguration)
-
-  override def close(): Unit = ()
-
-  override def iterator: Iterator[T] =
-    if (transformations.isEmpty) data.iterator.map(decode)
-    else
-      data.iterator.flatMap(record =>
-        transformations
-          .foldLeft(Iterator(record)) { case (iterator, transformation) =>
-            iterator.flatMap(transformation)
-          }
-          .map(decode)
-      )
 }

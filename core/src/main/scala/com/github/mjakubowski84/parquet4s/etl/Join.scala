@@ -1,4 +1,6 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.etl
+
+import com.github.mjakubowski84.parquet4s.*
 
 private[parquet4s] object Join {
 
