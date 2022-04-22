@@ -1,5 +1,6 @@
-package com.github.mjakubowski84.parquet4s
+package com.github.mjakubowski84.parquet4s.stats
 
+import com.github.mjakubowski84.parquet4s.*
 import org.apache.hadoop.fs.FileStatus
 import org.apache.parquet.ParquetReadOptions
 import org.apache.parquet.hadoop.ParquetFileReader
