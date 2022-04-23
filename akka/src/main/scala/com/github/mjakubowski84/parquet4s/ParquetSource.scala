@@ -164,7 +164,7 @@ object ParquetSource extends IOOps {
       .map(decode)
   }
 
-  private def setPartitionValues[T](partitionedPath: PartitionedPath)(record: RowParquetRecord) =
+  private def setPartitionValues(partitionedPath: PartitionedPath)(record: RowParquetRecord) =
     partitionedPath.partitions.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
       currentRecord.updated(columnPath, BinaryValue(value))
     }

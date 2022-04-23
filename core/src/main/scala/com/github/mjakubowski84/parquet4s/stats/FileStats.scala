@@ -1,6 +1,7 @@
 package com.github.mjakubowski84.parquet4s.stats
 
 import com.github.mjakubowski84.parquet4s.*
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileStatus
 import org.apache.parquet.ParquetReadOptions
 import org.apache.parquet.column.statistics.Statistics
@@ -15,12 +16,12 @@ import scala.jdk.CollectionConverters.*
   */
 private[parquet4s] class FileStats(
     status: FileStatus,
-    options: ParquetReader.Options,
+    vcc: ValueCodecConfiguration,
+    hadoopConf: Configuration,
     projectionSchemaOpt: Option[MessageType]
 ) extends Stats {
 
-  private val vcc           = ValueCodecConfiguration(options)
-  private val inputFile     = HadoopInputFile.fromStatus(status, options.hadoopConf)
+  private val inputFile     = HadoopInputFile.fromStatus(status, hadoopConf)
   private val readerOptions = ParquetReadOptions.builder().build()
 
   abstract private class StatsReader {

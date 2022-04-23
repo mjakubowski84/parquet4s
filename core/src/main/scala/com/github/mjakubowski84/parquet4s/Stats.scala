@@ -1,7 +1,9 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.stats.LazyDelegateStats
+import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.column.statistics.*
+import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.schema.MessageType
 
 /** Utilises statistics of Parquet files to provide number of records and minimum and maximum value of columns. Values
@@ -117,16 +119,19 @@ object Stats {
     override def filter(filter: Filter): Builder                  = this.copy(filter = filter)
     override def projection[T: ParquetSchemaResolver]: Builder =
       this.copy(projectionSchemaOpt = Option(ParquetSchemaResolver.resolveSchema[T]))
-    override def stats(path: Path): Stats =
-      apply(path = path, options = options, projectionSchemaOpt = projectionSchemaOpt, filter = filter)
+    override def stats(path: Path): Stats = {
+      val vcc = ValueCodecConfiguration(options)
+      apply(path, vcc, options.hadoopConf, projectionSchemaOpt, filter.toFilterCompat(vcc))
+    }
   }
 
   private[parquet4s] def apply(
       path: Path,
-      options: ParquetReader.Options,
+      vcc: ValueCodecConfiguration,
+      hadoopConf: Configuration,
       projectionSchemaOpt: Option[MessageType],
-      filter: Filter
-  ): Stats = new LazyDelegateStats(path, options, projectionSchemaOpt, filter)
+      filter: FilterCompat.Filter
+  ): Stats = new LazyDelegateStats(path, vcc, hadoopConf, projectionSchemaOpt, filter)
 
   def builder: Builder = BuilderImpl()
 
