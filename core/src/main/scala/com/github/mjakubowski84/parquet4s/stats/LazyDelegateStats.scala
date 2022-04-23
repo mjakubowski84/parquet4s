@@ -1,19 +1,25 @@
 package com.github.mjakubowski84.parquet4s.stats
 
 import com.github.mjakubowski84.parquet4s.*
+import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.filter2.compat.FilterCompat
+import org.apache.parquet.filter2.compat.FilterCompat.NoOpFilter
 import org.apache.parquet.schema.MessageType
 
 private[parquet4s] class LazyDelegateStats(
     path: Path,
-    options: ParquetReader.Options,
+    vcc: ValueCodecConfiguration,
+    hadoopConf: Configuration,
     projectionSchemaOpt: Option[MessageType],
-    filter: Filter
+    filter: FilterCompat.Filter
 ) extends Stats {
   private lazy val delegate: Stats = {
-    val fs = path.toHadoop.getFileSystem(options.hadoopConf)
+    val fs = path.toHadoop.getFileSystem(hadoopConf)
     val statsArray = fs.listStatus(path.toHadoop).map {
-      case status if filter == Filter.noopFilter => new FileStats(status, options, projectionSchemaOpt)
-      case status                                => new FilteredFileStats(status, options, projectionSchemaOpt, filter)
+      case status if filter.isInstanceOf[NoOpFilter] =>
+        new FileStats(status, vcc, hadoopConf, projectionSchemaOpt)
+      case status =>
+        new FilteredFileStats(status, vcc, hadoopConf, projectionSchemaOpt, filter)
     }
     if (statsArray.length == 1) statsArray.head
     else new CompoundStats(statsArray.toIndexedSeq)

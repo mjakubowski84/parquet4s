@@ -1,8 +1,10 @@
 package com.github.mjakubowski84.parquet4s.stats
 
 import com.github.mjakubowski84.parquet4s.*
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileStatus
 import org.apache.parquet.ParquetReadOptions
+import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.io.api.*
@@ -16,14 +18,14 @@ import scala.jdk.CollectionConverters.*
   */
 private[parquet4s] class FilteredFileStats(
     status: FileStatus,
-    options: ParquetReader.Options,
+    vcc: ValueCodecConfiguration,
+    hadoopConf: Configuration,
     projectionSchemaOpt: Option[MessageType],
-    filter: Filter
+    filter: FilterCompat.Filter
 ) extends Stats {
 
-  private val vcc           = ValueCodecConfiguration(options)
-  private val inputFile     = HadoopInputFile.fromStatus(status, options.hadoopConf)
-  private val readerOptions = ParquetReadOptions.builder().withRecordFilter(filter.toFilterCompat(vcc)).build()
+  private val inputFile     = HadoopInputFile.fromStatus(status, hadoopConf)
+  private val readerOptions = ParquetReadOptions.builder().withRecordFilter(filter).build()
 
   abstract private class StatsReader {
     protected val reader: ParquetFileReader = ParquetFileReader.open(inputFile, readerOptions)
@@ -47,7 +49,7 @@ private[parquet4s] class FilteredFileStats(
           val recordReader = columnIO.getRecordReader(
             store,
             new RowCountMaterializer(requestedSchema),
-            filter.toFilterCompat(vcc)
+            filter
           )
           (0L until store.getRowCount.longValue()).iterator
             .map(_ => Option(recordReader.read()))
@@ -88,7 +90,7 @@ private[parquet4s] class FilteredFileStats(
         columnIO.getRecordReader(
           store,
           new ParquetRecordMaterializer(schema = requestedSchema, columnProjections = Seq.empty),
-          filter.toFilterCompat(vcc)
+          filter
         )
       (0L until store.getRowCount.longValue()).iterator
         .map(_ => Option(recordReader.read()))
