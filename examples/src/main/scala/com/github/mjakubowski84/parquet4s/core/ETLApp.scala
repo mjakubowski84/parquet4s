@@ -4,15 +4,16 @@ import com.github.mjakubowski84.parquet4s.*
 
 import java.nio.file.Files
 
-object JoinApp extends App {
+object ETLApp extends App {
 
   case class Owner(id: Long, name: String)
   case class Pet(id: Long, name: String, ownerId: Long)
   case class PetOwner(id: Long, name: String, petId: Long, petName: String)
 
-  val path      = Path(Files.createTempDirectory("example"))
-  val ownerPath = path.append("owners.parquet")
-  val petsPath  = path.append("pets.parquet")
+  val path       = Path(Files.createTempDirectory("example"))
+  val ownerPath  = path.append("owners.parquet")
+  val petsPath   = path.append("pets.parquet")
+  val outputPath = path.append("output.parquet")
 
   val owners = List(
     Owner(1L, "Alice"),
@@ -47,13 +48,12 @@ object JoinApp extends App {
     )
     .read(petsPath)
 
-  // define join operation
-  val readPetOwners = readOwners
-    .innerJoin(right = readPets, onLeft = Col("id"), onRight = Col("ownerId"))
-    .as[PetOwner]
+  readOwners
+    .innerJoin(right = readPets, onLeft = Col("id"), onRight = Col("ownerId")) // define join operation
+    .as[PetOwner] // set typed schema and codecs
+    .writeAndClose(outputPath) // execute all operations defined above and write results to disk
 
-  // execute
-  try readPetOwners.foreach(println)
-  finally readPetOwners.close()
+  // take note that all operations defined above writeAndClose are lazy and are not executed
+  // until writeAndClose is called
 
 }

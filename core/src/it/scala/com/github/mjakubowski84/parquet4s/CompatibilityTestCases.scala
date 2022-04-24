@@ -334,7 +334,7 @@ object CompatibilityTestCases extends TestCaseSupport {
         ContainsMapOfNestedClassAsKey(Map(Nested(1) -> "1", Nested(2) -> "2")),
         ContainsMapOfNestedClassAsKey(Map(Nested(1) -> null))
       ),
-      compatibilityParties = Set(CompatibilityParty.Reader, CompatibilityParty.Reader)
+      compatibilityParties = Set(CompatibilityParty.Reader, CompatibilityParty.Writer)
     ),
     Case(
       "map of optional nested class as value",

@@ -168,6 +168,21 @@ trait ParquetIterable[T] extends Iterable[T] with Closeable {
   @experimental
   def concat(other: ParquetIterable[T]): ParquetIterable[T] = new CompoundParquetIterable(Seq(this, other))
 
+  /** Writes this dataset to given <i>path</i> and releases all opened resources.
+    * @param path
+    *   path to write the dataset to
+    * @param options
+    *   [[ParquetWriter.Options]]
+    */
+  @experimental
+  def writeAndClose(path: Path, options: ParquetWriter.Options = ParquetWriter.Options())(implicit
+      schemaResolver: ParquetSchemaResolver[T],
+      encoder: ParquetRecordEncoder[T]
+  ): Unit = {
+    ParquetWriter.of[T].options(options).writeAndClose(path, this)
+    this.close()
+  }
+
   private[parquet4s] def appendTransformation(
       transformation: RowParquetRecord => Iterable[RowParquetRecord]
   ): ParquetIterable[T]

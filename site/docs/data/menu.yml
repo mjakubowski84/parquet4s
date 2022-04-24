@@ -35,5 +35,5 @@ options:
   - title: Migration from 1.x
     url: docs/migration
 
-  - title: (Experimental) Joins and Concat
+  - title: (Experimental) ETL
     url: docs/experimental

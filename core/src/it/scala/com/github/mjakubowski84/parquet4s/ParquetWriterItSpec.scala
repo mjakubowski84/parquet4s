@@ -94,4 +94,13 @@ class ParquetWriterItSpec extends AnyFreeSpec with Matchers with BeforeAndAfter 
     meta should contain(Entry("MadeBy", "https://github.com/mjakubowski84/parquet4s"))
   }
 
+  "Writer invoked from within ParquetIterable should work as simple writer" in {
+    val secondWritePath = tempDir.append("file1.parquet")
+    ParquetWriter.of[Record].writeAndClose(writePath, records)
+    ParquetReader.as[Record].read(writePath).writeAndClose(secondWritePath)
+    val records1 = ParquetReader.as[Record].read(secondWritePath)
+    try records1.toSeq should be(records)
+    finally records1.close()
+  }
+
 }
