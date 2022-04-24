@@ -1,10 +1,10 @@
 ---
 layout: docs
-title: (Experimental) Joins and Concat
+title: (Experimental) ETL
 permalink: docs/experimental/
 ---
 
-# (Experimental) Joins and Concat
+# (Experimental) ETL
 
 Version 2.1.0 of Parquet4s introduces advanced operations on generic datasets, that is on `ParquetIterable[RowParquetRecord]`, to core module. Now users can join and concat two or more datasets what can simplify some ETL jobs a lot.
 
@@ -15,6 +15,7 @@ Available operations:
 - Inner join
 - Full join
 - Concat (appending one dataset to another)
+- Write called directly on a dataset
 
 Mind that joins require loading right-side dataset into memory so that those operations are not applicable for very large datasets. Consider switching position of datasets in your join operation (left dataset is iterated over). Or use e.g. Apache Spark which distributes data across multiple machines for performing join operations.
 
@@ -42,13 +43,12 @@ val readPets = ParquetReader
   )
   .read(Path("/pets"))
 
-// define join operation
-val readPetOwners = readOwners
-  .innerJoin(right = readPets, onLeft = Col("id"), onRight = Col("ownerId"))
-  .as[PetOwner]
+// join and write output dataset
+readOwners
+  .innerJoin(right = readPets, onLeft = Col("id"), onRight = Col("ownerId")) // define join operation
+  .as[PetOwner] // set typed schema and codecs
+  .writeAndClose("/pet_owners/file.parquet") // execute all including write to the disk
 
-// execute
-// note that all operations defined before are lazy and are not executed before `foreach` is ran
-try readPetOwners.foreach(println)
-finally readPetOwners.close()
+// take note that all operations defined above writeAndClose are lazy and are not execute until 
+// writeAndClose is called
 ```
