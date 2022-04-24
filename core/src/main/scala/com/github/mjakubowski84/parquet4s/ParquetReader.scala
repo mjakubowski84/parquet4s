@@ -38,7 +38,7 @@ object ParquetReader extends IOOps {
       *   decodes [[RowParquetRecord]] to your data type
       * @return
       *   final [[ParquetIterable]]
-      * @throws IllegalArgumentException
+      * @throws scala.IllegalArgumentException
       *   when reading inconsistent partition directory
       */
     def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T]
