@@ -47,7 +47,7 @@ val readPets = ParquetReader
 readOwners
   .innerJoin(right = readPets, onLeft = Col("id"), onRight = Col("ownerId")) // define join operation
   .as[PetOwner] // set typed schema and codecs
-  .writeAndClose("/pet_owners/file.parquet") // execute all including write to the disk
+  .writeAndClose(Path("/pet_owners/file.parquet")) // execute all including write to the disk
 
 // take note that all operations defined above writeAndClose are lazy and are not execute until 
 // writeAndClose is called
