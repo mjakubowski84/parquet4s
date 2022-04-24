@@ -12,7 +12,7 @@ Parquet files contain metadata that are used to optimize [filtering]({% link doc
 - Min value of a column
 - Max value of a column
 
-Parquet4s will try to resolve those statistics without iterating over each record if possible. Statistics can be queried for also using a filter but please mind that speed of the query might decrease as due to filtering algorithm might need to iterate over a content of row group to resolve min/max value. Performance of the query is the best in case of sorted datasets.
+Parquet4s will try to resolve those statistics without iterating over each record if possible. Statistics can also be queried for using a filter — but please mind that speed of the query might decrease as due to filtering the algorithm might need to iterate over a content of a row group to resolve min/max values. Performance of the query is the best in case of sorted datasets.
 
 Parquet4s provides separate API for Statistics. It is also leveraged in `ParqueIterable`e.g. to efficiently calculate `size`.
 

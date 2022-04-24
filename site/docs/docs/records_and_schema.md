@@ -119,7 +119,7 @@ implicit val customFilterCodec: FilterCodec[CustomType, java.lang.Integer, IntCo
 
 # Using generic records directly
 
-Parquet4s allows you to choose to use generic records explicitly from the level of API in each module of the library. But you can also use typed API and define `RowParquetRecord` as your data type. Parquet4s contains type classes for encoding, decoding and automatic schema resolution for `RowParquetRecord`.
+Parquet4s allows you to choose to use generic records explicitly from the level of API in each module of the library. But you can also use typed API and define `RowParquetRecord` as your data type. Parquet4s contains type classes for encoding, decoding and schema provisioning for `RowParquetRecord`.
 
 ```scala mdoc:compile-only
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path, RowParquetRecord}
