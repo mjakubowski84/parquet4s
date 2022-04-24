@@ -1,0 +1,64 @@
+<!DOCTYPE html><html><head><title>Parquet4s: (Experimental) ETL</title><meta charset="utf-8" /><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="Marcin Jakubowski" /><meta name="description" content="Read and write Parquet files using Scala" /><meta name="og:image" content="/parquet4s/img/poster.png" /><meta name="image" property="og:image" content="/parquet4s/img/poster.png" /><meta name="og:title" content="Parquet4s: (Experimental) ETL" /><meta name="title" property="og:title" content="Parquet4s: (Experimental) ETL" /><meta name="og:site_name" content="Parquet4s" /><meta name="og:url" content="" /><meta name="og:type" content="website" /><meta name="og:description" content="Read and write Parquet files using Scala" /><link rel="icon" type="image/png" href="/parquet4s/img/favicon.png" /><meta name="twitter:title" content="Parquet4s: (Experimental) ETL" /><meta name="twitter:image" content="/parquet4s/img/poster.png" /><meta name="twitter:description" content="Read and write Parquet files using Scala" /><meta name="twitter:card" content="summary_large_image" /><link rel="icon" type="image/png" sizes="16x16" href="/parquet4s/img/favicon-16x16.png" /><link rel="icon" type="image/png" sizes="32x32" href="/parquet4s/img/favicon-32x32.png" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" /><link rel="stylesheet" href="/parquet4s/highlight/styles/vs.css" /><link rel="stylesheet" href="/parquet4s/css/light-style.css" /></head><body class="docs"><div id="wrapper"><div id="sidebar-wrapper"><div id="sidebar-brand"><a href="/parquet4s/" class="brand"><div class="brand-wrapper"></div><span>Parquet4s</span></a><button id="main-toggle" class="sidebar-toggle"><span class="close"></span></button></div><div class="sidebar-nav"> <div class="sidebar-nav-item  "><a href="/parquet4s/docs" title="Introduction" class="">Introduction</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/quick_start" title="Quick Start" class="">Quick Start</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/akka" title="Integration with Akka Streams" class="">Integration with Akka Streams</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/fs2" title="Integration with FS2" class="">Integration with FS2</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/storage_types" title="Supported storage types" class="">Supported storage types</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/records_and_schema" title="Records, types and schema" class="">Records, types and schema</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/projection" title="Projection" class="">Projection</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/filtering" title="Filtering" class="">Filtering</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/partitioning" title="Partitioning" class="">Partitioning</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/statistics" title="Statistics" class="">Statistics</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/examples" title="Examples" class="">Examples</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/migration" title="Migration from 1.x" class="">Migration from 1.x</a></div> <div class="sidebar-nav-item active "><a href="/parquet4s/docs/experimental" title="(Experimental) ETL" class="active">(Experimental) ETL</a></div></div></div><div id="page-content-wrapper"><div class="nav"><div class="container-fluid"><div class="row"><div class="col-lg-12"><div class="action-menu pull-left clearfix"><a href="#menu-toggle" id="menu-toggle"><i class="fa fa-bars" aria-hidden="true"></i></a></div><ul class="pull-right"><li class="search-nav"><div id="search-dropdown"><label><i class="fa fa-search"></i>Search</label><input id="search-bar" type="text" placeholder="Enter keywords here..." onclick="displayToggleSearch(event)" /><ul id="search-dropdown-content" class="dropdown dropdown-content"></ul></div></li><li id="gh-eyes-item" class="hidden-xs to-uppercase"><a href="https://github.com/mjakubowski84/parquet4s" target="_blank" rel="noopener noreferrer"><i class="fa fa-eye"></i><span>Watchers<span id="eyes" class="label label-default">--</span></span></a></li><li id="gh-stars-item" class="hidden-xs to-uppercase"><a href="https://github.com/mjakubowski84/parquet4s" target="_blank" rel="noopener noreferrer"><i class="fa fa-star-o"></i><span>Stars<span id="stars" class="label label-default">--</span></span></a></li></ul></div></div></div></div><div id="content" data-github-owner="mjakubowski84" data-github-repo="parquet4s"><div class="content-wrapper"><section><h1 id="experimental-etl">(Experimental) ETL</h1>
+
+<p>Version 2.1.0 of Parquet4s introduces advanced operations on generic datasets, that is on <code class="language-plaintext highlighter-rouge">ParquetIterable[RowParquetRecord]</code>, to core module. Now users can join and concat two or more datasets what can simplify some ETL jobs a lot.</p>
+
+<p>Available operations:</p>
+
+<ul>
+  <li>Left join</li>
+  <li>Right join</li>
+  <li>Inner join</li>
+  <li>Full join</li>
+  <li>Concat (appending one dataset to another)</li>
+  <li>Write called directly on a dataset</li>
+</ul>
+
+<p>Mind that joins require loading right-side dataset into memory so that those operations are not applicable for very large datasets. Consider switching position of datasets in your join operation (left dataset is iterated over). Or use e.g. Apache Spark which distributes data across multiple machines for performing join operations.</p>
+
+<p>Please note that this is an experimental feature. API may change in the future and some functionalities may be added or removed.</p>
+
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="nn">com.github.mjakubowski84.parquet4s.</span><span class="o">{</span><span class="nc">Col</span><span class="o">,</span> <span class="nc">ParquetReader</span><span class="o">,</span> <span class="nc">Path</span><span class="o">}</span>
+
+<span class="k">case</span> <span class="k">class</span> <span class="nc">PetOwner</span><span class="o">(</span><span class="n">id</span><span class="k">:</span> <span class="kt">Long</span><span class="o">,</span> <span class="n">name</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">petId</span><span class="k">:</span> <span class="kt">Long</span><span class="o">,</span> <span class="n">petName</span><span class="k">:</span> <span class="kt">String</span><span class="o">)</span>
+
+<span class="c1">// define 1st dataset</span>
+<span class="k">val</span> <span class="nv">readOwners</span> <span class="k">=</span> <span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">projectedGeneric</span><span class="o">(</span>
+    <span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">).</span><span class="py">as</span><span class="o">[</span><span class="kt">Long</span><span class="o">],</span>
+    <span class="nc">Col</span><span class="o">(</span><span class="s">"name"</span><span class="o">).</span><span class="py">as</span><span class="o">[</span><span class="kt">String</span><span class="o">]</span>
+  <span class="o">)</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"/owners"</span><span class="o">))</span>
+
+<span class="c1">// define 2nd dataset</span>
+<span class="k">val</span> <span class="nv">readPets</span> <span class="k">=</span> <span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">projectedGeneric</span><span class="o">(</span>
+    <span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">).</span><span class="py">as</span><span class="o">[</span><span class="kt">Long</span><span class="o">].</span><span class="py">alias</span><span class="o">(</span><span class="s">"petId"</span><span class="o">),</span>
+    <span class="nc">Col</span><span class="o">(</span><span class="s">"name"</span><span class="o">).</span><span class="py">as</span><span class="o">[</span><span class="kt">String</span><span class="o">].</span><span class="py">alias</span><span class="o">(</span><span class="s">"petName"</span><span class="o">),</span>
+    <span class="nc">Col</span><span class="o">(</span><span class="s">"ownerId"</span><span class="o">).</span><span class="py">as</span><span class="o">[</span><span class="kt">Long</span><span class="o">]</span>
+  <span class="o">)</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"/pets"</span><span class="o">))</span>
+
+<span class="c1">// join and write output dataset</span>
+<span class="n">readOwners</span>
+  <span class="o">.</span><span class="py">innerJoin</span><span class="o">(</span><span class="n">right</span> <span class="k">=</span> <span class="n">readPets</span><span class="o">,</span> <span class="n">onLeft</span> <span class="k">=</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">),</span> <span class="n">onRight</span> <span class="k">=</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"ownerId"</span><span class="o">))</span> <span class="c1">// define join operation</span>
+  <span class="o">.</span><span class="py">as</span><span class="o">[</span><span class="kt">PetOwner</span><span class="o">]</span> <span class="c1">// set typed schema and codecs</span>
+  <span class="o">.</span><span class="py">writeAndClose</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"/pet_owners/file.parquet"</span><span class="o">))</span> <span class="c1">// execute all including write to the disk</span>
+</code></pre></div></div>
+</section></div></div></div></div><script src="/parquet4s/highlight/highlight.pack.js"></script><script src="/parquet4s/lunr/lunr.js"></script><script>
+// For all code blocks, copy the language from the containing div
+// to the inner code tag (where hljs expects it to be)
+const langPrefix = 'language-';
+document.querySelectorAll(`div[class^='${langPrefix}']`).forEach(function(div) {
+  div.classList.forEach(function(cssClass) {
+    if (cssClass.startsWith(langPrefix)) {
+      const lang = cssClass.substring(langPrefix.length);
+      div.querySelectorAll('pre code').forEach(function(code) {
+        code.classList.add(lang);
+      });
+    }
+  });
+});
+
+hljs.configure({languages:['scala','java','bash']});
+hljs.initHighlightingOnLoad();
+      </script><script>console.info('\x57\x65\x62\x73\x69\x74\x65\x20\x62\x75\x69\x6c\x74\x20\x77\x69\x74\x68\x3a\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x5f\x20\x20\x20\x20\x5f\x5f\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x20\x5f\x5f\x0a\x20\x20\x20\x5f\x5f\x5f\x5f\x5f\x2f\x20\x2f\x5f\x20\x20\x2f\x20\x2f\x5f\x20\x20\x20\x20\x20\x20\x5f\x5f\x5f\x5f\x20\x5f\x5f\x5f\x20\x20\x28\x5f\x29\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x20\x20\x5f\x5f\x5f\x5f\x5f\x28\x5f\x29\x20\x2f\x5f\x5f\x5f\x5f\x20\x20\x5f\x5f\x5f\x5f\x5f\x0a\x20\x20\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x5c\x2f\x20\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x60\x5f\x5f\x20\x5c\x2f\x20\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x5c\x2f\x20\x5f\x5f\x5f\x2f\x20\x2f\x20\x5f\x5f\x2f\x20\x5f\x20\x5c\x2f\x20\x5f\x5f\x5f\x2f\x0a\x20\x28\x5f\x5f\x20\x20\x29\x20\x2f\x5f\x2f\x20\x2f\x20\x2f\x5f\x2f\x5f\x5f\x5f\x5f\x5f\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x5f\x5f\x2f\x20\x2f\x20\x20\x2f\x20\x2f\x5f\x2f\x20\x28\x5f\x5f\x20\x20\x29\x20\x2f\x20\x2f\x5f\x2f\x20\x20\x5f\x5f\x28\x5f\x5f\x20\x20\x29\x0a\x2f\x5f\x5f\x5f\x5f\x2f\x5f\x2e\x5f\x5f\x5f\x2f\x5c\x5f\x5f\x2f\x20\x20\x20\x20\x20\x2f\x5f\x2f\x20\x2f\x5f\x2f\x20\x2f\x5f\x2f\x5f\x2f\x5c\x5f\x5f\x5f\x2f\x5f\x2f\x20\x20\x20\x5c\x5f\x5f\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x2f\x5f\x2f\x5c\x5f\x5f\x2f\x5c\x5f\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x2f\x0a\x0a\x68\x74\x74\x70\x73\x3a\x2f\x2f\x34\x37\x64\x65\x67\x2e\x67\x69\x74\x68\x75\x62\x2e\x69\x6f\x2f\x73\x62\x74\x2d\x6d\x69\x63\x72\x6f\x73\x69\x74\x65\x73')</script><script src="/parquet4s/js/search.js"></script><script src="/parquet4s/js/docs.js"></script></body></html>
