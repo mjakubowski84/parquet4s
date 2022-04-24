@@ -99,7 +99,7 @@ jobs:
           working_directory: workspace/repo
       - run:
           name: Compile
-          command: cat /dev/null | sbt +test:compile +it:compile
+          command: cat /dev/null | sbt +test:compile +it:compile +doc
           working_directory: workspace/repo
       - cache_dependencies:
           path: workspace/repo
