@@ -9,8 +9,9 @@ import org.slf4j.LoggerFactory
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
-
 import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow.*
+
+import scala.collection.concurrent.TrieMap
 
 object ParquetPartitioningFlow {
 
@@ -266,11 +267,11 @@ private class ParquetPartitioningFlow[T, W](
         var written: Long
     )
 
-    private var writers: Map[Path, WriterState] = Map.empty
+    private val writers = TrieMap.empty[Path, WriterState]
 
     setHandlers(in, out, this)
 
-    private def compressionExtension: String = writeOptions.compressionCodecName.getExtension
+    private val compressionExtension: String = writeOptions.compressionCodecName.getExtension
     private def newFileName: String          = UUID.randomUUID().toString + compressionExtension + ".parquet"
 
     private def partition(record: RowParquetRecord): (Path, RowParquetRecord) =
@@ -297,11 +298,8 @@ private class ParquetPartitioningFlow[T, W](
 
       pathsAndPartitionedRecords.foldLeft(Map.empty[Path, Long]) {
         case (modifiedPartitions, (writerPath, partitionedRecord)) =>
-          val state = writers.get(writerPath) match {
-            case Some(state) =>
-              state
-
-            case None =>
+          val state = writers.getOrElseUpdate(
+            writerPath, {
               logger.debug("Creating writer to write to [{}]", writerPath)
 
               val writer = ParquetWriter.internalWriter(
@@ -315,10 +313,10 @@ private class ParquetPartitioningFlow[T, W](
                 written = 0L
               )
 
-              writers += writerPath -> state
               scheduleNextRotation(writerPath, maxDuration)
               state
-          }
+            }
+          )
 
           state.writer.write(partitionedRecord)
           state.written += 1
@@ -327,16 +325,14 @@ private class ParquetPartitioningFlow[T, W](
       }
     }
 
-    private def close(path: Path): Unit = {
-      cancelTimer(path)
-      writers.get(path) match {
+    private def close(path: Path): Unit =
+      writers.remove(path) match {
         case Some(writerState) =>
+          cancelTimer(path)
           writerState.writer.close()
-          writers -= path
         case None =>
-          logger.debug("Trying to close a writer for a path [{}] no state was found", path)
+          logger.debug("Trying to close a writer for a path [{}], no state was found", path)
       }
-    }
 
     override def onTimer(timerKey: Any): Unit =
       timerKey match {
@@ -373,12 +369,9 @@ private class ParquetPartitioningFlow[T, W](
       }
 
     override def postStop(): Unit = {
-      writers.foreach { case (path, state) =>
-        cancelTimer(path)
-        state.writer.close()
+      writers.keySet.foreach { path =>
+        close(path)
       }
-
-      writers = Map.empty
 
       super.postStop()
     }
