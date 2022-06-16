@@ -53,7 +53,7 @@ private[parquet4s] object writer {
       * @return
       *   final [[fs2.Pipe]]
       */
-    def write(path: Path): Pipe[F, T, fs2.INothing]
+    def write(path: Path): Pipe[F, T, Nothing]
   }
 
   private case class BuilderImpl[F[_], T](options: ParquetWriter.Options = ParquetWriter.Options())(implicit
@@ -62,7 +62,7 @@ private[parquet4s] object writer {
       sync: Sync[F]
   ) extends Builder[F, T] {
     override def options(options: ParquetWriter.Options): Builder[F, T] = this.copy(options = options)
-    override def write(path: Path): Pipe[F, T, fs2.INothing]            = pipe[F, T](path, options)
+    override def write(path: Path): Pipe[F, T, Nothing]                 = pipe[F, T](path, options)
   }
 
   private class Writer[T, F[_]](internalWriter: ParquetWriter.InternalWriter, encode: T => F[RowParquetRecord])(implicit
@@ -84,7 +84,7 @@ private[parquet4s] object writer {
         case None                => Pull.done
       }
 
-    def writeAllStream(in: Stream[F, T]): Stream[F, fs2.INothing] = writeAll(in).stream
+    def writeAllStream(in: Stream[F, T]): Stream[F, Nothing] = writeAll(in).stream
 
     override def close(): Unit = internalWriter.close()
   }
@@ -92,7 +92,7 @@ private[parquet4s] object writer {
   private def pipe[F[_]: Sync, T: ParquetRecordEncoder: ParquetSchemaResolver](
       path: Path,
       options: ParquetWriter.Options
-  ): Pipe[F, T, fs2.INothing] =
+  ): Pipe[F, T, Nothing] =
     in =>
       for {
         logger  <- Stream.eval(logger(getClass))

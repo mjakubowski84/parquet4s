@@ -6,7 +6,7 @@ import com.github.mjakubowski84.parquet4s.parquet.viaParquet
 import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, Path}
 import fs2.io.file.Files
 import fs2.kafka.*
-import fs2.{INothing, Pipe, Stream}
+import fs2.{Pipe, Stream}
 import io.github.embeddedkafka.EmbeddedKafka
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
@@ -81,7 +81,7 @@ object IndefiniteFS2App extends IOApp.Simple {
     stream.compile.drain
   }
 
-  private def producer(producerSettings: ProducerSettings[IO, String, String]): Stream[IO, INothing] =
+  private def producer(producerSettings: ProducerSettings[IO, String, String]): Stream[IO, Nothing] =
     Stream
       .iterate(fluctuate.runS(Down(StartDelay)).value)(fluctuation => fluctuate.runS(fluctuation).value)
       .flatMap(fluctuation => Stream.sleep_[IO](fluctuation.delay) ++ Stream.emit(nextWord()))
@@ -90,7 +90,7 @@ object IndefiniteFS2App extends IOApp.Simple {
       .through(KafkaProducer.pipe(producerSettings))
       .drain
 
-  private def consumer(consumerSettings: ConsumerSettings[IO, String, String], writePath: Path): Stream[IO, INothing] =
+  private def consumer(consumerSettings: ConsumerSettings[IO, String, String], writePath: Path): Stream[IO, Nothing] =
     KafkaConsumer[IO]
       .stream(consumerSettings)
       .evalTap(_.subscribeTo(Topic))
