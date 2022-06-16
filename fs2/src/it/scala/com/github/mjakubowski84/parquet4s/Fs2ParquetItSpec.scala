@@ -81,7 +81,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
   it should "write and read single parquet file" in {
     val outputFileName = "data.parquet"
-    def write(path: Path): Stream[IO, fs2.INothing] =
+    def write(path: Path): Stream[IO, Nothing] =
       Stream
         .iterable(data)
         .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).write(path.append(outputFileName)))
@@ -97,7 +97,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
   it should "write and read single parquet file using projection" in {
     val outputFileName = "data.parquet"
-    def write(path: Path): Stream[IO, fs2.INothing] =
+    def write(path: Path): Stream[IO, Nothing] =
       Stream
         .iterable(data)
         .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).write(path.append(outputFileName)))
@@ -125,7 +125,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
   it should "write and read single parquet file using generic column projection" in {
     val outputFileName = "data.parquet"
-    def write(path: Path): Stream[IO, fs2.INothing] =
+    def write(path: Path): Stream[IO, Nothing] =
       Stream
         .iterable(data)
         .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).write(path.append(outputFileName)))
@@ -155,7 +155,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   it should "flush already processed data to file on failure" in {
     val numberOfProcessedElementsBeforeFailure = 5
     val outputFileName                         = "data.parquet"
-    def write(path: Path): Stream[IO, fs2.INothing] =
+    def write(path: Path): Stream[IO, Nothing] =
       Stream
         .iterable(data)
         .take(numberOfProcessedElementsBeforeFailure)

@@ -4,9 +4,9 @@ import Documentation._
 import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
-lazy val twoTwelve              = "2.12.15"
+lazy val twoTwelve              = "2.12.16"
 lazy val twoThirteen            = "2.13.8"
-lazy val three                  = "3.1.1"
+lazy val three                  = "3.1.2"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
@@ -96,8 +96,8 @@ lazy val core = (project in file("core"))
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.7.0",
 
       // tests
-      "org.mockito" % "mockito-core" % "4.4.0" % "test",
-      "org.scalatest" %% "scalatest" % "3.2.11" % "test,it",
+      "org.mockito" % "mockito-core" % "4.6.1" % "test",
+      "org.scalatest" %% "scalatest" % "3.2.12" % "test,it",
       "ch.qos.logback" % "logback-classic" % "1.2.11" % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
@@ -164,7 +164,7 @@ lazy val examples = (project in file("examples"))
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.1.0",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.2.0",
       "ch.qos.logback" % "logback-classic" % "1.2.11",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % {
