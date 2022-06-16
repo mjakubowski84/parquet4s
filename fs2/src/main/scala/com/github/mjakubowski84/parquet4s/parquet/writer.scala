@@ -86,7 +86,11 @@ private[parquet4s] object writer {
 
     def writeAllStream(in: Stream[F, T]): Stream[F, Nothing] = writeAll(in).stream
 
-    override def close(): Unit = internalWriter.close()
+    override def close(): Unit =
+      try internalWriter.close()
+      catch {
+        case _: NullPointerException => // ignores bug in Parquet
+      }
   }
 
   private def pipe[F[_]: Sync, T: ParquetRecordEncoder: ParquetSchemaResolver](

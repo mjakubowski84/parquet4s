@@ -329,7 +329,10 @@ private class ParquetPartitioningFlow[T, W](
       writers.remove(path) match {
         case Some(writerState) =>
           cancelTimer(path)
-          writerState.writer.close()
+          try writerState.writer.close()
+          catch {
+            case _: NullPointerException => // ignores bug in Parquet
+          }
         case None =>
           logger.debug("Trying to close a writer for a path [{}], no state was found", path)
       }
