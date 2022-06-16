@@ -294,7 +294,9 @@ object rotatingWriter {
 
     def dispose: F[Unit] =
       F.uncancelable { _ =>
-        rotationFiber.cancel >> F.delay(scala.concurrent.blocking(internalWriter.close()))
+        rotationFiber.cancel >> F.delay(scala.concurrent.blocking(internalWriter.close())).recover {
+          case _: NullPointerException => () // ignores bug in Parquet
+        }
       }
   }
 

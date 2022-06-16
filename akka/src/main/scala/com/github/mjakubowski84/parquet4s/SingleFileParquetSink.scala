@@ -74,7 +74,10 @@ object SingleFileParquetSink {
       .fold(0) { case (acc, record) => writer.write(record); acc + 1 }
       .map { count =>
         if (logger.isDebugEnabled) logger.debug(s"$count records were successfully written to $path")
-        writer.close()
+        try writer.close()
+        catch {
+          case _: NullPointerException => // ignores bug in Parquet
+        }
       }
       .recover { case NonFatal(e) =>
         Try(writer.close())
