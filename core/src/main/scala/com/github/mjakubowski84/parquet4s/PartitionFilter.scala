@@ -218,6 +218,8 @@ private class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPr
       udp.getUserDefined.getUserDefinedPredicate.keep(partitionValue.asInstanceOf[T])
     }
 
+  // TODO support In and NotIn
+
   private def applyOperator[T <: Comparable[T]](column: Column[T])(op: Binary => Boolean): Boolean = {
     val columnPath = ColumnPath(column.getColumnPath)
     val filterType = column.getColumnType
