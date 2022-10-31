@@ -1,8 +1,9 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.ParquetRecordDecoder.{DecodingException, decode}
-import com.github.mjakubowski84.parquet4s.TestCases._
-import com.github.mjakubowski84.parquet4s.ValueImplicits._
+import com.github.mjakubowski84.parquet4s.TestCases.*
+import com.github.mjakubowski84.parquet4s.TimeValueCodecs.localDateTimeToTimestamp
+import com.github.mjakubowski84.parquet4s.ValueImplicits.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -60,7 +61,7 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
 
     val expectedData = TimePrimitives(
       localDateTime = dateTime,
-      sqlTimestamp  = java.sql.Timestamp.valueOf(dateTime),
+      sqlTimestamp  = localDateTimeToTimestamp(dateTime, timeZone),
       localDate     = date,
       sqlDate       = java.sql.Date.valueOf(date)
     )
@@ -85,7 +86,7 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
 
     val expectedData = TimePrimitives(
       localDateTime = dateTime,
-      sqlTimestamp  = java.sql.Timestamp.valueOf(dateTime),
+      sqlTimestamp  = localDateTimeToTimestamp(dateTime, timeZone),
       localDate     = date,
       sqlDate       = java.sql.Date.valueOf(date)
     )
@@ -110,7 +111,7 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
 
     val expectedData = TimePrimitives(
       localDateTime = dateTime,
-      sqlTimestamp  = java.sql.Timestamp.valueOf(dateTime),
+      sqlTimestamp  = localDateTimeToTimestamp(dateTime, TimeZone.getTimeZone("UTC")),
       localDate     = date,
       sqlDate       = java.sql.Date.valueOf(date)
     )
@@ -136,7 +137,7 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
 
     val expectedData = TimePrimitives(
       localDateTime = dateTime,
-      sqlTimestamp  = java.sql.Timestamp.valueOf(dateTime),
+      sqlTimestamp  = localDateTimeToTimestamp(dateTime, TimeZone.getTimeZone("UTC")),
       localDate     = date,
       sqlDate       = java.sql.Date.valueOf(date)
     )

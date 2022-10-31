@@ -4,9 +4,9 @@ import Documentation._
 import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
-lazy val twoTwelve              = "2.12.16"
-lazy val twoThirteen            = "2.13.8"
-lazy val three                  = "3.1.2"
+lazy val twoTwelve              = "2.12.17"
+lazy val twoThirteen            = "2.13.10"
+lazy val three                  = "3.2.0"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
@@ -15,10 +15,8 @@ ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
-ThisBuild / resolvers := Seq(
-  Opts.resolver.sonatypeReleases,
-  Resolver.jcenterRepo
-)
+ThisBuild / resolvers := Opts.resolver.sonatypeOssReleases :+ Resolver.jcenterRepo
+
 ThisBuild / makePomConfiguration := makePomConfiguration.value.withConfigurations(
   Configurations.defaultMavenConfigurations
 )
@@ -44,13 +42,13 @@ lazy val compilationSettings = Seq(
         case Some((3, _)) =>
           Seq(
             "-unchecked",
-            "-Xtarget:8"
+            "-release:8"
           )
         case _ =>
           Seq(
             "-deprecation",
             "-Xsource:3",
-            "-target:jvm-1.8"
+            "-release:8"
           )
       }
     }
@@ -93,12 +91,12 @@ lazy val core = (project in file("core"))
         exclude (org = "org.slf4j", name = "slf4j-api"),
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.7.0",
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.8.1",
 
       // tests
-      "org.mockito" % "mockito-core" % "4.6.1" % "test",
-      "org.scalatest" %% "scalatest" % "3.2.12" % "test,it",
-      "ch.qos.logback" % "logback-classic" % "1.2.11" % "test,it",
+      "org.mockito" % "mockito-core" % "4.8.0" % "test",
+      "org.scalatest" %% "scalatest" % "3.2.14" % "test,it",
+      "ch.qos.logback" % "logback-classic" % "1.3.4" % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
       CrossVersion.partialVersion(scalaBinaryVersion.value) match {
@@ -164,14 +162,14 @@ lazy val examples = (project in file("examples"))
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.2.0",
-      "ch.qos.logback" % "logback-classic" % "1.2.11",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.3.1",
+      "ch.qos.logback" % "logback-classic" % "1.3.4",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % {
-        if (scalaVersion.value == twoThirteen) { "3.0.0" }
+        if (scalaVersion.value == twoThirteen) { "3.0.1" }
         else { "2.1.1" }
       },
-      "com.github.fd4s" %% "fs2-kafka" % "2.4.0",
+      "com.github.fd4s" %% "fs2-kafka" % "2.5.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(
@@ -252,7 +250,7 @@ lazy val documentation = (project in file("site"))
   .settings(
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "mdoc" % "2.3.2",
+      "org.scalameta" %% "mdoc" % "2.3.5",
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
@@ -261,7 +259,7 @@ lazy val documentation = (project in file("site"))
       ExclusionRule("org.scala-lang.modules", "scala-collection-compat_2.13")
     ),
     dependencyOverrides ++= Seq(
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.7.0"
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.8.1"
     )
   )
   .dependsOn(core, akka, fs2)

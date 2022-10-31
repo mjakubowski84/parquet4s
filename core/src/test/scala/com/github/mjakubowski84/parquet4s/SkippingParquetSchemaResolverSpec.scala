@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.LogicalTypes._
+import com.github.mjakubowski84.parquet4s.LogicalTypes.*
 import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.resolveSchema
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.{BINARY, INT32}
 import org.apache.parquet.schema.Type.Repetition.{OPTIONAL, REQUIRED}
@@ -13,6 +13,8 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   case class Street(name: String, more: Option[String])
   case class Address(street: Street, city: String)
   case class Person(name: String, age: Int, address: Address)
+
+  // TODO test case for skipping optional group or a collection field!
 
   implicit val fullSchema: MessageType = Message(
     Some(classOf[Person].getCanonicalName),
@@ -91,6 +93,18 @@ class SkippingParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   it should "process empty class" in {
     case class Empty()
     resolveSchema[Empty](Set(Col("field"))) should be(Message(None))
+  }
+
+  it should "skip optional field" in {
+    case class Clazz(field: Option[String])
+    resolveSchema[Clazz](Set(Col("field"))) should be(Message(None))
+  }
+
+  // TODO should we support skipping nested values inside option even when partitioning by it is not supported?
+  ignore should "skip optional group" in {
+    case class Row(field: String)
+    case class Clazz(opt: Option[Row])
+    resolveSchema[Clazz](Set(Col("opt.field"))) should be(Message(None))
   }
 
   "Generic skipping ParquetSchemaResolver" should "create unpartitioned schema" in {

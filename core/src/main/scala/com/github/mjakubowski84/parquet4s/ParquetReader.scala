@@ -144,7 +144,10 @@ object ParquetReader extends IOOps {
     * @param hadoopConf
     *   use it to programmatically override Hadoop's [[org.apache.hadoop.conf.Configuration]]
     */
-  case class Options(timeZone: TimeZone = TimeZone.getDefault, hadoopConf: Configuration = new Configuration())
+  case class Options(
+      timeZone: TimeZone        = TimeZone.getDefault,
+      hadoopConf: Configuration = new Configuration()
+  )
 
   override val logger: Logger = LoggerFactory.getLogger(this.getClass)
 

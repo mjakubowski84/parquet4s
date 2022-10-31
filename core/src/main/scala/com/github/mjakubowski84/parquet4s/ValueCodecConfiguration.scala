@@ -10,7 +10,7 @@ import java.util.TimeZone
 case class ValueCodecConfiguration(timeZone: TimeZone)
 
 object ValueCodecConfiguration {
-  val Default: ValueCodecConfiguration = ValueCodecConfiguration(TimeZone.getDefault)
+  val Default: ValueCodecConfiguration = ValueCodecConfiguration(timeZone = TimeZone.getDefault)
 
   def apply(readerOptions: ParquetReader.Options): ValueCodecConfiguration =
     ValueCodecConfiguration(readerOptions.timeZone)

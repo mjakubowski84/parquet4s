@@ -99,9 +99,9 @@ object ParquetSchemaResolver:
     */
   given productSchemaVisitor[V <: Product: ParquetSchemaResolver: TSD]: SchemaVisitor[V] with
     def onActive(cursor: Cursor, fieldName: String): Option[Type] =
-      summon[TSD[V]].wrapped match
+      summon[TSD[V]] match
         // override fields only in generated groups (records), custom ones provided by users are not processed
-        case schema: GroupSchemaDef if schema.metadata.contains(SchemaDef.Meta.Generated) =>
+        case schema if schema.isGroup && schema.metadata.contains(SchemaDef.Meta.Generated) =>
           summon[ParquetSchemaResolver[V]].resolveSchema(cursor) match
             case Nil =>
               None

@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.CompatibilityParty.CompatibilityParty
 
-import java.util.NoSuchElementException
 import scala.reflect.runtime.universe.TypeTag
 
 object CompatibilityParty {
@@ -16,7 +15,7 @@ object CompatibilityParty {
 
 object Case {
 
-  type CaseDef = Case[_ <: Product]
+  type CaseDef = Case[? <: Product]
 
   def apply[T <: Product: TypeTag: ParquetRecordDecoder: ParquetRecordEncoder: ParquetSchemaResolver](
       description: String,

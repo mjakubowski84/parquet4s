@@ -7,7 +7,9 @@ import org.apache.parquet.schema.*
 import org.apache.parquet.schema.LogicalTypeAnnotation.{
   DecimalLogicalTypeAnnotation,
   ListLogicalTypeAnnotation,
-  MapLogicalTypeAnnotation
+  MapLogicalTypeAnnotation,
+  TimeLogicalTypeAnnotation,
+  TimestampLogicalTypeAnnotation
 }
 
 import java.math.MathContext
@@ -62,6 +64,8 @@ abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](schema: 
           scale     = ann.getScale,
           precision = ann.getPrecision
         )
+      case Some(ann: TimestampLogicalTypeAnnotation) =>
+        new DateTimeConverter(name = fieldName, timeUnit = ann.getUnit)
       case _ if field.isPrimitive =>
         new ParquetPrimitiveConverter(fieldName)
       case Some(_: MapLogicalTypeAnnotation) =>
@@ -110,6 +114,21 @@ abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](schema: 
         else value
       record = record.add(name, BinaryValue(rescaled))
     }
+  }
+
+  private class DateTimeConverter(name: String, timeUnit: LogicalTypeAnnotation.TimeUnit)
+      extends ParquetPrimitiveConverter(name) {
+    private val format = timeUnit match {
+      case LogicalTypeAnnotation.TimeUnit.MILLIS =>
+        TimestampFormat.Int64Millis
+      case LogicalTypeAnnotation.TimeUnit.MICROS =>
+        TimestampFormat.Int64Micros
+      case LogicalTypeAnnotation.TimeUnit.NANOS =>
+        TimestampFormat.Int64Nanos
+    }
+
+    override def addLong(value: Long): Unit =
+      record = record.add(name, DateTimeValue(value, format))
   }
 
 }

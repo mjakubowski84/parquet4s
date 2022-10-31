@@ -1,12 +1,13 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.SchemaDef.Meta
-import org.apache.parquet.schema.*
+import org.apache.parquet.schema.{Types, *}
 import org.apache.parquet.schema.LogicalTypeAnnotation.{
   DateLogicalTypeAnnotation,
   DecimalLogicalTypeAnnotation,
   IntLogicalTypeAnnotation,
-  StringLogicalTypeAnnotation
+  StringLogicalTypeAnnotation,
+  TimestampLogicalTypeAnnotation
 }
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.*
 import org.apache.parquet.schema.Type.Repetition
@@ -91,6 +92,7 @@ object SchemaDef {
     required = false,
     metadata = Set.empty
   )
+
 }
 
 object LogicalTypes {
@@ -101,6 +103,18 @@ object LogicalTypes {
   val DecimalType: DecimalLogicalTypeAnnotation = LogicalTypeAnnotation.decimalType(Decimals.Scale, Decimals.Precision)
   val StringType: StringLogicalTypeAnnotation   = LogicalTypeAnnotation.stringType()
   val DateType: DateLogicalTypeAnnotation       = LogicalTypeAnnotation.dateType()
+  val TimestampMillisType: TimestampLogicalTypeAnnotation = LogicalTypeAnnotation.timestampType(
+    true,
+    LogicalTypeAnnotation.TimeUnit.MILLIS
+  )
+  val TimestampMicrosType: TimestampLogicalTypeAnnotation = LogicalTypeAnnotation.timestampType(
+    true,
+    LogicalTypeAnnotation.TimeUnit.MICROS
+  )
+  val TimestampNanosType: TimestampLogicalTypeAnnotation = LogicalTypeAnnotation.timestampType(
+    true,
+    LogicalTypeAnnotation.TimeUnit.NANOS
+  )
 }
 
 private case class PrimitiveSchemaDef(
@@ -190,13 +204,17 @@ private case class MapSchemaDef(key: Type, value: Type, required: Boolean, metad
 /** [[SchemaDef]] for type `V`.
   */
 trait TypedSchemaDef[V] extends SchemaDef {
-  private[parquet4s] def wrapped: SchemaDef
+  private[parquet4s] def isGroup: Boolean
 }
 
 object TypedSchemaDef extends PrimitiveSchemaDefs with TimeValueSchemaDefs with ComplexSchemaDefs {
   private[parquet4s] def wrap[V](schemaDef: SchemaDef): TypedSchemaDef[V] =
     new TypedSchemaDef[V] {
-      override val wrapped: SchemaDef = schemaDef
+      override val isGroup: Boolean = schemaDef match {
+        case typed: TypedSchemaDef[?] => typed.isGroup
+        case _: GroupSchemaDef        => true
+        case _                        => false
+      }
       override type Self = TypedSchemaDef[V]
       override def apply(name: String): Type                                 = schemaDef.apply(name)
       override def withRequired(required: Boolean): Self                     = wrap[V](schemaDef.withRequired(required))

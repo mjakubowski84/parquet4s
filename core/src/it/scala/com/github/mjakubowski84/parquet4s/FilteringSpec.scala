@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import java.nio.file.Files
-import java.time.LocalDate
+import java.time.{LocalDate, LocalDateTime, LocalTime}
 import org.apache.parquet.filter2.predicate.Operators.{Column, DoubleColumn, FloatColumn, SupportsLtGt}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -21,18 +21,27 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
       `enum`: String,
       flag: Boolean,
       date: LocalDate,
+      dateTime: LocalDateTime,
       decimal: BigDecimal,
       embedded: Embedded
   )
 
-  val `enum`: Seq[String] = List("a", "b", "c", "d")
-  val dataSize: Int       = 4096
-  val halfSize: Int       = dataSize / 2
-  val filePath: Path      = Path(Path(Files.createTempDirectory("example")), "file.parquet")
-  val zeroDate: LocalDate = LocalDate.of(1900, 1, 1)
+  val `enum`: Seq[String]         = List("a", "b", "c", "d")
+  val dataSize: Int               = 4096
+  val halfSize: Int               = dataSize / 2
+  val filePath: Path              = Path(Path(Files.createTempDirectory("example")), "file.parquet")
+  val millisFilePath: Path        = Path(Path(Files.createTempDirectory("example")), "millis.parquet")
+  val microsFilePath: Path        = Path(Path(Files.createTempDirectory("example")), "micros.parquet")
+  val nanosFilePath: Path         = Path(Path(Files.createTempDirectory("example")), "nanos.parquet")
+  val zeroDate: LocalDate         = LocalDate.of(1900, 1, 1)
+  val zeroDateTime: LocalDateTime = LocalDateTime.of(zeroDate, LocalTime.ofNanoOfDay(0))
 
   implicit val localDateOrdering: Ordering[LocalDate] = new Ordering[LocalDate] {
     override def compare(x: LocalDate, y: LocalDate): Int = x.compareTo(y)
+  }
+
+  implicit val localDateTimeOrdering: Ordering[LocalDateTime] = new Ordering[LocalDateTime] {
+    override def compare(x: LocalDateTime, y: LocalDateTime): Int = x.compareTo(y)
   }
 
   def data: LazyList[Data] =
@@ -44,6 +53,7 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
         `enum`   = `enum`(Random.nextInt(`enum`.size)),
         flag     = Random.nextBoolean(),
         date     = zeroDate.plusDays(i),
+        dateTime = zeroDateTime.plusSeconds(i),
         decimal  = BigDecimal.valueOf(0.001 * (i - halfSize)),
         embedded = Embedded(i)
       )
@@ -51,20 +61,42 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
 
   override def beforeAll(): Unit = {
     super.beforeAll()
-    ParquetWriter
-      .of[Data]
-      .options(
-        ParquetWriter.Options(
-          rowGroupSize       = 512 * 1024,
-          pageSize           = 128 * 1024,
-          dictionaryPageSize = 128 * 1024
-        )
-      )
-      .writeAndClose(filePath, data)
+    val options = ParquetWriter.Options(
+      rowGroupSize       = 512 * 1024,
+      pageSize           = 128 * 1024,
+      dictionaryPageSize = 128 * 1024
+    )
+    locally {
+      ParquetWriter
+        .of[Data]
+        .options(options)
+        .writeAndClose(filePath, data)
+    }
+    locally {
+      import TimestampFormat.Implicits.Millis.*
+      ParquetWriter
+        .of[Data]
+        .options(options)
+        .writeAndClose(millisFilePath, data)
+    }
+    locally {
+      import TimestampFormat.Implicits.Micros.*
+      ParquetWriter
+        .of[Data]
+        .options(options)
+        .writeAndClose(microsFilePath, data)
+    }
+    locally {
+      import TimestampFormat.Implicits.Nanos.*
+      ParquetWriter
+        .of[Data]
+        .options(options)
+        .writeAndClose(nanosFilePath, data)
+    }
   }
 
-  def read(filter: Filter): Seq[Data] = {
-    val iter = ParquetReader.as[Data].filter(filter).read(filePath)
+  def read(filter: Filter, path: Path = filePath): Seq[Data] = {
+    val iter = ParquetReader.as[Data].filter(filter).read(path)
     try iter.toSeq
     finally iter.close()
   }
@@ -72,23 +104,24 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
   def ltGtTest[T: Ordering, V <: Comparable[V], C <: Column[V] & SupportsLtGt](
       columnName: String,
       boundaryValue: T,
-      field: Data => T
+      field: Data => T,
+      path: Path = filePath
   )(implicit codec: FilterCodec[T, V, C]): Assertion = {
-    forExactly(halfSize, read(Col(columnName) < boundaryValue)) { dataRecord =>
+    forExactly(halfSize, read(Col(columnName) < boundaryValue, path)) { dataRecord =>
       field(dataRecord) should be < boundaryValue
     }
 
-    forExactly(halfSize + 1, read(Col(columnName) <= boundaryValue)) { dataRecord =>
+    forExactly(halfSize + 1, read(Col(columnName) <= boundaryValue, path)) { dataRecord =>
       field(dataRecord) should be <= boundaryValue
     }
 
-    field(read(Col(columnName) === boundaryValue).head) should be(boundaryValue)
+    field(read(Col(columnName) === boundaryValue, path).head) should be(boundaryValue)
 
-    forExactly(halfSize, read(Col(columnName) >= boundaryValue)) { dataRecord =>
+    forExactly(halfSize, read(Col(columnName) >= boundaryValue, path)) { dataRecord =>
       field(dataRecord) should be >= boundaryValue
     }
 
-    forExactly(halfSize - 1, read(Col(columnName) > boundaryValue)) { dataRecord =>
+    forExactly(halfSize - 1, read(Col(columnName) > boundaryValue, path)) { dataRecord =>
       field(dataRecord) should be > boundaryValue
     }
   }
@@ -136,6 +169,21 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
   }
 
   it should "filter data by date" in ltGtTest("date", zeroDate.plusDays(halfSize), _.date)
+
+  it should "filter data by dateTime INT64 millis" in {
+    import TimestampFormat.Implicits.Millis.*
+    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize), _.dateTime, millisFilePath)
+  }
+
+  it should "filter data by dateTime INT64 micros" in {
+    import TimestampFormat.Implicits.Micros.*
+    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize), _.dateTime, microsFilePath)
+  }
+
+  it should "filter data by dateTime INT64 nanos" in {
+    import TimestampFormat.Implicits.Nanos.*
+    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize), _.dateTime, nanosFilePath)
+  }
 
   it should "filter data by decimal" in ltGtTest("decimal", BigDecimal(0), _.decimal)
 

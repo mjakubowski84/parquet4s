@@ -1,36 +1,44 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.util.TimeZone
-
 import com.github.mjakubowski84.parquet4s.CompatibilityTestCases.TimePrimitives
+import com.github.mjakubowski84.parquet4s.TimeValueCodecs.*
 import org.scalatest.BeforeAndAfter
-import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.freespec.AnyFreeSpecLike
 import org.scalatest.matchers.should.Matchers
 
-class TimeEncodingCompatibilityItSpec extends AnyFlatSpec with Matchers with BeforeAndAfter with SparkHelper {
+import java.sql.Date
+import java.time.{LocalDate, LocalDateTime}
+import java.util.TimeZone
 
-  private val localTimeZone          = TimeZone.getDefault
-  private val utcTimeZone            = TimeZone.getTimeZone("UTC")
-  private lazy val newYearEveEvening = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2018, 12, 31, 23, 0, 0))
-  private lazy val newYearMidnight   = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2019, 1, 1, 0, 0, 0))
-  private lazy val newYear           = java.sql.Date.valueOf(java.time.LocalDate.of(2019, 1, 1))
+abstract class TimeEncodingCompatibilityItSpec
+    extends AnyFreeSpecLike
+    with Matchers
+    with BeforeAndAfter
+    with SparkHelper {
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    TimeZone.setDefault(utcTimeZone)
-  }
+  private val newYearMidnight = LocalDateTime.of(2019, 1, 1, 0, 0, 0)
+  private val newYear         = Date.valueOf(LocalDate.of(2019, 1, 1))
+  private val timeZones = List(
+    TimeZone.getTimeZone("GMT-1"),
+    TimeZone.getTimeZone("UTC"),
+    TimeZone.getTimeZone("GMT+1")
+  )
+
+  protected val parquetWriter: ParquetWriter.Builder[TimePrimitives] = ParquetWriter.of[TimePrimitives]
 
   before {
     clearTemp()
   }
 
   private def writeWithSpark(data: TimePrimitives): Unit = writeToTemp(Seq(data))
-  private def readWithSpark: TimePrimitives              = readFromTemp[TimePrimitives].head
+
+  private def readWithSpark: TimePrimitives = readFromTemp[TimePrimitives].head
+
   private def writeWithParquet4S(data: TimePrimitives, timeZone: TimeZone): Unit =
-    ParquetWriter
-      .of[TimePrimitives]
+    parquetWriter
       .options(ParquetWriter.Options(timeZone = timeZone))
       .writeAndClose(tempPath, Seq(data))
+
   private def readWithParquet4S(timeZone: TimeZone): TimePrimitives = {
     val parquetIterable =
       ParquetReader.as[TimePrimitives].options(ParquetReader.Options(timeZone = timeZone)).read(tempPath)
@@ -38,37 +46,20 @@ class TimeEncodingCompatibilityItSpec extends AnyFlatSpec with Matchers with Bef
     finally parquetIterable.close()
   }
 
-  "Spark" should "read properly time written with time zone one hour east" in {
-    val input          = TimePrimitives(timestamp = newYearMidnight, date = newYear)
-    val expectedOutput = TimePrimitives(timestamp = newYearEveEvening, date = newYear)
-    writeWithParquet4S(input, TimeZone.getTimeZone("GMT+1"))
-    readWithSpark should be(expectedOutput)
-  }
-
-  it should "read properly written with time zone one hour west" in {
-    val input          = TimePrimitives(timestamp = newYearEveEvening, date = newYear)
-    val expectedOutput = TimePrimitives(timestamp = newYearMidnight, date = newYear)
-    writeWithParquet4S(input, TimeZone.getTimeZone("GMT-1"))
-    readWithSpark should be(expectedOutput)
-  }
-
-  "Parquet4S" should "read properly time written with time zone one hour east" in {
-    val input          = TimePrimitives(timestamp = newYearMidnight, date = newYear)
-    val expectedOutput = TimePrimitives(timestamp = newYearEveEvening, date = newYear)
-    writeWithSpark(input)
-    readWithParquet4S(TimeZone.getTimeZone("GMT-1")) should be(expectedOutput)
-  }
-
-  it should "read properly time written with time zone one hour west" in {
-    val input          = TimePrimitives(timestamp = newYearEveEvening, date = newYear)
-    val expectedOutput = TimePrimitives(timestamp = newYearMidnight, date = newYear)
-    writeWithSpark(input)
-    readWithParquet4S(TimeZone.getTimeZone("GMT+1")) should be(expectedOutput)
-  }
-
-  override def afterAll(): Unit = {
-    TimeZone.setDefault(localTimeZone)
-    super.afterAll()
+  "For time zone of" - {
+    timeZones.foreach { timeZone =>
+      val data = TimePrimitives(timestamp = localDateTimeToTimestamp(newYearMidnight, timeZone), date = newYear)
+      timeZone.getDisplayName - {
+        "Spark should read data written by Parquet4s" in {
+          writeWithParquet4S(data, timeZone)
+          readWithSpark should be(data)
+        }
+        "Parquet4s should read data written by Spark" in {
+          writeWithSpark(data)
+          readWithParquet4S(timeZone) should be(data)
+        }
+      }
+    }
   }
 
 }

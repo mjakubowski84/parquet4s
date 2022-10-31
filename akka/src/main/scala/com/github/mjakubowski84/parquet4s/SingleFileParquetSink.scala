@@ -63,9 +63,9 @@ object SingleFileParquetSink {
       path: Path,
       options: ParquetWriter.Options = ParquetWriter.Options()
   ): Sink[T, Future[Done]] = {
+    val valueCodecConfiguration = ValueCodecConfiguration(options)
     val schema                  = ParquetSchemaResolver.resolveSchema[T]
     val writer                  = ParquetWriter.internalWriter(path, schema, options)
-    val valueCodecConfiguration = ValueCodecConfiguration(options)
 
     def encode(data: T): RowParquetRecord = ParquetRecordEncoder.encode[T](data, valueCodecConfiguration)
 

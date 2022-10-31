@@ -1,13 +1,14 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.time.LocalDate
-import java.util.TimeZone
+import java.time.{Instant, LocalDate, LocalDateTime, ZoneId}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.util.TimeZone
+
 class FilterSpec extends AnyFlatSpec with Matchers {
 
-  private val valueCodecConfiguration = ValueCodecConfiguration.Default
+  private val valueCodecConfiguration = ValueCodecConfiguration.apply(TimeZone.getTimeZone("UTC"))
 
   "Filter" should "build eq predicate" in {
     val predicate = (Col("i") === 1).toPredicate(valueCodecConfiguration)
@@ -118,6 +119,20 @@ class FilterSpec extends AnyFlatSpec with Matchers {
     val predicate =
       (Col("date") === java.sql.Date.valueOf(LocalDate.of(1970, 1, 1))).toPredicate(valueCodecConfiguration)
     predicate.toString should be("eq(date, 0)")
+  }
+
+  it should "build predicate for java.time.LocalDateTime" in {
+    import TimestampFormat.Implicits.Millis.*
+    val dateTime  = LocalDateTime.ofInstant(Instant.ofEpochMilli(1L), ZoneId.of("UTC"))
+    val predicate = (Col("dateTime") === dateTime).toPredicate(valueCodecConfiguration)
+    predicate.toString should be("eq(dateTime, 1)")
+  }
+
+  it should "build predicate for java.sql.Timestamp" in {
+    import TimestampFormat.Implicits.Millis.*
+    val timestamp = java.sql.Timestamp.from(Instant.ofEpochMilli(1L))
+    val predicate = (Col("dateTime") === timestamp).toPredicate(valueCodecConfiguration)
+    predicate.toString should be("eq(dateTime, 1)")
   }
 
   it should "build udp" in {

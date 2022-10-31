@@ -1,7 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.io.Closeable
-import java.util.TimeZone
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.WriteSupport
 import org.apache.parquet.hadoop.api.WriteSupport.WriteContext
@@ -11,6 +9,8 @@ import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.MessageType
 import org.slf4j.LoggerFactory
 
+import java.io.Closeable
+import java.util.TimeZone
 import scala.annotation.implicitNotFound
 import scala.jdk.CollectionConverters.*
 
@@ -180,14 +180,14 @@ private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
     path: Path,
     options: ParquetWriter.Options
 ) extends ParquetWriter[T] {
+  private val valueCodecConfiguration = ValueCodecConfiguration(options)
+  private val logger                  = LoggerFactory.getLogger(this.getClass)
   private val internalWriter = ParquetWriter.internalWriter(
     path    = path,
     schema  = ParquetSchemaResolver.resolveSchema[T],
     options = options
   )
-  private val valueCodecConfiguration = ValueCodecConfiguration(options)
-  private val logger                  = LoggerFactory.getLogger(this.getClass)
-  private var closed                  = false
+  private var closed = false
 
   override def write(data: Iterable[T]): Unit =
     if (closed) {

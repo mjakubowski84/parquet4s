@@ -9,11 +9,24 @@ trait SparkHelper extends BeforeAndAfterAll with TestUtils {
 
   this: Suite =>
 
+  sealed trait OutputTimestampType
+  case object Int96 extends OutputTimestampType
+  case object TIMESTAMP_MICROS extends OutputTimestampType
+  case object TIMESTAMP_MILLIS extends OutputTimestampType
+
   private var sparkStarted = false
+
+  protected def outputTimestampType: OutputTimestampType = Int96
 
   lazy val sparkSession: SparkSession = {
     sparkStarted = true
-    SparkSession.builder().master("local[2]").appName(getClass.getSimpleName).getOrCreate()
+    SparkSession
+      .builder()
+      .master("local[2]")
+      .appName(getClass.getSimpleName)
+      .config("spark.sql.parquet.outputTimestampType", outputTimestampType.toString)
+      .config("spark.sql.session.timeZone", "UTC")
+      .getOrCreate()
   }
 
   override def afterAll(): Unit = {
