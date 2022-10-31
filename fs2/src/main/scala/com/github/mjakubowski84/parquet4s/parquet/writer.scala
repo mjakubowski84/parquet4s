@@ -111,8 +111,8 @@ private[parquet4s] object writer {
   )(implicit F: Sync[F]): Resource[F, Writer[T, F]] =
     Resource.fromAutoCloseable(
       for {
-        schema                  <- F.catchNonFatal(ParquetSchemaResolver.resolveSchema[T])
         valueCodecConfiguration <- F.catchNonFatal(ValueCodecConfiguration(options))
+        schema                  <- F.catchNonFatal(ParquetSchemaResolver.resolveSchema[T])
         internalWriter <- F.delay(scala.concurrent.blocking(ParquetWriter.internalWriter(path, schema, options)))
         encode = { (entity: T) => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)) }
       } yield new Writer[T, F](internalWriter, encode)

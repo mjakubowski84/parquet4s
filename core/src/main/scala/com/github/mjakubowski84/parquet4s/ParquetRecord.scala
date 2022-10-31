@@ -139,8 +139,9 @@ object RowParquetRecord {
 
   implicit def genericParquetSchemaResolver(implicit message: MessageType): ParquetSchemaResolver[RowParquetRecord] =
     new ParquetSchemaResolver[RowParquetRecord] {
-      override def schemaName: Option[String]                = Option(message.getName)
-      override def resolveSchema(cursor: Cursor): List[Type] = skipFields(cursor, message.getFields.asScala.toList)
+      override def schemaName: Option[String] = Option(message.getName)
+      override def resolveSchema(cursor: Cursor): List[Type] =
+        skipFields(cursor, message.getFields.asScala.toList)
 
       private def skipFields(cursor: Cursor, fields: List[Type]): List[Type] =
         fields.flatMap {

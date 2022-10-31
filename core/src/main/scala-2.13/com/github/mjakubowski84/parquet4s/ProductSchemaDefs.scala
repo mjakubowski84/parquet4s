@@ -7,6 +7,9 @@ trait ProductSchemaDefs {
       ev: LowPriority,
       parquetSchemaResolver: ParquetSchemaResolver[T]
   ): TypedSchemaDef[T] =
-    SchemaDef.group(parquetSchemaResolver.resolveSchema(Cursor.simple)*).withMetadata(SchemaDef.Meta.Generated).typed[T]
+    SchemaDef
+      .group(parquetSchemaResolver.resolveSchema(Cursor.simple)*)
+      .withMetadata(SchemaDef.Meta.Generated)
+      .typed[T]
 
 }

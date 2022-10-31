@@ -1,7 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import java.util.TimeZone
-
 import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
 import com.github.mjakubowski84.parquet4s.PartitionFilterRewriter.AssumeTrue
 import com.github.mjakubowski84.parquet4s.PartitionFilterSpec.IsUppercase
@@ -9,17 +7,17 @@ import org.apache.commons.lang3.StringUtils
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.compat.FilterCompat.FilterPredicateCompat
 import org.apache.parquet.filter2.predicate.FilterApi.{
-  and         => AND,
-  eq          => EQ,
-  gt          => GT,
-  gtEq        => GTE,
-  lt          => LT,
-  ltEq        => LTE,
-  not         => NOT,
-  notEq       => NEQ,
-  or          => OR,
-  userDefined => UDP,
-  _
+  and as AND,
+  eq as EQ,
+  gt as GT,
+  gtEq as GTE,
+  lt as LT,
+  ltEq as LTE,
+  not as NOT,
+  notEq as NEQ,
+  or as OR,
+  userDefined as UDP,
+  *
 }
 import org.apache.parquet.filter2.predicate.{FilterPredicate, Operators, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary

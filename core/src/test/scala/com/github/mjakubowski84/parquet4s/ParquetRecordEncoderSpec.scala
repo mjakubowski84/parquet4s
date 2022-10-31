@@ -2,12 +2,12 @@ package com.github.mjakubowski84.parquet4s
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.TimeZone
-
 import com.github.mjakubowski84.parquet4s.ParquetRecordEncoder.{EncodingException, encode}
-import com.github.mjakubowski84.parquet4s.TestCases._
-import com.github.mjakubowski84.parquet4s.ValueImplicits._
+import com.github.mjakubowski84.parquet4s.TestCases.*
+import com.github.mjakubowski84.parquet4s.ValueImplicits.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import TimeValueCodecs.*
 
 class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
 
@@ -52,7 +52,7 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
 
     val data = TimePrimitives(
       localDateTime = dateTime,
-      sqlTimestamp  = java.sql.Timestamp.valueOf(dateTime),
+      sqlTimestamp  = localDateTimeToTimestamp(dateTime, timeZone),
       localDate     = date,
       sqlDate       = java.sql.Date.valueOf(date)
     )
@@ -79,7 +79,7 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "encode record containing time values using UTC time zone" in {
-    val timeZone: TimeZone = TimeZone.getTimeZone("UTC")
+    val timeZone = TimeZone.getTimeZone("UTC")
 
     val date     = java.time.LocalDate.of(2019, 1, 1)
     val time     = java.time.LocalTime.of(0, 0, 0)
@@ -87,7 +87,7 @@ class ParquetRecordEncoderSpec extends AnyFlatSpec with Matchers {
 
     val data = TimePrimitives(
       localDateTime = dateTime,
-      sqlTimestamp  = java.sql.Timestamp.valueOf(dateTime),
+      sqlTimestamp  = localDateTimeToTimestamp(dateTime, timeZone),
       localDate     = date,
       sqlDate       = java.sql.Date.valueOf(date)
     )

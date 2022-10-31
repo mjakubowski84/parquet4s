@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.{TypedSchemaDef => TSD}
+import com.github.mjakubowski84.parquet4s.TypedSchemaDef as TSD
 import org.apache.parquet.schema.*
 import org.slf4j.LoggerFactory
 import shapeless.*
@@ -110,17 +110,16 @@ object ParquetSchemaResolver {
     */
   implicit def productSchemaVisitor[V](implicit resolver: ParquetSchemaResolver[V]): SchemaVisitor[V] =
     (cursor: Cursor, invoker: TypedSchemaDefInvoker[V]) =>
-      invoker.schema.wrapped match {
-        // override fields only in generated groups (records), custom ones provided by users are not processed
-        case _: GroupSchemaDef if invoker.schema.metadata.contains(SchemaDef.Meta.Generated) =>
-          resolver.resolveSchema(cursor) match {
-            case Nil =>
-              None
-            case fieldTypes =>
-              Option(invoker().asGroupType().withNewFields(fieldTypes*))
-          }
-        case _ =>
-          Option(invoker())
+      // override fields only in generated groups (records), custom ones provided by users are not processed
+      if (invoker.schema.isGroup && invoker.schema.metadata.contains(SchemaDef.Meta.Generated)) {
+        resolver.resolveSchema(cursor) match {
+          case Nil =>
+            None
+          case fieldTypes =>
+            Option(invoker().asGroupType().withNewFields(fieldTypes*))
+        }
+      } else {
+        Option(invoker())
       }
 
 }

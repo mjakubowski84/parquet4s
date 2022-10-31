@@ -1,20 +1,17 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.CompatibilityTestCases.TimePrimitives
-import com.github.mjakubowski84.parquet4s.TimeValueCodecs.*
+import com.github.mjakubowski84.parquet4s.TimeValueCodecs.localDateTimeToTimestamp
 import org.scalatest.BeforeAndAfter
-import org.scalatest.freespec.AnyFreeSpecLike
+import org.scalatest.freespec.AnyFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import java.sql.Date
 import java.time.{LocalDate, LocalDateTime}
 import java.util.TimeZone
+import TimestampFormat.Implicits.Nanos.*
 
-abstract class TimeEncodingCompatibilityItSpec
-    extends AnyFreeSpecLike
-    with Matchers
-    with BeforeAndAfter
-    with SparkHelper {
+class TimeEncodingInt64NanosCompatibilityItSpec extends AnyFreeSpec with Matchers with BeforeAndAfter with TestUtils {
 
   private val newYearMidnight = LocalDateTime.of(2019, 1, 1, 0, 0, 0)
   private val newYear         = Date.valueOf(LocalDate.of(2019, 1, 1))
@@ -24,18 +21,13 @@ abstract class TimeEncodingCompatibilityItSpec
     TimeZone.getTimeZone("GMT+1")
   )
 
-  protected val parquetWriter: ParquetWriter.Builder[TimePrimitives] = ParquetWriter.of[TimePrimitives]
-
   before {
     clearTemp()
   }
 
-  private def writeWithSpark(data: TimePrimitives): Unit = writeToTemp(Seq(data))
-
-  private def readWithSpark: TimePrimitives = readFromTemp[TimePrimitives].head
-
   private def writeWithParquet4S(data: TimePrimitives, timeZone: TimeZone): Unit =
-    parquetWriter
+    ParquetWriter
+      .of[TimePrimitives]
       .options(ParquetWriter.Options(timeZone = timeZone))
       .writeAndClose(tempPath, Seq(data))
 
@@ -46,18 +38,12 @@ abstract class TimeEncodingCompatibilityItSpec
     finally parquetIterable.close()
   }
 
-  "For time zone of" - {
+  "Parquet4s should read data written with time zone of" - {
     timeZones.foreach { timeZone =>
       val data = TimePrimitives(timestamp = localDateTimeToTimestamp(newYearMidnight, timeZone), date = newYear)
-      timeZone.getDisplayName - {
-        "Spark should read data written by Parquet4s" in {
-          writeWithParquet4S(data, timeZone)
-          readWithSpark should be(data)
-        }
-        "Parquet4s should read data written by Spark" in {
-          writeWithSpark(data)
-          readWithParquet4S(timeZone) should be(data)
-        }
+      timeZone.getDisplayName in {
+        writeWithParquet4S(data, timeZone)
+        readWithParquet4S(timeZone) should be(data)
       }
     }
   }

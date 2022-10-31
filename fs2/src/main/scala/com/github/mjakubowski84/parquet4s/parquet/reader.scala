@@ -174,7 +174,7 @@ object reader {
                 case None =>
                   0 -> chunk
                 case Some(record) =>
-                  (i - 1) -> (chunk.appendK(record))
+                  (i - 1) -> chunk.appendK(record)
               }
             })
           }(_._1 != 0)

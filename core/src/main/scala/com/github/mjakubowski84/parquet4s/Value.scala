@@ -61,6 +61,10 @@ case class BooleanValue(value: Boolean) extends AnyVal with PrimitiveValue[Boole
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addBoolean(value)
 }
 
+case class DateTimeValue(value: Long, format: TimestampFormat.Format) extends PrimitiveValue[Long] {
+  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addLong(value)
+}
+
 /** Special instance of [[Value]] that represents lack of the value. [[NullValue]] does not hold any data so it cannot
   * be written.
   */

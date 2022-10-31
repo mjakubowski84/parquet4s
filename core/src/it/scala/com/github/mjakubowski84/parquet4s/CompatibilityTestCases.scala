@@ -1,6 +1,12 @@
 package com.github.mjakubowski84.parquet4s
 
+import TimeValueCodecs.localDateTimeToTimestamp
+
+import java.util.TimeZone
+
 object CompatibilityTestCases extends TestCaseSupport {
+
+  private val timeZone = TimeZone.getTimeZone("UTC")
 
   // Primitives
   case class Primitives(
@@ -138,15 +144,15 @@ object CompatibilityTestCases extends TestCaseSupport {
       "time primitives",
       Seq(
         TimePrimitives(
-          timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2019, 1, 1, 0, 0, 0)),
+          timestamp = localDateTimeToTimestamp(java.time.LocalDateTime.of(2019, 1, 1, 0, 0, 0), timeZone),
           date      = java.sql.Date.valueOf(java.time.LocalDate.of(2019, 1, 1))
         ),
         TimePrimitives(
-          timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2019, 1, 1, 0, 30, 0, 2000)),
+          timestamp = localDateTimeToTimestamp(java.time.LocalDateTime.of(2019, 1, 1, 0, 30, 0, 2000), timeZone),
           date      = java.sql.Date.valueOf(java.time.LocalDate.of(2019, 1, 1))
         ),
         TimePrimitives(
-          timestamp = java.sql.Timestamp.valueOf(java.time.LocalDateTime.of(2018, 12, 31, 23, 30, 0, 999000)),
+          timestamp = localDateTimeToTimestamp(java.time.LocalDateTime.of(2018, 12, 31, 23, 30, 0, 999000), timeZone),
           date      = java.sql.Date.valueOf(java.time.LocalDate.of(2018, 12, 31))
         ),
         TimePrimitives(timestamp = null, date = null)
