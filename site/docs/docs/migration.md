@@ -12,15 +12,15 @@ In 1.x `ParquetRecord` and its implementations were mutable `Iterable`s.\
 In 2.x those classes are immutable. That is, any modification on a record returns a new instance.
 
 In 1.x when reading using generic records `RowParquetRecord` had no entries for missing optional fields.\
-In 2.x each field is represented in `RowParquerRecord`, the order is kept, and `NullValue` represents tmissing data.
+In 2.x each field is represented in `RowParquerRecord`, the order is kept, and `NullValue` represents missing data.
 
 ## Type classes
 
-`SkippingParquetSchemaResolver` and `SkippingParquetRecordEncoder` are removed in 2.x and their logic is merged to regular `ParquetSchemaResolver` and `ParquetRecordEncoder`.
+`SkippingParquetSchemaResolver` and `SkippingParquetRecordEncoder` are removed in 2.x and their logic is merged into regular `ParquetSchemaResolver` and `ParquetRecordEncoder`.
 
 `PartitionLens` is removed in 2.x. Its functionality is now available in the API of `RowParquetRecord`.
 
-`ValueCodec` now composes `ValueDecoder` and `ValueEncoder` what allows writing custom encoders or decoders without implementing both.
+`ValueCodec` now composes `ValueDecoder` and `ValueEncoder` which allows writing custom encoders or decoders without implementing both.
 
 ### Core API changes
 
@@ -234,7 +234,7 @@ ParquetStreams
 ```
 
 In 1.x rotation was executed when `maxCount` was reached *and* when `maxDuration` expired.\
-In 2.x rotation is executed when `maxCount` is reached *or* when `maxDuration` expires. Counter and timer is reset after each rotation.
+In 2.x rotation is executed when `maxCount` is reached *or* when `maxDuration` expires. The counter and timer are reset after each rotation.
 
 In 1.x all files (all partitions) were rotated at once.\
 In 2.x each file (each partition) is rotated individually.
@@ -242,14 +242,14 @@ In 2.x each file (each partition) is rotated individually.
 In 1.x `preWriteTransformation` could produce only a single record.\
 In 2.x `preWriteTransformation` can produce a collection of records.
 
-In 1.x `postWriteHandler` allowed implementation of custom rotation of all files.\
-In 2.x `postWriteHandler` allows implementation of custom rotation of individual files.
+In 1.x `postWriteHandler` allowed the implementation of custom rotation of all files.\
+In 2.x `postWriteHandler` allows the implementation of custom rotation of individual files.
 
 Please note the dependency to type class `PartitionLens` is removed and `SkippingParquetSchemaResolver` and `SkippingParquetRecordEncoder` are replaced by regular `ParquetSchemaResolver` and `ParquetRecordEncoder`. 
 
 ### FS2 API changes
 
-Changes related to generic records are the same as in core library.
+Changes related to generic records are the same as in the core library.
 
 In 2.x FS2 and Cats Effect are upgraded to version 3.x.
 
@@ -325,12 +325,12 @@ parquet
 ```
 
 In 1.x rotation was executed when `maxCount` was reached *and* when `maxDuration` expired.\
-In 2.x rotation is executed when `maxCount` is reached *or* when `maxDuration` expires. Counter and timer is reset after each rotation.
+In 2.x rotation is executed when `maxCount` is reached *or* when `maxDuration` expires. The counter and timer are reset after each rotation.
 
 In 1.x all files (all partitions) were rotated at once.\
 In 2.x each file (each partition) is rotated individually.
 
-In 1.x `postWriteHandler` allowed implementation of custom rotation of all files.\
-In 2.x `postWriteHandler` allows implementation of custom rotation of individual files.
+In 1.x `postWriteHandler` allowed the implementation of custom rotation of all files.\
+In 2.x `postWriteHandler` allows the implementation of custom rotation of individual files.
 
 Please note the dependency to type class `SkippingParquetSchemaResolver` is replaced by regular `ParquetSchemaResolver`. 

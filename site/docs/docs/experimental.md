@@ -6,7 +6,7 @@ permalink: docs/experimental/
 
 # (Experimental) ETL
 
-Version 2.1.0 of Parquet4s introduces advanced operations on generic datasets, that is on `ParquetIterable[RowParquetRecord]`, to core module. Now users can join and concat two or more datasets what can simplify some ETL jobs a lot.
+Version 2.1.0 of Parquet4s introduces advanced operations on generic datasets, that is on `ParquetIterable[RowParquetRecord]`, to the core module. Now users can join and concat two or more datasets which can simplify some ETL jobs a lot.
 
 Available operations:
 
@@ -15,11 +15,11 @@ Available operations:
 - Inner join
 - Full join
 - Concat (appending one dataset to another)
-- Write called directly on a dataset
+- Write called directly on a dataset.
 
-Mind that joins require loading right-side dataset into memory so that those operations are not applicable for very large datasets. Consider switching position of datasets in your join operation (left dataset is iterated over). Or use e.g. Apache Spark which distributes data across multiple machines for performing join operations.
+Mind that joins require loading the right-side dataset into memory, so those operations are not applicable for very large datasets. Consider switching the position of datasets in your join operation (the left dataset is iterated over). Or use e.g. Apache Spark which distributes data across multiple machines for performing join operations.
 
-Please note that this is an experimental feature. API may change in the future and some functionalities may be added or removed.
+Please note that this is an experimental feature. API may change in the future, and some functionalities may be added or removed.
 
 ```scala mdoc:compile-only
 import com.github.mjakubowski84.parquet4s.{Col, ParquetReader, Path}

@@ -6,9 +6,9 @@ permalink: docs/filtering/
 
 # Filtering
 
-One of the best features of Parquet is an efficient way of filtering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Parquet4s allows to define a filter predicates in order to push filtering out from Scala collections and Akka or FS2 stream down to a point before file content is even read.
+One of the best features of Parquet is an efficient way of filtering. Parquet files contain additional metadata that can be leveraged to drop chunks of data without scanning them. Parquet4s allows users to define filter predicates in order to push filtering out from Scala collections and Akka or FS2 stream down to a point before file content is even read.
 
-In Akka and FS2 filter applies both to content of files and [partitions]({% link docs/partitioning.md %})).
+In Akka and FS2 filter applies both to the content of files and [partitions]({% link docs/partitioning.md %}).
 
 You define your filters using simple algebra as follows:
 
@@ -23,9 +23,9 @@ ParquetReader
   .read(Path("file.parquet"))
 ```
 
-You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, `in`  and  `udp` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Mind that operations on `java.sql.Timestamp` and `java.time.LocalDateTime` are not supported as Parquet still does not allow filtering by `Int96` columns. 
+You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, `in` and `udp` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Please mind that filtering on `java.sql.Timestamp` and `java.time.LocalDateTime` is not supported for `Int96` timestamps which is a default type used for timestamps. Consider a different timestamp [format]({% link docs/records_and_schema.md %}) for your data to enable filtering. 
 
-For custom filtering by column of type `T` implement `UDP[T]` trait and use `udp` operator.
+For custom filtering by a column of type `T` implement `UDP[T]` trait and use `udp` operator.
 
 ```scala
 import com.github.mjakubowski84.parquet4s.{Col, FilterStatistics, ParquetReader, Path, UDP}

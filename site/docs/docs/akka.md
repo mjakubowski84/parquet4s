@@ -13,7 +13,7 @@ Parquet4s has an integration module that allows you to read and write Parquet fi
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
-`ParquetStreams` has a single `Source` for reading single file or a directory (can be [partitioned]({% link docs/partitioning.md %})), a `Sink`s for writing a single file and a sophisticated `Flow` for performing complex writes.
+`ParquetStreams` has a single `Source` for reading a single file or a directory (can be [partitioned]({% link docs/partitioning.md %})), a `Sink`s for writing a single file and a sophisticated `Flow` for performing complex writes.
 
 ```scala mdoc:compile-only
 import akka.NotUsed

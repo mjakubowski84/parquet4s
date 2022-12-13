@@ -6,24 +6,24 @@ permalink: docs/partitioning/
 
 # Partitioning
 
-Parquet4s supports both reading partitions and partitioning data during writing. Writing partitioned data is available **only** in Akka and FS2 modules. Reading partitions is enabled by default in Akka and FS2 but must be enabled explicitly in core module.
+Parquet4s supports both reading partitions and partitioning data during writing. Writing partitioned data is available **only** in Akka and FS2 modules. Reading partitions is enabled by default in Akka and FS2 but must be enabled explicitly in the core module.
 
 #### Akka & FS2
 
-Reading partitions is handled by default by `fromParquet` function. Before data is read Parquet4s scans the directory and resolves partition fields and values. After reading each record is enriched according to partition directory tree the file resides in.
+Reading partitions is handled by default by `fromParquet` function. Before data is read Parquet4s scans the directory and resolves partition fields and values. After reading, each record is enriched according to the partition directory tree the file resides in.
 
-Writing partitioned data is available in `viaParquet`. You can specify by which columns data shall be partitioned and Parquet4s will automatically create proper directory structure and it will remove the fields from the written records (so that there is no data redundancy).
+Writing partitioned data is available in `viaParquet`. You can specify by which columns data shall be partitioned and Parquet4s will automatically create the proper directory structure, and it will remove the fields from the written records (so that there is no data redundancy).
 
 #### Core
 
-As core module is commonly used in low-level applications enabling partition reading can add redundant overhead. Therefore, when using core module you have to tell Parquet4s explicitely to read partitions.
+As the core module is commonly used in low-level applications enabling partition reading can add redundant overhead. Therefore, when using the core module, you have to tell Parquet4s explicitly to read partitions.
 
 #### **Take note!** 
 
- - Partition field must be a String. 
+ - The partition field must be a String. 
  - The field cannot be null, be an Option or belong to the collection.
  - When reading partitioned data make sure that partition directory names follow Hive format.
- - Parquet4s takes care of building proper schemas for partitioned data. However, when you use a custom type and a custom schema definition remember to not include the partition field in the schema — because it is supposed to be encoded as a directory name.
+ - Parquet4s takes care of building proper schemas for partitioned data. However, when you use a custom type and a custom schema definition remember not to include the partition field in the schema — because it is supposed to be encoded as a directory name.
 
 In Akka:
 ```scala mdoc:compile-only
