@@ -6,12 +6,12 @@ import sbt.util
 
 lazy val twoTwelve              = "2.12.17"
 lazy val twoThirteen            = "2.13.10"
-lazy val three                  = "3.2.0"
+lazy val three                  = "3.2.1"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.8.0-SNAPSHOT"
-ThisBuild / isSnapshot := true
+ThisBuild / version := "2.8.0"
+ThisBuild / isSnapshot := false
 ThisBuild / scalaVersion := twoThirteen
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -91,12 +91,12 @@ lazy val core = (project in file("core"))
         exclude (org = "org.slf4j", name = "slf4j-api"),
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.8.1",
+      "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion,
 
       // tests
       "org.mockito" % "mockito-core" % "4.8.0" % "test",
       "org.scalatest" %% "scalatest" % "3.2.14" % "test,it",
-      "ch.qos.logback" % "logback-classic" % "1.3.4" % "test,it",
+      "ch.qos.logback" % "logback-classic" % logbackVersion % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
       CrossVersion.partialVersion(scalaBinaryVersion.value) match {
@@ -142,7 +142,7 @@ lazy val fs2 = (project in file("fs2"))
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "co.fs2" %% "fs2-io" % fs2Version % "it",
-      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.4.0" % "it"
+      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.5.0" % "it"
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
@@ -163,10 +163,10 @@ lazy val examples = (project in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "io.github.embeddedkafka" %% "embedded-kafka" % "3.3.1",
-      "ch.qos.logback" % "logback-classic" % "1.3.4",
+      "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % {
-        if (scalaVersion.value == twoThirteen) { "3.0.1" }
+        if (scalaVersion.value == twoThirteen) { "3.0.1" } // non-licensed version
         else { "2.1.1" }
       },
       "com.github.fd4s" %% "fs2-kafka" % "2.5.0",
@@ -250,7 +250,7 @@ lazy val documentation = (project in file("site"))
   .settings(
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "mdoc" % "2.3.5",
+      "org.scalameta" %% "mdoc" % "2.3.6",
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
@@ -259,7 +259,7 @@ lazy val documentation = (project in file("site"))
       ExclusionRule("org.scala-lang.modules", "scala-collection-compat_2.13")
     ),
     dependencyOverrides ++= Seq(
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.8.1"
+      "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion
     )
   )
   .dependsOn(core, akka, fs2)

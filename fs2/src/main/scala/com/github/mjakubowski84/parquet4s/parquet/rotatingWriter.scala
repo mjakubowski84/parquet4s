@@ -5,6 +5,7 @@ import cats.effect.std.Queue
 import cats.effect.syntax.all.*
 import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.*
+import com.github.mjakubowski84.parquet4s.compat.MapCompat
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import fs2.{Pipe, Pull, Stream}
 import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
@@ -12,7 +13,6 @@ import org.apache.parquet.schema.MessageType
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 import fs2.Chunk
@@ -284,7 +284,8 @@ object rotatingWriter {
       rotationFiber: Fiber[F, Throwable, Unit]
   )(implicit F: Async[F]) {
 
-    var count: Long = 0
+    var count: Long       = 0
+    var disposed: Boolean = false
 
     def write(record: RowParquetRecord): F[Long] = F.delay(scala.concurrent.blocking {
       internalWriter.write(record)
@@ -294,6 +295,7 @@ object rotatingWriter {
 
     def dispose: F[Unit] =
       F.uncancelable { _ =>
+        disposed = true
         rotationFiber.cancel >> F.delay(scala.concurrent.blocking(internalWriter.close())).recover {
           case _: NullPointerException => () // ignores bug in Parquet
         }
@@ -311,47 +313,9 @@ object rotatingWriter {
       encode: W => F[RowParquetRecord],
       eventQueue: Queue[F, WriterEvent[F, T, W]],
       logger: Logger[F],
-      postWriteHandlerOpt: Option[PostWriteHandler[F, T]]
+      postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
+      writersRef: Ref[F, Map[Path, RecordWriter[F]]]
   )(implicit F: Async[F]) {
-
-    private val writers = TrieMap.empty[Path, RecordWriter[F]]
-
-    private def writeEntitiesAndOutputPull(
-        entityStream: Stream[F, W],
-        outChunk: Chunk[T],
-        modifiedPartitions: Map[Path, Long] = Map.empty
-    ): Pull[F, T, Map[Path, Long]] =
-      entityStream.pull.uncons.flatMap {
-        case Some((chunk, tail)) =>
-          Pull.eval(write(chunk)).flatMap { chunkModifiedPartitions =>
-            writeEntitiesAndOutputPull(tail, outChunk, modifiedPartitions.combine(chunkModifiedPartitions))
-          }
-        case None if postWriteHandlerOpt.isEmpty =>
-          Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
-        case None =>
-          postWriteHandlerPull(outChunk, modifiedPartitions).flatMap {
-            case Nil => Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
-            case partitionsToRotate =>
-              rotatePull(partitionsToRotate) >> Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
-          }
-      }
-
-    private def getOrCreateWriter(basePath: Path): F[RecordWriter[F]] =
-      writers.get(basePath) match {
-        case Some(writer) =>
-          F.pure(writer)
-        case None =>
-          F.uncancelable { _ =>
-            for {
-              writer            <- RecordWriter(basePath, schema, options, eventQueue, maxDuration)
-              existingWriterOpt <- F.delay(writers.putIfAbsent(basePath, writer))
-              resultingWriter <- existingWriterOpt match {
-                case Some(existing) => writer.dispose.as(existing) // should not happen
-                case None           => F.pure(writer)
-              }
-            } yield resultingWriter
-          }
-      }
 
     private def write(chunk: Chunk[W]): F[Map[Path, Long]] =
       chunk.foldM(Map.empty[Path, Long]) { case (map, entity) =>
@@ -371,14 +335,38 @@ object rotatingWriter {
           }
         }
         (path, partitionedRecord) = partitioning
-        writer <- getOrCreateWriter(path)
-        count  <- writer.write(partitionedRecord)
-        _ <-
-          if (count >= maxCount) {
-            dispose(path)
-          } else {
-            F.unit
+        count <- writersRef.access.flatMap { case (writers, setter) =>
+          writers.get(path) match {
+            // it should never happened that disposed writer is left in the map but let's be safe
+            case Some(writer) if !writer.disposed =>
+              for {
+                count <- writer.write(partitionedRecord)
+                _ <-
+                  if (count >= maxCount) {
+                    writer.dispose >> setter(MapCompat.remove(writers, path)).void
+                  } else {
+                    F.unit
+                  }
+              } yield count
+            case _ =>
+              for {
+                writer <- RecordWriter(path, schema, options, eventQueue, maxDuration)
+                count  <- writer.write(partitionedRecord)
+                isUpdated <-
+                  if (count >= maxCount) {
+                    F.pure(false)
+                  } else {
+                    setter(writers.updated(path, writer))
+                  }
+                _ <-
+                  if (isUpdated) {
+                    F.unit
+                  } else {
+                    writer.dispose
+                  }
+              } yield count
           }
+        }
       } yield path -> count
 
     private def partition(
@@ -396,17 +384,25 @@ object rotatingWriter {
 
     private def disposeAll: F[Unit] =
       F.uncancelable { _ =>
-        Stream
-          .suspend(Stream.iterable(writers.values))
-          .evalMapChunk(_.dispose)
-          .onFinalize(F.delay(writers.clear()))
-          .compile
-          .drain
+        for {
+          writers <- writersRef.getAndSet(Map.empty)
+          _       <- writers.values.toList.traverse_(_.dispose)
+        } yield ()
       }
 
     private def dispose(partition: Path): F[Unit] =
       F.uncancelable { _ =>
-        writers.remove(partition).traverse_(_.dispose)
+        for {
+          removedWriterOpt <- writersRef.modify { writers =>
+            writers.get(partition) match {
+              case Some(writer) =>
+                MapCompat.remove(writers, partition) -> Some(writer)
+              case None =>
+                writers -> None
+            }
+          }
+          _ <- removedWriterOpt.traverse_(_.dispose)
+        } yield ()
       }
 
     private def rotatePull(partitions: Iterable[Path]): Pull[F, T, Unit] =
@@ -434,16 +430,42 @@ object rotatingWriter {
         }
       )
 
+    private def writeEntitiesAndOutputPull(
+        entityStream: Stream[F, W],
+        outChunk: Chunk[T]
+    ): Pull[F, T, Map[Path, Long]] =
+      writeEntityChunksAndOutputPull(
+        entityChunksStream = entityStream.chunkN(chunkSize),
+        outChunk           = outChunk,
+        modifiedPartitions = Map.empty
+      )
+
+    private def writeEntityChunksAndOutputPull(
+        entityChunksStream: Stream[F, Chunk[W]],
+        outChunk: Chunk[T],
+        modifiedPartitions: Map[Path, Long]
+    ): Pull[F, T, Map[Path, Long]] =
+      entityChunksStream.pull.uncons1.flatMap {
+        case Some((chunk, tail)) =>
+          Pull.eval(write(chunk)).flatMap { chunkModifiedPartitions =>
+            writeEntityChunksAndOutputPull(tail, outChunk, modifiedPartitions.combine(chunkModifiedPartitions))
+          }
+        case None if postWriteHandlerOpt.isEmpty =>
+          Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
+        case None =>
+          postWriteHandlerPull(outChunk, modifiedPartitions).flatMap {
+            case Nil => Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
+            case partitionsToRotate =>
+              rotatePull(partitionsToRotate) >> Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
+          }
+      }
+
     sealed private trait Acc
     private case class DataAcc(data: Stream[F, W], chunk: Chunk[T], pull: Pull[F, T, Unit]) extends Acc
     private case class StopAcc(data: Stream[F, W], chunk: Chunk[T], pull: Pull[F, T, Unit]) extends Acc
 
-    implicit private class SteamWrapper(stream: Stream[F, W]) {
-      def rechunk: Stream[F, W] = stream.chunkMin(chunkSize).flatMap(Stream.chunk)
-    }
-
-    private def writeAllEventsPull(in: Stream[F, WriterEvent[F, T, W]]): Pull[F, T, Unit] =
-      in.pull.unconsLimit(chunkSize).flatMap {
+    private def writeAllEventsPull(in: Stream[F, Chunk[WriterEvent[F, T, W]]]): Pull[F, T, Unit] =
+      in.pull.uncons1.flatMap {
         case Some((eventChunk, tail)) =>
           eventChunk.foldLeft[Acc](DataAcc(Stream.empty, Chunk.empty, Pull.done)) {
             case (DataAcc(dataStream, outChunk, pull), DataEvent(data, out)) =>
@@ -452,7 +474,7 @@ object rotatingWriter {
               DataAcc(
                 Stream.empty,
                 Chunk.empty[T],
-                pull >> writeEntitiesAndOutputPull(dataStream.rechunk, outChunk) >> rotatePull(Iterable(partition))
+                pull >> writeEntitiesAndOutputPull(dataStream, outChunk) >> rotatePull(Iterable(partition))
               )
             case (DataAcc(dataStream, outChunk, pull), StopEvent()) =>
               StopAcc(dataStream, outChunk, pull)
@@ -462,18 +484,18 @@ object rotatingWriter {
             case StopAcc(_, outChunk, pull) if outChunk.isEmpty =>
               pull
             case StopAcc(dataStream, outChunk, pull) =>
-              pull >> writeEntitiesAndOutputPull(dataStream.rechunk, outChunk) >> Pull.done
+              pull >> writeEntitiesAndOutputPull(dataStream, outChunk) >> Pull.done
             case DataAcc(_, outChunk, pull) if outChunk.isEmpty =>
               pull >> writeAllEventsPull(tail)
             case DataAcc(dataStream, outChunk, pull) =>
-              pull >> writeEntitiesAndOutputPull(dataStream.rechunk, outChunk) >> writeAllEventsPull(tail)
+              pull >> writeEntitiesAndOutputPull(dataStream, outChunk) >> writeAllEventsPull(tail)
           }
         case None =>
           Pull.done
       }
 
     def writeAllEvents(in: Stream[F, WriterEvent[F, T, W]]): Stream[F, T] =
-      writeAllEventsPull(in).stream.onFinalize(disposeAll)
+      writeAllEventsPull(in.chunkLimit(chunkSize)).stream.onFinalize(disposeAll)
   }
 
   private def write[F[_], T, W: ParquetRecordEncoder](
@@ -486,7 +508,7 @@ object rotatingWriter {
       prewriteTransformation: T => Stream[F, W],
       postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
       options: ParquetWriter.Options
-  )(implicit F: Async[F]): Pipe[F, T, T] =
+  )(implicit F: Async[F]): Pipe[F, T, T] = // TODO check if we still need Async or can we go with Concurrent
     in =>
       for {
         schema                  <- Stream.eval(schemaF)
@@ -494,6 +516,7 @@ object rotatingWriter {
         encode = { (entity: W) => F.delay(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
         logger     <- Stream.eval(logger[F](this.getClass))
         eventQueue <- Stream.eval(Queue.unbounded[F, WriterEvent[F, T, W]])
+        writersRef <- Stream.eval(Ref.of(Map.empty[Path, RecordWriter[F]]))
         rotatingWriter <- Stream.emit(
           new RotatingWriter[T, W, F](
             basePath            = basePath,
@@ -506,11 +529,12 @@ object rotatingWriter {
             encode              = encode,
             eventQueue          = eventQueue,
             logger              = logger,
-            postWriteHandlerOpt = postWriteHandlerOpt
+            postWriteHandlerOpt = postWriteHandlerOpt,
+            writersRef          = writersRef
           )
         )
         eventStream = Stream(
-          Stream.fromQueueUnterminated(eventQueue),
+          Stream.fromQueueUnterminated(eventQueue, limit = chunkSize),
           in
             .map { inputElement =>
               DataEvent[F, T, W](prewriteTransformation(inputElement), inputElement)

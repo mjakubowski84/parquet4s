@@ -2,12 +2,12 @@ package com.github.mjakubowski84.parquet4s
 
 import cats.effect.IO
 import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
-import fs2.Stream
+import fs2.{Chunk, Stream}
 import org.openjdk.jmh.annotations.*
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{Path as NioPath, _}
+import java.nio.file.{Path as NioPath, *}
 import java.util.UUID
 import java.util.concurrent.{Executors, TimeUnit}
 import scala.collection.immutable
@@ -19,8 +19,8 @@ case class Record(i: Int, dict: String, embedded: Option[Embedded])
 
 object Fs2Benchmark {
 
-  val Fractioner = 100.12
-  val Dict       = List("a", "b", "c", "d")
+  private val Fractioner = 100.12
+  private val Dict       = List("a", "b", "c", "d")
 
   @State(Scope.Benchmark)
   class Dataset {
@@ -97,15 +97,16 @@ object Fs2Benchmark {
   @State(Scope.Thread)
   class WriteState extends BaseState {
 
-    var operation: IO[Unit] = _
+    var operation: IO[Unit]        = _
+    var chunks: Seq[Chunk[Record]] = _
 
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = {
       fetchDataset(dataset)
+      chunks = Stream.iterable(dataset.records).chunkN(16).compile.toVector
       operation = Stream
-        .iterable(dataset.records)
-        .chunkN(16)
-        .flatMap(Stream.chunk)
+        .iterable(chunks)
+        .unchunks
         .through(parquet.writeSingleFile[IO].of[Record].write(filePath))
         .compile
         .drain
@@ -123,15 +124,16 @@ object Fs2Benchmark {
   @State(Scope.Thread)
   class WritePartitionedState extends BaseState {
 
-    var operation: IO[Record] = _
+    var operation: IO[Record]      = _
+    var chunks: Seq[Chunk[Record]] = _
 
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = {
       fetchDataset(dataset)
+      chunks = Stream.iterable(dataset.records).chunkN(16).compile.toVector
       operation = Stream
-        .iterable(dataset.records)
-        .chunkN(16)
-        .flatMap(Stream.chunk)
+        .iterable(chunks)
+        .unchunks
         .through(parquet.viaParquet[IO].of[Record].partitionBy(ColumnPath("dict")).write(dataset.basePath))
         .compile
         .lastOrError

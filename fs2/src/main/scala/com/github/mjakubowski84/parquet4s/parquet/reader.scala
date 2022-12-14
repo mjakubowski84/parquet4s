@@ -143,7 +143,7 @@ object reader {
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
   )(implicit F: Sync[F]): Stream[F, T] =
     for {
-      vcc <- Stream.eval(F.pure(ValueCodecConfiguration(options)))
+      vcc <- Stream(ValueCodecConfiguration(options))
       decode = (record: RowParquetRecord) => F.delay(ParquetRecordDecoder.decode(record, vcc))
       partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf)
       projectedSchemaOpt <- Stream.eval(
@@ -156,40 +156,18 @@ object reader {
         .eval(F.catchNonFatal(PartitionFilter.filter(filter, vcc, partitionedDirectory)))
         .flatMap(Stream.iterable)
       (partitionFilter, partitionedPath) = partitionData
-      reader <- Stream.resource(readerResource(partitionedPath.path, options, partitionFilter, projectedSchemaOpt))
-      entity <- readerStream(reader, partitionedPath, chunkSize).evalMapChunk(decode)
+      parquetIterator <- Stream.resource(
+        parquetIteratorResource(partitionedPath.path, options, partitionFilter, projectedSchemaOpt)
+      )
+      entity <- readerStream(parquetIterator, partitionedPath, chunkSize).evalMapChunk(decode)
     } yield entity
 
   private def readerStream[F[_]](
-      reader: HadoopParquetReader[RowParquetRecord],
+      reader: ParquetIterator,
       partitionedPath: PartitionedPath,
       chunkSize: Int
   )(implicit F: Sync[F]): Stream[F, RowParquetRecord] = {
-    val stream = Pull
-      .loop[F, RowParquetRecord, HadoopParquetReader[RowParquetRecord]] { reader =>
-        val readChunkF = F
-          .iterateWhileM(chunkSize -> Chunk.empty[RowParquetRecord]) { case (i, chunk) =>
-            F.delay(scala.concurrent.blocking {
-              Option(reader.read()) match {
-                case None =>
-                  0 -> chunk
-                case Some(record) =>
-                  (i - 1) -> chunk.appendK(record)
-              }
-            })
-          }(_._1 != 0)
-          .map(_._2)
-
-        Pull.eval(readChunkF).flatMap {
-          case chunk if chunk.isEmpty =>
-            Pull.pure(None)
-          case chunk =>
-            Pull.output(chunk) >> Pull.pure(Some(reader))
-        }
-      }
-      .apply(reader)
-      .stream
-
+    val stream = Stream.fromBlockingIterator[F](reader, chunkSize)
     if (partitionedPath.partitions.nonEmpty) {
       stream.evalMapChunk { record =>
         partitionedPath.partitions.foldLeft(F.pure(record)) { case (f, (columnPath, value)) =>
@@ -203,20 +181,21 @@ object reader {
     }
   }
 
-  private def readerResource[F[_]: Sync](
+  private def parquetIteratorResource[F[_]: Sync](
       path: Path,
       options: ParquetReader.Options,
       filter: FilterCompat.Filter,
       projectionSchemaOpt: Option[MessageType]
-  ): Resource[F, HadoopParquetReader[RowParquetRecord]] =
+  ): Resource[F, ParquetIterator] =
     Resource.fromAutoCloseable(
       Sync[F].delay(
         scala.concurrent.blocking(
-          HadoopParquetReader
-            .builder[RowParquetRecord](new ParquetReadSupport(projectionSchemaOpt), path.toHadoop)
-            .withConf(options.hadoopConf)
-            .withFilter(filter)
-            .build()
+          new ParquetIterator(
+            HadoopParquetReader
+              .builder[RowParquetRecord](new ParquetReadSupport(projectionSchemaOpt), path.toHadoop)
+              .withConf(options.hadoopConf)
+              .withFilter(filter)
+          )
         )
       )
     )
