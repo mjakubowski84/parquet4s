@@ -1,0 +1,322 @@
+<!DOCTYPE html><html><head><title>Parquet4s: Migration from 1.x</title><meta charset="utf-8" /><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="Marcin Jakubowski" /><meta name="description" content="Read and write Parquet files using Scala" /><meta name="og:image" content="/parquet4s/img/poster.png" /><meta name="image" property="og:image" content="/parquet4s/img/poster.png" /><meta name="og:title" content="Parquet4s: Migration from 1.x" /><meta name="title" property="og:title" content="Parquet4s: Migration from 1.x" /><meta name="og:site_name" content="Parquet4s" /><meta name="og:url" content="" /><meta name="og:type" content="website" /><meta name="og:description" content="Read and write Parquet files using Scala" /><link rel="icon" type="image/png" href="/parquet4s/img/favicon.png" /><meta name="twitter:title" content="Parquet4s: Migration from 1.x" /><meta name="twitter:image" content="/parquet4s/img/poster.png" /><meta name="twitter:description" content="Read and write Parquet files using Scala" /><meta name="twitter:card" content="summary_large_image" /><link rel="icon" type="image/png" sizes="16x16" href="/parquet4s/img/favicon-16x16.png" /><link rel="icon" type="image/png" sizes="32x32" href="/parquet4s/img/favicon-32x32.png" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" /><link rel="stylesheet" href="/parquet4s/highlight/styles/vs.css" /><link rel="stylesheet" href="/parquet4s/css/light-style.css" /></head><body class="docs"><div id="wrapper"><div id="sidebar-wrapper"><div id="sidebar-brand"><a href="/parquet4s/" class="brand"><div class="brand-wrapper"></div><span>Parquet4s</span></a><button id="main-toggle" class="sidebar-toggle"><span class="close"></span></button></div><div class="sidebar-nav"> <div class="sidebar-nav-item  "><a href="/parquet4s/docs" title="Introduction" class="">Introduction</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/quick_start" title="Quick Start" class="">Quick Start</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/akka" title="Integration with Akka Streams" class="">Integration with Akka Streams</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/fs2" title="Integration with FS2" class="">Integration with FS2</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/storage_types" title="Supported storage types" class="">Supported storage types</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/records_and_schema" title="Records, types and schema" class="">Records, types and schema</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/projection" title="Projection" class="">Projection</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/filtering" title="Filtering" class="">Filtering</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/partitioning" title="Partitioning" class="">Partitioning</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/statistics" title="Statistics" class="">Statistics</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/examples" title="Examples" class="">Examples</a></div> <div class="sidebar-nav-item active "><a href="/parquet4s/docs/migration" title="Migration from 1.x" class="active">Migration from 1.x</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/experimental" title="(Experimental) ETL" class="">(Experimental) ETL</a></div></div></div><div id="page-content-wrapper"><div class="nav"><div class="container-fluid"><div class="row"><div class="col-lg-12"><div class="action-menu pull-left clearfix"><a href="#menu-toggle" id="menu-toggle"><i class="fa fa-bars" aria-hidden="true"></i></a></div><ul class="pull-right"><li class="search-nav"><div id="search-dropdown"><label><i class="fa fa-search"></i>Search</label><input id="search-bar" type="text" placeholder="Enter keywords here..." onclick="displayToggleSearch(event)" /><ul id="search-dropdown-content" class="dropdown dropdown-content"></ul></div></li><li id="gh-eyes-item" class="hidden-xs to-uppercase"><a href="https://github.com/mjakubowski84/parquet4s" target="_blank" rel="noopener noreferrer"><i class="fa fa-eye"></i><span>Watchers<span id="eyes" class="label label-default">--</span></span></a></li><li id="gh-stars-item" class="hidden-xs to-uppercase"><a href="https://github.com/mjakubowski84/parquet4s" target="_blank" rel="noopener noreferrer"><i class="fa fa-star-o"></i><span>Stars<span id="stars" class="label label-default">--</span></span></a></li></ul></div></div></div></div><div id="content" data-github-owner="mjakubowski84" data-github-repo="parquet4s"><div class="content-wrapper"><section><h1 id="migration-from-1x">Migration from 1.x</h1>
+
+<h2 id="records">Records</h2>
+
+<p>In 1.x <code class="language-plaintext highlighter-rouge">ParquetRecord</code> and its implementations were mutable <code class="language-plaintext highlighter-rouge">Iterable</code>s.<br />
+In 2.x those classes are immutable. That is, any modification on a record returns a new instance.</p>
+
+<p>In 1.x when reading using generic records <code class="language-plaintext highlighter-rouge">RowParquetRecord</code> had no entries for missing optional fields.<br />
+In 2.x each field is represented in <code class="language-plaintext highlighter-rouge">RowParquerRecord</code>, the order is kept, and <code class="language-plaintext highlighter-rouge">NullValue</code> represents missing data.</p>
+
+<h2 id="type-classes">Type classes</h2>
+
+<p><code class="language-plaintext highlighter-rouge">SkippingParquetSchemaResolver</code> and <code class="language-plaintext highlighter-rouge">SkippingParquetRecordEncoder</code> are removed in 2.x and their logic is merged into regular <code class="language-plaintext highlighter-rouge">ParquetSchemaResolver</code> and <code class="language-plaintext highlighter-rouge">ParquetRecordEncoder</code>.</p>
+
+<p><code class="language-plaintext highlighter-rouge">PartitionLens</code> is removed in 2.x. Its functionality is now available in the API of <code class="language-plaintext highlighter-rouge">RowParquetRecord</code>.</p>
+
+<p><code class="language-plaintext highlighter-rouge">ValueCodec</code> now composes <code class="language-plaintext highlighter-rouge">ValueDecoder</code> and <code class="language-plaintext highlighter-rouge">ValueEncoder</code> which allows writing custom encoders or decoders without implementing both.</p>
+
+<h3 id="core-api-changes">Core API changes</h3>
+
+<h4 id="reading">Reading</h4>
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">[</span><span class="kt">Data</span><span class="o">](</span>
+    <span class="n">path</span> <span class="k">=</span> <span class="s">"path/to/file"</span><span class="o">,</span> 
+    <span class="n">options</span> <span class="k">=</span> <span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">(),</span> 
+    <span class="n">filter</span> <span class="k">=</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span>
+  <span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">as</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">filter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<h4 id="reading-with-projection">Reading with projection</h4>
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">withProjection</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span>
+    <span class="n">path</span> <span class="k">=</span> <span class="s">"path/to/file"</span><span class="o">,</span> 
+    <span class="n">options</span> <span class="k">=</span> <span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">(),</span> 
+    <span class="n">filter</span> <span class="k">=</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span>
+  <span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">projectedAs</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">filter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<h4 id="reading-generic-records">Reading generic records</h4>
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">[</span><span class="kt">RowParquetRecord</span><span class="o">](</span>
+    <span class="n">path</span> <span class="k">=</span> <span class="s">"path/to/file"</span><span class="o">,</span> 
+    <span class="n">options</span> <span class="k">=</span> <span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">(),</span> 
+    <span class="n">filter</span> <span class="k">=</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span>
+  <span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">generic</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">filter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<p>Or:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetReader</span>
+  <span class="o">.</span><span class="py">as</span><span class="o">[</span><span class="kt">RowParquetRecord</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">filter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<h3 id="writing">Writing</h3>
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">writeAndClose</span><span class="o">(</span>
+  <span class="n">path</span> <span class="k">=</span> <span class="s">"path/to/file"</span><span class="o">,</span> 
+  <span class="n">data</span> <span class="k">=</span> <span class="n">data</span><span class="o">,</span> 
+  <span class="n">options</span> <span class="k">=</span> <span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">()</span>
+<span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetWriter</span>
+  <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">writeAndClose</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">),</span> <span class="n">data</span><span class="o">)</span>
+</code></pre></div></div>
+
+<h3 id="writing-generic-records">Writing generic records</h3>
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">implicit</span> <span class="k">val</span> <span class="nv">schema</span><span class="k">:</span> <span class="kt">MessageType</span> <span class="o">=</span> <span class="o">???</span>
+<span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">writeAndClose</span><span class="o">(</span>
+  <span class="n">path</span> <span class="k">=</span> <span class="s">"path/to/file"</span><span class="o">,</span>
+  <span class="n">data</span> <span class="k">=</span> <span class="n">records</span><span class="o">,</span> 
+  <span class="n">options</span> <span class="k">=</span> <span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">()</span>
+<span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetWriter</span>
+  <span class="o">.</span><span class="py">generic</span><span class="o">(</span><span class="n">schema</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">writeAndClose</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">),</span> <span class="n">records</span><span class="o">)</span>
+</code></pre></div></div>
+
+<p>Or:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">implicit</span> <span class="k">val</span> <span class="nv">schema</span><span class="k">:</span> <span class="kt">MessageType</span> <span class="o">=</span> <span class="o">???</span>
+<span class="nc">ParquetWriter</span>
+  <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">RowParquetRecord</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">writeAndClose</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">),</span> <span class="n">records</span><span class="o">)</span>
+</code></pre></div></div>
+
+<h3 id="stats">Stats</h3>
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">Stats</span><span class="o">(</span>
+  <span class="n">path</span> <span class="k">=</span> <span class="s">"path/to/file"</span><span class="o">,</span> 
+  <span class="n">options</span> <span class="k">=</span> <span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">(),</span> 
+  <span class="n">filter</span> <span class="k">=</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span>
+<span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">Stats</span>
+  <span class="o">.</span><span class="py">builder</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">filter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">stats</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<h3 id="akka-api-changes">Akka API changes</h3>
+
+<p>Changes related to generic records are the same as in the core library.</p>
+
+<p>Deprecated API of <code class="language-plaintext highlighter-rouge">fromParquet</code>, <code class="language-plaintext highlighter-rouge">toParquetSequentialWithFileSplit</code>, <code class="language-plaintext highlighter-rouge">toParquetParallelUnordered</code> and <code class="language-plaintext highlighter-rouge">toParquetIndefinite</code> is removed in 2.x.</p>
+
+<h4 id="reading-1">Reading</h4>
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetStreams</span>
+  <span class="o">.</span><span class="py">fromParquet</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">withOptions</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">withFilter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">withProjection</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetStreams</span>
+  <span class="o">.</span><span class="py">fromParquet</span>
+  <span class="o">.</span><span class="py">projectedAs</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">filter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<p>Note that type class <code class="language-plaintext highlighter-rouge">SkippingParquetSchemaResolver</code> that was required for projection is now replaced by regular <code class="language-plaintext highlighter-rouge">ParquetSchemaResolver</code>.</p>
+
+<h3 id="writing-single-file">Writing single file</h3>
+
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetStreams</span>
+  <span class="o">.</span><span class="py">toParquetSingleFile</span><span class="o">(</span>
+    <span class="n">path</span> <span class="k">=</span> <span class="s">"path/to/file"</span><span class="o">,</span>
+    <span class="n">options</span> <span class="k">=</span> <span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">()</span>
+  <span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetStreams</span>
+  <span class="o">.</span><span class="py">toParquetSingleFile</span>
+  <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">write</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<h3 id="advanced-writing">Advanced writing</h3>
+
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetStreams</span>
+  <span class="o">.</span><span class="py">viaParquet</span><span class="o">[</span><span class="kt">User</span><span class="o">](</span><span class="s">"path/to/directory"</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">withMaxCount</span><span class="o">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">withMaxDuration</span><span class="o">(</span><span class="mf">30.</span><span class="n">seconds</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">withWriteOptions</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">withPartitionBy</span><span class="o">(</span><span class="s">"col1"</span><span class="o">,</span> <span class="s">"col2"</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">build</span><span class="o">()</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nc">ParquetStreams</span>
+  <span class="o">.</span><span class="py">viaParquet</span>
+  <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">maxCount</span><span class="o">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">maxDuration</span><span class="o">(</span><span class="mf">30.</span><span class="n">seconds</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">partitionBy</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"col1"</span><span class="o">),</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"col2"</span><span class="o">))</span>
+  <span class="o">.</span><span class="py">write</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/directory"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<p>In 1.x rotation was executed when <code class="language-plaintext highlighter-rouge">maxCount</code> was reached <em>and</em> when <code class="language-plaintext highlighter-rouge">maxDuration</code> expired.<br />
+In 2.x rotation is executed when <code class="language-plaintext highlighter-rouge">maxCount</code> is reached <em>or</em> when <code class="language-plaintext highlighter-rouge">maxDuration</code> expires. The counter and timer are reset after each rotation.</p>
+
+<p>In 1.x all files (all partitions) were rotated at once.<br />
+In 2.x each file (each partition) is rotated individually.</p>
+
+<p>In 1.x <code class="language-plaintext highlighter-rouge">preWriteTransformation</code> could produce only a single record.<br />
+In 2.x <code class="language-plaintext highlighter-rouge">preWriteTransformation</code> can produce a collection of records.</p>
+
+<p>In 1.x <code class="language-plaintext highlighter-rouge">postWriteHandler</code> allowed the implementation of custom rotation of all files.<br />
+In 2.x <code class="language-plaintext highlighter-rouge">postWriteHandler</code> allows the implementation of custom rotation of individual files.</p>
+
+<p>Please note the dependency to type class <code class="language-plaintext highlighter-rouge">PartitionLens</code> is removed and <code class="language-plaintext highlighter-rouge">SkippingParquetSchemaResolver</code> and <code class="language-plaintext highlighter-rouge">SkippingParquetRecordEncoder</code> are replaced by regular <code class="language-plaintext highlighter-rouge">ParquetSchemaResolver</code> and <code class="language-plaintext highlighter-rouge">ParquetRecordEncoder</code>.</p>
+
+<h3 id="fs2-api-changes">FS2 API changes</h3>
+
+<p>Changes related to generic records are the same as in the core library.</p>
+
+<p>In 2.x FS2 and Cats Effect are upgraded to version 3.x.</p>
+
+<p>Deprecated API of <code class="language-plaintext highlighter-rouge">read</code> is removed in 2.x</p>
+
+<h4 id="reading-2">Reading</h4>
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">parquet</span>
+  <span class="o">.</span><span class="py">fromParquet</span><span class="o">[</span><span class="kt">IO</span>, <span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">filter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">projection</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="n">blocker</span><span class="o">,</span> <span class="s">"path/to/file"</span><span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">parquet</span>
+  <span class="o">.</span><span class="py">fromParquet</span><span class="o">[</span><span class="kt">IO</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">projectedAs</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetReader</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">filter</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"id"</span><span class="o">)</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<p>Note that type class <code class="language-plaintext highlighter-rouge">SkippingParquetSchemaResolver</code> that was required for projection is now replaced by regular <code class="language-plaintext highlighter-rouge">ParquetSchemaResolver</code>.</p>
+
+<h3 id="writing-single-file-1">Writing single file</h3>
+
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">parquet</span>
+  <span class="o">.</span><span class="py">writeSingleFile</span><span class="o">[</span><span class="kt">IO</span>, <span class="kt">Data</span><span class="o">](</span>
+    <span class="n">blocker</span> <span class="k">=</span> <span class="n">blocker</span><span class="o">,</span>
+    <span class="n">path</span> <span class="k">=</span> <span class="s">"path/to/file"</span><span class="o">,</span>
+    <span class="n">options</span> <span class="k">=</span> <span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">()</span>
+  <span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">parquet</span>
+  <span class="o">.</span><span class="py">writeSingleFile</span><span class="o">[</span><span class="kt">IO</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">write</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/file"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<h3 id="advanced-writing-1">Advanced writing</h3>
+
+<p>Was:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">parquet</span>
+  <span class="o">.</span><span class="py">viaParquet</span><span class="o">[</span><span class="kt">IO</span>, <span class="kt">User</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">maxCount</span><span class="o">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">maxDuration</span><span class="o">(</span><span class="mf">30.</span><span class="n">seconds</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">partitionBy</span><span class="o">(</span><span class="s">"col1"</span><span class="o">,</span> <span class="s">"col2"</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">write</span><span class="o">(</span><span class="n">blocker</span><span class="o">,</span> <span class="s">"path/to/directory"</span><span class="o">)</span>
+</code></pre></div></div>
+
+<p>Is:</p>
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">parquet</span>
+  <span class="o">.</span><span class="py">viaParquet</span><span class="o">[</span><span class="kt">IO</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">Data</span><span class="o">]</span>
+  <span class="o">.</span><span class="py">maxCount</span><span class="o">(</span><span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">maxDuration</span><span class="o">(</span><span class="mf">30.</span><span class="n">seconds</span><span class="o">)</span>
+  <span class="o">.</span><span class="py">options</span><span class="o">(</span><span class="nv">ParquetWriter</span><span class="o">.</span><span class="py">Options</span><span class="o">())</span>
+  <span class="o">.</span><span class="py">partitionBy</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"col1"</span><span class="o">),</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"col2"</span><span class="o">))</span>
+  <span class="o">.</span><span class="py">write</span><span class="o">(</span><span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/directory"</span><span class="o">))</span>
+</code></pre></div></div>
+
+<p>In 1.x rotation was executed when <code class="language-plaintext highlighter-rouge">maxCount</code> was reached <em>and</em> when <code class="language-plaintext highlighter-rouge">maxDuration</code> expired.<br />
+In 2.x rotation is executed when <code class="language-plaintext highlighter-rouge">maxCount</code> is reached <em>or</em> when <code class="language-plaintext highlighter-rouge">maxDuration</code> expires. The counter and timer are reset after each rotation.</p>
+
+<p>In 1.x all files (all partitions) were rotated at once.<br />
+In 2.x each file (each partition) is rotated individually.</p>
+
+<p>In 1.x <code class="language-plaintext highlighter-rouge">postWriteHandler</code> allowed the implementation of custom rotation of all files.<br />
+In 2.x <code class="language-plaintext highlighter-rouge">postWriteHandler</code> allows the implementation of custom rotation of individual files.</p>
+
+<p>Please note the dependency to type class <code class="language-plaintext highlighter-rouge">SkippingParquetSchemaResolver</code> is replaced by regular <code class="language-plaintext highlighter-rouge">ParquetSchemaResolver</code>.</p>
+</section></div></div></div></div><script src="/parquet4s/highlight/highlight.pack.js"></script><script src="/parquet4s/lunr/lunr.js"></script><script>
+// For all code blocks, copy the language from the containing div
+// to the inner code tag (where hljs expects it to be)
+const langPrefix = 'language-';
+document.querySelectorAll(`div[class^='${langPrefix}']`).forEach(function(div) {
+  div.classList.forEach(function(cssClass) {
+    if (cssClass.startsWith(langPrefix)) {
+      const lang = cssClass.substring(langPrefix.length);
+      div.querySelectorAll('pre code').forEach(function(code) {
+        code.classList.add(lang);
+      });
+    }
+  });
+});
+
+hljs.configure({languages:['scala','java','bash']});
+hljs.initHighlightingOnLoad();
+      </script><script>console.info('\x57\x65\x62\x73\x69\x74\x65\x20\x62\x75\x69\x6c\x74\x20\x77\x69\x74\x68\x3a\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x5f\x20\x20\x20\x20\x5f\x5f\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x20\x5f\x5f\x0a\x20\x20\x20\x5f\x5f\x5f\x5f\x5f\x2f\x20\x2f\x5f\x20\x20\x2f\x20\x2f\x5f\x20\x20\x20\x20\x20\x20\x5f\x5f\x5f\x5f\x20\x5f\x5f\x5f\x20\x20\x28\x5f\x29\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x20\x20\x5f\x5f\x5f\x5f\x5f\x28\x5f\x29\x20\x2f\x5f\x5f\x5f\x5f\x20\x20\x5f\x5f\x5f\x5f\x5f\x0a\x20\x20\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x5c\x2f\x20\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x60\x5f\x5f\x20\x5c\x2f\x20\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x5c\x2f\x20\x5f\x5f\x5f\x2f\x20\x2f\x20\x5f\x5f\x2f\x20\x5f\x20\x5c\x2f\x20\x5f\x5f\x5f\x2f\x0a\x20\x28\x5f\x5f\x20\x20\x29\x20\x2f\x5f\x2f\x20\x2f\x20\x2f\x5f\x2f\x5f\x5f\x5f\x5f\x5f\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x5f\x5f\x2f\x20\x2f\x20\x20\x2f\x20\x2f\x5f\x2f\x20\x28\x5f\x5f\x20\x20\x29\x20\x2f\x20\x2f\x5f\x2f\x20\x20\x5f\x5f\x28\x5f\x5f\x20\x20\x29\x0a\x2f\x5f\x5f\x5f\x5f\x2f\x5f\x2e\x5f\x5f\x5f\x2f\x5c\x5f\x5f\x2f\x20\x20\x20\x20\x20\x2f\x5f\x2f\x20\x2f\x5f\x2f\x20\x2f\x5f\x2f\x5f\x2f\x5c\x5f\x5f\x5f\x2f\x5f\x2f\x20\x20\x20\x5c\x5f\x5f\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x2f\x5f\x2f\x5c\x5f\x5f\x2f\x5c\x5f\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x2f\x0a\x0a\x68\x74\x74\x70\x73\x3a\x2f\x2f\x34\x37\x64\x65\x67\x2e\x67\x69\x74\x68\x75\x62\x2e\x69\x6f\x2f\x73\x62\x74\x2d\x6d\x69\x63\x72\x6f\x73\x69\x74\x65\x73')</script><script src="/parquet4s/js/search.js"></script><script src="/parquet4s/js/docs.js"></script></body></html>
