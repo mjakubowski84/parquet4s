@@ -287,6 +287,31 @@ lazy val documentation = (project in file("site"))
   .dependsOn(core, akka, fs2)
   .enablePlugins(MicrositesPlugin)
 
+lazy val luceneCore = (project in file("lucene-core"))
+  .configs(IntegrationTest)
+  .settings(
+    name := "parquet4s-lucene-core",
+    crossScalaVersions := supportedScalaVersions,
+    javacOptions := Seq("-source", "11", "-target", "11"),
+    scalacOptions ++= Seq("-release:11"),
+    libraryDependencies ++= Seq(
+      "org.apache.lucene" % "lucene-core" % "9.4.2",
+      "org.apache.lucene" % "lucene-codecs" % "9.4.2",
+      "org.apache.lucene" % "lucene-backward-codecs" % "9.4.2",
+      "org.apache.solr" % "solr-hdfs" % "9.1.0",
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
+      "org.scalatest" %% "scalatest" % "3.2.14" % "test,it"
+    )
+//    excludeDependencies ++= Seq(
+//      ExclusionRule("org.slf4j", "slf4j-log4j12")
+//    )
+  )
+  .settings(compilationSettings)
+  .settings(itSettings)
+  .settings(publishSettings)
+  .settings(testReportSettings)
+  .dependsOn(core)
+
 lazy val root = (project in file("."))
   .settings(publishSettings)
   .settings(
@@ -305,5 +330,6 @@ lazy val root = (project in file("."))
     coreBenchmarks,
     akkaBenchmarks,
     fs2Benchmarks,
-    documentation
+    documentation,
+    luceneCore
   )

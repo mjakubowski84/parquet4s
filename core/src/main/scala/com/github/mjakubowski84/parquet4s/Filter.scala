@@ -1,11 +1,50 @@
 package com.github.mjakubowski84.parquet4s
 
+import org.apache.parquet.filter.RecordFilter as ParquetRecordFilter
+import org.apache.parquet.filter.UnboundRecordFilter
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators.*
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
 
 import scala.language.{existentials, implicitConversions}
+
+sealed trait IFilter {
+
+  protected[parquet4s] def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter
+
+}
+
+trait RecordFilter extends IFilter {
+
+  protected[parquet4s] def toUnboundedRecordFilter(
+      valueCodecConfiguration: ValueCodecConfiguration
+  ): UnboundRecordFilter
+
+  override protected[parquet4s] def toFilterCompat(
+      valueCodecConfiguration: ValueCodecConfiguration
+  ): FilterCompat.Filter =
+    FilterCompat.get(toUnboundedRecordFilter(valueCodecConfiguration))
+
+}
+
+object RecordFilter {
+  def apply(indices: Set[Long]): RecordFilter = new RecordFilterImpl(indices)
+}
+
+private class RecordFilterImpl(indices: Set[Long]) extends RecordFilter {
+  override protected[parquet4s] def toUnboundedRecordFilter(
+      valueCodecConfiguration: ValueCodecConfiguration
+  ): UnboundRecordFilter = _ =>
+    new ParquetRecordFilter {
+      private var counter: Long = 0L
+      override def isMatch: Boolean = {
+        val currentIndex = counter
+        counter = counter + 1
+        indices.contains(currentIndex)
+      }
+    }
+}
 
 /** Filter provides a way to define filtering predicates with a simple algebra. Use filters to process your files while
   * it is read from a file system and BEFORE its content is transferred to your application. <br/> You can filter by
@@ -19,11 +58,13 @@ import scala.language.{existentials, implicitConversions}
   *   Given schema: {{{case class User(id: Long, age: Int, gender: String)}}} Search for males in age below 40
   *   (exclusive) or above 50 (inclusive) {{{Col("gender") === "male" && (Col("age") < 40 || Col("age") >= 50)}}}
   */
-trait Filter {
+trait Filter extends IFilter {
 
   protected[parquet4s] def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate
 
-  private[parquet4s] def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
+  override protected[parquet4s] def toFilterCompat(
+      valueCodecConfiguration: ValueCodecConfiguration
+  ): FilterCompat.Filter =
     FilterCompat.get(toPredicate(valueCodecConfiguration))
 
   /** @return

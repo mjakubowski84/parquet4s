@@ -25,7 +25,7 @@ object ParquetReader extends IOOps {
     /** @param filter
       *   optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
       */
-    def filter(filter: Filter): Builder[T]
+    def filter(filter: IFilter): Builder[T]
 
     /** Attempt to read data as partitioned. Partition names must follow Hive format. Partition values will be set in
       * read records to corresponding fields.
@@ -46,7 +46,7 @@ object ParquetReader extends IOOps {
 
   private case class BuilderImpl[T](
       options: ParquetReader.Options                               = ParquetReader.Options(),
-      filter: Filter                                               = Filter.noopFilter,
+      filter: IFilter                                              = Filter.noopFilter,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None,
       columnProjections: Seq[ColumnProjection]                     = Seq.empty,
       readPartitions: Boolean                                      = false
@@ -54,7 +54,7 @@ object ParquetReader extends IOOps {
     override def options(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
 
-    override def filter(filter: Filter): Builder[T] =
+    override def filter(filter: IFilter): Builder[T] =
       this.copy(filter = filter)
 
     override def partitioned: Builder[T] = this.copy(readPartitions = true)
@@ -103,7 +103,7 @@ object ParquetReader extends IOOps {
           new CompoundParquetIterable[T](iterables)
       }
 
-    private def singleIterable(
+    private def singleIterable( // TODO this should accept InputFile pointing to a single file
         path: Path,
         valueCodecConfiguration: ValueCodecConfiguration,
         projectedSchemaOpt: Option[MessageType],
@@ -116,6 +116,7 @@ object ParquetReader extends IOOps {
       ParquetIterable[T](
         iteratorFactory = () =>
           new ParquetIterator(
+            // TODO we need to extend existing Builder (and provide ReadSupport) so that we can use read with InputFile
             HadoopParquetReader
               .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, columnProjections), path.toHadoop)
               .withConf(hadoopConf)
@@ -147,6 +148,7 @@ object ParquetReader extends IOOps {
   case class Options(
       timeZone: TimeZone        = TimeZone.getDefault,
       hadoopConf: Configuration = new Configuration()
+      // TODO add a config with a set of supported file extensions to be read, default: .parquet
   )
 
   override val logger: Logger = LoggerFactory.getLogger(this.getClass)

@@ -118,7 +118,7 @@ trait PartitionedDirectory {
   /** @return
     *   all [[PartitionedPath]]s belonging to this directory
     */
-  def paths: Iterable[PartitionedPath]
+  def paths: Iterable[PartitionedPath] // TODO this should return list of leaf Parquet files, not dirs!
 }
 
 private[parquet4s] object PartitionFilter {
@@ -140,14 +140,21 @@ private[parquet4s] object PartitionFilter {
     *   paths that meet the filter accompanied by rewritten filters that shall be used to process Parquet files
     */
   def filter(
-      filter: Filter,
+      filter: IFilter,
       valueCodecConfiguration: ValueCodecConfiguration,
       partitionedDirectory: PartitionedDirectory
   ): Iterable[(FilterCompat.Filter, PartitionedPath)] =
-    if (filter == Filter.noopFilter) {
-      val filterCompat = filter.toFilterCompat(valueCodecConfiguration)
-      partitionedDirectory.paths.map(pp => (filterCompat, pp))
-    } else filterNonEmptyPredicate(filter.toPredicate(valueCodecConfiguration), partitionedDirectory)
+    filter match {
+      case Filter.noopFilter =>
+        val filterCompat = filter.toFilterCompat(valueCodecConfiguration)
+        partitionedDirectory.paths.map(pp => (filterCompat, pp))
+      case filter: Filter =>
+        filterNonEmptyPredicate(filter.toPredicate(valueCodecConfiguration), partitionedDirectory)
+      case _: RecordFilter =>
+        // TODO
+        val filterCompat = Filter.noopFilter.toFilterCompat(valueCodecConfiguration)
+        partitionedDirectory.paths.map(pp => (filterCompat, pp))
+    }
 
   private def filterNonEmptyPredicate(
       filterPredicate: FilterPredicate,
