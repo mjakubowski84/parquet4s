@@ -4,21 +4,10 @@ import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
 import com.github.mjakubowski84.parquet4s.PartitionFilterRewriter.AssumeTrue
 import com.github.mjakubowski84.parquet4s.PartitionFilterSpec.IsUppercase
 import org.apache.commons.lang3.StringUtils
+import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.compat.FilterCompat.FilterPredicateCompat
-import org.apache.parquet.filter2.predicate.FilterApi.{
-  and as AND,
-  eq as EQ,
-  gt as GT,
-  gtEq as GTE,
-  lt as LT,
-  ltEq as LTE,
-  not as NOT,
-  notEq as NEQ,
-  or as OR,
-  userDefined as UDP,
-  *
-}
+import org.apache.parquet.filter2.predicate.FilterApi.{and as AND, eq as EQ, gt as GT, gtEq as GTE, lt as LT, ltEq as LTE, not as NOT, notEq as NEQ, or as OR, userDefined as UDP, *}
 import org.apache.parquet.filter2.predicate.{FilterPredicate, Operators, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
 import org.scalatest.{EitherValues, Inside}
@@ -56,9 +45,10 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
   val case4: FilterPredicate = NOT(OR(eqi, neqj))
 
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
+  val configuration = new Configuration()
 
   def partitionedPath(partitions: (ColumnPath, String)*): PartitionedPath =
-    PartitionedPath(Path("/"), partitions.toList)
+    PartitionedPath(Path("/"), configuration, partitions.toList)
 
   def partitionedDirectory(partitionedPaths: PartitionedPath*): PartitionedDirectory =
     PartitionedDirectory(partitionedPaths).value

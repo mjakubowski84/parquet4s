@@ -4,6 +4,7 @@ import com.github.mjakubowski84.parquet4s.*
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.compat.FilterCompat.NoOpFilter
+import org.apache.parquet.hadoop.util.HiddenFileFilter
 import org.apache.parquet.schema.MessageType
 
 private[parquet4s] class LazyDelegateStats(
@@ -15,7 +16,7 @@ private[parquet4s] class LazyDelegateStats(
 ) extends Stats {
   private lazy val delegate: Stats = {
     val fs = path.toHadoop.getFileSystem(hadoopConf)
-    val statsArray = fs.listStatus(path.toHadoop).map {
+    val statsArray = fs.listStatus(path.toHadoop, HiddenFileFilter.INSTANCE).map {
       case status if filter.isInstanceOf[NoOpFilter] =>
         new FileStats(status, vcc, hadoopConf, projectionSchemaOpt)
       case status =>

@@ -131,30 +131,39 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
   }
 
   it should "create single element partition in a path" in {
-    val pathX1 = tempPath.append("x=1")
-    fileSystem.createNewFile(pathX1.append("file.parquet").toHadoop)
+    val pathX1 = tempPath.append("x=1").append("file.parquet")
+    fileSystem.createNewFile(pathX1.toHadoop)
 
     val dir = findPartitionedPaths(tempPath, configuration).value
-    dir.paths should be(List(PartitionedPath(pathX1, (Col("x") -> "1") :: Nil)))
+    dir.paths should be(List(PartitionedPath(pathX1, configuration, (Col("x") -> "1") :: Nil)))
     dir.schema should be(Col("x") :: Nil)
   }
 
+  it should "return a partitioned directory with single file of no partitions values" in {
+    val pathX1 = tempPath.append("x=1").append("file.parquet")
+    fileSystem.createNewFile(pathX1.toHadoop)
+
+    val dir = findPartitionedPaths(pathX1, configuration).value
+    dir.paths should be(List(PartitionedPath(pathX1, configuration, Nil)))
+    dir.schema should be(empty)
+  }
+
   it should "create proper partitions for complex tree" in {
-    val path1 = tempPath.append("x=1/y=a/z=1_1")
-    val path2 = tempPath.append("x=1/y=b/z=1_2")
-    val path3 = tempPath.append("x=1/y=c/z=1_3")
-    val path4 = tempPath.append("x=2/y=b/z=0_9")
-    fileSystem.createNewFile(path1.append("file.parquet").toHadoop)
-    fileSystem.createNewFile(path2.append("file.parquet").toHadoop)
-    fileSystem.createNewFile(path3.append("file.parquet").toHadoop)
-    fileSystem.createNewFile(path4.append("file.parquet").toHadoop)
+    val path1 = tempPath.append("x=1/y=a/z=1_1").append("file.parquet")
+    val path2 = tempPath.append("x=1/y=b/z=1_2").append("file.parquet")
+    val path3 = tempPath.append("x=1/y=c/z=1_3").append("file.parquet")
+    val path4 = tempPath.append("x=2/y=b/z=0_9").append("file.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
+    fileSystem.createNewFile(path3.toHadoop)
+    fileSystem.createNewFile(path4.toHadoop)
 
     val dir = findPartitionedPaths(tempPath, configuration).value
     dir.paths should contain theSameElementsAs List(
-      PartitionedPath(path1, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "1_1")),
-      PartitionedPath(path2, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_2")),
-      PartitionedPath(path3, List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_3")),
-      PartitionedPath(path4, List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "0_9"))
+      PartitionedPath(path1, configuration, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "1_1")),
+      PartitionedPath(path2, configuration, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_2")),
+      PartitionedPath(path3, configuration, List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_3")),
+      PartitionedPath(path4, configuration, List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "0_9"))
     )
     dir.schema should be(List(Col("x"), Col("y"), Col("z")))
   }

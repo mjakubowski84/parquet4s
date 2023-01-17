@@ -293,7 +293,7 @@ lazy val luceneCore = (project in file("lucene-core"))
     name := "parquet4s-lucene-core",
     crossScalaVersions := supportedScalaVersions,
     javacOptions := Seq("-source", "11", "-target", "11"),
-    scalacOptions ++= Seq("-release:11"),
+    scalacOptions ++= Seq("-release:8"),
     libraryDependencies ++= Seq(
       "org.apache.lucene" % "lucene-core" % "9.4.2",
       "org.apache.lucene" % "lucene-codecs" % "9.4.2",

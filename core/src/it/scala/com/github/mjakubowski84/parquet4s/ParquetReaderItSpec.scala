@@ -45,7 +45,7 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b1/file.parquet"), Seq(I(3)))
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b2/file.parquet"), Seq(I(4)))
 
-    val partitioned = ParquetReader.as[Partitioned].partitioned.read(tempPath)
+    val partitioned = ParquetReader.as[Partitioned].read(tempPath)
     try partitioned.toSeq should contain theSameElementsAs
       Seq(
         Partitioned(a = "a1", b = "b1", i = 1),
@@ -62,7 +62,7 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b1/file.parquet"), Seq(I(3)))
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b2/file.parquet"), Seq(I(4)))
 
-    val partitioned = ParquetReader.as[Partitioned].partitioned.filter(Col("b") === "b1").read(tempPath)
+    val partitioned = ParquetReader.as[Partitioned].filter(Col("b") === "b1").read(tempPath)
     try partitioned.toSeq should contain theSameElementsAs
       Seq(
         Partitioned(a = "a1", b = "b1", i = 1),
@@ -74,7 +74,7 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
   "Attempt to read partitions on non-partitioned data should succeed" in {
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "file.parquet"), Seq(I(1), I(2)))
 
-    val data = ParquetReader.as[I].partitioned.read(tempPath)
+    val data = ParquetReader.as[I].read(tempPath)
     try data.toSeq should be(Seq(I(1), I(2)))
     finally data.close()
   }
@@ -83,7 +83,7 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/b=b1/file.parquet"), Seq(I(1)))
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/file.parquet"), Seq(I(2)))
 
-    an[IllegalArgumentException] should be thrownBy ParquetReader.as[Partitioned].partitioned.read(tempPath)
+    an[IllegalArgumentException] should be thrownBy ParquetReader.as[Partitioned].read(tempPath)
   }
 
 }

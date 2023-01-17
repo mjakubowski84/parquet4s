@@ -27,8 +27,9 @@ private class IndexerImpl(readerOptions: ParquetReader.Options) extends Indexer 
   private val indexerConfig = new IndexWriterConfig(analyzer)
 
   override def index(path: Path, col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Unit = {
-    // TODO path shall be a single file ???
-    // TODO version which points a directory shall have a index-by col ???
+    // TODO check if the path is file or dir, if it is a dir then list all parquet files and index them all
+    // TODO use reader options to pick up a proper extension for validation and dir filtering
+    // TODO check all places in the project where we filter by extension
     val indexPath = path.parent
       .getOrElse(throw new IllegalArgumentException("Invalid path"))
       .append("lucene_index")

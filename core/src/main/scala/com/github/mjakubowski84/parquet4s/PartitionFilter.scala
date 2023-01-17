@@ -2,17 +2,35 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
 import com.github.mjakubowski84.parquet4s.PartitionedDirectory.PartitioningSchema
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.FileStatus
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators.Column
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Operators, UserDefinedPredicate}
+import org.apache.parquet.hadoop.util.HadoopInputFile
+import org.apache.parquet.io.InputFile
 import org.apache.parquet.io.api.Binary
 import org.apache.parquet.schema.PrimitiveComparator
 import org.slf4j.LoggerFactory
 
 object PartitionedPath {
 
-  def apply(path: Path, partitions: List[(ColumnPath, String)]): PartitionedPath =
-    new PartitionedPathImpl(path, partitions.map { case (name, value) => (name, Binary.fromString(value)) })
+  def apply(
+      fileStatus: FileStatus,
+      configuration: Configuration,
+      partitions: List[(ColumnPath, String)]
+  ): PartitionedPath =
+    apply(HadoopInputFile.fromStatus(fileStatus, configuration), partitions)
+
+  def apply(path: Path, configuration: Configuration, partitions: List[(ColumnPath, String)]): PartitionedPath =
+    apply(HadoopInputFile.fromPath(path.toHadoop, configuration), partitions)
+
+  def apply(hadoopInputFile: HadoopInputFile, partitions: List[(ColumnPath, String)]): PartitionedPath =
+    new PartitionedPathImpl(
+      Path(hadoopInputFile.getPath),
+      hadoopInputFile,
+      partitions.map { case (name, value) => (name, Binary.fromString(value)) }
+    )
 
 }
 
@@ -25,6 +43,11 @@ trait PartitionedPath {
     *   file system path
     */
   def path: Path
+
+  /** @return
+    *   file for reading
+    */
+  def inputFile: InputFile
 
   /** @return
     *   list of partition names
@@ -45,6 +68,7 @@ trait PartitionedPath {
 
 private class PartitionedPathImpl(
     override val path: Path,
+    override val inputFile: InputFile,
     override val partitions: List[(ColumnPath, Binary)]
 ) extends PartitionedPath {
 

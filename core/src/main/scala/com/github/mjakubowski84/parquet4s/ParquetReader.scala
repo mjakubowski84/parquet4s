@@ -3,7 +3,8 @@ package com.github.mjakubowski84.parquet4s
 import com.github.mjakubowski84.parquet4s.etl.CompoundParquetIterable
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
+import org.apache.parquet.hadoop.util.HadoopInputFile
+import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -30,6 +31,10 @@ object ParquetReader extends IOOps {
     /** Attempt to read data as partitioned. Partition names must follow Hive format. Partition values will be set in
       * read records to corresponding fields.
       */
+    @deprecated(
+      message = "Reading always tries to resolve partitions if the provided path is a directory.",
+      since   = "2.8.0"
+    )
     def partitioned: Builder[T]
 
     /** @param path
@@ -42,14 +47,16 @@ object ParquetReader extends IOOps {
       *   when reading inconsistent partition directory
       */
     def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T]
+
+    // TODO docs
+    def read(inputFile: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T]
   }
 
   private case class BuilderImpl[T](
       options: ParquetReader.Options                               = ParquetReader.Options(),
       filter: IFilter                                              = Filter.noopFilter,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None,
-      columnProjections: Seq[ColumnProjection]                     = Seq.empty,
-      readPartitions: Boolean                                      = false
+      columnProjections: Seq[ColumnProjection]                     = Seq.empty
   ) extends Builder[T] {
     override def options(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
@@ -57,23 +64,27 @@ object ParquetReader extends IOOps {
     override def filter(filter: IFilter): Builder[T] =
       this.copy(filter = filter)
 
-    override def partitioned: Builder[T] = this.copy(readPartitions = true)
+    override def partitioned: Builder[T] = this
 
     override def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
       val valueCodecConfiguration = ValueCodecConfiguration(options)
       val hadoopConf              = options.hadoopConf
 
-      if (readPartitions)
-        partitionedIterable(path, valueCodecConfiguration, hadoopConf)
-      else
-        singleIterable(
-          path                    = path,
-          valueCodecConfiguration = valueCodecConfiguration,
-          projectedSchemaOpt =
-            projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T]),
-          filterCompat = filter.toFilterCompat(valueCodecConfiguration),
-          hadoopConf   = hadoopConf
-        )
+      partitionedIterable(path, valueCodecConfiguration, hadoopConf)
+    }
+
+    override def read(inputFile: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
+      val valueCodecConfiguration = ValueCodecConfiguration(options)
+      val hadoopConf              = options.hadoopConf
+
+      singleIterable(
+        inputFile               = inputFile,
+        valueCodecConfiguration = valueCodecConfiguration,
+        projectedSchemaOpt =
+          projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T]),
+        filterCompat = filter.toFilterCompat(valueCodecConfiguration),
+        hadoopConf   = hadoopConf
+      )
     }
 
     private def partitionedIterable(
@@ -81,6 +92,7 @@ object ParquetReader extends IOOps {
         valueCodecConfiguration: ValueCodecConfiguration,
         hadoopConf: Configuration
     )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] =
+      // TODO use provided filter to optimise directory scanning
       findPartitionedPaths(path, hadoopConf) match {
         case Left(exception) =>
           throw exception
@@ -93,7 +105,7 @@ object ParquetReader extends IOOps {
             .toSeq
             .map { case (filter, partitionedPath) =>
               singleIterable(
-                path                    = partitionedPath.path,
+                inputFile               = partitionedPath.inputFile,
                 valueCodecConfiguration = valueCodecConfiguration,
                 projectedSchemaOpt      = projectedSchemaOpt,
                 filterCompat            = filter,
@@ -103,27 +115,28 @@ object ParquetReader extends IOOps {
           new CompoundParquetIterable[T](iterables)
       }
 
-    private def singleIterable( // TODO this should accept InputFile pointing to a single file
-        path: Path,
+    private def singleIterable(
+        inputFile: InputFile,
         valueCodecConfiguration: ValueCodecConfiguration,
         projectedSchemaOpt: Option[MessageType],
         filterCompat: FilterCompat.Filter,
         hadoopConf: Configuration
     )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
       if (logger.isDebugEnabled) {
-        logger.debug(s"Creating ParquetIterable for path $path")
+        logger.debug(s"Creating ParquetIterable for input file $inputFile")
       }
       ParquetIterable[T](
         iteratorFactory = () =>
-          new ParquetIterator(
-            // TODO we need to extend existing Builder (and provide ReadSupport) so that we can use read with InputFile
-            HadoopParquetReader
-              .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, columnProjections), path.toHadoop)
-              .withConf(hadoopConf)
-              .withFilter(filterCompat)
-          ),
+          new ParquetIterator(HadoopParquetReader(inputFile, projectedSchemaOpt, columnProjections, filterCompat)),
         valueCodecConfiguration = valueCodecConfiguration,
-        stats                   = Stats(path, valueCodecConfiguration, hadoopConf, projectedSchemaOpt, filterCompat)
+        // TODO handle path/inputfile properly in Stats
+        stats = Stats(
+          Path(inputFile.asInstanceOf[HadoopInputFile].getPath),
+          valueCodecConfiguration,
+          hadoopConf,
+          projectedSchemaOpt,
+          filterCompat
+        )
       )
     }
 

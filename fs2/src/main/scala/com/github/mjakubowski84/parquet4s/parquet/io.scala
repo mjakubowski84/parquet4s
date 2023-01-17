@@ -3,16 +3,15 @@ package com.github.mjakubowski84.parquet4s.parquet
 import cats.effect.Sync
 import com.github.mjakubowski84.parquet4s.{ColumnPath, ParquetWriter, PartitionedDirectory, PartitionedPath, Path}
 import org.apache.hadoop.fs.{FileAlreadyExistsException, FileStatus, FileSystem}
-import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
 import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import org.apache.hadoop.conf.Configuration
 import fs2.Stream
+import org.apache.parquet.hadoop.util.HiddenFileFilter
 
 import scala.language.higherKinds
 import scala.util.matching.Regex
-import org.apache.commons.io.filefilter.HiddenFileFilter
 
 private[parquet] object io {
 
@@ -24,7 +23,7 @@ private[parquet] object io {
     def apply(partitionPath: (Path, Partition)): Dirs = Dirs(Vector(partitionPath))
   }
   private case class Dirs(partitionPaths: Vector[(Path, Partition)]) extends StatusAccumulator
-  private case object Files extends StatusAccumulator
+  private case class Files(files: Vector[FileStatus]) extends StatusAccumulator
 
   private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!?\-+_.,*'()&$@:;/ ]+)""".r
 
@@ -59,7 +58,7 @@ private[parquet] object io {
   ): Stream[F, PartitionedDirectory] =
     Stream
       .eval(F.blocking(path.toHadoop.getFileSystem(configuration)))
-      .flatMap(fs => findPartitionedPaths(fs, path, logger, List.empty))
+      .flatMap(fs => findPartitionedPaths(fs, configuration, path, logger, List.empty))
       .fold[Either[Seq[Path], Seq[PartitionedPath]]](Right(Vector.empty)) {
         case (Left(invalidPaths), Left(moreInvalidPaths)) =>
           Left(invalidPaths ++ moreInvalidPaths)
@@ -76,32 +75,38 @@ private[parquet] object io {
       }
       .flatMap(Stream.fromEither[F].apply)
 
-  private def findPartitionedPaths[F[_]](fs: FileSystem, path: Path, logger: Logger[F], partitions: List[Partition])(
-      implicit F: Sync[F]
+  private def findPartitionedPaths[F[_]](
+      fs: FileSystem,
+      configuration: Configuration,
+      path: Path,
+      logger: Logger[F],
+      partitions: List[Partition]
+  )(implicit
+      F: Sync[F]
   ): Stream[F, Either[Seq[Path], Seq[PartitionedPath]]] =
     Stream
-      .evalSeq(F.blocking(fs.listStatus(path.toHadoop).toVector))
+      .evalSeq(F.blocking(fs.listStatus(path.toHadoop, HiddenFileFilter.INSTANCE).toVector))
       .fold[StatusAccumulator](Empty) {
         case (Empty, status) if status.isDirectory =>
           matchPartition(status).fold[StatusAccumulator](Empty)(Dirs.apply)
-        case (Empty, _) =>
-          Files
+        case (Empty, status) =>
+          Files(Vector(status))
         case (dirs @ Dirs(partitionPaths), status) if status.isDirectory =>
           matchPartition(status).fold(dirs)(partitionPath => Dirs(partitionPaths :+ partitionPath))
         case (_: Dirs, _) =>
           throw new RuntimeException("Inconsistent directory")
-        case (Files, status) if status.isDirectory =>
+        case (_: Files, status) if status.isDirectory =>
           throw new RuntimeException("Inconsistent directory")
-        case (Files, _) =>
-          Files
+        case (Files(files), status) =>
+          Files(files :+ status)
       }
       .flatMap {
         case Dirs(partitionPaths) => // node of directory tree
           Stream.emits(partitionPaths).flatMap { case (subPath, partition) =>
-            findPartitionedPaths(fs, subPath, logger, partitions :+ partition)
+            findPartitionedPaths(fs, configuration, subPath, logger, partitions :+ partition)
           }
-        case Files => // leaf of directory tree
-          Stream.emit(Right(Vector(PartitionedPath(path, partitions))))
+        case Files(files) => // leaf of directory tree
+          Stream.emit(Right(files.map(fileStatus => PartitionedPath(fileStatus, configuration, partitions))))
         case Empty => // avoid redundant scans of empty dirs
           Stream.empty
       }
