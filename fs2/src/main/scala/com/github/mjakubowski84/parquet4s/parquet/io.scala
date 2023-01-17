@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
-import cats.effect.{Resource, Sync}
+import cats.effect.Sync
 import com.github.mjakubowski84.parquet4s.{ColumnPath, ParquetWriter, PartitionedDirectory, PartitionedPath, Path}
 import org.apache.hadoop.fs.{FileStatus, FileSystem}
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
@@ -30,9 +30,8 @@ private[parquet] object io {
   def validateWritePath[F[_]](path: Path, writeOptions: ParquetWriter.Options, logger: Logger[F])(implicit
       F: Sync[F]
   ): F[Unit] =
-    Resource
-      .fromAutoCloseable(F.blocking(path.toHadoop.getFileSystem(writeOptions.hadoopConf)))
-      .use { fs =>
+    F.blocking(path.toHadoop.getFileSystem(writeOptions.hadoopConf))
+      .flatMap { fs =>
         F.blocking(fs.exists(path.toHadoop)).flatMap {
           case true if writeOptions.writeMode == ParquetFileWriter.Mode.CREATE =>
             F.raiseError(new AlreadyExistsException(s"File or directory already exists: $path"))
@@ -48,7 +47,7 @@ private[parquet] object io {
       F: Sync[F]
   ): Stream[F, PartitionedDirectory] =
     Stream
-      .resource(Resource.fromAutoCloseable(F.blocking(path.toHadoop.getFileSystem(configuration))))
+      .eval(F.blocking(path.toHadoop.getFileSystem(configuration)))
       .flatMap(fs => findPartitionedPaths(fs, path, List.empty))
       .fold[Either[Seq[Path], Seq[PartitionedPath]]](Right(Vector.empty)) {
         case (Left(invalidPaths), Left(moreInvalidPaths)) =>

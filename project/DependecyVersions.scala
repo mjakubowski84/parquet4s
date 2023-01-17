@@ -9,4 +9,6 @@ object DependecyVersions {
   val fs2Version                   = "3.4.0"
   val catsEffectVersion            = "3.4.2"
   val scalaCollectionCompatVersion = "2.9.0"
+  val scalatestVersion             = "3.2.14"
+  val mockitoVersion               = "4.8.0"
 }

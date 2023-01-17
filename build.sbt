@@ -94,8 +94,8 @@ lazy val core = (project in file("core"))
       "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion,
 
       // tests
-      "org.mockito" % "mockito-core" % "4.8.0" % "test",
-      "org.scalatest" %% "scalatest" % "3.2.14" % "test,it",
+      "org.mockito" % "mockito-core" % mockitoVersion % "test",
+      "org.scalatest" %% "scalatest" % scalatestVersion % "test,it",
       "ch.qos.logback" % "logback-classic" % logbackVersion % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
     ) ++ {
@@ -152,7 +152,24 @@ lazy val fs2 = (project in file("fs2"))
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
-  .dependsOn(core % "compile->compile;test->test")
+  .dependsOn(core % "compile->compile;test->test", testkit % "it->compile")
+
+lazy val testkit = (project in file("testkit"))
+  .settings(
+    name := "parquet4s-testkit",
+    crossScalaVersions := supportedScalaVersions,
+    publish / skip := true,
+    publishLocal / skip := true,
+    libraryDependencies ++= Seq(
+      "org.scalatest" %% "scalatest" % scalatestVersion,
+      "org.apache.hadoop" % "hadoop-minicluster" % hadoopVersion,
+      // MiniDFSCluster leaks Mockito via NameNodeAdapter while hadoop-minicluster doesn't bring
+      // the dependency transitively. We have to add it explicitly to prevent ClassNotFoundException.
+      "org.mockito" % "mockito-core" % mockitoVersion,
+      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
+      "ch.qos.logback" % "logback-classic" % logbackVersion
+    )
+  )
 
 lazy val examples = (project in file("examples"))
   .settings(
@@ -278,6 +295,7 @@ lazy val root = (project in file("."))
     core,
     akka,
     fs2,
+    testkit,
     examples,
     coreBenchmarks,
     akkaBenchmarks,
