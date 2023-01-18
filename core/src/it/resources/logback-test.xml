@@ -11,6 +11,14 @@
     <logger name="org.sparkproject.jetty" level="WARN"/>
     <logger name="org.apache.hadoop" level="WARN"/>
     <logger name="org.apache.htrace" level="WARN"/>
+    <!-- Configure Hadoop minicluster-related logs -->
+    <logger name="org.apache.hadoop.hdfs.MiniDFSCluster" level="INFO"/>
+    <logger name="org.apache.hadoop.hdfs" level="ERROR"/>
+    <logger name="org.apache.hadoop.http" level="ERROR"/>
+    <logger name="org.apache.hadoop.security" level="ERROR"/>
+    <logger name="org.apache.hadoop.metrics2" level="ERROR"/>
+    <logger name="BlockStateChange" level="WARN"/>
+    <logger name="org.eclipse.jetty" level="WARN"/>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
