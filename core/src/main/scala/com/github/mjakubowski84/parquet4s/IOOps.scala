@@ -34,7 +34,7 @@ trait IOOps {
   protected def validateWritePath(path: Path, writeOptions: ParquetWriter.Options): Unit = {
     val hadoopPath = path.toHadoop
     val fs         = hadoopPath.getFileSystem(writeOptions.hadoopConf)
-    try if (fs.exists(hadoopPath)) {
+    if (fs.exists(hadoopPath)) {
       if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
         throw new AlreadyExistsException(s"File or directory already exists: $hadoopPath")
       else {
@@ -43,7 +43,7 @@ trait IOOps {
         fs.delete(hadoopPath, true)
         ()
       }
-    } finally fs.close()
+    }
   }
 
   protected def filesAtPath(path: Path, configuration: Configuration)(implicit
@@ -52,12 +52,11 @@ trait IOOps {
     Future {
       val hadoopPath = path.toHadoop
       scala.concurrent.blocking {
-        val fs = hadoopPath.getFileSystem(configuration)
-        try fs
+        hadoopPath
+          .getFileSystem(configuration)
           .listFiles(hadoopPath, false)
           .map(_.getPath.getName)
           .toList
-        finally fs.close()
       }
     }
 
@@ -66,11 +65,10 @@ trait IOOps {
       configuration: Configuration
   ): Either[Exception, PartitionedDirectory] = {
     val fs = path.toHadoop.getFileSystem(configuration)
-    try findPartitionedPaths(fs, path, List.empty).fold(
+    findPartitionedPaths(fs, path, List.empty).fold(
       PartitionedDirectory.failed,
       PartitionedDirectory.apply
     )
-    finally fs.close()
   }
 
   private def findPartitionedPaths(

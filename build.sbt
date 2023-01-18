@@ -75,6 +75,7 @@ lazy val testReportSettings = Project.inConfig(Test)(
 lazy val sparkDeps = Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "it"
     exclude (org = "org.apache.hadoop", name = "hadoop-client")
+    exclude (org = "org.apache.hadoop", name = "hadoop-client-api")
     exclude (org = "org.slf4j", name = "slf4j-api")
     exclude (org = "org.apache.parquet", name = "parquet-hadoop"),
   "org.apache.spark" %% "spark-sql" % sparkVersion % "it"
@@ -112,6 +113,7 @@ lazy val core = (project in file("core"))
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
+  .dependsOn(testkit % "it->compile")
 
 lazy val akka = (project in file("akka"))
   .configs(IntegrationTest)
