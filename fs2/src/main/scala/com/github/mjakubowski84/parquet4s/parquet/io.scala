@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s.parquet
 
 import cats.effect.Sync
 import com.github.mjakubowski84.parquet4s.{ColumnPath, ParquetWriter, PartitionedDirectory, PartitionedPath, Path}
-import org.apache.hadoop.fs.{FileStatus, FileSystem}
+import org.apache.hadoop.fs.{FileAlreadyExistsException, FileStatus, FileSystem}
 import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
 import cats.implicits.*
@@ -12,6 +12,7 @@ import fs2.Stream
 
 import scala.language.higherKinds
 import scala.util.matching.Regex
+import org.apache.commons.io.filefilter.HiddenFileFilter
 
 private[parquet] object io {
 
@@ -29,19 +30,29 @@ private[parquet] object io {
 
   def validateWritePath[F[_]](path: Path, writeOptions: ParquetWriter.Options, logger: Logger[F])(implicit
       F: Sync[F]
-  ): F[Unit] =
-    F.blocking(path.toHadoop.getFileSystem(writeOptions.hadoopConf))
+  ): F[Unit] = {
+    val hadoopPath = path.toHadoop
+    F.blocking(hadoopPath.getFileSystem(writeOptions.hadoopConf))
       .flatMap { fs =>
-        F.blocking(fs.exists(path.toHadoop)).flatMap {
-          case true if writeOptions.writeMode == ParquetFileWriter.Mode.CREATE =>
-            F.raiseError(new AlreadyExistsException(s"File or directory already exists: $path"))
+        F.blocking(fs.exists(hadoopPath)).flatMap {
           case true =>
-            logger.debug(s"Deleting $path in order to override with new data.") >>
-              F.blocking(fs.delete(path.toHadoop, true)).void
+            F.blocking(fs.getFileStatus(path.toHadoop)).map(_.isDirectory()).flatMap {
+              case false if writeOptions.writeMode == ParquetFileWriter.Mode.CREATE =>
+                F.raiseError(new FileAlreadyExistsException(s"File already exists: $path"))
+              case false =>
+                logger.debug(s"Deleting file $path in order to overwrite with new data.") >>
+                  F.blocking(fs.delete(path.toHadoop, true)).void
+              case true if writeOptions.writeMode == ParquetFileWriter.Mode.CREATE =>
+                F.unit
+              case true =>
+                logger.debug(s"Deleting directory $path in order to overwrite with new data.") >>
+                  F.blocking(fs.delete(path.toHadoop, true)).void  
+            }
           case false =>
             F.unit
         }
       }
+  }
 
   def findPartitionedPaths[F[_]](path: Path, configuration: Configuration)(implicit
       F: Sync[F]

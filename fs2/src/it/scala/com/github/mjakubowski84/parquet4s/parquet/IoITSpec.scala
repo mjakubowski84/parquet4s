@@ -5,7 +5,6 @@ import cats.effect.testing.scalatest.AsyncIOSpec
 import com.github.mjakubowski84.parquet4s.{Col, ParquetWriter, PartitionedPath, Path}
 import fs2.Stream
 import fs2.io.file.*
-import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -30,30 +29,67 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       )
       .as(path)
 
-  "validateWritePath" should "fail if path already exists in create mode" in {
+  "validateWritePath" should "succeed if path already exists in create mode" in {
     val options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.CREATE)
 
     val dirResource = Files[IO].tempDirectory(None, "", None).map(_.toPath)
 
-    val testIO = dirResource.use { existingDir =>
+    dirResource.use { existingDir =>
       for {
         logger <- logger[IO](getClass)
         _      <- io.validateWritePath[IO](existingDir, options, logger)
       } yield succeed
     }
-
-    testIO.assertThrows[AlreadyExistsException]
   }
 
-  it should "delete existing path in overwrite mode" in {
+  it should "fail if file path already exists in create mode" in {
+    val options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.CREATE)
+
+    val fileResource = Files[IO]
+      .tempDirectory(None, "", None)
+      .flatMap(dirPath =>
+        Files[IO].tempFile(dir = Option(dirPath), suffix = ".parquet", prefix = "", permissions = None)
+      )
+      .map(_.toPath)
+
+    val testIO = fileResource.use { existingFile =>
+      for {
+        logger <- logger[IO](getClass)
+        _      <- io.validateWritePath[IO](existingFile, options, logger)
+      } yield succeed
+    }
+
+    testIO.assertThrows[org.apache.hadoop.fs.FileAlreadyExistsException]
+  }
+
+  it should "delete existing directory path in overwrite mode" in {
+    val options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.OVERWRITE)
+
+    val fileResource = Files[IO]
+      .tempDirectory(None, "", None)
+      .flatMap(dirPath =>
+        Files[IO].tempFile(dir = Option(dirPath), suffix = ".parquet", prefix = "", permissions = None)
+      )
+      .map(_.toPath)
+
+    fileResource.use { existingFile =>
+      for {
+        logger          <- logger[IO](getClass)
+        _               <- io.validateWritePath[IO](existingFile, options, logger)
+        pathStillExists <- Files[IO].exists(existingFile)
+      } yield pathStillExists should be(false)
+    }
+  }
+
+  it should "delete existing file path in overwrite mode" in {
     val options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.OVERWRITE)
 
     val dirResource = Files[IO].tempDirectory(None, "", None).map(_.toPath)
 
     dirResource.use { existingDir =>
       for {
-        logger          <- logger[IO](getClass)
-        _               <- io.validateWritePath[IO](existingDir, options, logger)
+        logger <- logger[IO](getClass)
+        _ <- io.validateWritePath[IO](existingDir, options, logger)
         pathStillExists <- Files[IO].exists(existingDir)
       } yield pathStillExists should be(false)
     }

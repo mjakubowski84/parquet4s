@@ -99,8 +99,6 @@ private[parquet4s] object writer {
   ): Pipe[F, T, Nothing] =
     in =>
       for {
-        logger  <- Stream.eval(logger(getClass))
-        _       <- Stream.eval(io.validateWritePath(path, options, logger))
         writer  <- Stream.resource(writerResource[T, F](path, options))
         nothing <- writer.writeAllStream(in)
       } yield nothing

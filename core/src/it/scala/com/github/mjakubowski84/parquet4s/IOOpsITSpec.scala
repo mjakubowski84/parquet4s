@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
+import org.apache.hadoop.fs.FileAlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter.Mode
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -15,11 +15,11 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     clearTemp()
   }
 
-  "validateWritePath" should "raise an exception when writing to existing path in CREATE mode" in {
+  "validateWritePath" should "succeed when writing to an existing directory path in CREATE mode" in {
     fileSystem.mkdirs(tempPath.toHadoop)
     fileSystem.exists(tempPath.toHadoop) should be(true)
 
-    an[AlreadyExistsException] should be thrownBy validateWritePath(
+    validateWritePath(
       path         = tempPath,
       writeOptions = ParquetWriter.Options(writeMode = Mode.CREATE)
     )
@@ -27,7 +27,21 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.exists(tempPath.toHadoop) should be(true)
   }
 
-  it should "pass if path doesn't exist in CREATE mode" in {
+  it should "raise an exception when writing to an existing file path in CREATE mode" in {
+    val filePath = tempPath.append("file.parquet")
+    fileSystem.mkdirs(tempPath.toHadoop)
+    fileSystem.createNewFile(filePath.hadoopPath)
+    fileSystem.exists(filePath.toHadoop) should be(true)
+
+    a[FileAlreadyExistsException] should be thrownBy validateWritePath(
+      path         = filePath,
+      writeOptions = ParquetWriter.Options(writeMode = Mode.CREATE)
+    )
+
+    fileSystem.exists(filePath.toHadoop) should be(true)
+  }
+
+  it should "pass if directory path doesn't exist in CREATE mode" in {
     fileSystem.exists(tempPath.toHadoop) should be(false)
 
     validateWritePath(
@@ -38,7 +52,19 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.exists(tempPath.toHadoop) should be(false)
   }
 
-  it should "delete existing path in OVERRIDE mode" in {
+  it should "pass if file path doesn't exist in CREATE mode" in {
+    val filePath = tempPath.append("file.parquet")
+    fileSystem.exists(filePath.toHadoop) should be(false)
+
+    validateWritePath(
+      path         = filePath,
+      writeOptions = ParquetWriter.Options(writeMode = Mode.CREATE)
+    )
+
+    fileSystem.exists(filePath.toHadoop) should be(false)
+  }
+
+  it should "delete existing directory path in OVERRIDE mode" in {
     fileSystem.mkdirs(tempPath.toHadoop)
     fileSystem.exists(tempPath.toHadoop) should be(true)
 
@@ -50,7 +76,21 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.exists(tempPath.toHadoop) should be(false)
   }
 
-  it should "pass when writing to non-existing path in OVERRIDE mode" in {
+  it should "delete existing file path in OVERRIDE mode" in {
+    val filePath = tempPath.append("file.parquet")
+    fileSystem.mkdirs(tempPath.toHadoop)
+    fileSystem.createNewFile(filePath.hadoopPath)
+    fileSystem.exists(filePath.toHadoop) should be(true)
+
+    validateWritePath(
+      path         = filePath,
+      writeOptions = ParquetWriter.Options(writeMode = Mode.OVERWRITE)
+    )
+
+    fileSystem.exists(filePath.toHadoop) should be(false)
+  }
+
+  it should "pass when writing to a non-existing directory path in OVERRIDE mode" in {
     fileSystem.exists(tempPath.toHadoop) should be(false)
 
     validateWritePath(
@@ -59,6 +99,18 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     )
 
     fileSystem.exists(tempPath.toHadoop) should be(false)
+  }
+
+  it should "pass when writing to a non-existing file path in OVERRIDE mode" in {
+    val filePath = tempPath.append("file.parquet")
+    fileSystem.exists(filePath.toHadoop) should be(false)
+
+    validateWritePath(
+      path         = filePath,
+      writeOptions = ParquetWriter.Options(writeMode = Mode.OVERWRITE)
+    )
+
+    fileSystem.exists(filePath.toHadoop) should be(false)
   }
 
   "findPartitionedPaths" should "return no paths and no partitions for empty directory" in {
