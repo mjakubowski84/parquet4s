@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Sink, Source}
+import org.apache.parquet.hadoop.ParquetFileWriter
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -632,6 +633,40 @@ class ParquetStreamsITSpec
         record should have size 1
         record.get[String]("s", ValueCodecConfiguration.Default) should contain oneElementOf dict
       }
+    }
+  }
+
+  it should "add new files in create mode" in {
+    val flow = ParquetStreams.viaParquet
+      .of[Data]
+      .options(options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.CREATE))
+      .write(tempPath)
+
+    for {
+      _        <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      _        <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      _        <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      readData <- ParquetStreams.fromParquet.as[Data].read(tempPath).runWith(Sink.seq)
+    } yield {
+      readData should have size 3
+      fileSystem.listStatus(tempPath.toHadoop) should have size 3
+    }
+  }
+
+  it should "add overwrite files in overwrite mode" in {
+    val flow = ParquetStreams.viaParquet
+      .of[Data]
+      .options(options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.OVERWRITE))
+      .write(tempPath)
+
+    for {
+      _ <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      _ <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      _ <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      readData <- ParquetStreams.fromParquet.as[Data].read(tempPath).runWith(Sink.seq)
+    } yield {
+      readData should have size 1
+      fileSystem.listStatus(tempPath.toHadoop) should have size 1
     }
   }
 

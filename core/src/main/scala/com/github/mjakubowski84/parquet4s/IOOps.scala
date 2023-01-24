@@ -1,8 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileStatus, FileSystem, RemoteIterator}
-import org.apache.hadoop.io.SecureIOUtils.AlreadyExistsException
+import org.apache.hadoop.fs.{FileAlreadyExistsException, FileStatus, FileSystem, RemoteIterator}
 import org.apache.parquet.hadoop.ParquetFileWriter
 import org.slf4j.Logger
 
@@ -35,13 +34,21 @@ trait IOOps {
     val hadoopPath = path.toHadoop
     val fs         = hadoopPath.getFileSystem(writeOptions.hadoopConf)
     if (fs.exists(hadoopPath)) {
-      if (writeOptions.writeMode == ParquetFileWriter.Mode.CREATE)
-        throw new AlreadyExistsException(s"File or directory already exists: $hadoopPath")
-      else {
-        if (logger.isDebugEnabled)
-          logger.debug(s"Deleting $hadoopPath in order to override with new data.")
-        fs.delete(hadoopPath, true)
-        ()
+      fs.getFileStatus(path.toHadoop).isDirectory match {
+        case false if writeOptions.writeMode == ParquetFileWriter.Mode.CREATE =>
+          throw new FileAlreadyExistsException(s"File or directory already exists: $hadoopPath")
+        case false =>
+          if (logger.isDebugEnabled)
+            logger.debug(s"Deleting file $hadoopPath in order to override with new data.")
+          fs.delete(hadoopPath, true)
+          ()
+        case true if writeOptions.writeMode == ParquetFileWriter.Mode.CREATE =>
+          ()
+        case true =>
+          if (logger.isDebugEnabled)
+            logger.debug(s"Deleting directory $hadoopPath in order to override with new data.")
+          fs.delete(hadoopPath, true)
+          ()
       }
     }
   }

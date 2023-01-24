@@ -17,6 +17,7 @@ import org.scalatest.matchers.should.Matchers
 import scala.collection.compat.immutable.LazyList
 import scala.concurrent.duration.*
 import scala.util.Random
+import org.apache.parquet.hadoop.ParquetFileWriter
 
 object Fs2ParquetItSpec {
 
@@ -74,12 +75,12 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
   def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
     Files[IO]
-      .list(path)
+      .walk(path)
       .map(_.toPath)
       .filter(_.toString.endsWith(".parquet"))
       .fold(Vector.empty[Path])(_ :+ _)
 
-  it should "write and read single parquet file" in {
+  "FS2 Parquet" should "write and read single parquet file" in {
     val outputFileName = "data.parquet"
     def write(path: Path): Stream[IO, Nothing] =
       Stream
@@ -293,13 +294,6 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         )
         .fold(Vector.empty[DataPartitioned])(_ :+ _)
 
-    def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
-      Files[IO]
-        .walk(path)
-        .map(_.toPath)
-        .filter(_.name.endsWith(".parquet"))
-        .fold(Vector.empty[Path])(_ :+ _)
-
     def partitionValue(path: Path): (String, String) = {
       val split = path.name.split("=")
       (split(0), split(1))
@@ -471,13 +465,6 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
-    def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
-      Files[IO]
-        .walk(path)
-        .map(_.toPath)
-        .filter(_.name.endsWith(".parquet"))
-        .fold(Vector.empty[Path])(_ :+ _)
-
     val testStream =
       for {
         path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
@@ -515,13 +502,6 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         )
         .fold(Vector.empty[Data])(_ :+ _)
 
-    def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
-      Files[IO]
-        .walk(path)
-        .map(_.toPath)
-        .filter(_.name.endsWith(".parquet"))
-        .fold(Vector.empty[Path])(_ :+ _)
-
     val testStream =
       for {
         path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
@@ -532,6 +512,54 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         parquetFiles.length should be > expectedNumberOfPartitions
         total should be(count)
       }
+
+    testStream.compile.lastOrError
+  }
+
+  it should "add new files in create mode" in {
+    def write(path: Path): Stream[IO, Unit] =
+      Stream
+        .iterable(data)
+        .take(1L)
+        .through(
+          parquet
+            .viaParquet[IO]
+            .of[Data]
+            .options(writeOptions.copy(writeMode = ParquetFileWriter.Mode.CREATE))
+            .write(path)
+        )
+        .void
+
+    val testStream =
+      for {
+        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        _            <- write(path) >> write(path) >> write(path)
+        parquetFiles <- listParquetFiles(path)
+      } yield parquetFiles should have size 3
+
+    testStream.compile.lastOrError
+  }
+
+  it should "delete existing files in overwrite mode" in {
+    def write(path: Path): Stream[IO, Unit] =
+      Stream
+        .iterable(data)
+        .take(1L)
+        .through(
+          parquet
+            .viaParquet[IO]
+            .of[Data]
+            .options(writeOptions.copy(writeMode = ParquetFileWriter.Mode.OVERWRITE))
+            .write(path)
+        )
+        .void
+
+    val testStream =
+      for {
+        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        _            <- write(path) >> write(path) >> write(path)
+        parquetFiles <- listParquetFiles(path)
+      } yield parquetFiles should have size 1
 
     testStream.compile.lastOrError
   }

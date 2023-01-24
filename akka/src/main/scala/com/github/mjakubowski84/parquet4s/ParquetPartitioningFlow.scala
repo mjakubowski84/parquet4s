@@ -2,15 +2,14 @@ package com.github.mjakubowski84.parquet4s
 
 import akka.stream.stage.*
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
+import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow.PostWriteState
 import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.schema.MessageType
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
-import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow.*
-
 import scala.collection.concurrent.TrieMap
 
 object ParquetPartitioningFlow {
@@ -214,6 +213,7 @@ object ParquetPartitioningFlow {
     ): GraphStage[FlowShape[T, T]] = {
       val schema = ParquetSchemaResolver.resolveSchema[W](toSkip = partitionBy)
       val encode = (obj: W, vcc: ValueCodecConfiguration) => ParquetRecordEncoder.encode(obj, vcc)
+
       new ParquetPartitioningFlow[T, W](
         basePath,
         maxCount,
@@ -254,12 +254,13 @@ private class ParquetPartitioningFlow[T, W](
     schema: MessageType,
     writeOptions: ParquetWriter.Options,
     postWriteHandler: Option[PostWriteState[T] => Unit]
-) extends GraphStage[FlowShape[T, T]] {
-  val in: Inlet[T]           = Inlet[T]("ParquetPartitioningFlow.in")
-  val out: Outlet[T]         = Outlet[T]("ParquetPartitioningFlow.out")
-  val shape: FlowShape[T, T] = FlowShape.of(in, out)
-  private val logger         = LoggerFactory.getLogger("ParquetPartitioningFlow")
-  private val vcc            = ValueCodecConfiguration(writeOptions)
+) extends GraphStage[FlowShape[T, T]]
+    with IOOps {
+  val in: Inlet[T]            = Inlet[T]("ParquetPartitioningFlow.in")
+  val out: Outlet[T]          = Outlet[T]("ParquetPartitioningFlow.out")
+  val shape: FlowShape[T, T]  = FlowShape.of(in, out)
+  override val logger: Logger = LoggerFactory.getLogger("ParquetPartitioningFlow")
+  private val vcc             = ValueCodecConfiguration(writeOptions)
 
   private class Logic extends TimerGraphStageLogic(shape) with InHandler with OutHandler {
     case class WriterState(
@@ -370,6 +371,9 @@ private class ParquetPartitioningFlow[T, W](
       if (!isClosed(in) && !hasBeenPulled(in)) {
         pull(in)
       }
+
+    override def preStart(): Unit =
+      validateWritePath(path = basePath, writeOptions = writeOptions)
 
     override def postStop(): Unit = {
       writers.keySet.foreach { path =>

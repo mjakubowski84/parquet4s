@@ -512,9 +512,10 @@ object rotatingWriter {
     in =>
       for {
         schema                  <- Stream.eval(schemaF)
+        logger                  <- Stream.eval(logger[F](this.getClass))
+        _                       <- Stream.eval(io.validateWritePath[F](basePath, options, logger))
         valueCodecConfiguration <- Stream.eval(F.catchNonFatal(ValueCodecConfiguration(options)))
         encode = { (entity: W) => F.delay(ParquetRecordEncoder.encode[W](entity, valueCodecConfiguration)) }
-        logger     <- Stream.eval(logger[F](this.getClass))
         eventQueue <- Stream.eval(Queue.unbounded[F, WriterEvent[F, T, W]])
         writersRef <- Stream.eval(Ref.of(Map.empty[Path, RecordWriter[F]]))
         rotatingWriter <- Stream.emit(
@@ -543,5 +544,6 @@ object rotatingWriter {
         ).parJoin(maxOpen = 2)
         out <- rotatingWriter.writeAllEvents(eventStream)
       } yield out
+
 
 }
