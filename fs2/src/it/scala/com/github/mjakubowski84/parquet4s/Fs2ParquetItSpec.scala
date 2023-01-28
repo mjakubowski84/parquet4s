@@ -517,7 +517,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   }
 
   it should "add new files in create mode" in {
-    def write(path: Path): Stream[IO, Unit] =
+    def write(path: Path): Stream[IO, Data] =
       Stream
         .iterable(data)
         .take(1L)
@@ -528,7 +528,6 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .options(writeOptions.copy(writeMode = ParquetFileWriter.Mode.CREATE))
             .write(path)
         )
-        .void
 
     val testStream =
       for {
@@ -541,7 +540,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   }
 
   it should "delete existing files in overwrite mode" in {
-    def write(path: Path): Stream[IO, Unit] =
+    def write(path: Path): Stream[IO, Data] =
       Stream
         .iterable(data)
         .take(1L)
@@ -552,7 +551,6 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .options(writeOptions.copy(writeMode = ParquetFileWriter.Mode.OVERWRITE))
             .write(path)
         )
-        .void
 
     val testStream =
       for {
