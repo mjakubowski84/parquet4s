@@ -62,10 +62,10 @@ object ParquetWriter {
       new ParquetWriteSupport(schema, SignatureMetadata)
   }
 
-  /** Configuration of parquet writer. Please have a look at <a
-    * href="https://parquet.apache.org/documentation/latest/">documentation of Parquet</a> to understand what every
-    * configuration entry is responsible for. Apart from options specific for Parquet file format there are some other -
-    * what follows:
+  /** Configuration of parquet writer. Please have a look at <a href="https://parquet.apache.org/docs/">documentation of
+    * Parquet</a> to understand what every configuration entry is responsible for. <br> <b>NOTE!</b> Please be careful
+    * when using OVERWRITE mode. All data at given path (either file or directory) are deleted before writing in the
+    * OVERWRITE mode. <br> Apart from options specific for Parquet file format there are some other:
     * @param hadoopConf
     *   can be used to programmatically set Hadoop's [[org.apache.hadoop.conf.Configuration]]
     * @param timeZone
