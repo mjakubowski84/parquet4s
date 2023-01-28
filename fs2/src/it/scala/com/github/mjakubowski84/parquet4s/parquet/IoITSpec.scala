@@ -88,8 +88,8 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
 
     dirResource.use { existingDir =>
       for {
-        logger <- logger[IO](getClass)
-        _ <- io.validateWritePath[IO](existingDir, options, logger)
+        logger          <- logger[IO](getClass)
+        _               <- io.validateWritePath[IO](existingDir, options, logger)
         pathStillExists <- Files[IO].exists(existingDir)
       } yield pathStillExists should be(false)
     }

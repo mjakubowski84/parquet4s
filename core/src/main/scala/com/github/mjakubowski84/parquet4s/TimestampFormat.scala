@@ -6,7 +6,7 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.TimestampLogicalTypeAnnot
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64
 
 import java.sql.Timestamp
-import java.time.LocalDateTime
+import java.time.{LocalDateTime, ZonedDateTime}
 
 object TimestampFormat {
 
@@ -60,8 +60,10 @@ object TimestampFormat {
 
       implicit override val localDateTimeEncoder: OptionalValueEncoder[LocalDateTime] =
         new OptionalValueEncoder[LocalDateTime] {
-          def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value =
-            DateTimeValue(data.toInstant(zoneOffset(configuration.timeZone)).toEpochMilli, Int64Millis)
+          def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value = {
+            val zoned = ZonedDateTime.of(data, configuration.timeZone.toZoneId)
+            DateTimeValue(zoned.toInstant.toEpochMilli, Int64Millis)
+          }
         }
 
     }
@@ -79,8 +81,8 @@ object TimestampFormat {
       implicit override val localDateTimeEncoder: OptionalValueEncoder[LocalDateTime] =
         new OptionalValueEncoder[LocalDateTime] {
           def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value = {
-            val instant = data.toInstant(zoneOffset(configuration.timeZone))
-            val micros  = (instant.getEpochSecond * MicrosPerSecond) + (instant.getNano / NanosPerMicro)
+            val zoned  = ZonedDateTime.of(data, configuration.timeZone.toZoneId)
+            val micros = (zoned.toEpochSecond * MicrosPerSecond) + (zoned.getNano / NanosPerMicro)
             DateTimeValue(micros, Int64Micros)
           }
         }
@@ -100,8 +102,8 @@ object TimestampFormat {
       implicit override val localDateTimeEncoder: OptionalValueEncoder[LocalDateTime] =
         new OptionalValueEncoder[LocalDateTime] {
           def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value = {
-            val instant = data.toInstant(zoneOffset(configuration.timeZone))
-            val nanos   = (instant.getEpochSecond * MicrosPerSecond * NanosPerMicro) + instant.getNano
+            val zoned = ZonedDateTime.of(data, configuration.timeZone.toZoneId)
+            val nanos = (zoned.toEpochSecond * MicrosPerSecond * NanosPerMicro) + zoned.getNano
             DateTimeValue(nanos, Int64Micros)
           }
         }

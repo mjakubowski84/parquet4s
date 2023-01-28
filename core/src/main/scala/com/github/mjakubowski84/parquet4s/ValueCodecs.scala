@@ -144,8 +144,6 @@ private[parquet4s] object TimeValueCodecs {
   val NanosPerSecond: Long  = NanosPerMilli * MillisPerSecond
   val NanosPerDay           = 86400000000000L
 
-  // TODO there are other parquet time formats over there to be checked, too
-
   def decodeLocalDateTime(value: Value, timeZone: TimeZone): LocalDateTime =
     value match {
       case BinaryValue(binary) =>
@@ -219,11 +217,8 @@ private[parquet4s] object TimeValueCodecs {
 
   def encodeLocalDate(data: LocalDate): Value = IntValue(data.toEpochDay.toInt)
 
-  def zoneOffset(timeZone: TimeZone): ZoneOffset =
-    ZoneOffset.ofTotalSeconds(timeZone.getRawOffset / MillisPerSecond.toInt)
-
   def localDateTimeToTimestamp(dateTime: LocalDateTime, timeZone: TimeZone): Timestamp =
-    Timestamp.from(dateTime.toInstant(zoneOffset(timeZone)))
+    Timestamp.from(ZonedDateTime.of(dateTime, timeZone.toZoneId).toInstant)
 
   def timestampToLocalDateTime(timestamp: Timestamp, timeZone: TimeZone): LocalDateTime =
     LocalDateTime.ofInstant(timestamp.toInstant, timeZone.toZoneId)

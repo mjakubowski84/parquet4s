@@ -545,5 +545,4 @@ object rotatingWriter {
         out <- rotatingWriter.writeAllEvents(eventStream)
       } yield out
 
-
 }

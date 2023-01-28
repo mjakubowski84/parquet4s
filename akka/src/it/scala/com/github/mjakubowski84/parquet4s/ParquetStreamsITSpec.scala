@@ -660,9 +660,9 @@ class ParquetStreamsITSpec
       .write(tempPath)
 
     for {
-      _ <- Source(data).take(1).via(flow).runWith(Sink.ignore)
-      _ <- Source(data).take(1).via(flow).runWith(Sink.ignore)
-      _ <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      _        <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      _        <- Source(data).take(1).via(flow).runWith(Sink.ignore)
+      _        <- Source(data).take(1).via(flow).runWith(Sink.ignore)
       readData <- ParquetStreams.fromParquet.as[Data].read(tempPath).runWith(Sink.seq)
     } yield {
       readData should have size 1
