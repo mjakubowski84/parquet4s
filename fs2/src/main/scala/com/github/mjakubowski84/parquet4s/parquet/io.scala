@@ -46,7 +46,7 @@ private[parquet] object io {
                 F.unit
               case true =>
                 logger.debug(s"Deleting directory $path in order to overwrite with new data.") >>
-                  F.blocking(fs.delete(path.toHadoop, true)).void  
+                  F.blocking(fs.delete(path.toHadoop, true)).void
             }
           case false =>
             F.unit
