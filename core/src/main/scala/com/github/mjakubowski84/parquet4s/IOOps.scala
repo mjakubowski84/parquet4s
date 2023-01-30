@@ -92,13 +92,15 @@ trait IOOps {
     if (dirs.nonEmpty && files.nonEmpty)
       Left(path :: Nil) // path is invalid because it contains both dirs and files
     else {
-      val partitionedDirs = dirs.flatMap(matchPartition)
+      val partitionedDirs: Seq[(Path, (ColumnPath, String))] = dirs.flatMap(matchPartition)
       if (partitionedDirs.isEmpty && files.isEmpty)
-        Right(List.empty) // empty leaf dir
+        Right(List.empty) // empty dir
       else if (partitionedDirs.isEmpty) {
+        // leaf file
         Right(files.map(fileStatus => PartitionedPath(fileStatus, configuration, partitions)))
-      } // leaf dir with files
-      else
+      } else {
+        // node dir with files
+        // TODO filter
         partitionedDirs
           .map { case (subPath, partition) =>
             findPartitionedPaths(fs, configuration, subPath, partitions :+ partition)
@@ -113,6 +115,7 @@ trait IOOps {
             case (_, left: Left[?, ?]) =>
               left
           }
+      }
     }
   }
 
