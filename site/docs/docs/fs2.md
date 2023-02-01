@@ -22,6 +22,7 @@ import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path}
 import fs2.Stream
 import org.apache.parquet.hadoop.ParquetFileWriter.Mode
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
+import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.hadoop.conf.Configuration
 
 import scala.concurrent.duration._
@@ -48,6 +49,17 @@ object Example extends IOApp.Simple {
       .options(writeOptions)
       .write(Path("file:///data/users/single.parquet"))
 
+  // (Experimental API) Writes a single file using a custom ParquetWriter.
+  class UserParquetWriterBuilder(path: Path) extends HadoopParquetWriter.Builder[User, UserParquetWriterBuilder](path.toHadoop) {
+    override def self() = this
+    override def getWriteSupport(conf: Configuration) = ???
+  }
+  val writeSingleFileCustomPipe =
+    writeSingleFile[IO]
+      .custom[User, UserParquetWriterBuilder](new UserParquetWriterBuilder(Path("file:///data/users/custom.parquet")))
+      .options(writeOptions)
+      .write
+
   // Tailored for writing indefinite streams.
   // Writes file when chunk reaches size limit and when defined time period elapses.
   // Can also partition files!
@@ -73,6 +85,7 @@ object Example extends IOApp.Simple {
     users
       .through(writeRotatedPipe)
       .through(writeSingleFilePipe)
+      .through(writeSingleFileCustomPipe)
       .append(readAllStream)
       .compile
       .drain

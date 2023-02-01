@@ -181,6 +181,7 @@ lazy val examples = (project in file("examples"))
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
+      "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
       "io.github.embeddedkafka" %% "embedded-kafka" % "3.3.1",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
@@ -200,6 +201,7 @@ lazy val examples = (project in file("examples"))
   )
   .settings(compilationSettings)
   .dependsOn(akka, fs2)
+  .enablePlugins(ProtobufPlugin)
 
 lazy val coreBenchmarks = (project in file("coreBenchmarks"))
   .settings(

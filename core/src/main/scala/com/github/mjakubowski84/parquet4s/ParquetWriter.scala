@@ -82,7 +82,19 @@ object ParquetWriter {
       validationEnabled: Boolean                 = HadoopParquetWriter.DEFAULT_IS_VALIDATING_ENABLED,
       hadoopConf: Configuration                  = new Configuration(),
       timeZone: TimeZone                         = TimeZone.getDefault
-  )
+  ) {
+    private[parquet4s] def applyTo[T, B <: HadoopParquetWriter.Builder[T, B]](builder: B): B =
+      builder
+        .withWriteMode(writeMode)
+        .withCompressionCodec(compressionCodecName)
+        .withDictionaryEncoding(dictionaryEncodingEnabled)
+        .withDictionaryPageSize(dictionaryPageSize)
+        .withMaxPaddingSize(maxPaddingSize)
+        .withPageSize(pageSize)
+        .withRowGroupSize(rowGroupSize)
+        .withValidation(validationEnabled)
+        .withConf(hadoopConf)
+  }
 
   /** Builder of [[ParquetWriter]].
     * @tparam T
@@ -117,16 +129,8 @@ object ParquetWriter {
   }
 
   private[parquet4s] def internalWriter(path: Path, schema: MessageType, options: Options): InternalWriter =
-    new InternalBuilder(path, schema)
-      .withWriteMode(options.writeMode)
-      .withCompressionCodec(options.compressionCodecName)
-      .withDictionaryEncoding(options.dictionaryEncodingEnabled)
-      .withDictionaryPageSize(options.dictionaryPageSize)
-      .withMaxPaddingSize(options.maxPaddingSize)
-      .withPageSize(options.pageSize)
-      .withRowGroupSize(options.rowGroupSize)
-      .withValidation(options.validationEnabled)
-      .withConf(options.hadoopConf)
+    options
+      .applyTo[RowParquetRecord, InternalBuilder](new InternalBuilder(path, schema))
       .build()
 
   /** Writes iterable collection of data as a Parquet files at given path. Path can represent local file or directory,

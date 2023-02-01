@@ -22,6 +22,7 @@ import akka.stream.scaladsl.Source
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetStreams, ParquetWriter, Path}
 import org.apache.parquet.hadoop.ParquetFileWriter.Mode
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
+import org.apache.parquet.hadoop.{ParquetWriter => HadoopParquetWriter}
 import org.apache.hadoop.conf.Configuration
 
 import scala.concurrent.duration._
@@ -48,6 +49,19 @@ users.runWith(
     .of[User]
     .options(writeOptions)
     .write(Path("file:///data/users/user-303.parquet"))
+)
+
+// (Experimental API) Writes a single file using a custom ParquetWriter.
+class UserParquetWriterBuilder(path: Path) extends HadoopParquetWriter.Builder[User, UserParquetWriterBuilder](path.toHadoop) {
+  override def self() = this
+  override def getWriteSupport(conf: Configuration) = ???
+}
+users.runWith(
+  ParquetStreams
+    .toParquetSingleFile
+    .custom[User, UserParquetWriterBuilder](new UserParquetWriterBuilder(Path("file:///data/users/custom.parquet")))
+    .options(writeOptions)
+    .write
 )
 
 // Tailored for writing indefinite streams.
