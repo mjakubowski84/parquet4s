@@ -8,9 +8,11 @@ import com.github.mjakubowski84.parquet4s.{
   ParquetWriter,
   Path,
   RowParquetRecord,
-  ValueCodecConfiguration
+  ValueCodecConfiguration,
+  experimental
 }
 import fs2.{Chunk, Pipe, Pull, Stream}
+import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.schema.MessageType
 
 import scala.language.higherKinds
@@ -28,6 +30,17 @@ private[parquet4s] object writer {
     /** Creates a builder of pipe that processes generic records
       */
     def generic(schema: MessageType): Builder[F, RowParquetRecord]
+
+    /** Creates a builder of pipe that processes data of a given type using a
+      * [[org.apache.parquet.hadoop.ParquetWriter]] built from a provided
+      * [[org.apache.parquet.hadoop.ParquetWriter.Builder]].
+      * @tparam T
+      *   Schema type
+      * @tparam B
+      *   Type of custom [[org.apache.parquet.hadoop.ParquetWriter.Builder]]
+      */
+    @experimental
+    def custom[T, B <: HadoopParquetWriter.Builder[T, B]](builder: B): CustomBuilder[F, T]
   }
 
   private[parquet4s] class ToParquetImpl[F[_]: Sync] extends ToParquet[F] {
@@ -39,6 +52,8 @@ private[parquet4s] object writer {
         encoder        = RowParquetRecord.genericParquetRecordEncoder,
         sync           = Sync[F]
       )
+    override def custom[T, B <: HadoopParquetWriter.Builder[T, B]](builder: B): CustomBuilder[F, T] =
+      CustomBuilderImpl(builder)
   }
 
   trait Builder[F[_], T] {
@@ -62,18 +77,40 @@ private[parquet4s] object writer {
       sync: Sync[F]
   ) extends Builder[F, T] {
     override def options(options: ParquetWriter.Options): Builder[F, T] = this.copy(options = options)
-    override def write(path: Path): Pipe[F, T, Nothing]                 = pipe[F, T](path, options)
+    override def write(path: Path): Pipe[F, T, Nothing]                 = rowParquetRecordPipe[F, T](path, options)
   }
 
-  private class Writer[T, F[_]](internalWriter: ParquetWriter.InternalWriter, encode: T => F[RowParquetRecord])(implicit
-      F: Sync[F]
-  ) extends AutoCloseable {
+  trait CustomBuilder[F[_], T] {
 
+    /** @param options
+      *   writer options
+      */
+    def options(options: ParquetWriter.Options): CustomBuilder[F, T]
+
+    /** @return
+      *   final [[fs2.Pipe]]
+      */
+    def write: Pipe[F, T, Nothing]
+  }
+
+  private case class CustomBuilderImpl[F[_]: Sync, T, B <: HadoopParquetWriter.Builder[T, B]](
+      builder: B,
+      maybeOptions: Option[ParquetWriter.Options] = None
+  ) extends CustomBuilder[F, T] {
+    override def options(options: ParquetWriter.Options): CustomBuilder[F, T] =
+      this.copy(maybeOptions = Some(options))
+
+    override def write: Pipe[F, T, Nothing] =
+      pipe(
+        maybeOptions
+          .fold(builder)(_.applyTo[T, B](builder))
+          .build()
+      )
+  }
+
+  private class Writer[T, F[_]](internalWriter: HadoopParquetWriter[T])(implicit F: Sync[F]) extends AutoCloseable {
     def write(elem: T): F[Unit] =
-      for {
-        record <- encode(elem)
-        _      <- F.delay(scala.concurrent.blocking(internalWriter.write(record)))
-      } yield ()
+      F.delay(scala.concurrent.blocking(internalWriter.write(elem)))
 
     def writePull(chunk: Chunk[T]): Pull[F, Nothing, Unit] =
       Pull.eval(chunk.traverse_(write))
@@ -92,28 +129,28 @@ private[parquet4s] object writer {
         case _: NullPointerException => // ignores bug in Parquet
       }
   }
+  private object Writer {
+    def apply[T, F[_]](makeParquetWriter: => HadoopParquetWriter[T])(implicit
+        F: Sync[F]
+    ): Resource[F, Writer[T, F]] =
+      Resource.fromAutoCloseable(
+        F.blocking(makeParquetWriter).map(new Writer[T, F](_))
+      )
+  }
 
-  private def pipe[F[_]: Sync, T: ParquetRecordEncoder: ParquetSchemaResolver](
+  private def rowParquetRecordPipe[F[_], T: ParquetRecordEncoder: ParquetSchemaResolver](
       path: Path,
       options: ParquetWriter.Options
-  ): Pipe[F, T, Nothing] =
+  )(implicit F: Sync[F]): Pipe[F, T, Nothing] = { in =>
+    val valueCodecConfiguration = ValueCodecConfiguration(options)
+    in
+      .evalMapChunk(entity => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)))
+      .through(pipe(ParquetWriter.internalWriter(path, ParquetSchemaResolver.resolveSchema[T], options)))
+  }
+
+  private def pipe[F[_]: Sync, T](makeParquetWriter: => HadoopParquetWriter[T]): Pipe[F, T, Nothing] =
     in =>
-      for {
-        writer  <- Stream.resource(writerResource[T, F](path, options))
-        nothing <- writer.writeAllStream(in)
-      } yield nothing
-
-  private def writerResource[T: ParquetRecordEncoder: ParquetSchemaResolver, F[_]](
-      path: Path,
-      options: ParquetWriter.Options
-  )(implicit F: Sync[F]): Resource[F, Writer[T, F]] =
-    Resource.fromAutoCloseable(
-      for {
-        valueCodecConfiguration <- F.pure(ValueCodecConfiguration(options))
-        schema                  <- F.catchNonFatal(ParquetSchemaResolver.resolveSchema[T])
-        internalWriter <- F.delay(scala.concurrent.blocking(ParquetWriter.internalWriter(path, schema, options)))
-        encode = { (entity: T) => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)) }
-      } yield new Writer[T, F](internalWriter, encode)
-    )
-
+      Stream
+        .resource(Writer[T, F](makeParquetWriter))
+        .flatMap(_.writeAllStream(in))
 }
