@@ -506,11 +506,14 @@ final class RowParquetRecord private (
 }
 
 object ListParquetRecord {
+  object ElementName {
+    val Element = "element"
+    val Array = "array"
+    val ArrayElement = "array_element"
+  }
 
   private val ListFieldName          = "list"
-  private val ElementFieldName       = "element"
-  private val LegacyElementFieldName = "array"
-  private val ElementNames           = Set(ElementFieldName, LegacyElementFieldName)
+  private val ElementNames           = Set(ElementName.Element, ElementName.Array, ElementName.ArrayElement)
 
   /** @param elements
     *   to init the record with
@@ -519,7 +522,7 @@ object ListParquetRecord {
     */
   def apply(elements: Value*): ListParquetRecord =
     elements.foldLeft(ListParquetRecord.Empty) { case (record, element) =>
-      record.add(ListFieldName, RowParquetRecord.apply(ElementFieldName -> element))
+      record.add(ListFieldName, RowParquetRecord.apply(ElementName.Element -> element))
     }
 
   /** An empty instance of [[ListParquetRecord]]
@@ -624,16 +627,21 @@ final class ListParquetRecord private (private val values: Vector[Value])
 
     if (values.nonEmpty) {
       val groupSchema = schema.asGroupType()
-      val listSchema  = groupSchema.getType(ListFieldName).asGroupType()
-      val listIndex   = groupSchema.getFieldIndex(ListFieldName)
 
-      recordConsumer.startField(ListFieldName, listIndex)
+      val container = groupSchema.getFields.get(0).asGroupType()
+      val fieldName = container.getName
+      val elementName = container.getFields.get(0).getName
+
+      val listSchema  = groupSchema.getType(fieldName).asGroupType()
+      val listIndex   = groupSchema.getFieldIndex(fieldName)
+
+      recordConsumer.startField(fieldName, listIndex)
 
       values.foreach { value =>
-        RowParquetRecord.apply(ElementFieldName -> value).write(listSchema, recordConsumer)
+        RowParquetRecord.apply(elementName -> value).write(listSchema, recordConsumer)
       }
 
-      recordConsumer.endField(ListFieldName, listIndex)
+      recordConsumer.endField(fieldName, listIndex)
     }
 
     recordConsumer.endGroup()
