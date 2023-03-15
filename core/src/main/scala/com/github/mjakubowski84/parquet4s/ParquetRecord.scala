@@ -507,13 +507,13 @@ final class RowParquetRecord private (
 
 object ListParquetRecord {
   object ElementName {
-    val Element = "element"
-    val Array = "array"
+    val Element      = "element"
+    val Array        = "array"
     val ArrayElement = "array_element"
   }
 
-  private val ListFieldName          = "list"
-  private val ElementNames           = Set(ElementName.Element, ElementName.Array, ElementName.ArrayElement)
+  private val ListFieldName = "list"
+  private val ElementNames  = Set(ElementName.Element, ElementName.Array, ElementName.ArrayElement)
 
   /** @param elements
     *   to init the record with
@@ -628,12 +628,12 @@ final class ListParquetRecord private (private val values: Vector[Value])
     if (values.nonEmpty) {
       val groupSchema = schema.asGroupType()
 
-      val container = groupSchema.getFields.get(0).asGroupType()
-      val fieldName = container.getName
+      val container   = groupSchema.getFields.get(0).asGroupType()
+      val fieldName   = container.getName
       val elementName = container.getFields.get(0).getName
 
-      val listSchema  = groupSchema.getType(fieldName).asGroupType()
-      val listIndex   = groupSchema.getFieldIndex(fieldName)
+      val listSchema = groupSchema.getType(fieldName).asGroupType()
+      val listIndex  = groupSchema.getFieldIndex(fieldName)
 
       recordConsumer.startField(fieldName, listIndex)
 
