@@ -185,10 +185,10 @@ private[parquet4s] object PartitionFilter {
         partitionedDirectory.paths.map(pp => (filterCompat, pp))
     }
 
-  private def filterPartial(
+  def filterPartial(
       filterPredicate: FilterPredicate,
       commonPartitions: List[(ColumnPath, String)],
-      partitionedDirs: List[(Path, (ColumnPath, String))]
+      partitionedDirs: Seq[(Path, (ColumnPath, String))]
   ): Iterable[(Path, List[(ColumnPath, String)])] =
     partitionedDirs.flatMap { case (path, partition) =>
       val partitions               = commonPartitions :+ partition // TODO maybe using vector is better

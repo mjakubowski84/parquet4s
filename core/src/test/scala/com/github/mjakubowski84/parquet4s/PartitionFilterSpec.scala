@@ -92,74 +92,74 @@ class PartitionFilterSpec extends AnyFlatSpec with Matchers with Inside with Eit
   }
 
   "PartitionFilter visitor" should "handle case when there predicate does not match any column" in {
-    eqi.accept(new PartitionFilter(partitionedPath())) should be(false)
-    eqi.accept(new PartitionFilter(partitionedPath(other -> "other"))) should be(false)
+    eqi.accept(new PartitionFilter(partitionedPath().value)) should be(false)
+    eqi.accept(new PartitionFilter(partitionedPath(other -> "other").value)) should be(false)
   }
 
   it should "handle case when predicate matches column but is of non-binary type" in {
     val intPredicate = EQ(intColumn("i"), java.lang.Integer.valueOf(100))
-    an[IllegalArgumentException] should be thrownBy intPredicate.accept(new PartitionFilter(partitionedPath(i -> "A")))
+    an[IllegalArgumentException] should be thrownBy intPredicate.accept(new PartitionFilter(partitionedPath(i -> "A").value))
   }
 
   it should "process EQ predicate" in {
-    eqi.accept(new PartitionFilter(partitionedPath(i -> "A"))) should be(false)
-    eqi.accept(new PartitionFilter(partitionedPath(i -> "I"))) should be(true)
+    eqi.accept(new PartitionFilter(partitionedPath(i -> "A").value)) should be(false)
+    eqi.accept(new PartitionFilter(partitionedPath(i -> "I").value)) should be(true)
   }
 
   it should "process NEQ predicate" in {
-    neqj.accept(new PartitionFilter(partitionedPath(j -> "A"))) should be(true)
-    neqj.accept(new PartitionFilter(partitionedPath(j -> "J"))) should be(false)
+    neqj.accept(new PartitionFilter(partitionedPath(j -> "A").value)) should be(true)
+    neqj.accept(new PartitionFilter(partitionedPath(j -> "J").value)) should be(false)
   }
 
   it should "process GT predicate" in {
-    gtk.accept(new PartitionFilter(partitionedPath(k -> "A"))) should be(false)
-    gtk.accept(new PartitionFilter(partitionedPath(k -> "a"))) should be(false)
-    gtk.accept(new PartitionFilter(partitionedPath(k -> "b"))) should be(true)
+    gtk.accept(new PartitionFilter(partitionedPath(k -> "A").value)) should be(false)
+    gtk.accept(new PartitionFilter(partitionedPath(k -> "a").value)) should be(false)
+    gtk.accept(new PartitionFilter(partitionedPath(k -> "b").value)) should be(true)
   }
 
   it should "process GTE predicate" in {
-    gtek.accept(new PartitionFilter(partitionedPath(k -> "A"))) should be(false)
-    gtek.accept(new PartitionFilter(partitionedPath(k -> "a"))) should be(true)
-    gtek.accept(new PartitionFilter(partitionedPath(k -> "b"))) should be(true)
+    gtek.accept(new PartitionFilter(partitionedPath(k -> "A").value)) should be(false)
+    gtek.accept(new PartitionFilter(partitionedPath(k -> "a").value)) should be(true)
+    gtek.accept(new PartitionFilter(partitionedPath(k -> "b").value)) should be(true)
   }
 
   it should "process LT predicate" in {
-    ltl.accept(new PartitionFilter(partitionedPath(l -> "ż"))) should be(false)
-    ltl.accept(new PartitionFilter(partitionedPath(l -> "z"))) should be(false)
-    ltl.accept(new PartitionFilter(partitionedPath(l -> "y"))) should be(true)
+    ltl.accept(new PartitionFilter(partitionedPath(l -> "ż").value)) should be(false)
+    ltl.accept(new PartitionFilter(partitionedPath(l -> "z").value)) should be(false)
+    ltl.accept(new PartitionFilter(partitionedPath(l -> "y").value)) should be(true)
   }
 
   it should "process LTE predicate" in {
-    ltel.accept(new PartitionFilter(partitionedPath(l -> "ż"))) should be(false)
-    ltel.accept(new PartitionFilter(partitionedPath(l -> "z"))) should be(true)
-    ltel.accept(new PartitionFilter(partitionedPath(l -> "y"))) should be(true)
+    ltel.accept(new PartitionFilter(partitionedPath(l -> "ż").value)) should be(false)
+    ltel.accept(new PartitionFilter(partitionedPath(l -> "z").value)) should be(true)
+    ltel.accept(new PartitionFilter(partitionedPath(l -> "y").value)) should be(true)
   }
 
   it should "process UDP" in {
-    udpi.accept(new PartitionFilter(partitionedPath(i -> "ABC"))) should be(true)
-    udpi.accept(new PartitionFilter(partitionedPath(i -> "abc"))) should be(false)
+    udpi.accept(new PartitionFilter(partitionedPath(i -> "ABC").value)) should be(true)
+    udpi.accept(new PartitionFilter(partitionedPath(i -> "abc").value)) should be(false)
   }
 
   it should "process AND predicate" in {
     val predicate = AND(eqi, neqj)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "I", j -> "A"))) should be(true)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "I", j -> "J"))) should be(false)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "X", j -> "A"))) should be(false)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "X", j -> "J"))) should be(false)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "I", j -> "A").value)) should be(true)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "I", j -> "J").value)) should be(false)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "X", j -> "A").value)) should be(false)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "X", j -> "J").value)) should be(false)
   }
 
   it should "process OR predicate" in {
     val predicate = OR(eqi, neqj)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "I", j -> "A"))) should be(true)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "I", j -> "J"))) should be(true)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "X", j -> "A"))) should be(true)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "X", j -> "J"))) should be(false)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "I", j -> "A").value)) should be(true)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "I", j -> "J").value)) should be(true)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "X", j -> "A").value)) should be(true)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "X", j -> "J").value)) should be(false)
   }
 
   it should "process NOT predicate" in {
     val predicate = NOT(eqi)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "I"))) should be(false)
-    predicate.accept(new PartitionFilter(partitionedPath(i -> "X"))) should be(true)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "I").value)) should be(false)
+    predicate.accept(new PartitionFilter(partitionedPath(i -> "X").value)) should be(true)
   }
 
   "PartitionFilterRewriter" should "rewrite case1 correctly" in {
