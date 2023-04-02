@@ -10,8 +10,8 @@ lazy val three                  = "3.2.1"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.11.0-SNAPSHOT"
-ThisBuild / isSnapshot := true
+ThisBuild / version := "2.10.1"
+ThisBuild / isSnapshot := false
 ThisBuild / scalaVersion := twoThirteen
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -182,7 +182,7 @@ lazy val examples = (project in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.3.1",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.4.0",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % {
@@ -271,7 +271,7 @@ lazy val documentation = (project in file("site"))
   .settings(
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "mdoc" % "2.3.6",
+      "org.scalameta" %% "mdoc" % "2.3.7",
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
