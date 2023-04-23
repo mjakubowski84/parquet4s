@@ -150,6 +150,14 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
     } finally filteredRecords.close()
   }
 
+  it should "inverse filter data by a hard-coded list of values" in {
+    val filteredRecords = ParquetReader.as[Data].filter(!Col("idx").in(1, 2, 3)).read(filePath)
+    try {
+      filteredRecords.toSeq.size should equal(dataSize - 3)
+      filteredRecords.map(_.idx) should contain noneOf (1, 2, 3)
+    } finally filteredRecords.close()
+  }
+
   it should "reject an empty set of keys" in {
     a[IllegalArgumentException] should be thrownBy (Col("idx") in Set.empty[Int])
   }
