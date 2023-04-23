@@ -320,19 +320,22 @@ private class FilterCodecImpl[In, V <: Comparable[V], C <: Column[V]](
     override val columnFactory: ColumnFactory[V, C]
 ) extends FilterCodec[In, V, C]
 
+/** Parquet library has its own implementation of `in` and `notIn` since version 1.12.0. However, still, even in version
+  * 1.13.0 it has a bug - notIn and !in gives incorrect results. This custom implementation maybe is not optimal but
+  * returns correct results.
+  */
 private class InPredicate[T <: Comparable[T]](values: Set[T]) extends UserDefinedPredicate[T] with Serializable {
   override def keep(value: T): Boolean = values.contains(value)
 
-  override def canDrop(statistics: Statistics[T]): Boolean = !inverseCanDrop(statistics)
-
-  @inline
-  override def inverseCanDrop(statistics: Statistics[T]): Boolean = {
+  override def canDrop(statistics: Statistics[T]): Boolean = {
     val compare   = statistics.getComparator.compare(_, _)
     val min       = statistics.getMin
     val max       = statistics.getMax
     val isInRange = (value: T) => compare(value, min) >= 0 && compare(value, max) <= 0
-    values.exists(isInRange)
+    !values.exists(isInRange)
   }
+
+  override def inverseCanDrop(statistics: Statistics[T]): Boolean = false
 
   override def toString: String = values.mkString("in(", ", ", ")")
 }

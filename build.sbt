@@ -6,12 +6,12 @@ import sbt.util
 
 lazy val twoTwelve              = "2.12.17"
 lazy val twoThirteen            = "2.13.10"
-lazy val three                  = "3.2.1"
+lazy val three                  = "3.2.2"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.10.1"
-ThisBuild / isSnapshot := false
+ThisBuild / version := "2.11.0"
+ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -182,14 +182,14 @@ lazy val examples = (project in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.4.0",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.4.0.1",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % {
         if (scalaVersion.value == twoThirteen) { "3.0.1" } // non-licensed version
         else { "2.1.1" }
       },
-      "com.github.fd4s" %% "fs2-kafka" % "2.5.0",
+      "com.github.fd4s" %% "fs2-kafka" % "3.0.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(
@@ -197,7 +197,8 @@ lazy val examples = (project in file("examples"))
     ),
     evictionErrorLevel := util.Level.Warn,
     run / cancelable := true,
-    run / fork := true
+    run / fork := true,
+    compileOrder := CompileOrder.JavaThenScala
   )
   .settings(compilationSettings)
   .dependsOn(akka, fs2)
