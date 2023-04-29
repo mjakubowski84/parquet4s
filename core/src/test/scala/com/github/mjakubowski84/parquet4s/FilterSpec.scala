@@ -42,12 +42,22 @@ class FilterSpec extends AnyFlatSpec with Matchers {
 
   it should "build in predicate with varargs" in {
     val predicate = Col("i").in(1, 2, 3).toPredicate(valueCodecConfiguration)
-    predicate.toString should be("userdefinedbyinstance(i, in(1, 2, 3))")
+    predicate.toString should be("in(i, 1, 2, 3)")
   }
 
   it should "build in predicate with collection" in {
     val predicate = (Col("i") in Seq(1, 2, 3)).toPredicate(valueCodecConfiguration)
-    predicate.toString should be("userdefinedbyinstance(i, in(1, 2, 3))")
+    predicate.toString should be("in(i, 1, 2, 3)")
+  }
+
+  it should "build notin predicate with varargs" in {
+    val predicate = Col("i").notin(1, 2, 3).toPredicate(valueCodecConfiguration)
+    predicate.toString should be("notin(i, 1, 2, 3)")
+  }
+
+  it should "build notin predicate with collection" in {
+    val predicate = (Col("i") notin Seq(1, 2, 3)).toPredicate(valueCodecConfiguration)
+    predicate.toString should be("notin(i, 1, 2, 3)")
   }
 
   it should "build not predicate" in {

@@ -6,6 +6,7 @@ import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Statist
 import org.apache.parquet.io.api.Binary
 
 import scala.language.{existentials, implicitConversions}
+import scala.jdk.CollectionConverters.*
 
 /** Filter provides a way to define filtering predicates with a simple algebra. Use filters to process your files while
   * it is read from a file system and BEFORE its content is transferred to your application. <br/> You can filter by
@@ -101,7 +102,7 @@ trait FilterOps {
   def in[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: In, inx: In*)(implicit
       codec: FilterCodec[In, V, C]
   ): Filter =
-    Filter.inFilter(this, Set(in) ++ inx.toSet)
+    this.in(in :: inx.toList)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> one of the provided values
@@ -110,6 +111,22 @@ trait FilterOps {
       codec: FilterCodec[In, V, C]
   ): Filter =
     Filter.inFilter(this, in)
+
+  /** @return
+    *   Returns [[Filter]] that passes data that, in `this` column, is <b>not equal to</b> any of the provided values
+    */
+  def notin[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: In, inx: In*)(implicit
+      codec: FilterCodec[In, V, C]
+  ): Filter =
+    Filter.notInFilter(this, Set(in) ++ inx.toSet)
+
+  /** @return
+    *   Returns [[Filter]] that passes data that, in `this` column, is <b>not equal to</b> any of the provided values
+    */
+  def notin[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: Iterable[In])(implicit
+      codec: FilterCodec[In, V, C]
+  ): Filter =
+    Filter.notInFilter(this, in)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, satisfy provided [[UDP]] predicate.
@@ -194,7 +211,19 @@ object Filter {
       require(in.nonEmpty, "Cannot filter with an empty list of keys.")
       override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
         val filterValues = in.map(codec.encode(_, valueCodecConfiguration)).toSet
-        FilterApi.userDefined(codec.columnFactory(columnPath), new InPredicate(filterValues))
+        FilterApi.in(codec.columnFactory(columnPath), filterValues.asJava)
+      }
+    }
+
+  def notInFilter[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnPath: ColumnPath, in: Iterable[In])(
+      implicit codec: FilterCodec[In, V, C]
+  ): Filter =
+    new Filter {
+      require(in.nonEmpty, "Cannot filter with an empty list of keys.")
+
+      override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
+        val filterValues = in.map(codec.encode(_, valueCodecConfiguration)).toSet
+        FilterApi.notIn(codec.columnFactory(columnPath), filterValues.asJava)
       }
     }
 
