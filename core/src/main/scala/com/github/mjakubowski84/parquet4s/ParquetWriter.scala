@@ -1,6 +1,8 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.column.ParquetProperties
+import org.apache.parquet.column.ParquetProperties.WriterVersion
 import org.apache.parquet.hadoop.api.WriteSupport
 import org.apache.parquet.hadoop.api.WriteSupport.WriteContext
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
@@ -73,12 +75,16 @@ object ParquetWriter {
     */
   case class Options(
       writeMode: ParquetFileWriter.Mode          = ParquetFileWriter.Mode.CREATE,
+      writerVersion: WriterVersion               = HadoopParquetWriter.DEFAULT_WRITER_VERSION,
       compressionCodecName: CompressionCodecName = HadoopParquetWriter.DEFAULT_COMPRESSION_CODEC_NAME,
       dictionaryEncodingEnabled: Boolean         = HadoopParquetWriter.DEFAULT_IS_DICTIONARY_ENABLED,
-      dictionaryPageSize: Int                    = HadoopParquetWriter.DEFAULT_PAGE_SIZE,
+      dictionaryPageSize: Int                    = ParquetProperties.DEFAULT_DICTIONARY_PAGE_SIZE,
+      enableDictionaryEncoding: Boolean          = HadoopParquetWriter.DEFAULT_IS_DICTIONARY_ENABLED,
       maxPaddingSize: Int                        = HadoopParquetWriter.MAX_PADDING_SIZE_DEFAULT,
       pageSize: Int                              = HadoopParquetWriter.DEFAULT_PAGE_SIZE,
       rowGroupSize: Long                         = HadoopParquetWriter.DEFAULT_BLOCK_SIZE,
+      minRowCountForPageSizeCheck: Int           = ParquetProperties.DEFAULT_MINIMUM_RECORD_COUNT_FOR_CHECK,
+      maxRowCountForPageSizeCheck: Int           = ParquetProperties.DEFAULT_MAXIMUM_RECORD_COUNT_FOR_CHECK,
       validationEnabled: Boolean                 = HadoopParquetWriter.DEFAULT_IS_VALIDATING_ENABLED,
       hadoopConf: Configuration                  = new Configuration(),
       timeZone: TimeZone                         = TimeZone.getDefault
@@ -86,12 +92,16 @@ object ParquetWriter {
     private[parquet4s] def applyTo[T, B <: HadoopParquetWriter.Builder[T, B]](builder: B): B =
       builder
         .withWriteMode(writeMode)
+        .withWriterVersion(writerVersion)
         .withCompressionCodec(compressionCodecName)
         .withDictionaryEncoding(dictionaryEncodingEnabled)
         .withDictionaryPageSize(dictionaryPageSize)
+        .withDictionaryEncoding(enableDictionaryEncoding)
         .withMaxPaddingSize(maxPaddingSize)
         .withPageSize(pageSize)
         .withRowGroupSize(rowGroupSize)
+        .withMinRowCountForPageSizeCheck(minRowCountForPageSizeCheck)
+        .withMaxRowCountForPageSizeCheck(maxRowCountForPageSizeCheck)
         .withValidation(validationEnabled)
         .withConf(hadoopConf)
   }

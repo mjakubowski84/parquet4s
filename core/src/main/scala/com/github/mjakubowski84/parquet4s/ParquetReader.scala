@@ -2,6 +2,10 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.etl.CompoundParquetIterable
 import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.ParquetReadOptions
+import org.apache.parquet.column.ParquetProperties
+import org.apache.parquet.compression.CompressionCodecFactory
+import org.apache.parquet.crypto.FileDecryptionProperties
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
 import org.apache.parquet.schema.{MessageType, Type}
@@ -10,6 +14,8 @@ import org.slf4j.{Logger, LoggerFactory}
 import java.util.TimeZone
 
 object ParquetReader extends IOOps {
+
+  private val defaultReaderOptions = ParquetReadOptions.builder().build()
 
   /** Builds an instance of [[ParquetIterable]]
     * @tparam T
@@ -116,14 +122,42 @@ object ParquetReader extends IOOps {
       ParquetIterable[T](
         iteratorFactory = () =>
           new ParquetIterator(
-            HadoopParquetReader
-              .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, columnProjections), path.toHadoop)
-              .withConf(hadoopConf)
-              .withFilter(filterCompat)
+            createHadoopParquetReaderBuilder(path, projectedSchemaOpt, filterCompat, hadoopConf)
           ),
         valueCodecConfiguration = valueCodecConfiguration,
         stats                   = Stats(path, valueCodecConfiguration, hadoopConf, projectedSchemaOpt, filterCompat)
       )
+    }
+
+    private def createHadoopParquetReaderBuilder(
+        path: Path,
+        projectedSchemaOpt: Option[MessageType],
+        filterCompat: FilterCompat.Filter,
+        hadoopConf: Configuration
+    ): HadoopParquetReader.Builder[RowParquetRecord] = {
+      val builder = HadoopParquetReader
+        .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, columnProjections), path.toHadoop)
+        .withConf(hadoopConf)
+        .withCodecFactory(options.codecFactory)
+        .withDecryption(options.fileDecryptionProperties)
+        .withFilter(filterCompat)
+        .useSignedStringMinMax(options.useSignedStringMinMax)
+        .useStatsFilter(options.useStatsFilter)
+        .useDictionaryFilter(options.useDictionaryFilter)
+        .useRecordFilter(options.useRecordFilter)
+        .useColumnIndexFilter(options.useColumnIndexFilter)
+        .usePageChecksumVerification(options.usePageChecksumVerification)
+        .useBloomFilter(options.useBloomFilter)
+
+      val builderWithExtraOpts = options.extraOps.foldLeft(builder) { case (builder, kv) =>
+        builder.set(kv._1, kv._2)
+      }
+      if (options.offsetRange.isDefined) {
+        val range = options.offsetRange.get
+        builderWithExtraOpts.withFileRange(range.start, range.end)
+      } else {
+        builderWithExtraOpts
+      }
     }
 
     private def setPartitionValues(partitionedPath: PartitionedPath)(
@@ -136,6 +170,12 @@ object ParquetReader extends IOOps {
       )
   }
 
+  /** Stores offset range for RangeMetadataFilter to filter out records.
+    * @param start
+    * @param end
+    */
+  case class OffsetRange(start: Long, end: Long)
+
   /** Configuration settings that are used during decoding or reading Parquet files
     *
     * @param timeZone
@@ -143,10 +183,43 @@ object ParquetReader extends IOOps {
     *   zone is used by default
     * @param hadoopConf
     *   use it to programmatically override Hadoop's [[org.apache.hadoop.conf.Configuration]]
+    * @param codecFactory
+    *   use it to programmatically override Parquet's [[org.apache.parquet.compression.CompressionCodecFactory]]
+    * @param fileDecryptionProperties
+    *   use it to programmatically override Parquet's [[org.apache.parquet.crypto.FileDecryptionProperties]]
+    * @param useSignedStringMinMax
+    *   use signed min/max values for string columns; unsigned values are used by default
+    * @param useStatsFilter
+    *   use min/max values from Parquet statistics to filter out records; disabled by default
+    * @param useDictionaryFilter
+    *   use dictionary filter to filter out records; disabled by default
+    * @param useRecordFilter
+    *   use record filter to filter out records; disabled by default
+    * @param useColumnIndexFilter
+    *   use column index filter to filter out records; disabled by default
+    * @param usePageChecksumVerification
+    *   use page checksum verification; disabled by default
+    * @param useBloomFilter
+    *   use bloom filter to filter out records; disabled by default
+    * @param offsetRange
+    *   use it to filter out records by offset range
+    * @param extraOps
+    *   use it to add any extra options that are supported by Parquet reader
     */
   case class Options(
-      timeZone: TimeZone        = TimeZone.getDefault,
-      hadoopConf: Configuration = new Configuration()
+      timeZone: TimeZone                                 = TimeZone.getDefault,
+      hadoopConf: Configuration                          = new Configuration(),
+      codecFactory: CompressionCodecFactory              = defaultReaderOptions.getCodecFactory(),
+      fileDecryptionProperties: FileDecryptionProperties = defaultReaderOptions.getDecryptionProperties(),
+      useSignedStringMinMax: Boolean                     = defaultReaderOptions.useSignedStringMinMax(),
+      useStatsFilter: Boolean                            = defaultReaderOptions.useStatsFilter(),
+      useDictionaryFilter: Boolean                       = defaultReaderOptions.useDictionaryFilter(),
+      useRecordFilter: Boolean                           = defaultReaderOptions.useRecordFilter(),
+      useColumnIndexFilter: Boolean                      = defaultReaderOptions.useColumnIndexFilter(),
+      usePageChecksumVerification: Boolean               = defaultReaderOptions.usePageChecksumVerification(),
+      useBloomFilter: Boolean                            = defaultReaderOptions.useBloomFilter(),
+      offsetRange: Option[OffsetRange]                   = None,
+      extraOps: Map[String, String]                      = Map.empty
   )
 
   override val logger: Logger = LoggerFactory.getLogger(this.getClass)
