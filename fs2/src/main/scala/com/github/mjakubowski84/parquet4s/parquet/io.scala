@@ -106,7 +106,7 @@ private[parquet] object io {
           Stream.empty
       }
       .handleErrorWith(err =>
-        Stream.eval(logger.debug(s"Error while fetching partitions: ${err.getMessage}")) *> Stream.emit(
+        Stream.eval(logger.debug(s"Error while fetching partitions: ${err.getMessage}")) >> Stream.emit(
           Left(Vector(path))
         )
       ) // mixture of dirs and files
