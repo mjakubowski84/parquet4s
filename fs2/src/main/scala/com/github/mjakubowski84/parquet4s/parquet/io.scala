@@ -54,12 +54,12 @@ private[parquet] object io {
       }
   }
 
-  def findPartitionedPaths[F[_]](path: Path, configuration: Configuration)(implicit
+  def findPartitionedPaths[F[_]](path: Path, configuration: Configuration, logger: Logger[F])(implicit
       F: Sync[F]
   ): Stream[F, PartitionedDirectory] =
     Stream
       .eval(F.blocking(path.toHadoop.getFileSystem(configuration)))
-      .flatMap(fs => findPartitionedPaths(fs, path, List.empty))
+      .flatMap(fs => findPartitionedPaths(fs, path, logger, List.empty))
       .fold[Either[Seq[Path], Seq[PartitionedPath]]](Right(Vector.empty)) {
         case (Left(invalidPaths), Left(moreInvalidPaths)) =>
           Left(invalidPaths ++ moreInvalidPaths)
@@ -76,8 +76,8 @@ private[parquet] object io {
       }
       .flatMap(Stream.fromEither[F].apply)
 
-  private def findPartitionedPaths[F[_]](fs: FileSystem, path: Path, partitions: List[Partition])(implicit
-      F: Sync[F]
+  private def findPartitionedPaths[F[_]](fs: FileSystem, path: Path, logger: Logger[F], partitions: List[Partition])(
+      implicit F: Sync[F]
   ): Stream[F, Either[Seq[Path], Seq[PartitionedPath]]] =
     Stream
       .evalSeq(F.blocking(fs.listStatus(path.toHadoop).toVector))
@@ -98,14 +98,18 @@ private[parquet] object io {
       .flatMap {
         case Dirs(partitionPaths) => // node of directory tree
           Stream.emits(partitionPaths).flatMap { case (subPath, partition) =>
-            findPartitionedPaths(fs, subPath, partitions :+ partition)
+            findPartitionedPaths(fs, subPath, logger, partitions :+ partition)
           }
         case Files => // leaf of directory tree
           Stream.emit(Right(Vector(PartitionedPath(path, partitions))))
         case Empty => // avoid redundant scans of empty dirs
           Stream.empty
       }
-      .handleErrorWith(_ => Stream.emit(Left(Vector(path)))) // mixture of dirs and files
+      .handleErrorWith(err =>
+        Stream.eval(logger.debug(s"Error while fetching partitions: ${err.getMessage}")) *> Stream.emit(
+          Left(Vector(path))
+        )
+      ) // mixture of dirs and files
 
   private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
     val path = Path(fileStatus.getPath)

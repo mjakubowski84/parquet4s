@@ -145,7 +145,8 @@ object reader {
     for {
       vcc <- Stream(ValueCodecConfiguration(options))
       decode = (record: RowParquetRecord) => F.delay(ParquetRecordDecoder.decode(record, vcc))
-      partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf)
+      logger               <- Stream.eval(logger[F](this.getClass))
+      partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf, logger)
       projectedSchemaOpt <- Stream.eval(
         projectedSchemaResolverOpt
           .traverse(implicit resolver =>
