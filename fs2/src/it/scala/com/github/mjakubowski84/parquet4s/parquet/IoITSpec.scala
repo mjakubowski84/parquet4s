@@ -112,8 +112,9 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
 
   "findPartitionedPaths" should "return empty PartitionedDirectory for empty path" in {
     val testStream = for {
-      path <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
-      dir  <- io.findPartitionedPaths[IO](path, writeOptions.hadoopConf)
+      path   <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
+      logger <- Stream.eval(logger[IO](getClass))
+      dir    <- io.findPartitionedPaths[IO](path, writeOptions.hadoopConf, logger)
     } yield {
       dir.schema should be(empty)
       dir.paths should be(empty)
@@ -126,7 +127,8 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
     val testStream = for {
       basePath <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
       _        <- createTempFileAtPath(basePath)
-      dir      <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
+      logger   <- Stream.eval(logger[IO](getClass))
+      dir      <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield {
       dir.schema should be(empty)
       dir.paths should be(Vector(PartitionedPath(basePath, List.empty)))
@@ -139,7 +141,8 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
     val testStream = for {
       basePath      <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
       partitionPath <- createTempFileAtPath(basePath.append("x=1"))
-      dir           <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
+      logger        <- Stream.eval(logger[IO](getClass))
+      dir           <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield {
       dir.schema should be(List(Col("x")))
       dir.paths should be(Vector(PartitionedPath(partitionPath, List(Col("x") -> "1"))))
@@ -155,7 +158,8 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       partition2 <- createTempFileAtPath(basePath.append("x=1/y=b/z=1_0"))
       partition3 <- createTempFileAtPath(basePath.append("x=1/y=c/z=1_1"))
       partition4 <- createTempFileAtPath(basePath.append("x=2/y=b/z=1_2"))
-      dir        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
+      logger     <- Stream.eval(logger[IO](getClass))
+      dir        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield {
       dir.schema should be(List(Col("x"), Col("y"), Col("z")))
       dir.paths should contain theSameElementsAs Vector(
@@ -174,7 +178,8 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       basePath <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
       _        <- createTempFileAtPath(basePath.append("x=1/y=a"))
       _        <- createTempFileAtPath(basePath.append("y=b/x=2"))
-      _        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
+      logger   <- Stream.eval(logger[IO](getClass))
+      _        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield succeed
 
     testStream.compile.lastOrError.assertThrows[IllegalArgumentException]
@@ -185,7 +190,8 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       basePath <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
       _        <- createTempFileAtPath(basePath.append("x=1/y=a"))
       _        <- createTempFileAtPath(basePath.append("x=1/y=a/z=0_9"))
-      _        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf)
+      logger   <- Stream.eval(logger[IO](getClass))
+      _        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield succeed
 
     testStream.compile.lastOrError.assertThrows[IllegalArgumentException]
