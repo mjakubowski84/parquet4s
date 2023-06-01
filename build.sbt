@@ -10,7 +10,7 @@ lazy val three                  = "3.2.2"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.11.0"
+ThisBuild / version := "2.11.1"
 ThisBuild / isSnapshot := false
 ThisBuild / scalaVersion := twoThirteen
 
@@ -189,7 +189,7 @@ lazy val examples = (project in file("examples"))
         if (scalaVersion.value == twoThirteen) { "3.0.1" } // non-licensed version
         else { "2.1.1" }
       },
-      "com.github.fd4s" %% "fs2-kafka" % "3.0.0",
+      "com.github.fd4s" %% "fs2-kafka" % "3.0.1",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(
