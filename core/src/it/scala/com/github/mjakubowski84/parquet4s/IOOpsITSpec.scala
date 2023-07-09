@@ -1,5 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.PartitionFilterRewriter.AssumeTrue
 import org.apache.hadoop.fs.FileAlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter.Mode
 import org.scalatest.flatspec.AnyFlatSpec
@@ -116,7 +117,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
   "findPartitionedPaths" should "return no paths and no partitions for empty directory" in {
     fileSystem.mkdirs(tempPath.toHadoop)
 
-    val dir = findPartitionedPaths(tempPath, configuration).value
+    val dir = findPartitionedPaths(tempPath, configuration, AssumeTrue).value
     dir.paths should be(empty)
     dir.schema should be(empty)
   }
@@ -125,7 +126,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val pathX1 = tempPath.append("x=1")
     fileSystem.mkdirs(pathX1.toHadoop)
 
-    val dir = findPartitionedPaths(tempPath, configuration).value
+    val dir = findPartitionedPaths(tempPath, configuration, AssumeTrue).value
     dir.paths should be(empty)
     dir.schema should be(empty) // ???
   }
@@ -134,7 +135,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val pathX1 = tempPath.append("x=1").append("file.parquet")
     fileSystem.createNewFile(pathX1.toHadoop)
 
-    val dir = findPartitionedPaths(tempPath, configuration).value
+    val dir = findPartitionedPaths(tempPath, configuration, AssumeTrue).value
     dir.paths should be(List(PartitionedPath(pathX1, configuration, (Col("x") -> "1") :: Nil)))
     dir.schema should be(Col("x") :: Nil)
   }
@@ -143,7 +144,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val pathX1 = tempPath.append("x=1").append("file.parquet")
     fileSystem.createNewFile(pathX1.toHadoop)
 
-    val dir = findPartitionedPaths(pathX1, configuration).value
+    val dir = findPartitionedPaths(pathX1, configuration, AssumeTrue).value
     dir.paths should be(List(PartitionedPath(pathX1, configuration, Nil)))
     dir.schema should be(empty)
   }
@@ -158,7 +159,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.createNewFile(path3.toHadoop)
     fileSystem.createNewFile(path4.toHadoop)
 
-    val dir = findPartitionedPaths(tempPath, configuration).value
+    val dir = findPartitionedPaths(tempPath, configuration, AssumeTrue).value
     dir.paths should contain theSameElementsAs List(
       PartitionedPath(path1, configuration, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "1_1")),
       PartitionedPath(path2, configuration, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_2")),
@@ -174,7 +175,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.createNewFile(path1.toHadoop)
     fileSystem.createNewFile(path2.toHadoop)
 
-    findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
+    findPartitionedPaths(tempPath, configuration, AssumeTrue) should be a Symbol("Left")
   }
 
   it should "fail to create partitions from inconsistent directory [case2]" in {
@@ -183,7 +184,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.createNewFile(path1.toHadoop)
     fileSystem.createNewFile(path2.toHadoop)
 
-    findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
+    findPartitionedPaths(tempPath, configuration, AssumeTrue) should be a Symbol("Left")
   }
 
 }

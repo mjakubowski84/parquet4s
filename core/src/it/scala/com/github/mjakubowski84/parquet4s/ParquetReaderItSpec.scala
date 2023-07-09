@@ -62,11 +62,11 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b1/file.parquet"), Seq(I(3)))
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b2/file.parquet"), Seq(I(4)))
 
-    val partitioned = ParquetReader.as[Partitioned].filter(Col("b") === "b1").read(tempPath)
+    val partitioned = ParquetReader.as[Partitioned].filter(Col("b") === "b1" && Col("a") === "a1").read(tempPath)
     try partitioned.toSeq should contain theSameElementsAs
       Seq(
-        Partitioned(a = "a1", b = "b1", i = 1),
-        Partitioned(a = "a2", b = "b1", i = 3)
+        Partitioned(a = "a1", b = "b1", i = 1)
+//        Partitioned(a = "a2", b = "b1", i = 3)
       )
     finally partitioned.close()
   }

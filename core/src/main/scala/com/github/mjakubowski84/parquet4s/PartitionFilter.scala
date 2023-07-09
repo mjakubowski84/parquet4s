@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
-import com.github.mjakubowski84.parquet4s.IOOps.{Partition, PartitionRegexp}
 import com.github.mjakubowski84.parquet4s.PartitionedDirectory.PartitioningSchema
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileStatus
@@ -143,7 +142,7 @@ trait PartitionedDirectory {
   /** @return
     *   all [[PartitionedPath]]s belonging to this directory
     */
-  def paths: Iterable[PartitionedPath] // TODO this should return list of leaf Parquet files, not dirs!
+  def paths: Iterable[PartitionedPath] // TODO test whether this contains a list of all files in all partitions
 }
 
 private[parquet4s] object PartitionFilter {
@@ -172,7 +171,7 @@ private[parquet4s] object PartitionFilter {
     filter match {
       case Filter.noopFilter =>
         val filterCompat = filter.toFilterCompat(valueCodecConfiguration)
-        partitionedDirectory.paths.map(pp => (filterCompat, pp))
+        partitionedDirectory.paths.map(partitionedPath => (filterCompat, partitionedPath))
       case filter: Filter =>
         filterNonEmptyPredicate(
           filterPredicate    = filter.toPredicate(valueCodecConfiguration),
@@ -185,15 +184,17 @@ private[parquet4s] object PartitionFilter {
         partitionedDirectory.paths.map(pp => (filterCompat, pp))
     }
 
+  // TODO refactor the API so that we hide complexity
   def filterPartial(
       filterPredicate: FilterPredicate,
       commonPartitions: List[(ColumnPath, String)],
       partitionedDirs: Seq[(Path, (ColumnPath, String))]
   ): Iterable[(Path, List[(ColumnPath, String)])] =
     partitionedDirs.flatMap { case (path, partition) =>
+      println("... Entering " + path)
       val partitions               = commonPartitions :+ partition // TODO maybe using vector is better
-      val schema                   = partitions.map(_._1)
-      val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, schema)
+      val partitioningSchema       = partitions.map { case (columnPath, _) => columnPath }
+      val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, partitioningSchema)
       if (partitionFilterPredicate == AssumeTrue) {
         Some(path, partitions)
       } else {
@@ -205,6 +206,7 @@ private[parquet4s] object PartitionFilter {
         if (partitionFilterPredicate.accept(new PartitionFilter(partitionMap.get))) {
           Some(path, partitions)
         } else {
+          println(s"... Skipping $path as it doesn't match filter")
           None
         }
       }
@@ -214,14 +216,15 @@ private[parquet4s] object PartitionFilter {
       filterPredicate: FilterPredicate,
       partitionedPaths: Iterable[PartitionedPath],
       partitioningSchema: PartitioningSchema
-  ): Iterable[(FilterCompat.Filter, PartitionedPath)] = {
-    val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, partitioningSchema)
-    debug(s"Using rewritten predicate to filter partitions: $partitionFilterPredicate")
+  ): Iterable[(FilterCompat.Filter, PartitionedPath)] =
+    // TODO tidy up here - rewriting and filtering paths is removed as we do filter partition paths earlier
+//    val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, partitioningSchema)
+//    debug(s"Using rewritten predicate to filter partitions: $partitionFilterPredicate")
     partitionedPaths
-      .filter {
-        case _ if partitionFilterPredicate == AssumeTrue => true
-        case partitionedPath => partitionFilterPredicate.accept(new PartitionFilter(partitionedPath.value))
-      }
+//      .filter {
+//        case _ if partitionFilterPredicate == AssumeTrue => true
+//        case partitionedPath => partitionFilterPredicate.accept(new PartitionFilter(partitionedPath.value))
+//      }
       .map(partitionedPath => (FilterRewriter.rewrite(filterPredicate, partitionedPath), partitionedPath))
       .flatMap {
         case (IsTrue, partitionedPath) =>
@@ -238,7 +241,6 @@ private[parquet4s] object PartitionFilter {
           debug(s"Filter $filterPredicate for $partitionedPath is rewritten to $rewritten")
           Some(FilterCompat.get(rewritten), partitionedPath)
       }
-  }
 
 }
 
@@ -321,7 +323,9 @@ private[parquet4s] object PartitionFilterRewriter {
     *   rewritten filter predicate.
     */
   def rewrite(filterPredicate: FilterPredicate, schema: PartitioningSchema): FilterPredicate =
-    filterPredicate.accept(new PartitionFilterRewriter(schema))
+    // TODO refactor
+    if (filterPredicate == AssumeTrue) AssumeTrue
+    else filterPredicate.accept(new PartitionFilterRewriter(schema))
 
 }
 

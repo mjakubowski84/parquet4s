@@ -70,7 +70,7 @@ object ParquetReader extends IOOps {
       val valueCodecConfiguration = ValueCodecConfiguration(options)
       val hadoopConf              = options.hadoopConf
 
-      partitionedIterable(path, valueCodecConfiguration, hadoopConf)
+      partitionedIterable(path, valueCodecConfiguration, filter, hadoopConf)
     }
 
     override def read(inputFile: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
@@ -90,10 +90,17 @@ object ParquetReader extends IOOps {
     private def partitionedIterable(
         path: Path,
         valueCodecConfiguration: ValueCodecConfiguration,
+        filter: IFilter,
         hadoopConf: Configuration
-    )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] =
-      // TODO use provided filter to optimise directory scanning
-      findPartitionedPaths(path, hadoopConf) match {
+    )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
+
+      // TODO refactor so that we have lower complexity and we handle other types of filters properly
+      val filterPredicate = filter match {
+        case filter: Filter if filter != Filter.noopFilter => filter.toPredicate(valueCodecConfiguration)
+        case _                                             => PartitionFilterRewriter.AssumeTrue
+      }
+
+      findPartitionedPaths(path, hadoopConf, filterPredicate) match {
         case Left(exception) =>
           throw exception
         case Right(partitionedDirectory) =>
@@ -104,6 +111,7 @@ object ParquetReader extends IOOps {
             .filter(filter, valueCodecConfiguration, partitionedDirectory)
             .toSeq
             .map { case (filter, partitionedPath) =>
+              println("... Reading partitioned path" + partitionedPath)
               singleIterable(
                 inputFile               = partitionedPath.inputFile,
                 valueCodecConfiguration = valueCodecConfiguration,
@@ -114,6 +122,7 @@ object ParquetReader extends IOOps {
             }
           new CompoundParquetIterable[T](iterables)
       }
+    }
 
     private def singleIterable(
         inputFile: InputFile,
@@ -131,11 +140,11 @@ object ParquetReader extends IOOps {
         valueCodecConfiguration = valueCodecConfiguration,
         // TODO handle path/inputfile properly in Stats
         stats = Stats(
-          Path(inputFile.asInstanceOf[HadoopInputFile].getPath),
-          valueCodecConfiguration,
-          hadoopConf,
-          projectedSchemaOpt,
-          filterCompat
+          path                = Path(inputFile.asInstanceOf[HadoopInputFile].getPath),
+          vcc                 = valueCodecConfiguration,
+          hadoopConf          = hadoopConf,
+          projectionSchemaOpt = projectedSchemaOpt,
+          filter              = filterCompat
         )
       )
     }

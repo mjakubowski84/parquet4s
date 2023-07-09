@@ -126,13 +126,14 @@ object ParquetSource extends IOOps {
   private def apply[T: ParquetRecordDecoder](
       path: Path,
       options: ParquetReader.Options,
-      filter: Filter,
+      filter: IFilter,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
   ): Source[T, NotUsed] = {
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     val hadoopConf              = options.hadoopConf
 
-    findPartitionedPaths(path, hadoopConf).fold(
+    // FIXME
+    findPartitionedPaths(path, hadoopConf, null).fold(
       Source.failed,
       partitionedDirectory => {
         val projectedSchemaOpt = projectedSchemaResolverOpt
