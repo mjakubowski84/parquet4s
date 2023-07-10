@@ -145,7 +145,9 @@ private[parquet4s] object writer {
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     in
       .evalMapChunk(entity => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)))
-      .through(pipe(ParquetWriter.internalWriter(path, ParquetSchemaResolver.resolveSchema[T], options)))
+      .through(
+        pipe(ParquetWriter.internalWriter(path.toOutputFile(options), ParquetSchemaResolver.resolveSchema[T], options))
+      )
   }
 
   private def pipe[F[_]: Sync, T](makeParquetWriter: => HadoopParquetWriter[T]): Pipe[F, T, Nothing] =

@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import akka.Done
 import akka.stream.scaladsl.{Flow, Keep, Sink}
 import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
+import org.apache.parquet.io.OutputFile
 import org.apache.parquet.schema.MessageType
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -55,6 +56,13 @@ object SingleFileParquetSink {
       */
     def options(options: ParquetWriter.Options): Builder[T]
 
+    /** @param file
+      *   at which data is supposed to be written
+      * @return
+      *   final [[akka.stream.scaladsl.Sink]]
+      */
+    def write(file: OutputFile): Sink[T, Future[Done]]
+
     /** @param path
       *   at which data is supposed to be written
       * @return
@@ -68,7 +76,8 @@ object SingleFileParquetSink {
       encoder: ParquetRecordEncoder[T]
   ) extends Builder[T] {
     override def options(options: ParquetWriter.Options): Builder[T] = this.copy(options = options)
-    override def write(path: Path): Sink[T, Future[Done]]            = rowParquetRecordSink(path, options)
+    override def write(file: OutputFile): Sink[T, Future[Done]]      = rowParquetRecordSink(file, options)
+    override def write(path: Path): Sink[T, Future[Done]] = rowParquetRecordSink(path.toOutputFile(options), options)
   }
 
   trait CustomBuilder[T] {
@@ -100,12 +109,12 @@ object SingleFileParquetSink {
   private val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   private def rowParquetRecordSink[T: ParquetRecordEncoder: ParquetSchemaResolver](
-      path: Path,
+      file: OutputFile,
       options: ParquetWriter.Options = ParquetWriter.Options()
   ): Sink[T, Future[Done]] = {
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     val schema                  = ParquetSchemaResolver.resolveSchema[T]
-    val writer                  = ParquetWriter.internalWriter(path, schema, options)
+    val writer                  = ParquetWriter.internalWriter(file, schema, options)
 
     def encode(data: T): RowParquetRecord = ParquetRecordEncoder.encode[T](data, valueCodecConfiguration)
 

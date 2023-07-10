@@ -1,6 +1,10 @@
 package com.github.mjakubowski84.parquet4s
 
+import com.github.mjakubowski84.parquet4s.ParquetWriter.Options
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path as HadoopPath
+import org.apache.parquet.hadoop.util.HadoopOutputFile
+import org.apache.parquet.io.OutputFile
 
 import java.net.URI
 import java.nio.file.{Paths, Path as NioPath}
@@ -36,6 +40,10 @@ class Path private (val hadoopPath: HadoopPath) {
   def toHadoop: HadoopPath = hadoopPath
 
   def canEqual(other: Any): Boolean = other.isInstanceOf[Path]
+
+  def toOutputFile(conf: Configuration): OutputFile = HadoopOutputFile.fromPath(hadoopPath, conf)
+
+  def toOutputFile(options: Options): OutputFile = toOutputFile(options.hadoopConf)
 
   override def equals(other: Any): Boolean = other match {
     case that: Path =>
