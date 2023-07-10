@@ -5,6 +5,7 @@ import org.apache.parquet.hadoop.api.WriteSupport
 import org.apache.parquet.hadoop.api.WriteSupport.WriteContext
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.hadoop.{ParquetFileWriter, ParquetWriter as HadoopParquetWriter}
+import org.apache.parquet.io.OutputFile
 import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.MessageType
 import org.slf4j.LoggerFactory
@@ -48,12 +49,12 @@ object ParquetWriter {
 
   private val SignatureMetadata = Map("MadeBy" -> "https://github.com/mjakubowski84/parquet4s")
 
-  private class InternalBuilder(path: Path, schema: MessageType)
-      extends HadoopParquetWriter.Builder[RowParquetRecord, InternalBuilder](path.toHadoop) {
+  private class InternalBuilder(file: OutputFile, schema: MessageType)
+      extends HadoopParquetWriter.Builder[RowParquetRecord, InternalBuilder](file) {
     private val logger = LoggerFactory.getLogger(ParquetWriter.this.getClass)
 
     if (logger.isDebugEnabled) {
-      logger.debug(s"""Resolved following schema to write Parquet to "$path":\n$schema""")
+      logger.debug(s"""Resolved following schema to write Parquet to "$file":\n$schema""")
     }
 
     override def self(): InternalBuilder = this
@@ -108,7 +109,11 @@ object ParquetWriter {
 
     /** Builds a writer for writing files to given path.
       */
+    def build(file: OutputFile): ParquetWriter[T]
+
     def build(path: Path): ParquetWriter[T]
+
+    def writeAndClose(file: OutputFile, data: Iterable[T]): Unit
 
     /** Writes iterable collection of data as a Parquet files at given path.
       */
@@ -119,8 +124,16 @@ object ParquetWriter {
       encoder: ParquetRecordEncoder[T],
       schemaResolver: ParquetSchemaResolver[T]
   ) extends Builder[T] {
-    override def options(options: Options): Builder[T] = this.copy(options = options)
-    override def build(path: Path): ParquetWriter[T]   = new ParquetWriterImpl[T](path, options)
+    override def options(options: Options): Builder[T]     = this.copy(options = options)
+    override def build(file: OutputFile): ParquetWriter[T] = new ParquetWriterImpl[T](file, options)
+    override def build(path: Path): ParquetWriter[T]       = build(path.toOutputFile(options))
+
+    override def writeAndClose(file: OutputFile, data: Iterable[T]): Unit = {
+      val writer = build(file)
+      try writer.write(data)
+      finally writer.close()
+    }
+
     override def writeAndClose(path: Path, data: Iterable[T]): Unit = {
       val writer = build(path)
       try writer.write(data)
@@ -128,9 +141,9 @@ object ParquetWriter {
     }
   }
 
-  private[parquet4s] def internalWriter(path: Path, schema: MessageType, options: Options): InternalWriter =
+  private[parquet4s] def internalWriter(file: OutputFile, schema: MessageType, options: Options): InternalWriter =
     options
-      .applyTo[RowParquetRecord, InternalBuilder](new InternalBuilder(path, schema))
+      .applyTo[RowParquetRecord, InternalBuilder](new InternalBuilder(file, schema))
       .build()
 
   /** Writes iterable collection of data as a Parquet files at given path. Path can represent local file or directory,
@@ -167,7 +180,7 @@ object ParquetWriter {
     */
   @deprecated("2.0.0", "Use builder api by calling 'of[T]' or 'generic'")
   implicit def writerFactory[T: ParquetRecordEncoder: ParquetSchemaResolver]: ParquetWriterFactory[T] =
-    (path, options) => new ParquetWriterImpl[T](path, options)
+    (path, options) => new ParquetWriterImpl[T](path.toOutputFile(options), options)
 
   /** Creates [[Builder]] of [[ParquetWriter]] for documents of type <i>T</i>.
     */
@@ -181,13 +194,13 @@ object ParquetWriter {
 }
 
 private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
-    path: Path,
+    file: OutputFile,
     options: ParquetWriter.Options
 ) extends ParquetWriter[T] {
   private val valueCodecConfiguration = ValueCodecConfiguration(options)
   private val logger                  = LoggerFactory.getLogger(this.getClass)
   private val internalWriter = ParquetWriter.internalWriter(
-    path    = path,
+    file    = file,
     schema  = ParquetSchemaResolver.resolveSchema[T],
     options = options
   )
@@ -209,7 +222,7 @@ private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
       logger.warn("Attempted to close a writer which was already closed")
     } else {
       if (logger.isDebugEnabled) {
-        logger.debug(s"Finished writing to $path and closing writer.")
+        logger.debug(s"Finished writing to $file and closing writer.")
       }
       closed = true
       internalWriter.close()
