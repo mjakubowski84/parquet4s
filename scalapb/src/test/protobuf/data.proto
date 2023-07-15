@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+option java_package = "com.github.mjakubowski84.parquet4s";
+
+message Data {
+  enum ABC {
+    A = 0;
+    B = 1;
+    C = 2;
+  }
+
+  message Inner {
+    string text = 1;
+  }
+
+  // primitive types
+  bool bool = 1;
+  int32 int = 2;
+  int64 long = 3;
+  float float = 4;
+  double double = 5;
+  string text = 6;
+  ABC abc = 7;
+
+  // message type
+  Inner inner = 8;
+
+  // map types
+  map<string, int32> map = 9;
+  map<int32, ABC> enum_map = 10;
+  map<int64, Inner> msg_map = 11;
+
+  // list types
+  repeated bool bool_list = 101;
+  repeated int32 int_list = 102;
+  repeated int64 long_list = 103;
+  repeated float float_list = 104;
+  repeated double double_list = 105;
+  repeated string text_list = 106;
+  repeated ABC enum_list = 107;
+  repeated Inner msg_list = 108;
+}

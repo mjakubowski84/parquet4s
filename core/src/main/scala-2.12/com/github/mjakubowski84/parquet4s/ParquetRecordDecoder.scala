@@ -25,6 +25,7 @@ trait ParquetRecordDecoder[T] {
     */
   def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): T
 
+  def setMetadata(metadata: collection.Map[String, String]): Unit = {}
 }
 
 object ParquetRecordDecoder {

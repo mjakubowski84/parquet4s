@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s.parquet
 import cats.effect.{Resource, Sync}
 import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.{
+  ExtraMetadata,
   ParquetRecordEncoder,
   ParquetSchemaResolver,
   ParquetWriter,
@@ -155,7 +156,15 @@ private[parquet4s] object writer {
     in
       .evalMapChunk(entity => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)))
       .through(
-        pipe(ParquetWriter.internalWriter(outputFile, ParquetSchemaResolver.resolveSchema[T], options))
+        pipe(
+          ParquetWriter
+            .internalWriter(
+              outputFile,
+              ParquetSchemaResolver.resolveSchema[T],
+              ExtraMetadata.NoExtraMetadata,
+              options
+            )
+        )
       )
   }
 
