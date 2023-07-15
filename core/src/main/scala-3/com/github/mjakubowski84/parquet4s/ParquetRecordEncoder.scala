@@ -13,7 +13,7 @@ import scala.reflect.ClassTag
   "Cannot write data of type ${T}. " +
     "Please check if there is implicit ValueEncoder available for each field and subfield of ${T}."
 )
-trait ParquetRecordEncoder[T]:
+trait ParquetRecordEncoder[T] extends ExtraMetadata:
   /** @param entity
     *   data to be encoded
     * @param resolver
@@ -28,6 +28,8 @@ trait ParquetRecordEncoder[T]:
       resolver: EmptyRowParquetRecordResolver,
       configuration: ValueCodecConfiguration
   ): RowParquetRecord
+
+  override def getExtraMetadata(): Map[String, String] = Map.empty
 
 object ParquetRecordEncoder:
 

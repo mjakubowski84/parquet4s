@@ -131,6 +131,27 @@ lazy val fs2 = (project in file("fs2"))
   .settings(testReportSettings)
   .dependsOn(core % "compile->compile;test->test", testkit % "it->compile")
 
+lazy val scalapb = (project in file("scalapb"))
+  .configs(IntegrationTest)
+  .settings(
+    name := "parquet4s-scalapb",
+    crossScalaVersions := supportedScalaVersions,
+    libraryDependencies ++= Seq(
+      "com.thesamet.scalapb" %% "scalapb-runtime" % "0.11.13",
+      "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Test,
+      "org.apache.parquet" % "parquet-protobuf" % parquetVersion % Test
+    ),
+    Test / PB.targets := Seq(
+      _root_.scalapb.gen(flatPackage = true, lenses = false) -> ((Test / sourceManaged).value / "protobuf/scala"),
+      PB.gens.java -> ((Test / sourceManaged).value / "protobuf/java")
+    )
+  )
+  .settings(compilationSettings)
+  .settings(publishSettings)
+  .settings(testReportSettings)
+  .dependsOn(core % "compile->compile;test->test", akka % "test->test", testkit % "it->compile")
+
 lazy val testkit = (project in file("testkit"))
   .settings(
     name := "parquet4s-testkit",
@@ -173,11 +194,14 @@ lazy val examples = (project in file("examples"))
     evictionErrorLevel := util.Level.Warn,
     run / cancelable := true,
     run / fork := true,
-    compileOrder := CompileOrder.JavaThenScala
+    compileOrder := CompileOrder.JavaThenScala,
+    Compile / PB.targets := Seq(
+      _root_.scalapb.gen(flatPackage = true, lenses = false) -> ((Compile / sourceManaged).value / "protobuf/scala"),
+      PB.gens.java -> ((Test / sourceManaged).value / "protobuf/java")
+    )
   )
   .settings(compilationSettings)
-  .dependsOn(akka, fs2)
-  .enablePlugins(ProtobufPlugin)
+  .dependsOn(akka, fs2, scalapb)
 
 lazy val coreBenchmarks = (project in file("coreBenchmarks"))
   .settings(
@@ -275,6 +299,7 @@ lazy val root = (project in file("."))
     core,
     akka,
     fs2,
+    scalapb,
     testkit,
     examples,
     coreBenchmarks,

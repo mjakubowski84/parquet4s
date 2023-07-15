@@ -16,8 +16,9 @@ import java.util
 import scala.jdk.CollectionConverters.*
 
 private[parquet4s] class ParquetReadSupport(
-    projectedSchemaOpt: Option[MessageType]  = None,
-    columnProjections: Seq[ColumnProjection] = Seq.empty
+    projectedSchemaOpt: Option[MessageType]             = None,
+    columnProjections: Seq[ColumnProjection]            = Seq.empty,
+    setMetadata: collection.Map[String, String] => Unit = _ => ()
 ) extends ReadSupport[RowParquetRecord] {
 
   override def prepareForRead(
@@ -25,12 +26,13 @@ private[parquet4s] class ParquetReadSupport(
       keyValueMetaData: util.Map[String, String],
       fileSchema: MessageType,
       readContext: ReadSupport.ReadContext
-  ): RecordMaterializer[RowParquetRecord] =
+  ): RecordMaterializer[RowParquetRecord] = {
+    setMetadata(keyValueMetaData.asScala)
     new ParquetRecordMaterializer(readContext.getRequestedSchema, columnProjections)
+  }
 
   override def init(context: InitContext): ReadSupport.ReadContext =
     new ReadSupport.ReadContext(projectedSchemaOpt.foldLeft(context.getFileSchema)(ReadSupport.getSchemaForRead))
-
 }
 
 private[parquet4s] class ParquetRecordMaterializer(

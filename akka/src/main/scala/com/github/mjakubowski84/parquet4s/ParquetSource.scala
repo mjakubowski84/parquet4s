@@ -133,13 +133,13 @@ object ParquetSource extends IOOps {
 
   override protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
-  private def apply[T: ParquetRecordDecoder](
+  private def apply[T](
       inputFile: InputFile,
       options: ParquetReader.Options,
       filter: Filter,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
       columnProjections: Seq[ColumnProjection]
-  ): Source[T, NotUsed] = {
+  )(implicit decoder: ParquetRecordDecoder[T]): Source[T, NotUsed] = {
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     val hadoopConf              = options.hadoopConf
 
@@ -154,7 +154,7 @@ object ParquetSource extends IOOps {
               .map(implicit resolver => ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))
             val sources = PartitionFilter
               .filter(filter, valueCodecConfiguration, partitionedDirectory)
-              .map(createPartitionedSource(projectedSchemaOpt, columnProjections).tupled)
+              .map(createPartitionedSource(projectedSchemaOpt, columnProjections, decoder).tupled)
 
             if (sources.isEmpty) Source.empty
             else sources.reduceLeft(_.concat(_))
@@ -163,7 +163,13 @@ object ParquetSource extends IOOps {
       case _ =>
         val projectedSchemaOpt =
           projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T])
-        createSource(inputFile, projectedSchemaOpt, columnProjections, filter.toFilterCompat(valueCodecConfiguration))
+        createSource(
+          inputFile,
+          projectedSchemaOpt,
+          columnProjections,
+          filter.toFilterCompat(valueCodecConfiguration),
+          decoder
+        )
     }
 
     recordSource.map(decode)
@@ -171,9 +177,10 @@ object ParquetSource extends IOOps {
 
   private def createPartitionedSource(
       projectedSchemaOpt: Option[MessageType],
-      columnProjections: Seq[ColumnProjection]
+      columnProjections: Seq[ColumnProjection],
+      decoder: ParquetRecordDecoder[_]
   ): (FilterCompat.Filter, PartitionedPath) => Source[RowParquetRecord, NotUsed] = { (filterCompat, partitionedPath) =>
-    createSource(partitionedPath.inputFile, projectedSchemaOpt, columnProjections, filterCompat)
+    createSource(partitionedPath.inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder)
       .map(setPartitionValues(partitionedPath))
   }
 
@@ -181,11 +188,12 @@ object ParquetSource extends IOOps {
       inputFile: InputFile,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
-      filterCompat: FilterCompat.Filter
+      filterCompat: FilterCompat.Filter,
+      decoder: ParquetRecordDecoder[_]
   ) =
     Source
       .unfoldResource[RowParquetRecord, org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]](
-        create = () => createReader(filterCompat, inputFile, projectedSchemaOpt, columnProjections),
+        create = () => createReader(filterCompat, inputFile, projectedSchemaOpt, columnProjections, decoder),
         read   = reader => Option(reader.read()),
         close  = _.close()
       )
@@ -199,8 +207,8 @@ object ParquetSource extends IOOps {
       filterCompat: FilterCompat.Filter,
       inputFile: InputFile,
       projectedSchemaOpt: Option[MessageType],
-      columnProjections: Seq[ColumnProjection]
+      columnProjections: Seq[ColumnProjection],
+      decoder: ParquetRecordDecoder[_]
   ): org.apache.parquet.hadoop.ParquetReader[RowParquetRecord] =
-    HadoopParquetReader(inputFile, projectedSchemaOpt, columnProjections, filterCompat).build()
-
+    HadoopParquetReader(inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder.setMetadata).build()
 }

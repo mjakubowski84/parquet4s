@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.WriteSupport
-import org.apache.parquet.hadoop.api.WriteSupport.WriteContext
+import org.apache.parquet.hadoop.api.WriteSupport.{FinalizedWriteContext, WriteContext}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 import org.apache.parquet.hadoop.{ParquetFileWriter, ParquetWriter as HadoopParquetWriter}
 import org.apache.parquet.io.OutputFile
@@ -49,7 +49,7 @@ object ParquetWriter {
 
   private val SignatureMetadata = Map("MadeBy" -> "https://github.com/mjakubowski84/parquet4s")
 
-  private class InternalBuilder(file: OutputFile, schema: MessageType)
+  private class InternalBuilder(file: OutputFile, schema: MessageType, extraMetadata: ExtraMetadata)
       extends HadoopParquetWriter.Builder[RowParquetRecord, InternalBuilder](file) {
     private val logger = LoggerFactory.getLogger(ParquetWriter.this.getClass)
 
@@ -60,7 +60,7 @@ object ParquetWriter {
     override def self(): InternalBuilder = this
 
     override def getWriteSupport(conf: Configuration): WriteSupport[RowParquetRecord] =
-      new ParquetWriteSupport(schema, SignatureMetadata)
+      new ParquetWriteSupport(schema, SignatureMetadata, extraMetadata)
   }
 
   /** Configuration of parquet writer. Please have a look at <a href="https://parquet.apache.org/docs/">documentation of
@@ -145,9 +145,14 @@ object ParquetWriter {
     }
   }
 
-  private[parquet4s] def internalWriter(file: OutputFile, schema: MessageType, options: Options): InternalWriter =
+  private[parquet4s] def internalWriter(
+      file: OutputFile,
+      schema: MessageType,
+      extraMetadata: ExtraMetadata,
+      options: Options
+  ): InternalWriter =
     options
-      .applyTo[RowParquetRecord, InternalBuilder](new InternalBuilder(file, schema))
+      .applyTo[RowParquetRecord, InternalBuilder](new InternalBuilder(file, schema, extraMetadata))
       .build()
 
   /** Writes iterable collection of data as a Parquet files at given path. Path can represent local file or directory,
@@ -201,12 +206,14 @@ private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
     file: OutputFile,
     options: ParquetWriter.Options
 ) extends ParquetWriter[T] {
+  private val encoder                 = implicitly[ParquetRecordEncoder[T]]
   private val valueCodecConfiguration = ValueCodecConfiguration(options)
   private val logger                  = LoggerFactory.getLogger(this.getClass)
   private val internalWriter = ParquetWriter.internalWriter(
-    file    = file,
-    schema  = ParquetSchemaResolver.resolveSchema[T],
-    options = options
+    file          = file,
+    schema        = ParquetSchemaResolver.resolveSchema[T],
+    extraMetadata = encoder,
+    options       = options
   )
   private var closed = false
 
@@ -235,7 +242,7 @@ private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
 
 }
 
-private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, String])
+private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, String], extraMetadata: ExtraMetadata)
     extends WriteSupport[RowParquetRecord] {
   private var consumer: RecordConsumer = _
 
@@ -257,4 +264,7 @@ private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, Str
 
   override def prepareForWrite(recordConsumer: RecordConsumer): Unit =
     consumer = recordConsumer
+
+  override def finalizeWrite(): FinalizedWriteContext =
+    new FinalizedWriteContext(extraMetadata.getExtraMetadata().asJava)
 }

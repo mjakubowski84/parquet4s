@@ -272,6 +272,7 @@ object rotatingWriter {
               ParquetWriter.internalWriter(
                 basePath.append(newFileName(options)).toOutputFile(options),
                 schema,
+                ExtraMetadata.NoExtraMetadata,
                 options
               )
             )
