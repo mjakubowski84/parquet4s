@@ -1,9 +1,12 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.etl.CompoundParquetIterable
+import com.github.mjakubowski84.parquet4s.stats.FileStats
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
+import org.apache.parquet.hadoop.api.ReadSupport
+import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -42,6 +45,16 @@ object ParquetReader extends IOOps {
       *   when reading inconsistent partition directory
       */
     def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T]
+
+    /** @param file
+      *   the InputFile to read from
+      * @param decoder
+      *   decodes [[RowParquetRecord]] to your data type
+      * @return
+      *   final [[ParquetIterable]]
+      */
+    @experimental
+    def read(file: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T]
   }
 
   private case class BuilderImpl[T](
@@ -74,6 +87,20 @@ object ParquetReader extends IOOps {
           filterCompat = filter.toFilterCompat(valueCodecConfiguration),
           hadoopConf   = hadoopConf
         )
+    }
+
+    override def read(file: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
+      val valueCodecConfiguration = ValueCodecConfiguration(options)
+      val hadoopConf              = options.hadoopConf
+
+      singleIterable(
+        file                    = file,
+        valueCodecConfiguration = valueCodecConfiguration,
+        projectedSchemaOpt =
+          projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T]),
+        filterCompat = filter.toFilterCompat(valueCodecConfiguration),
+        hadoopConf   = hadoopConf
+      )
     }
 
     private def partitionedIterable(
@@ -123,6 +150,30 @@ object ParquetReader extends IOOps {
           ),
         valueCodecConfiguration = valueCodecConfiguration,
         stats                   = Stats(path, valueCodecConfiguration, hadoopConf, projectedSchemaOpt, filterCompat)
+      )
+    }
+
+    private def singleIterable(
+        file: InputFile,
+        valueCodecConfiguration: ValueCodecConfiguration,
+        projectedSchemaOpt: Option[MessageType],
+        filterCompat: FilterCompat.Filter,
+        hadoopConf: Configuration
+    )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
+      if (logger.isDebugEnabled) {
+        logger.debug(s"Creating ParquetIterable for file $file")
+      }
+      ParquetIterable[T](
+        iteratorFactory = () =>
+          new ParquetIterator(
+            new HadoopParquetReader.Builder[RowParquetRecord](file) {
+              override def getReadSupport: ReadSupport[RowParquetRecord] = new ParquetReadSupport(projectedSchemaOpt)
+            }
+              .withConf(hadoopConf)
+              .withFilter(filterCompat)
+          ),
+        valueCodecConfiguration = valueCodecConfiguration,
+        stats                   = new FileStats(file, valueCodecConfiguration, projectedSchemaOpt)
       )
     }
 

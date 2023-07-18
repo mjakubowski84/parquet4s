@@ -107,12 +107,16 @@ object ParquetWriter {
       */
     def options(options: Options): Builder[T]
 
-    /** Builds a writer for writing files to given path.
+    /** Builds a writer for writing the output file
       */
+    @experimental
     def build(file: OutputFile): ParquetWriter[T]
 
     def build(path: Path): ParquetWriter[T]
 
+    /** Writes iterable collection of data as a Parquet output file.
+      */
+    @experimental
     def writeAndClose(file: OutputFile, data: Iterable[T]): Unit
 
     /** Writes iterable collection of data as a Parquet files at given path.

@@ -7,21 +7,30 @@ import org.apache.parquet.ParquetReadOptions
 import org.apache.parquet.column.statistics.Statistics
 import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
+import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.MessageType
 
 import scala.collection.compat.*
 import scala.jdk.CollectionConverters.*
 
+private[parquet4s] object FileStats {
+  def apply(
+      status: FileStatus,
+      vcc: ValueCodecConfiguration,
+      hadoopConf: Configuration,
+      projectionSchemaOpt: Option[MessageType]
+  ) =
+    new FileStats(HadoopInputFile.fromStatus(status, hadoopConf), vcc, projectionSchemaOpt)
+}
+
 /** Calculates statistics from <b>unfiltered</b> Parquet files.
   */
 private[parquet4s] class FileStats(
-    status: FileStatus,
+    inputFile: InputFile,
     vcc: ValueCodecConfiguration,
-    hadoopConf: Configuration,
     projectionSchemaOpt: Option[MessageType]
 ) extends Stats {
 
-  private val inputFile     = HadoopInputFile.fromStatus(status, hadoopConf)
   private val readerOptions = ParquetReadOptions.builder().build()
 
   abstract private class StatsReader {
