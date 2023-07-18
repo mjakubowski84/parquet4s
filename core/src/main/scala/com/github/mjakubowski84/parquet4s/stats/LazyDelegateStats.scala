@@ -17,7 +17,7 @@ private[parquet4s] class LazyDelegateStats(
     val fs = path.toHadoop.getFileSystem(hadoopConf)
     val statsArray = fs.listStatus(path.toHadoop).map {
       case status if filter.isInstanceOf[NoOpFilter] =>
-        new FileStats(status, vcc, hadoopConf, projectionSchemaOpt)
+        FileStats(status, vcc, hadoopConf, projectionSchemaOpt)
       case status =>
         new FilteredFileStats(status, vcc, hadoopConf, projectionSchemaOpt, filter)
     }
