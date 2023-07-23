@@ -12,13 +12,13 @@ class InMemoryFileSpec extends AnyFlatSpec with Matchers {
 
     val count = 100
     val data  = (1 to count).map(i => Data(id = i, text = RandomStringUtils.randomPrint(4)))
-    val file  = InMemoryOutputFile.create("test")
+    val file  = InMemoryOutputFile("test")
 
     // write
     ParquetWriter.of[Data].writeAndClose(file, data)
 
     val inputFile = Files.createTempFile("in-memory-output-file-test", ".parquet")
-    Files.write(inputFile, file.toByteArray())
+    Files.write(inputFile, file.toByteArray)
 
     // read
     val readData = ParquetReader.as[Data].read(Path(inputFile))
@@ -31,12 +31,12 @@ class InMemoryFileSpec extends AnyFlatSpec with Matchers {
 
     val count      = 100
     val data       = (1 to count).map(i => Data(id = i, text = RandomStringUtils.randomPrint(4)))
-    val outputFile = InMemoryOutputFile.create("test")
+    val outputFile = InMemoryOutputFile("test")
 
     // write
     ParquetWriter.of[Data].writeAndClose(outputFile, data)
 
-    val inputFile = InMemoryInputFile.fromBytesUnsafe(outputFile.toByteArray())
+    val inputFile = InMemoryInputFile.fromBytesUnsafe(outputFile.toByteArray)
 
     // read
     val readData = ParquetReader.as[Data].read(inputFile)

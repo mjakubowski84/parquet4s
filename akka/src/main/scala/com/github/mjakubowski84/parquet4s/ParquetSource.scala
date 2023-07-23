@@ -2,9 +2,9 @@ package com.github.mjakubowski84.parquet4s
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
+import org.apache.parquet.hadoop.util.HadoopInputFile
+import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -102,6 +102,13 @@ object ParquetSource extends IOOps {
       *   final [[akka.stream.scaladsl.Source]]
       */
     def read(path: Path): Source[T, NotUsed]
+
+    /** @param inputFile
+      *   file to read
+      * @return
+      *   final [[akka.stream.scaladsl.Source]]
+      */
+    def read(inputFile: InputFile): Source[T, NotUsed]
   }
 
   private case class BuilderImpl[T: ParquetRecordDecoder](
@@ -117,52 +124,71 @@ object ParquetSource extends IOOps {
       this.copy(filter = filter)
 
     override def read(path: Path): Source[T, NotUsed] =
-      ParquetSource.apply(path, options, filter, projectedSchemaResolverOpt)
+      read(path.toInputFile(options))
+
+    override def read(inputFile: InputFile): Source[T, NotUsed] =
+      ParquetSource(inputFile, options, filter, projectedSchemaResolverOpt, columnProjections)
 
   }
 
   override protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   private def apply[T: ParquetRecordDecoder](
-      path: Path,
+      inputFile: InputFile,
       options: ParquetReader.Options,
       filter: Filter,
-      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
+      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
+      columnProjections: Seq[ColumnProjection]
   ): Source[T, NotUsed] = {
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     val hadoopConf              = options.hadoopConf
 
-    findPartitionedPaths(path, hadoopConf).fold(
-      Source.failed,
-      partitionedDirectory => {
-        val projectedSchemaOpt = projectedSchemaResolverOpt
-          .map(implicit resolver => ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))
-        val sources = PartitionFilter
-          .filter(filter, valueCodecConfiguration, partitionedDirectory)
-          .map(createSource[T](valueCodecConfiguration, hadoopConf, projectedSchemaOpt).tupled)
-
-        if (sources.isEmpty) Source.empty
-        else sources.reduceLeft(_.concat(_))
-      }
-    )
-  }
-
-  private def createSource[T: ParquetRecordDecoder](
-      valueCodecConfiguration: ValueCodecConfiguration,
-      hadoopConf: Configuration,
-      projectedSchemaOpt: Option[MessageType]
-  ): (FilterCompat.Filter, PartitionedPath) => Source[T, NotUsed] = { (filterCompat, partitionedPath) =>
     def decode(record: RowParquetRecord): T = ParquetRecordDecoder.decode[T](record, valueCodecConfiguration)
 
+    val recordSource = inputFile match {
+      case hadoopInputFile: HadoopInputFile =>
+        findPartitionedPaths(Path(hadoopInputFile.getPath), hadoopConf).fold(
+          Source.failed,
+          partitionedDirectory => {
+            val projectedSchemaOpt = projectedSchemaResolverOpt
+              .map(implicit resolver => ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))
+            val sources = PartitionFilter
+              .filter(filter, valueCodecConfiguration, partitionedDirectory)
+              .map(createPartitionedSource(projectedSchemaOpt, columnProjections).tupled)
+
+            if (sources.isEmpty) Source.empty
+            else sources.reduceLeft(_.concat(_))
+          }
+        )
+      case _ =>
+        val projectedSchemaOpt =
+          projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T])
+        createSource(inputFile, projectedSchemaOpt, columnProjections, filter.toFilterCompat(valueCodecConfiguration))
+    }
+
+    recordSource.map(decode)
+  }
+
+  private def createPartitionedSource(
+      projectedSchemaOpt: Option[MessageType],
+      columnProjections: Seq[ColumnProjection]
+  ): (FilterCompat.Filter, PartitionedPath) => Source[RowParquetRecord, NotUsed] = { (filterCompat, partitionedPath) =>
+    createSource(partitionedPath.inputFile, projectedSchemaOpt, columnProjections, filterCompat)
+      .map(setPartitionValues(partitionedPath))
+  }
+
+  private def createSource(
+      inputFile: InputFile,
+      projectedSchemaOpt: Option[MessageType],
+      columnProjections: Seq[ColumnProjection],
+      filterCompat: FilterCompat.Filter
+  ) =
     Source
-      .unfoldResource[RowParquetRecord, HadoopParquetReader[RowParquetRecord]](
-        create = () => createReader(hadoopConf, filterCompat, partitionedPath, projectedSchemaOpt),
+      .unfoldResource[RowParquetRecord, org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]](
+        create = () => createReader(filterCompat, inputFile, projectedSchemaOpt, columnProjections),
         read   = reader => Option(reader.read()),
         close  = _.close()
       )
-      .map(setPartitionValues(partitionedPath))
-      .map(decode)
-  }
 
   private def setPartitionValues(partitionedPath: PartitionedPath)(record: RowParquetRecord) =
     partitionedPath.partitions.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
@@ -170,15 +196,11 @@ object ParquetSource extends IOOps {
     }
 
   private def createReader(
-      hadoopConf: Configuration,
       filterCompat: FilterCompat.Filter,
-      partitionedPath: PartitionedPath,
-      projectedSchemaOpt: Option[MessageType]
-  ): HadoopParquetReader[RowParquetRecord] =
-    HadoopParquetReader
-      .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt), partitionedPath.path.toHadoop)
-      .withConf(hadoopConf)
-      .withFilter(filterCompat)
-      .build()
+      inputFile: InputFile,
+      projectedSchemaOpt: Option[MessageType],
+      columnProjections: Seq[ColumnProjection]
+  ): org.apache.parquet.hadoop.ParquetReader[RowParquetRecord] =
+    HadoopParquetReader(inputFile, projectedSchemaOpt, columnProjections, filterCompat).build()
 
 }

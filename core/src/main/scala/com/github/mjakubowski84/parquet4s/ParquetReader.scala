@@ -1,11 +1,9 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.etl.CompoundParquetIterable
-import com.github.mjakubowski84.parquet4s.stats.FileStats
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
-import org.apache.parquet.hadoop.api.ReadSupport
+import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
@@ -33,6 +31,10 @@ object ParquetReader extends IOOps {
     /** Attempt to read data as partitioned. Partition names must follow Hive format. Partition values will be set in
       * read records to corresponding fields.
       */
+    @deprecated(
+      message = "Reading always tries to resolve partitions if the provided path is a directory.",
+      since   = "2.12.0"
+    )
     def partitioned: Builder[T]
 
     /** @param path
@@ -46,7 +48,7 @@ object ParquetReader extends IOOps {
       */
     def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T]
 
-    /** @param file
+    /** @param inputFile
       *   the InputFile to read from
       * @param decoder
       *   decodes [[RowParquetRecord]] to your data type
@@ -54,15 +56,14 @@ object ParquetReader extends IOOps {
       *   final [[ParquetIterable]]
       */
     @experimental
-    def read(file: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T]
+    def read(inputFile: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T]
   }
 
   private case class BuilderImpl[T](
       options: ParquetReader.Options                               = ParquetReader.Options(),
       filter: Filter                                               = Filter.noopFilter,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None,
-      columnProjections: Seq[ColumnProjection]                     = Seq.empty,
-      readPartitions: Boolean                                      = false
+      columnProjections: Seq[ColumnProjection]                     = Seq.empty
   ) extends Builder[T] {
     override def options(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
@@ -70,37 +71,28 @@ object ParquetReader extends IOOps {
     override def filter(filter: Filter): Builder[T] =
       this.copy(filter = filter)
 
-    override def partitioned: Builder[T] = this.copy(readPartitions = true)
+    override def partitioned: Builder[T] = this
 
-    override def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
+    override def read(path: Path)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] =
+      read(path.toInputFile(options))
+
+    override def read(inputFile: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
       val valueCodecConfiguration = ValueCodecConfiguration(options)
       val hadoopConf              = options.hadoopConf
 
-      if (readPartitions)
-        partitionedIterable(path, valueCodecConfiguration, hadoopConf)
-      else
-        singleIterable(
-          path                    = path,
-          valueCodecConfiguration = valueCodecConfiguration,
-          projectedSchemaOpt =
-            projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T]),
-          filterCompat = filter.toFilterCompat(valueCodecConfiguration),
-          hadoopConf   = hadoopConf
-        )
-    }
-
-    override def read(file: InputFile)(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
-      val valueCodecConfiguration = ValueCodecConfiguration(options)
-      val hadoopConf              = options.hadoopConf
-
-      singleIterable(
-        file                    = file,
-        valueCodecConfiguration = valueCodecConfiguration,
-        projectedSchemaOpt =
-          projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T]),
-        filterCompat = filter.toFilterCompat(valueCodecConfiguration),
-        hadoopConf   = hadoopConf
-      )
+      inputFile match {
+        case hadoopInputFile: HadoopInputFile =>
+          partitionedIterable(Path(hadoopInputFile.getPath), valueCodecConfiguration, hadoopConf)
+        case _ =>
+          singleIterable(
+            inputFile               = inputFile,
+            valueCodecConfiguration = valueCodecConfiguration,
+            projectedSchemaOpt =
+              projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T]),
+            filterCompat = filter.toFilterCompat(valueCodecConfiguration),
+            hadoopConf   = hadoopConf
+          )
+      }
     }
 
     private def partitionedIterable(
@@ -120,7 +112,7 @@ object ParquetReader extends IOOps {
             .toSeq
             .map { case (filter, partitionedPath) =>
               singleIterable(
-                path                    = partitionedPath.path,
+                inputFile               = partitionedPath.inputFile,
                 valueCodecConfiguration = valueCodecConfiguration,
                 projectedSchemaOpt      = projectedSchemaOpt,
                 filterCompat            = filter,
@@ -131,49 +123,20 @@ object ParquetReader extends IOOps {
       }
 
     private def singleIterable(
-        path: Path,
+        inputFile: InputFile,
         valueCodecConfiguration: ValueCodecConfiguration,
         projectedSchemaOpt: Option[MessageType],
         filterCompat: FilterCompat.Filter,
         hadoopConf: Configuration
     )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
       if (logger.isDebugEnabled) {
-        logger.debug(s"Creating ParquetIterable for path $path")
+        logger.debug(s"Creating ParquetIterable for file $inputFile")
       }
       ParquetIterable[T](
         iteratorFactory = () =>
-          new ParquetIterator(
-            HadoopParquetReader
-              .builder[RowParquetRecord](new ParquetReadSupport(projectedSchemaOpt, columnProjections), path.toHadoop)
-              .withConf(hadoopConf)
-              .withFilter(filterCompat)
-          ),
+          new ParquetIterator(HadoopParquetReader(inputFile, projectedSchemaOpt, columnProjections, filterCompat)),
         valueCodecConfiguration = valueCodecConfiguration,
-        stats                   = Stats(path, valueCodecConfiguration, hadoopConf, projectedSchemaOpt, filterCompat)
-      )
-    }
-
-    private def singleIterable(
-        file: InputFile,
-        valueCodecConfiguration: ValueCodecConfiguration,
-        projectedSchemaOpt: Option[MessageType],
-        filterCompat: FilterCompat.Filter,
-        hadoopConf: Configuration
-    )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
-      if (logger.isDebugEnabled) {
-        logger.debug(s"Creating ParquetIterable for file $file")
-      }
-      ParquetIterable[T](
-        iteratorFactory = () =>
-          new ParquetIterator(
-            new HadoopParquetReader.Builder[RowParquetRecord](file) {
-              override def getReadSupport: ReadSupport[RowParquetRecord] = new ParquetReadSupport(projectedSchemaOpt)
-            }
-              .withConf(hadoopConf)
-              .withFilter(filterCompat)
-          ),
-        valueCodecConfiguration = valueCodecConfiguration,
-        stats                   = new FileStats(file, valueCodecConfiguration, projectedSchemaOpt)
+        stats = Stats(inputFile, valueCodecConfiguration, hadoopConf, projectedSchemaOpt, filterCompat)
       )
     }
 

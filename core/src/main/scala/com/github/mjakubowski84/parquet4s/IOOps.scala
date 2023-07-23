@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileAlreadyExistsException, FileStatus, FileSystem, RemoteIterator}
 import org.apache.parquet.hadoop.ParquetFileWriter
+import org.apache.parquet.hadoop.util.HiddenFileFilter
 import org.slf4j.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -72,7 +73,7 @@ trait IOOps {
       configuration: Configuration
   ): Either[Exception, PartitionedDirectory] = {
     val fs = path.toHadoop.getFileSystem(configuration)
-    findPartitionedPaths(fs, path, List.empty).fold(
+    findPartitionedPaths(fs, configuration, path, List.empty).fold(
       PartitionedDirectory.failed,
       PartitionedDirectory.apply
     )
@@ -80,10 +81,14 @@ trait IOOps {
 
   private def findPartitionedPaths(
       fs: FileSystem,
+      configuration: Configuration,
       path: Path,
       partitions: List[Partition]
   ): Either[List[Path], List[PartitionedPath]] = {
-    val (dirs, files) = fs.listStatus(path.toHadoop).toList.partition(_.isDirectory)
+    val (dirs, files) = fs
+      .listStatus(path.toHadoop, HiddenFileFilter.INSTANCE)
+      .toList
+      .partition(_.isDirectory)
     if (dirs.nonEmpty && files.nonEmpty)
       Left(path :: Nil) // path is invalid because it contains both dirs and files
     else {
@@ -91,10 +96,13 @@ trait IOOps {
       if (partitionedDirs.isEmpty && files.isEmpty)
         Right(List.empty) // empty leaf dir
       else if (partitionedDirs.isEmpty)
-        Right(List(PartitionedPath(path, partitions))) // leaf dir with files
+        // leaf files
+        Right(files.map(fileStatus => PartitionedPath(fileStatus, configuration, partitions)))
       else
         partitionedDirs
-          .map { case (subPath, partition) => findPartitionedPaths(fs, subPath, partitions :+ partition) }
+          .map { case (subPath, partition) =>
+            findPartitionedPaths(fs, configuration, subPath, partitions :+ partition)
+          }
           .foldLeft[Either[List[Path], List[PartitionedPath]]](Right(List.empty)) {
             case (Left(invalidPaths), Left(moreInvalidPaths)) =>
               Left(invalidPaths ++ moreInvalidPaths)

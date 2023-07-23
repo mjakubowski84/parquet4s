@@ -8,10 +8,10 @@ import scala.language.reflectiveCalls
 import scala.util.control.NoStackTrace
 
 object InMemoryOutputFile {
-  def create(name: String): InMemoryOutputFile = new InMemoryOutputFile(name)
+  def apply(name: String): InMemoryOutputFile = new InMemoryOutputFile(name)
 }
 
-class InMemoryOutputFile(name: String) extends OutputFile {
+class InMemoryOutputFile private (name: String) extends OutputFile {
   private val os = new ByteArrayOutputStream()
 
   override def create(blockSizeHint: Long): PositionOutputStream = {
@@ -33,5 +33,5 @@ class InMemoryOutputFile(name: String) extends OutputFile {
   override def defaultBlockSize(): Long =
     throw new UnsupportedOperationException("Block size is not supported by InMemoryOutputFile") with NoStackTrace
 
-  def toByteArray(): Array[Byte] = os.toByteArray
+  def toByteArray: Array[Byte] = os.toByteArray
 }

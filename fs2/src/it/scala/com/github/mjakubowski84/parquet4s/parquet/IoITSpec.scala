@@ -19,15 +19,16 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
     def toPath: Path = Path(fs2Path.toNioPath)
   }
 
-  private val writeOptions = ParquetWriter.Options()
+  private val writeOptions  = ParquetWriter.Options()
+  private val configuration = writeOptions.hadoopConf
+  private val fileName      = "file.parquet"
 
-  private def createTempFileAtPath(path: Path): Stream[IO, Path] =
+  private def createFileAtPath(path: Path): Stream[IO, Path] = {
+    val filePath = path.append(fileName)
     Stream.eval(Files[IO].createDirectories(path)) >> Stream
-      .resource(
-        Files[IO]
-          .tempFile(dir = Option(parquetPathToFs2Path(path)), suffix = ".parquet", prefix = "", permissions = None)
-      )
-      .as(path)
+      .eval(Files[IO].createFile(filePath))
+      .as(filePath)
+  }
 
   "validateWritePath" should "succeed if path already exists in create mode" in {
     val options = writeOptions.copy(writeMode = ParquetFileWriter.Mode.CREATE)
@@ -126,12 +127,12 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
   it should "return proper PartitionedDirectory for unpartitioned path with parquet content" in {
     val testStream = for {
       basePath <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
-      _        <- createTempFileAtPath(basePath)
+      filePath <- createFileAtPath(basePath)
       logger   <- Stream.eval(logger[IO](getClass))
       dir      <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield {
       dir.schema should be(empty)
-      dir.paths should be(Vector(PartitionedPath(basePath, List.empty)))
+      dir.paths should be(Vector(PartitionedPath(filePath, configuration, List.empty)))
     }
 
     testStream.compile.lastOrError
@@ -140,12 +141,26 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
   it should "return proper PartitionedDirectory for single partition" in {
     val testStream = for {
       basePath      <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
-      partitionPath <- createTempFileAtPath(basePath.append("x=1"))
+      partitionPath <- createFileAtPath(basePath.append("x=1"))
       logger        <- Stream.eval(logger[IO](getClass))
       dir           <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield {
       dir.schema should be(List(Col("x")))
-      dir.paths should be(Vector(PartitionedPath(partitionPath, List(Col("x") -> "1"))))
+      dir.paths should be(Vector(PartitionedPath(partitionPath, configuration, List(Col("x") -> "1"))))
+    }
+
+    testStream.compile.lastOrError
+  }
+
+  it should "return proper PartitionedDirectory for a path pointing a file" in {
+    val testStream = for {
+      basePath      <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
+      partitionPath <- createFileAtPath(basePath.append("x=1"))
+      logger        <- Stream.eval(logger[IO](getClass))
+      dir           <- io.findPartitionedPaths[IO](partitionPath, writeOptions.hadoopConf, logger)
+    } yield {
+      dir.schema should be(empty)
+      dir.paths should be(Vector(PartitionedPath(partitionPath, configuration, List.empty)))
     }
 
     testStream.compile.lastOrError
@@ -154,19 +169,19 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
   it should "return proper PartitionedDirectory for complex partition" in {
     val testStream = for {
       basePath   <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
-      partition1 <- createTempFileAtPath(basePath.append("x=1/y=a/z=0_9"))
-      partition2 <- createTempFileAtPath(basePath.append("x=1/y=b/z=1_0"))
-      partition3 <- createTempFileAtPath(basePath.append("x=1/y=c/z=1_1"))
-      partition4 <- createTempFileAtPath(basePath.append("x=2/y=b/z=1_2"))
+      partition1 <- createFileAtPath(basePath.append("x=1/y=a/z=0_9"))
+      partition2 <- createFileAtPath(basePath.append("x=1/y=b/z=1_0"))
+      partition3 <- createFileAtPath(basePath.append("x=1/y=c/z=1_1"))
+      partition4 <- createFileAtPath(basePath.append("x=2/y=b/z=1_2"))
       logger     <- Stream.eval(logger[IO](getClass))
       dir        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield {
       dir.schema should be(List(Col("x"), Col("y"), Col("z")))
       dir.paths should contain theSameElementsAs Vector(
-        PartitionedPath(partition1, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "0_9")),
-        PartitionedPath(partition2, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_0")),
-        PartitionedPath(partition3, List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_1")),
-        PartitionedPath(partition4, List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "1_2"))
+        PartitionedPath(partition1, configuration, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "0_9")),
+        PartitionedPath(partition2, configuration, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_0")),
+        PartitionedPath(partition3, configuration, List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_1")),
+        PartitionedPath(partition4, configuration, List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "1_2"))
       )
     }
 
@@ -176,8 +191,8 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
   it should "fail in case of inconsistent directory [case 1]" in {
     val testStream = for {
       basePath <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
-      _        <- createTempFileAtPath(basePath.append("x=1/y=a"))
-      _        <- createTempFileAtPath(basePath.append("y=b/x=2"))
+      _        <- createFileAtPath(basePath.append("x=1/y=a"))
+      _        <- createFileAtPath(basePath.append("y=b/x=2"))
       logger   <- Stream.eval(logger[IO](getClass))
       _        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield succeed
@@ -188,8 +203,8 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
   it should "fail in case of inconsistent directory [case 2]" in {
     val testStream = for {
       basePath <- Stream.resource(Files[IO].tempDirectory(None, "", None).map(_.toPath))
-      _        <- createTempFileAtPath(basePath.append("x=1/y=a"))
-      _        <- createTempFileAtPath(basePath.append("x=1/y=a/z=0_9"))
+      _        <- createFileAtPath(basePath.append("x=1/y=a"))
+      _        <- createFileAtPath(basePath.append("x=1/y=a/z=0_9"))
       logger   <- Stream.eval(logger[IO](getClass))
       _        <- io.findPartitionedPaths[IO](basePath, writeOptions.hadoopConf, logger)
     } yield succeed

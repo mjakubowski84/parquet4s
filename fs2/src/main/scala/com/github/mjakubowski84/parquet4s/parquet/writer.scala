@@ -13,6 +13,7 @@ import com.github.mjakubowski84.parquet4s.{
 }
 import fs2.{Chunk, Pipe, Pull, Stream}
 import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
+import org.apache.parquet.io.OutputFile
 import org.apache.parquet.schema.MessageType
 
 import scala.language.higherKinds
@@ -69,6 +70,14 @@ private[parquet4s] object writer {
       *   final [[fs2.Pipe]]
       */
     def write(path: Path): Pipe[F, T, Nothing]
+
+    /** @param outputFile
+      *   to which data is supposed to be written
+      * @return
+      *   final [[fs2.Pipe]]
+      */
+    @experimental
+    def write(outputFile: OutputFile): Pipe[F, T, Nothing]
   }
 
   private case class BuilderImpl[F[_], T](options: ParquetWriter.Options = ParquetWriter.Options())(implicit
@@ -77,7 +86,9 @@ private[parquet4s] object writer {
       sync: Sync[F]
   ) extends Builder[F, T] {
     override def options(options: ParquetWriter.Options): Builder[F, T] = this.copy(options = options)
-    override def write(path: Path): Pipe[F, T, Nothing]                 = rowParquetRecordPipe[F, T](path, options)
+    override def write(path: Path): Pipe[F, T, Nothing]                 = write(path.toOutputFile(options))
+
+    override def write(outputFile: OutputFile): Pipe[F, T, Nothing] = rowParquetRecordPipe[F, T](outputFile, options)
   }
 
   trait CustomBuilder[F[_], T] {
@@ -139,14 +150,14 @@ private[parquet4s] object writer {
   }
 
   private def rowParquetRecordPipe[F[_], T: ParquetRecordEncoder: ParquetSchemaResolver](
-      path: Path,
+      outputFile: OutputFile,
       options: ParquetWriter.Options
   )(implicit F: Sync[F]): Pipe[F, T, Nothing] = { in =>
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     in
       .evalMapChunk(entity => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)))
       .through(
-        pipe(ParquetWriter.internalWriter(path.toOutputFile(options), ParquetSchemaResolver.resolveSchema[T], options))
+        pipe(ParquetWriter.internalWriter(outputFile, ParquetSchemaResolver.resolveSchema[T], options))
       )
   }
 
