@@ -25,7 +25,7 @@ class ParquetDfsItSpec extends AnyFlatSpec with ForAllMiniDfsCluster {
     ParquetWriter.of[Data].options(writeOptions).writeAndClose(inPath, makeTestData())
     // When
     val outWriter  = ParquetWriter.of[Data].options(writeOptions).build(outPath)
-    val inIterable = ParquetReader.as[Data].options(readOptions).partitioned.read(inPath)
+    val inIterable = ParquetReader.as[Data].options(readOptions).read(inPath)
 
     try outWriter.write(inIterable.map(d => d.copy(i = d.i + 1)))
     finally {

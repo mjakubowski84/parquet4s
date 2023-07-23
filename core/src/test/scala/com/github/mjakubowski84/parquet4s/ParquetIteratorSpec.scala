@@ -2,7 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s
 import com.github.mjakubowski84.parquet4s.ValueImplicits.*
-import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
 import org.mockito.Mockito.{times, verify, when}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -15,14 +14,14 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
 
   private def mock[T: ClassTag]: T = org.mockito.Mockito.mock(classTag[T].runtimeClass).asInstanceOf[T]
 
-  private def mockTestBuilder(reader: HadoopParquetReader[RowParquetRecord]) = {
+  private def mockTestBuilder(reader: org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]) = {
     val builder = mock[parquet4s.ParquetIterator.HadoopBuilder]
     when(builder.build()).thenReturn(reader)
     builder
   }
 
   "hasNext" should "return false for empty resource" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(null)
 
     new ParquetIterator(mockTestBuilder(reader)).hasNext should be(false)
@@ -31,7 +30,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "return true for single-record resource" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(testRecord(1))
 
     new ParquetIterator(mockTestBuilder(reader)).hasNext should be(true)
@@ -40,7 +39,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "call 'read' when it is called itself multiple times in sequence (and return false)" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(null)
 
     val iterator = new ParquetIterator(mockTestBuilder(reader))
@@ -52,7 +51,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "call 'read' when it is called itself multiple times in sequence (and return true)" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(testRecord(1))
 
     val iterator = new ParquetIterator(mockTestBuilder(reader))
@@ -64,21 +63,21 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   "next" should "return row for single-record resource" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(testRecord(1))
 
     new ParquetIterator(mockTestBuilder(reader)).next() should be(testRecord(1))
   }
 
   it should "throw NoSuchElementException for empty resource" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(null)
 
     a[NoSuchElementException] should be thrownBy new ParquetIterator(mockTestBuilder(reader)).next()
   }
 
   it should "try to read record only once in case of sequential calls for missing record" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(null)
 
     val iterator = new ParquetIterator(mockTestBuilder(reader))
@@ -90,7 +89,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "read next records until there so no more with subsequent calls" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read())
       .thenReturn(testRecord(1))
       .thenReturn(testRecord(2))
@@ -105,7 +104,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "not call 'read' if 'hasNext' already did it (and throw exception)" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(null)
 
     val iterator = new ParquetIterator(mockTestBuilder(reader))
@@ -116,7 +115,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "not call 'read' if 'hasNext' already did it (and return record)" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(testRecord(1))
 
     val iterator = new ParquetIterator(mockTestBuilder(reader))
@@ -127,7 +126,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "not call 'read' if 'hasNext' already did it (return the only available record)" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read())
       .thenReturn(testRecord(1))
       .thenReturn(null)
@@ -142,7 +141,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "not call 'read' if 'hasNext' already did it (return two available records)" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read())
       .thenReturn(testRecord(1))
       .thenReturn(testRecord(2))
@@ -160,7 +159,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   }
 
   "close" should "close the wrapped reader" in {
-    val reader = mock[HadoopParquetReader[RowParquetRecord]]
+    val reader = mock[org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]]
     when(reader.read()).thenReturn(null)
 
     new ParquetIterator(mockTestBuilder(reader)).close()

@@ -16,10 +16,10 @@ import scala.jdk.CollectionConverters.*
 private[parquet4s] object FileStats {
   def apply(
       status: FileStatus,
-      vcc: ValueCodecConfiguration,
       hadoopConf: Configuration,
+      vcc: ValueCodecConfiguration,
       projectionSchemaOpt: Option[MessageType]
-  ) =
+  ): Stats =
     new FileStats(HadoopInputFile.fromStatus(status, hadoopConf), vcc, projectionSchemaOpt)
 }
 

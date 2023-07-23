@@ -5,12 +5,11 @@ import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.*
 import fs2.Stream
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
 import org.apache.parquet.schema.{MessageType, Type}
 
 import scala.language.higherKinds
-import fs2.Pull
-import fs2.Chunk
+import org.apache.parquet.hadoop.util.HadoopInputFile
+import org.apache.parquet.io.InputFile
 
 object reader {
 
@@ -116,6 +115,14 @@ object reader {
       *   final [[fs2.Stream]]
       */
     def read(path: Path): Stream[F, T]
+
+    /** @param inputFile
+      *   file to read
+      * @return
+      *   final [[fs2.Stream]]
+      */
+    @experimental
+    def read(inputFile: InputFile): Stream[F, T]
   }
 
   private case class BuilderImpl[F[_]: Sync, T: ParquetRecordDecoder](
@@ -132,25 +139,56 @@ object reader {
     override def chunkSize(chunkSize: Int): Builder[F, T] = this.copy(chunkSize = chunkSize)
 
     override def read(path: Path): Stream[F, T] =
-      reader.read(path, options, filter, chunkSize, projectedSchemaResolverOpt)
+      read(path.toInputFile(options))
+
+    override def read(inputFile: InputFile): Stream[F, T] =
+      reader.read(inputFile, options, filter, chunkSize, projectedSchemaResolverOpt, columnProjections)
   }
 
   private[parquet4s] def read[F[_], T: ParquetRecordDecoder](
-      basePath: Path,
+      inputFile: InputFile,
       options: ParquetReader.Options,
       filter: Filter,
       chunkSize: Int,
-      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]]
+      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
+      columnProjections: Seq[ColumnProjection]
   )(implicit F: Sync[F]): Stream[F, T] =
     for {
       vcc <- Stream(ValueCodecConfiguration(options))
       decode = (record: RowParquetRecord) => F.delay(ParquetRecordDecoder.decode(record, vcc))
+      records <- inputFile match {
+        case hadoopInputFile: HadoopInputFile =>
+          readPartitioned[F, T](
+            Path(hadoopInputFile.getPath),
+            options,
+            filter,
+            projectedSchemaResolverOpt,
+            columnProjections,
+            vcc,
+            chunkSize
+          )
+        case _ =>
+          readSingleFile(inputFile, filter, projectedSchemaResolverOpt, columnProjections, vcc, chunkSize)
+      }
+      entity <- records.evalMapChunk(decode)
+    } yield entity
+
+  private def readPartitioned[F[_], T](
+      basePath: Path,
+      options: ParquetReader.Options,
+      filter: Filter,
+      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
+      columnProjections: Seq[ColumnProjection],
+      vcc: ValueCodecConfiguration,
+      chunkSize: Int
+  )(implicit F: Sync[F]): Stream[F, Stream[F, RowParquetRecord]] =
+    for {
       logger               <- Stream.eval(logger[F](this.getClass))
       partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf, logger)
       projectedSchemaOpt <- Stream.eval(
         projectedSchemaResolverOpt
           .traverse(implicit resolver =>
-            F.catchNonFatal(ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))
+            F.catchNonFatal(ParquetSchemaResolver.resolveSchema(toSkip = partitionedDirectory.schema))
           )
       )
       partitionData <- Stream
@@ -158,17 +196,34 @@ object reader {
         .flatMap(Stream.iterable)
       (partitionFilter, partitionedPath) = partitionData
       parquetIterator <- Stream.resource(
-        parquetIteratorResource(partitionedPath.path, options, partitionFilter, projectedSchemaOpt)
+        parquetIteratorResource(partitionedPath.inputFile, partitionFilter, projectedSchemaOpt, columnProjections)
       )
-      entity <- readerStream(parquetIterator, partitionedPath, chunkSize).evalMapChunk(decode)
-    } yield entity
+    } yield partitionedReaderStream[F](parquetIterator, partitionedPath, chunkSize)
 
-  private def readerStream[F[_]](
-      reader: ParquetIterator,
+  private def readSingleFile[F[_], T](
+      inputFile: InputFile,
+      filter: Filter,
+      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
+      columnProjections: Seq[ColumnProjection],
+      vcc: ValueCodecConfiguration,
+      chunkSize: Int
+  )(implicit F: Sync[F]): Stream[F, Stream[F, RowParquetRecord]] =
+    for {
+      projectedSchemaOpt <- Stream.eval(
+        projectedSchemaResolverOpt
+          .traverse(implicit resolver => F.catchNonFatal(ParquetSchemaResolver.resolveSchema[T]))
+      )
+      parquetIterator <- Stream.resource(
+        parquetIteratorResource(inputFile, filter.toFilterCompat(vcc), projectedSchemaOpt, columnProjections)
+      )
+    } yield Stream.fromBlockingIterator[F](parquetIterator, chunkSize)
+
+  private def partitionedReaderStream[F[_]](
+      parquetIterator: ParquetIterator,
       partitionedPath: PartitionedPath,
       chunkSize: Int
   )(implicit F: Sync[F]): Stream[F, RowParquetRecord] = {
-    val stream = Stream.fromBlockingIterator[F](reader, chunkSize)
+    val stream = Stream.fromBlockingIterator[F](parquetIterator, chunkSize)
     if (partitionedPath.partitions.nonEmpty) {
       stream.evalMapChunk { record =>
         partitionedPath.partitions.foldLeft(F.pure(record)) { case (f, (columnPath, value)) =>
@@ -183,19 +238,21 @@ object reader {
   }
 
   private def parquetIteratorResource[F[_]: Sync](
-      path: Path,
-      options: ParquetReader.Options,
+      inputFile: InputFile,
       filter: FilterCompat.Filter,
-      projectionSchemaOpt: Option[MessageType]
+      projectionSchemaOpt: Option[MessageType],
+      columnProjections: Seq[ColumnProjection]
   ): Resource[F, ParquetIterator] =
     Resource.fromAutoCloseable(
       Sync[F].delay(
         scala.concurrent.blocking(
           new ParquetIterator(
-            HadoopParquetReader
-              .builder[RowParquetRecord](new ParquetReadSupport(projectionSchemaOpt), path.toHadoop)
-              .withConf(options.hadoopConf)
-              .withFilter(filter)
+            HadoopParquetReader(
+              inputFile          = inputFile,
+              projectedSchemaOpt = projectionSchemaOpt,
+              columnProjections  = columnProjections,
+              filter             = filter
+            )
           )
         )
       )

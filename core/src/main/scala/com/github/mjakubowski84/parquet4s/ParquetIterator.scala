@@ -1,10 +1,9 @@
 package com.github.mjakubowski84.parquet4s
 
 import java.io.Closeable
-import org.apache.parquet.hadoop.ParquetReader as HadoopParquetReader
 
 private[parquet4s] object ParquetIterator {
-  private[parquet4s] type HadoopBuilder = HadoopParquetReader.Builder[RowParquetRecord]
+  private[parquet4s] type HadoopBuilder = org.apache.parquet.hadoop.ParquetReader.Builder[RowParquetRecord]
 
   def factory(builder: HadoopBuilder): () => Iterator[RowParquetRecord] & Closeable =
     () => new ParquetIterator(builder)
