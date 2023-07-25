@@ -4,18 +4,44 @@ import org.apache.hadoop.fs.FileAlreadyExistsException
 import org.apache.parquet.io.{OutputFile, PositionOutputStream}
 
 import java.io.ByteArrayOutputStream
-import scala.util.control.NoStackTrace
+
+import scala.language.reflectiveCalls
 
 object InMemoryOutputFile {
-  def apply(name: String): InMemoryOutputFile = new InMemoryOutputFile(name)
+  val DefaultBlockSize: Int = 64 << 10
+
+  def create(
+      initBufferSize: Int,
+      maxBufferSize: Option[Int] = None,
+      blockSize: Int             = DefaultBlockSize
+  ): InMemoryOutputFile =
+    new InMemoryOutputFile(initBufferSize, maxBufferSize.getOrElse(3 * initBufferSize), blockSize)
 }
 
-@experimental
-class InMemoryOutputFile private (name: String) extends OutputFile {
-  private val os = new ByteArrayOutputStream()
+/** Reusable in-memory [[OutputFile]] based on [[ByteArrayOutputStream]]
+  *
+  * @param initBufferSize
+  *   size of the [[ByteArrayOutputStream]]'s internal buffer when it is created
+  * @param maxBufferSize
+  *   a threshold beyond which the internal buffer will be recreated with the initBufferSize
+  * @param blockSize
+  *   size of a row group being buffered in memory. This limits the memory usage when writing
+  */
+class InMemoryOutputFile(initBufferSize: Int, maxBufferSize: Int, blockSize: Int = InMemoryOutputFile.DefaultBlockSize)
+    extends OutputFile {
+  private val os = new ByteArrayOutputStream(initBufferSize) {
+    def take: Array[Byte] = {
+      val content = toByteArray()
+      if (buf.length > maxBufferSize) {
+        buf = new Array[Byte](initBufferSize)
+      }
+      count = 0
+      content
+    }
+  }
 
   override def create(blockSizeHint: Long): PositionOutputStream = {
-    if (os.size() > 0) throw new FileAlreadyExistsException(s"In-memory file already exists: $name")
+    if (os.size() > 0) throw new FileAlreadyExistsException(s"In-memory file already exists")
     new PositionOutputStream {
       override def getPos: Long                                    = os.size().toLong
       override def write(b: Int): Unit                             = os.write(b)
@@ -28,10 +54,17 @@ class InMemoryOutputFile private (name: String) extends OutputFile {
     create(blockSizeHint)
   }
 
-  override def supportsBlockSize(): Boolean = false
+  override def supportsBlockSize(): Boolean = true
 
-  override def defaultBlockSize(): Long =
-    throw new UnsupportedOperationException("Block size is not supported by InMemoryOutputFile") with NoStackTrace
+  override def defaultBlockSize(): Long = blockSize
 
-  def toByteArray: Array[Byte] = os.toByteArray
+  /** Return an Array[Byte] copied from the current content of the internal buffer, and reset the internal state. The
+    * [[InMemoryOutputFile]] could then be reused without allocating the internal buffer.
+    *
+    * @return
+    *   bytes copied from the current content of internal buffer
+    */
+  def take(): Array[Byte] = os.take
+
+  def contentLength: Int = os.size()
 }
