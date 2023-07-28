@@ -2,8 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.CompatibilityParty.CompatibilityParty
 
-import java.util.NoSuchElementException
-
 object CompatibilityParty {
   sealed trait CompatibilityParty
   case object Spark extends CompatibilityParty

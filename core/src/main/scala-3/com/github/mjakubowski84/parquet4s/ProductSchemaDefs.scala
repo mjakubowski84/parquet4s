@@ -1,6 +1,5 @@
 package com.github.mjakubowski84.parquet4s
 
-import scala.reflect.{ClassTag, classTag}
 import scala.util.NotGiven
 
 trait ProductSchemaDefs:

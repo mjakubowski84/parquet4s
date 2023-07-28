@@ -7,7 +7,6 @@ import fs2.Stream
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.schema.{MessageType, Type}
 
-import scala.language.higherKinds
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.io.InputFile
 

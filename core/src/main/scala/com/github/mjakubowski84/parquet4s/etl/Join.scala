@@ -2,6 +2,8 @@ package com.github.mjakubowski84.parquet4s.etl
 
 import com.github.mjakubowski84.parquet4s.*
 
+import scala.annotation.nowarn
+
 private[parquet4s] object Join {
 
   def left(
@@ -55,11 +57,11 @@ private trait Join {
 
   def matchFound(
       leftRecord: RowParquetRecord,
-      key: Option[Value],
+      @nowarn key: Option[Value],
       matchingRightRecords: Iterable[RowParquetRecord]
   ): Iterable[RowParquetRecord] = matchingRightRecords.map(leftRecord.merge)
 
-  def matchNotFound(leftRecord: RowParquetRecord): Iterable[RowParquetRecord] = Iterable.empty
+  def matchNotFound(@nowarn leftRecord: RowParquetRecord): Iterable[RowParquetRecord] = Iterable.empty
 
   def apply(left: ParquetIterable[RowParquetRecord]): ParquetIterable[RowParquetRecord] =
     left

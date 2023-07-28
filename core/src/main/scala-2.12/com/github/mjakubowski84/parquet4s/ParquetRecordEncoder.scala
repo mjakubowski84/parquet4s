@@ -4,7 +4,6 @@ import shapeless.labelled.FieldType
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
 import scala.annotation.implicitNotFound
-import scala.language.higherKinds
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 

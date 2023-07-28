@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.TypedSchemaDef
-import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, PrimitiveType, Types}
+import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, PrimitiveType}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -13,9 +12,9 @@ class CustomTypeITSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
   object SimpleClass:
     given RequiredValueCodec[SimpleClass] with
       override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): SimpleClass =
-        value match {
+        value match
           case BinaryValue(binary) => new SimpleClass(binary.toStringUsingUTF8)
-        }
+
       override protected def encodeNonNull(data: SimpleClass, configuration: ValueCodecConfiguration): Value =
         BinaryValue(data.value)
 
@@ -38,9 +37,9 @@ class CustomTypeITSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
   object CaseClass:
     given RequiredValueCodec[CaseClass] with
       override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): CaseClass =
-        value match {
+        value match
           case BinaryValue(binary) => CaseClass(binary.toStringUsingUTF8)
-        }
+
       override protected def encodeNonNull(data: CaseClass, configuration: ValueCodecConfiguration): Value =
         BinaryValue(data.value)
 
@@ -57,15 +56,14 @@ class CustomTypeITSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
   object ComplexCaseClass:
     given RequiredValueCodec[ComplexCaseClass] with
       override protected def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): ComplexCaseClass =
-        value match {
+        value match
           case record: RowParquetRecord =>
-            (record.get[String]("i", configuration), record.get[String]("j", configuration)) match {
+            (record.get[String]("i", configuration), record.get[String]("j", configuration)) match
               case (Some(i), Some(j)) =>
                 ComplexCaseClass(i.toInt, j.toInt)
               case _ =>
                 throw new RuntimeException("Invalid data for ComplexCaseClass")
-            }
-        }
+
       override protected def encodeNonNull(data: ComplexCaseClass, configuration: ValueCodecConfiguration): Value =
         RowParquetRecord("i" -> data.x.toString.value, "j" -> data.y.toString.value)
 

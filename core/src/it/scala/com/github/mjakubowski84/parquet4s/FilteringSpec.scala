@@ -52,8 +52,8 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
         double   = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
         `enum`   = `enum`(Random.nextInt(`enum`.size)),
         flag     = Random.nextBoolean(),
-        date     = zeroDate.plusDays(i),
-        dateTime = zeroDateTime.plusSeconds(i),
+        date     = zeroDate.plusDays(i.toLong),
+        dateTime = zeroDateTime.plusSeconds(i.toLong),
         decimal  = BigDecimal.valueOf(0.001 * (i - halfSize)),
         embedded = Embedded(i)
       )
@@ -168,21 +168,21 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
     forAll(falseData)(_.flag should be(false))
   }
 
-  it should "filter data by date" in ltGtTest("date", zeroDate.plusDays(halfSize), _.date)
+  it should "filter data by date" in ltGtTest("date", zeroDate.plusDays(halfSize.toLong), _.date)
 
   it should "filter data by dateTime INT64 millis" in {
     import TimestampFormat.Implicits.Millis.*
-    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize), _.dateTime, millisFilePath)
+    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize.toLong), _.dateTime, millisFilePath)
   }
 
   it should "filter data by dateTime INT64 micros" in {
     import TimestampFormat.Implicits.Micros.*
-    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize), _.dateTime, microsFilePath)
+    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize.toLong), _.dateTime, microsFilePath)
   }
 
   it should "filter data by dateTime INT64 nanos" in {
     import TimestampFormat.Implicits.Nanos.*
-    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize), _.dateTime, nanosFilePath)
+    ltGtTest("dateTime", zeroDateTime.plusSeconds(halfSize.toLong), _.dateTime, nanosFilePath)
   }
 
   it should "filter data by decimal" in ltGtTest("decimal", BigDecimal(0), _.decimal)
@@ -192,7 +192,7 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
   it should "leave data unfiltered when using noop filter" in {
     val filtered = read(Filter.noopFilter)
 
-    filtered should have size dataSize
+    filtered should have size dataSize.toLong
   }
 
   it should "filter by udp" in {

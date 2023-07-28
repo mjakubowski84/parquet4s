@@ -67,7 +67,7 @@ trait MessageSink {
         )
       }
       .partitionBy(Col("year"), Col("month"), Col("day"))
-      .maxCount(MaxChunkSize)
+      .maxCount(MaxChunkSize.toLong)
       .maxDuration(ChunkWriteTimeWindow)
       .options(writerOptions)
       .postWriteHandler { state =>

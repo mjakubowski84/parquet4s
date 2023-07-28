@@ -4,8 +4,6 @@ import cats.effect.Sync
 import cats.implicits.*
 import org.slf4j.LoggerFactory
 
-import scala.language.higherKinds
-
 private[parquet] object logger {
 
   class Logger[F[_]](wrapped: org.slf4j.Logger)(implicit F: Sync[F]) {

@@ -246,7 +246,7 @@ class ParquetStreamsITSpec
     case class User(name: String, id: Int, id_part: String)
     case class UserNoPartition(name: String, id: Int)
 
-    val maxCount            = 10
+    val maxCount            = 10L
     val usersToWrite        = 33
     val partitions          = 2
     val lastToFlushOnDemand = 2
@@ -288,7 +288,7 @@ class ParquetStreamsITSpec
       every(files.map(_.getName)) should endWith(".snappy.parquet")
       writtenData should be(users)
 
-      readData should have size users.size
+      readData should have size users.size.toLong
       readData should contain allElementsOf users
 
       val usersPerPartition = usersToWrite / partitions
@@ -440,7 +440,7 @@ class ParquetStreamsITSpec
   }
 
   it should "close viaParquet properly on upstream exception" in {
-    val numberOfSuccessfulWrites = 25
+    val numberOfSuccessfulWrites = 25L
 
     val failingSource = Source(data).map {
       case data @ Data(i, _) if i < numberOfSuccessfulWrites => data
@@ -459,7 +459,7 @@ class ParquetStreamsITSpec
   }
 
   it should "close viaParquet properly on downstream exception" in {
-    val numberOfSuccessfulWrites = 25
+    val numberOfSuccessfulWrites = 25L
 
     val failingSink = Sink.foreach[Data] {
       case Data(i, _) if i < numberOfSuccessfulWrites - 1 => ()
@@ -478,7 +478,7 @@ class ParquetStreamsITSpec
   }
 
   it should "close viaParquet properly on internal exception" in {
-    val numberOfSuccessfulWrites = 25
+    val numberOfSuccessfulWrites = 25L
 
     val parquetFlow = ParquetStreams.viaParquet
       .of[Data]
@@ -501,9 +501,9 @@ class ParquetStreamsITSpec
     case class User(name: String, id: Int, id_part: String)
 
     val partitions   = 2
-    val maxCount     = 1000
+    val maxCount     = 1000L
     val maxDuration  = 3.seconds
-    val usersToWrite = maxCount * 5
+    val usersToWrite = maxCount.toInt * 5
 
     def genUser(id: Int) = User(
       name    = s"name_$id",
@@ -558,10 +558,10 @@ class ParquetStreamsITSpec
 
     val partitions        = 2
     val intervals         = 5
-    val maxCount          = 1000
+    val maxCount          = 1000L
     val maxDuration       = 1.second
     val usersToWrite      = 500
-    val writeInterval     = maxDuration / intervals
+    val writeInterval     = maxDuration / intervals.toLong
     val usersPerInterval  = usersToWrite / intervals
     val filesPerPartition = 2
 
@@ -575,7 +575,7 @@ class ParquetStreamsITSpec
       .of[User]
       .options(writeOptions)
       .maxCount(maxCount = maxCount)
-      .maxDuration(maxDuration = maxDuration / filesPerPartition)
+      .maxDuration(maxDuration = maxDuration / filesPerPartition.toLong)
       .partitionBy(Col("id_part"))
       .write(tempPath)
 
@@ -585,7 +585,7 @@ class ParquetStreamsITSpec
       usersWritten <- Source(users)
         .throttle(usersPerInterval, writeInterval)
         .via(flow)
-        .take(usersToWrite)
+        .take(usersToWrite.toLong)
         .runWith(Sink.seq)
       usersRead <- ParquetStreams.fromParquet.as[User].read(tempPath).runWith(Sink.seq)
       files = fileSystem

@@ -2,8 +2,6 @@ package com.github.mjakubowski84.parquet4s
 
 import cats.effect.{Async, Sync}
 
-import scala.language.higherKinds
-
 package object parquet {
 
   /** Creates a [[fs2.Stream]] that reads Parquet data from the specified path. If there are multiple files at path then

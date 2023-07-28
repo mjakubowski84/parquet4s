@@ -57,8 +57,8 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
         double   = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
         `enum`   = `enum`(Random.nextInt(`enum`.size)),
         flag     = Random.nextBoolean(),
-        date     = zeroDate.plusDays(i),
-        sqlDate  = Date.valueOf(zeroDate.plusDays(i)),
+        date     = zeroDate.plusDays(i.toLong),
+        sqlDate  = Date.valueOf(zeroDate.plusDays(i.toLong)),
         decimal  = BigDecimal.valueOf(0.001 * (i - halfSize)),
         embedded = Embedded(i)
       )
@@ -80,7 +80,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
       .writeAndClose(filePath, data)
   }
 
-  def genericFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](
+  def genericFilterTest[T, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](
       columnName: String,
       field: Data => T
   )(implicit codec: FilterCodec[T, V, C]): Assertion = {
@@ -89,7 +89,7 @@ class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterA
     finally actual.close()
   }
 
-  def specificValueFilterTest[T: Ordering, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](
+  def specificValueFilterTest[T, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](
       columnName: String,
       field: Data => T,
       values: Vector[T]

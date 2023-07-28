@@ -14,12 +14,12 @@ object InMemoryInputFile {
 
 class InMemoryInputFile private (content: Array[Byte]) extends InputFile {
 
-  override def getLength: Long = content.length
+  override def getLength: Long = content.length.toLong
 
   override def newStream(): SeekableInputStream = new SeekableInputStream {
     private var pos: Int = 0
 
-    override def getPos: Long = pos
+    override def getPos: Long = pos.toLong
 
     override def seek(newPos: Long): Unit = pos = newPos.toInt
 
