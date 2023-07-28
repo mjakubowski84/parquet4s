@@ -16,8 +16,6 @@ import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.io.OutputFile
 import org.apache.parquet.schema.MessageType
 
-import scala.language.higherKinds
-
 private[parquet4s] object writer {
 
   trait ToParquet[F[_]] {

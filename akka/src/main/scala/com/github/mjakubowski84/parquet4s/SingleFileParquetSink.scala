@@ -110,7 +110,7 @@ object SingleFileParquetSink {
 
   private def rowParquetRecordSink[T: ParquetRecordEncoder: ParquetSchemaResolver](
       outputFile: OutputFile,
-      options: ParquetWriter.Options = ParquetWriter.Options()
+      options: ParquetWriter.Options
   ): Sink[T, Future[Done]] = {
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     val schema                  = ParquetSchemaResolver.resolveSchema[T]

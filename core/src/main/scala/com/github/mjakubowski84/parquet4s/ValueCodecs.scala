@@ -6,8 +6,8 @@ import java.nio.{ByteBuffer, ByteOrder}
 import java.sql.{Date, Timestamp}
 import java.time.*
 import java.util.TimeZone
+import scala.annotation.nowarn
 import scala.collection.compat.*
-import scala.language.higherKinds
 import scala.reflect.ClassTag
 
 trait PrimitiveValueDecoders {
@@ -97,7 +97,7 @@ trait PrimitiveValueEncoders {
   }
 
   implicit val charEncoder: RequiredValueEncoder[Char] = new RequiredValueEncoder[Char] {
-    def encodeNonNull(data: Char, configuration: ValueCodecConfiguration): Value = IntValue(data)
+    def encodeNonNull(data: Char, configuration: ValueCodecConfiguration): Value = IntValue(data.toInt)
   }
 
   implicit val booleanEncoder: RequiredValueEncoder[Boolean] = new RequiredValueEncoder[Boolean] {
@@ -121,11 +121,11 @@ trait PrimitiveValueEncoders {
   }
 
   implicit val shortEncoder: RequiredValueEncoder[Short] = new RequiredValueEncoder[Short] {
-    def encodeNonNull(data: Short, configuration: ValueCodecConfiguration): Value = IntValue(data)
+    def encodeNonNull(data: Short, configuration: ValueCodecConfiguration): Value = IntValue(data.toInt)
   }
 
   implicit val byteEncoder: RequiredValueEncoder[Byte] = new RequiredValueEncoder[Byte] {
-    def encodeNonNull(data: Byte, configuration: ValueCodecConfiguration): Value = IntValue(data)
+    def encodeNonNull(data: Byte, configuration: ValueCodecConfiguration): Value = IntValue(data.toInt)
   }
 
   implicit val decimalEncoder: OptionalValueEncoder[BigDecimal] = new OptionalValueEncoder[BigDecimal] {
@@ -151,7 +151,7 @@ private[parquet4s] object TimeValueCodecs {
         val fixedTimeInNanos = buf.getLong
         val julianDay        = buf.getInt
 
-        val date = LocalDate.ofEpochDay(julianDay - JulianDayOfEpoch)
+        val date = LocalDate.ofEpochDay((julianDay - JulianDayOfEpoch).toLong)
 
         val fixedTimeInMillis = Math.floorDiv(fixedTimeInNanos, NanosPerMilli)
         val nanosLeft         = Math.floorMod(fixedTimeInNanos, NanosPerMilli)
@@ -212,7 +212,7 @@ private[parquet4s] object TimeValueCodecs {
 
   def decodeLocalDate(value: Value): LocalDate =
     value match {
-      case IntValue(epochDay) => LocalDate.ofEpochDay(epochDay)
+      case IntValue(epochDay) => LocalDate.ofEpochDay(epochDay.toLong)
     }
 
   def encodeLocalDate(data: LocalDate): Value = IntValue(data.toEpochDay.toInt)
@@ -279,7 +279,7 @@ trait TimeValueEncoders {
 trait ComplexValueDecoders extends ProductDecoders {
 
   implicit def collectionDecoder[T, Col[_]](implicit
-      evidence: Col[T] <:< Iterable[T],
+      @nowarn evidence: Col[T] <:< Iterable[T],
       elementDecoder: ValueDecoder[T],
       factory: Factory[T, Col[T]]
   ): OptionalValueDecoder[Col[T]] =
@@ -292,7 +292,7 @@ trait ComplexValueDecoders extends ProductDecoders {
     }
 
   implicit def arrayDecoder[T, Col[_]](implicit
-      evidence: Col[T] =:= Array[T],
+      @nowarn evidence: Col[T] =:= Array[T],
       classTag: ClassTag[T],
       factory: Factory[T, Col[T]],
       elementDecoder: ValueDecoder[T]

@@ -6,8 +6,7 @@ import org.slf4j.LoggerFactory
 import shapeless.*
 import shapeless.labelled.*
 
-import scala.annotation.implicitNotFound
-import scala.language.higherKinds
+import scala.annotation.{implicitNotFound, nowarn}
 import scala.reflect.ClassTag
 
 /** Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
@@ -84,7 +83,7 @@ object ParquetSchemaResolver {
       }
 
   implicit def generic[T, G](implicit
-      lg: LabelledGeneric.Aux[T, G],
+      @nowarn lg: LabelledGeneric.Aux[T, G],
       rest: Lazy[ParquetSchemaResolver[G]],
       classTag: ClassTag[T]
   ): ParquetSchemaResolver[T] = new ParquetSchemaResolver[T] {

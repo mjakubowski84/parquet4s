@@ -7,7 +7,6 @@ import org.apache.parquet.hadoop.util.HiddenFileFilter
 import org.slf4j.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.language.implicitConversions
 import scala.util.matching.Regex
 
 private[parquet4s] object IOOps {

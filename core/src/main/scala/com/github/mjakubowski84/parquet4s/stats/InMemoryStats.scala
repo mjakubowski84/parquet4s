@@ -5,7 +5,7 @@ import com.github.mjakubowski84.parquet4s.*
 private[parquet4s] class InMemoryStats(iterable: Iterable[RowParquetRecord], vcc: ValueCodecConfiguration)
     extends Stats {
 
-  override lazy val recordCount: Long = iterable.size
+  override lazy val recordCount: Long = iterable.size.toLong
 
   override protected[parquet4s] def min[V](columnPath: ColumnPath, currentMin: Option[V])(implicit
       decoder: ValueDecoder[V],

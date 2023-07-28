@@ -1,12 +1,13 @@
 import DependecyVersions._
 import Releasing._
 import Documentation._
+import Compilation._
 import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
-lazy val twoTwelve              = "2.12.17"
-lazy val twoThirteen            = "2.13.10"
-lazy val three                  = "3.2.2"
+lazy val twoTwelve              = "2.12.18"
+lazy val twoThirteen            = "2.13.11"
+lazy val three                  = "3.3.0"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
@@ -27,32 +28,6 @@ Global / excludeLintKeys ++= Set(
   makePomConfiguration,
   publish / parallelExecution,
   publishLocal / parallelExecution
-)
-
-lazy val compilationSettings = Seq(
-  scalacOptions ++= {
-    Seq(
-      "-encoding",
-      "UTF-8",
-      "-feature",
-      "-language:implicitConversions",
-      "-Xfatal-warnings"
-    ) ++ {
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) =>
-          Seq(
-            "-unchecked",
-            "-release:8"
-          )
-        case _ =>
-          Seq(
-            "-deprecation",
-            "-Xsource:3",
-            "-release:8"
-          )
-      }
-    }
-  }
 )
 
 lazy val itSettings = Defaults.itSettings ++
@@ -182,7 +157,7 @@ lazy val examples = (project in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.4.0.1",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.5.0",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % {

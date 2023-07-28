@@ -46,7 +46,7 @@ object IndefiniteFS2App extends IOApp.Simple {
 
   private val fluctuate: State[Fluctuation, Unit] = State[Fluctuation, Unit] { fluctuation =>
     val rate = Random.nextFloat() / 10.0f
-    val step = (fluctuation.delay.toMillis * rate).millis
+    val step = (fluctuation.delay.toMillis * rate).toLong.millis
     val nextFluctuation = fluctuation match {
       case Up(delay) if delay + step < MaxDelay =>
         Up(delay + step)
@@ -104,7 +104,7 @@ object IndefiniteFS2App extends IOApp.Simple {
     viaParquet[IO]
       .of[KafkaRecord]
       .options(WriterOptions)
-      .maxCount(MaxNumberOfRecordPerFile)
+      .maxCount(MaxNumberOfRecordPerFile.toLong)
       .maxDuration(MaxDurationOfFileWrite)
       .preWriteTransformation[Data] { kafkaRecord =>
         kafkaRecord.record.timestamp.createTime.map(l => new Timestamp(l)).fold[Stream[IO, Data]](Stream.empty) {

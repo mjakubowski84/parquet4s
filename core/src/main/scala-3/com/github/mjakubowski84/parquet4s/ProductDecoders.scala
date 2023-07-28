@@ -9,8 +9,7 @@ trait ProductDecoders:
       decoder: ParquetRecordDecoder[T]
   ): OptionalValueDecoder[T] =
     (value, configuration) =>
-      value match {
+      value match
         case record: RowParquetRecord => decoder.decode(record, configuration)
-      }
 
 end ProductDecoders

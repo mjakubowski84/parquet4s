@@ -9,8 +9,6 @@ import org.apache.parquet.hadoop.ParquetFileWriter
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import scala.language.implicitConversions
-
 class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
 
   implicit def parquetPathToFs2Path(path: Path): fs2.io.file.Path = fs2.io.file.Path.fromNioPath(path.toNio)

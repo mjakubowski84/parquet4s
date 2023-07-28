@@ -8,18 +8,16 @@ import com.github.mjakubowski84.parquet4s.*
 import com.github.mjakubowski84.parquet4s.compat.MapCompat
 import com.github.mjakubowski84.parquet4s.parquet.logger.Logger
 import fs2.{Pipe, Pull, Stream}
-import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.schema.MessageType
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 import fs2.Chunk
 
 object rotatingWriter {
 
-  val DefaultMaxCount: Long              = HadoopParquetWriter.DEFAULT_BLOCK_SIZE
+  val DefaultMaxCount: Long              = org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE
   val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
   val DefaultChunkSize                   = 16
 
@@ -283,7 +281,7 @@ object rotatingWriter {
       }
   }
 
-  private class RecordWriter[F[_]: Sync](
+  private class RecordWriter[F[_]](
       internalWriter: ParquetWriter.InternalWriter,
       rotationFiber: Fiber[F, Throwable, Unit]
   )(implicit F: Async[F]) {

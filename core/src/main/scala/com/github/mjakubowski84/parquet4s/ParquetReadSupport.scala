@@ -8,7 +8,6 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.{
   DecimalLogicalTypeAnnotation,
   ListLogicalTypeAnnotation,
   MapLogicalTypeAnnotation,
-  TimeLogicalTypeAnnotation,
   TimestampLogicalTypeAnnotation
 }
 

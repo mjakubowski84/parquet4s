@@ -11,7 +11,7 @@ object WriteAndReadCustomTypeApp extends App {
   object Data {
     def generate(count: Int): Iterable[Data] = (1 to count).map(i => Data(id = i, dict = Dict.random))
   }
-  case class Data(id: Long, dict: Dict.Type)
+  case class Data(id: Int, dict: Dict.Type)
 
   val data = Data.generate(count = 100)
   val path = Path(Files.createTempDirectory("example"))

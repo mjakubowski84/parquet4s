@@ -66,13 +66,12 @@ object ParquetRecordEncoder:
       val fieldName = summon[ValueOf[L]].value
       val fieldValue =
         try summon[ValueEncoder[V]].encode(fields.values.head, configuration)
-        catch {
+        catch
           case NonFatal(cause) =>
             throw EncodingException(
               s"Failed to encode field $fieldName: ${fields.values.head}, due to ${cause.getMessage}",
               cause
             )
-        }
       tailEncoder
         .encode(Fields(fields.values.tail), resolver.add(fieldName), configuration)
         .add(fieldName, fieldValue)

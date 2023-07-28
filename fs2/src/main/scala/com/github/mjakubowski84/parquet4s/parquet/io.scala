@@ -10,7 +10,6 @@ import org.apache.hadoop.conf.Configuration
 import fs2.Stream
 import org.apache.parquet.hadoop.util.HiddenFileFilter
 
-import scala.language.higherKinds
 import scala.util.matching.Regex
 
 private[parquet] object io {

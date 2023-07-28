@@ -5,8 +5,6 @@ import org.apache.parquet.filter2.predicate.Operators.*
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
 
-import scala.language.{existentials, implicitConversions}
-
 /** Filter provides a way to define filtering predicates with a simple algebra. Use filters to process your files while
   * it is read from a file system and BEFORE its content is transferred to your application. <br/> You can filter by
   * values of leaf fields of your schema. Check

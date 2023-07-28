@@ -45,7 +45,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
         double   = (BigDecimal("0.00000001") * BigDecimal(i)).toDouble,
         `enum`   = `enum`(Random.nextInt(`enum`.size)),
         bool     = Random.nextBoolean(),
-        date     = zeroDate.plusDays(i),
+        date     = zeroDate.plusDays(i.toLong),
         decimal  = decimal(i),
         embedded = Embedded(i),
         optional = if (i % 2 == 0) None else Some(i),
@@ -58,7 +58,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
   override def beforeAll(): Unit = {
     super.beforeAll()
     val writeOptions = ParquetWriter.Options(
-      rowGroupSize       = dataSize / 16,
+      rowGroupSize       = dataSize.toLong / 16L,
       pageSize           = 16 * 256,
       dictionaryPageSize = 16 * 256
     )
@@ -138,7 +138,7 @@ class StatsSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with In
     stats.max[Boolean](Col("bool")) should be(Some(true))
 
     stats.min[LocalDate](Col("date")) should be(Some(zeroDate))
-    stats.max[LocalDate](Col("date")) should be(Some(zeroDate.plusDays(maxIdx)))
+    stats.max[LocalDate](Col("date")) should be(Some(zeroDate.plusDays(maxIdx.toLong)))
 
     stats.min[BigDecimal](Col("decimal")) should be(Some(decimal(0)))
     stats.max[BigDecimal](Col("decimal")) should be(Some(decimal(maxIdx)))

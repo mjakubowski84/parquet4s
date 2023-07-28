@@ -4,7 +4,6 @@ import shapeless.labelled.{FieldType, field}
 import shapeless.{::, HList, HNil, LabelledGeneric, Lazy, Witness}
 
 import scala.annotation.implicitNotFound
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 /** Type class that allows to decode instances of [[RowParquetRecord]]

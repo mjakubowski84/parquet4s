@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s
 import akka.stream.stage.*
 import akka.stream.{Attributes, FlowShape, Inlet, Outlet}
 import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow.PostWriteState
-import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.schema.MessageType
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -14,7 +13,7 @@ import scala.collection.concurrent.TrieMap
 
 object ParquetPartitioningFlow {
 
-  val DefaultMaxCount: Long              = HadoopParquetWriter.DEFAULT_BLOCK_SIZE
+  val DefaultMaxCount: Long              = org.apache.parquet.hadoop.ParquetWriter.DEFAULT_BLOCK_SIZE
   val DefaultMaxDuration: FiniteDuration = FiniteDuration(1, TimeUnit.MINUTES)
 
   trait ViaParquet {

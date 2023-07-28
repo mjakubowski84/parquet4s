@@ -47,11 +47,11 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     pageSize             = 512,
     rowGroupSize         = 4 * 512
   )
-  val RowGroupsPerFile: Int = 4
-  val count: Long           = RowGroupsPerFile * writeOptions.rowGroupSize
-  val dictS: Seq[String]    = Vector("a", "b", "c", "d")
-  val dictA: Seq[String]    = Vector("1", "2", "3")
-  val dictB: Seq[String]    = Vector("x", "y", "z")
+  val RowGroupsPerFile: Long = 4L
+  val count: Long            = RowGroupsPerFile * writeOptions.rowGroupSize
+  val dictS: Seq[String]     = Vector("a", "b", "c", "d")
+  val dictA: Seq[String]     = Vector("1", "2", "3")
+  val dictB: Seq[String]     = Vector("x", "y", "z")
   val data: LazyList[Data] = LazyList
     .range(start = 0L, end = count, step = 1L)
     .map(i => Data(i = i, s = dictS(Random.nextInt(4))))
@@ -159,7 +159,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     def write(path: Path): Stream[IO, Nothing] =
       Stream
         .iterable(data)
-        .take(numberOfProcessedElementsBeforeFailure)
+        .take(numberOfProcessedElementsBeforeFailure.toLong)
         .append(Stream.raiseError[IO](new RuntimeException("test exception")))
         .through(parquet.writeSingleFile[IO].of[Data].options(writeOptions).write(path.append(outputFileName)))
         .handleErrorWith(_ => Stream.empty)
@@ -238,7 +238,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
   it should "apply postWriteHandler" in {
     val expectedNumberOfFiles = 8
-    val countOverride         = count / expectedNumberOfFiles
+    val countOverride: Long   = count / expectedNumberOfFiles
 
     def write(path: Path, gaugeRef: Ref[IO, Vector[Long]]): Stream[IO, Vector[Data]] =
       Stream
@@ -272,7 +272,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       } yield {
         writtenData should contain theSameElementsAs data
         readData should contain theSameElementsAs data
-        parquetFiles should have size expectedNumberOfFiles
+        parquetFiles should have size expectedNumberOfFiles.toLong
         gaugeValue should be(Vector.fill(expectedNumberOfFiles)(countOverride))
       }
 
@@ -324,9 +324,9 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   }
 
   it should "transform data before writing" in {
-    val partitions         = Set("x", "y", "z")
-    val partitionSize: Int = (count / partitions.size).toInt
-    val partitionData      = data.take(partitionSize)
+    val partitions          = Set("x", "y", "z")
+    val partitionSize: Long = count / partitions.size
+    val partitionData       = data.take(partitionSize.toInt)
 
     def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
@@ -361,7 +361,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         partitionedData <- read(path)
       } yield {
         writtenData should contain theSameElementsAs partitionData
-        partitionPaths should have size partitions.size
+        partitionPaths should have size partitions.size.toLong
         forEvery(partitionPaths)(_.name should fullyMatch regex "partition=[xyz]")
         partitionedData.keys should be(partitions)
         forEvery(partitionedData.keys) { partition =>
@@ -427,7 +427,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
             .partitionBy(Col("s"))
             .write(path)
         )
-        .take(numberOfProcessedElementsBeforeStop)
+        .take(numberOfProcessedElementsBeforeStop.toLong)
         .handleErrorWith(_ => Stream.empty)
         .fold(Vector.empty[Data])(_ :+ _)
 
@@ -446,7 +446,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   }
 
   it should "write files and rotate by max file size for each partition" in {
-    val maxCount                   = 512
+    val maxCount                   = 512L
     val expectedNumberOfPartitions = dictS.length
 
     case class I(i: Int)
@@ -475,7 +475,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
         }
       } yield {
         parquetFiles.length should be > expectedNumberOfPartitions
-        count.toInt should ((be <= maxCount) and be >= 1)
+        count should ((be <= maxCount) and be >= 1L)
       }
 
     testStream.compile.lastOrError

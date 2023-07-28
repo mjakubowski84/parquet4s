@@ -12,7 +12,7 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.{
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.*
 import org.apache.parquet.schema.Type.Repetition
 
-import scala.language.higherKinds
+import scala.annotation.nowarn
 import scala.reflect.ClassTag
 
 object Message {
@@ -309,13 +309,13 @@ trait ComplexSchemaDefs extends ProductSchemaDefs {
 
   implicit def collectionSchema[E, Col[_]](implicit
       elementSchema: TypedSchemaDef[E],
-      ev: Col[E] <:< Iterable[E]
+      @nowarn ev: Col[E] <:< Iterable[E]
   ): TypedSchemaDef[Col[E]] =
     SchemaDef.list(elementSchema).withMetadata(SchemaDef.Meta.Generated).typed[Col[E]]
 
   implicit def arraySchema[E, Col[_]](implicit
       elementSchema: TypedSchemaDef[E],
-      ev: Col[E] =:= Array[E],
+      @nowarn ev: Col[E] =:= Array[E],
       classTag: ClassTag[E]
   ): TypedSchemaDef[Col[E]] =
     if (classTag.runtimeClass == classOf[Byte])

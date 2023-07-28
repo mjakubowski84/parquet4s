@@ -4,7 +4,6 @@ import org.apache.hadoop.fs.FileAlreadyExistsException
 import org.apache.parquet.io.{OutputFile, PositionOutputStream}
 
 import java.io.ByteArrayOutputStream
-import scala.language.reflectiveCalls
 import scala.util.control.NoStackTrace
 
 object InMemoryOutputFile {
@@ -17,7 +16,7 @@ class InMemoryOutputFile private (name: String) extends OutputFile {
   override def create(blockSizeHint: Long): PositionOutputStream = {
     if (os.size() > 0) throw new FileAlreadyExistsException(s"In-memory file already exists: $name")
     new PositionOutputStream {
-      override def getPos: Long                                    = os.size()
+      override def getPos: Long                                    = os.size().toLong
       override def write(b: Int): Unit                             = os.write(b)
       override def write(b: Array[Byte], off: Int, len: Int): Unit = os.write(b, off, len)
     }
