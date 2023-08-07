@@ -6,7 +6,7 @@ object DependecyVersions {
   val slf4jVersion                 = "2.0.7"
   val logbackVersion               = "1.3.8" // stick to 1.3.x for JDK-8 compatibility
   val akkaVersion                  = "2.6.21" // non-licensed version
-  val fs2Version                   = "3.7.0"
+  val fs2Version                   = "3.8.0"
   val catsEffectVersion            = "3.5.1"
   val scalaCollectionCompatVersion = "2.11.0"
   val scalatestVersion             = "3.2.16"

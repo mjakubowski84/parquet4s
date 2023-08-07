@@ -10,6 +10,7 @@ object InMemoryOutputFile {
   def apply(name: String): InMemoryOutputFile = new InMemoryOutputFile(name)
 }
 
+@experimental
 class InMemoryOutputFile private (name: String) extends OutputFile {
   private val os = new ByteArrayOutputStream()
 

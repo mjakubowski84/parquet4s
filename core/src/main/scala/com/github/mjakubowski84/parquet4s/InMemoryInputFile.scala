@@ -12,6 +12,7 @@ object InMemoryInputFile {
   def fromBytes(bytes: Array[Byte]): InMemoryInputFile = new InMemoryInputFile(bytes.clone())
 }
 
+@experimental
 class InMemoryInputFile private (content: Array[Byte]) extends InputFile {
 
   override def getLength: Long = content.length.toLong
