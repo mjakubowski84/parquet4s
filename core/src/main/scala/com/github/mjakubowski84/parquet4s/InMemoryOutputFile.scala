@@ -56,7 +56,7 @@ class InMemoryOutputFile(initBufferSize: Int, maxBufferSize: Int, blockSize: Int
 
   override def supportsBlockSize(): Boolean = true
 
-  override def defaultBlockSize(): Long = blockSize
+  override def defaultBlockSize(): Long = blockSize.toLong
 
   /** Return an Array[Byte] copied from the current content of the internal buffer, and reset the internal state. The
     * [[InMemoryOutputFile]] could then be reused without allocating the internal buffer.
