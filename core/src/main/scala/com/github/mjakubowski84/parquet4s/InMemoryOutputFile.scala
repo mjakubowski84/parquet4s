@@ -5,8 +5,6 @@ import org.apache.parquet.io.{OutputFile, PositionOutputStream}
 
 import java.io.ByteArrayOutputStream
 
-import scala.language.reflectiveCalls
-
 object InMemoryOutputFile {
   val DefaultBlockSize: Int = 64 << 10
 
@@ -29,16 +27,7 @@ object InMemoryOutputFile {
   */
 class InMemoryOutputFile(initBufferSize: Int, maxBufferSize: Int, blockSize: Int = InMemoryOutputFile.DefaultBlockSize)
     extends OutputFile {
-  private val os = new ByteArrayOutputStream(initBufferSize) {
-    def take: Array[Byte] = {
-      val content = toByteArray()
-      if (buf.length > maxBufferSize) {
-        buf = new Array[Byte](initBufferSize)
-      }
-      count = 0
-      content
-    }
-  }
+  private val os = new ReusableByteArrayOutputStream(initBufferSize, maxBufferSize)
 
   override def create(blockSizeHint: Long): PositionOutputStream = {
     if (os.size() > 0) throw new FileAlreadyExistsException(s"In-memory file already exists")
@@ -67,4 +56,16 @@ class InMemoryOutputFile(initBufferSize: Int, maxBufferSize: Int, blockSize: Int
   def take(): Array[Byte] = os.take
 
   def contentLength: Int = os.size()
+}
+
+class ReusableByteArrayOutputStream(initBufferSize: Int, maxBufferSize: Int)
+    extends ByteArrayOutputStream(initBufferSize) {
+  def take: Array[Byte] = {
+    val content = toByteArray()
+    if (buf.length > maxBufferSize) {
+      buf = new Array[Byte](initBufferSize)
+    }
+    count = 0
+    content
+  }
 }
