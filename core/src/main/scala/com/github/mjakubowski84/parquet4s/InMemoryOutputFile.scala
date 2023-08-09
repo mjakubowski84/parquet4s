@@ -19,7 +19,7 @@ object InMemoryOutputFile {
 /** Reusable in-memory `OutputFile` based on `ByteArrayOutputStream`
   *
   * @param initBufferSize
-  *   size of the [[ByteArrayOutputStream]]'s internal buffer when it is created
+  *   size of the `ByteArrayOutputStream`'s internal buffer when it is created
   * @param maxBufferSize
   *   a threshold beyond which the internal buffer will be recreated with the initBufferSize
   * @param blockSize
