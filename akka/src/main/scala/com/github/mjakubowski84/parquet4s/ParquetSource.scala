@@ -163,7 +163,13 @@ object ParquetSource extends IOOps {
       case _ =>
         val projectedSchemaOpt =
           projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T])
-        createSource(inputFile, projectedSchemaOpt, columnProjections, filter.toFilterCompat(valueCodecConfiguration), decoder)
+        createSource(
+          inputFile,
+          projectedSchemaOpt,
+          columnProjections,
+          filter.toFilterCompat(valueCodecConfiguration),
+          decoder
+        )
     }
 
     recordSource.map(decode)
