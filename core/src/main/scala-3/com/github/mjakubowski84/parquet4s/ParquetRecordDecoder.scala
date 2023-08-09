@@ -2,7 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import scala.deriving.Mirror
 
-import scala.annotation.implicitNotFound
+import scala.annotation.{implicitNotFound, unused}
 import scala.util.control.NonFatal
 
 /** Type class that allows to decode instances of [[RowParquetRecord]]
@@ -23,7 +23,7 @@ trait ParquetRecordDecoder[T]:
     */
   def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): T
 
-  def setMetadata(metadata: collection.Map[String, String]): Unit = {}
+  def setMetadata(@unused metadata: collection.Map[String, String]): Unit = {}
 
 object ParquetRecordDecoder:
 
