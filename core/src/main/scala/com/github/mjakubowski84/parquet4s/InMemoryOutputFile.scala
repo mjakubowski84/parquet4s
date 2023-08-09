@@ -16,7 +16,7 @@ object InMemoryOutputFile {
     new InMemoryOutputFile(initBufferSize, maxBufferSize.getOrElse(3 * initBufferSize), blockSize)
 }
 
-/** Reusable in-memory `OutputFile` based on [[ByteArrayOutputStream]]
+/** Reusable in-memory `OutputFile` based on `ByteArrayOutputStream`
   *
   * @param initBufferSize
   *   size of the [[ByteArrayOutputStream]]'s internal buffer when it is created
