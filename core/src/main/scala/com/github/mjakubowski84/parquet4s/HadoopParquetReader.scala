@@ -11,22 +11,22 @@ object HadoopParquetReader {
       inputFile: InputFile,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
-      setMetadata: collection.Map[String, String] => Unit
+      metadataReader: MetadataReader
   ) extends org.apache.parquet.hadoop.ParquetReader.Builder[RowParquetRecord](inputFile) {
     override lazy val getReadSupport: ReadSupport[RowParquetRecord] = new ParquetReadSupport(
-      projectedSchemaOpt,
-      columnProjections,
-      setMetadata
+      projectedSchemaOpt = projectedSchemaOpt,
+      columnProjections  = columnProjections,
+      metadataReader     = metadataReader
     )
   }
 
   def apply(
       inputFile: InputFile,
-      projectedSchemaOpt: Option[MessageType]  = None,
-      columnProjections: Seq[ColumnProjection] = Seq.empty,
-      filter: FilterCompat.Filter              = FilterCompat.NOOP,
-      setMetadata: collection.Map[String, String] => Unit = _ => ()
+      projectedSchemaOpt: Option[MessageType],
+      columnProjections: Seq[ColumnProjection],
+      filter: FilterCompat.Filter,
+      metadataReader: MetadataReader
   ): org.apache.parquet.hadoop.ParquetReader.Builder[RowParquetRecord] =
-    new Builder(inputFile, projectedSchemaOpt, columnProjections, setMetadata).withFilter(filter)
+    new Builder(inputFile, projectedSchemaOpt, columnProjections, metadataReader).withFilter(filter)
 
 }

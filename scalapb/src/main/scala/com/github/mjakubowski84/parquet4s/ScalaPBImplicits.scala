@@ -24,7 +24,7 @@ object ScalaPBImplicits {
   private[parquet4s] val EnumNameNumberPairRe: Regex = "(.*?):(.*?)(?:,|$)".r
 
   implicit private[parquet4s] class RichGroupBuilder[T](private val builder: GroupBuilder[T]) extends AnyVal {
-    def addField(fd: FieldDescriptor): Builder[_ <: Builder[_, GroupBuilder[T]], GroupBuilder[T]] =
+    def addField(fd: FieldDescriptor): Builder[? <: Builder[?, GroupBuilder[T]], GroupBuilder[T]] =
       fd.scalaType match {
         case ScalaType.Message(md) =>
           if (fd.isMapField) addMapField(md.fields)
@@ -45,8 +45,8 @@ object ScalaPBImplicits {
         .as(mapType())
         .addMapKey(keyType)
         .addField(valFd)
-        .named("value")
-        .named("key_value")
+        .named(MapParquetRecord.ValueFieldName)
+        .named(MapParquetRecord.MapKeyValueFieldName)
     }
 
     def addMapKey(keyType: PrimitiveType): GroupBuilder[GroupBuilder[T]] =
@@ -54,7 +54,7 @@ object ScalaPBImplicits {
         .repeatedGroup()
         .primitive(keyType.getPrimitiveTypeName, Type.Repetition.REQUIRED)
         .as(keyType.getLogicalTypeAnnotation)
-        .named("key")
+        .named(MapParquetRecord.KeyFieldName)
 
     def addRepeatedMessage(fd: Descriptor): GroupBuilder[GroupBuilder[T]] =
       builder
@@ -63,8 +63,8 @@ object ScalaPBImplicits {
         .repeatedGroup()
         .optionalGroup()
         .addFields(fd.fields)
-        .named("element")
-        .named("list")
+        .named(ListParquetRecord.ElementName.Element)
+        .named(ListParquetRecord.ListFieldName)
 
     def addRepeatedPrimitive(elementType: PrimitiveType) =
       builder
@@ -73,8 +73,8 @@ object ScalaPBImplicits {
         .repeatedGroup()
         .primitive(elementType.getPrimitiveTypeName, Type.Repetition.REQUIRED)
         .as(elementType.getLogicalTypeAnnotation)
-        .named("element")
-        .named("list")
+        .named(ListParquetRecord.ElementName.Element)
+        .named(ListParquetRecord.ListFieldName)
 
     def addFields(fields: Vector[FieldDescriptor]): GroupBuilder[T] =
       fields.foldLeft(builder)((builder, fd) => builder.addField(fd).id(fd.index).named(fd.name))

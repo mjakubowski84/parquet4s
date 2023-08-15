@@ -14,6 +14,7 @@ import java.io.Closeable
 import java.util.TimeZone
 import scala.annotation.implicitNotFound
 import scala.jdk.CollectionConverters.*
+import scala.util.Using
 
 /** Type class that allows to write data which schema is represented by type <i>T</i>. Path and options are meant to be
   * set by implementation of the trait.
@@ -49,7 +50,7 @@ object ParquetWriter {
 
   private val SignatureMetadata = Map("MadeBy" -> "https://github.com/mjakubowski84/parquet4s")
 
-  private class InternalBuilder(file: OutputFile, schema: MessageType, extraMetadata: ExtraMetadata)
+  private class InternalBuilder(file: OutputFile, schema: MessageType, extraMetadata: MetadataWriter)
       extends HadoopParquetWriter.Builder[RowParquetRecord, InternalBuilder](file) {
     private val logger = LoggerFactory.getLogger(ParquetWriter.this.getClass)
 
@@ -122,37 +123,72 @@ object ParquetWriter {
     /** Writes iterable collection of data as a Parquet files at given path.
       */
     def writeAndClose(path: Path, data: Iterable[T]): Unit
+
+  }
+
+  trait CustomBuilder[T] {
+
+    /** @param options
+      *   writer options
+      */
+    def options(options: ParquetWriter.Options): CustomBuilder[T]
+
+    def writeAndClose(data: Iterable[T]): Unit
+
+    def build(): ParquetWriter[T]
+
+  }
+
+  private case class CustomBuilderImpl[T, B <: HadoopParquetWriter.Builder[T, B]](
+      builder: B,
+      options: Options = Options()
+  ) extends CustomBuilder[T] {
+    override def options(options: Options): CustomBuilder[T] = this.copy(options = options)
+
+    override def writeAndClose(data: Iterable[T]): Unit = Using.resource(build())(_.write(data))
+
+    override def build(): ParquetWriter[T] =
+      new ParquetWriterImpl[T, T](
+        internalWriter  = options.applyTo[T, B](builder).build(),
+        encode          = identity,
+        fileDescription = "custom"
+      )
+
   }
 
   private case class BuilderImpl[T](options: Options = Options())(implicit
       encoder: ParquetRecordEncoder[T],
       schemaResolver: ParquetSchemaResolver[T]
   ) extends Builder[T] {
-    override def options(options: Options): Builder[T]     = this.copy(options = options)
-    override def build(file: OutputFile): ParquetWriter[T] = new ParquetWriterImpl[T](file, options)
-    override def build(path: Path): ParquetWriter[T]       = build(path.toOutputFile(options))
+    override def options(options: Options): Builder[T] = this.copy(options = options)
+    override def build(file: OutputFile): ParquetWriter[T] = new ParquetWriterImpl[T, RowParquetRecord](
+      internalWriter = internalWriter(
+        file           = file,
+        schema         = ParquetSchemaResolver.resolveSchema[T],
+        metadataWriter = encoder,
+        options        = options
+      ),
+      encode          = ParquetRecordEncoder.encode(_, ValueCodecConfiguration(options)),
+      fileDescription = file.toString
+    )
+    override def build(path: Path): ParquetWriter[T] = build(path.toOutputFile(options))
 
-    override def writeAndClose(file: OutputFile, data: Iterable[T]): Unit = {
-      val writer = build(file)
-      try writer.write(data)
-      finally writer.close()
-    }
+    override def writeAndClose(file: OutputFile, data: Iterable[T]): Unit =
+      Using.resource(build(file))(_.write(data))
 
-    override def writeAndClose(path: Path, data: Iterable[T]): Unit = {
-      val writer = build(path)
-      try writer.write(data)
-      finally writer.close()
-    }
+    override def writeAndClose(path: Path, data: Iterable[T]): Unit =
+      Using.resource(build(path))(_.write(data))
+
   }
 
   private[parquet4s] def internalWriter(
       file: OutputFile,
       schema: MessageType,
-      extraMetadata: ExtraMetadata,
+      metadataWriter: MetadataWriter,
       options: Options
   ): InternalWriter =
     options
-      .applyTo[RowParquetRecord, InternalBuilder](new InternalBuilder(file, schema, extraMetadata))
+      .applyTo[RowParquetRecord, InternalBuilder](new InternalBuilder(file, schema, metadataWriter))
       .build()
 
   /** Writes iterable collection of data as a Parquet files at given path. Path can represent local file or directory,
@@ -173,11 +209,8 @@ object ParquetWriter {
   @deprecated("2.0.0", "Use builder api by calling 'of[T]' or 'generic'")
   def writeAndClose[T](path: Path, data: Iterable[T], options: ParquetWriter.Options = ParquetWriter.Options())(implicit
       writerFactory: ParquetWriterFactory[T]
-  ): Unit = {
-    val writer = writerFactory(path, options)
-    try writer.write(data)
-    finally writer.close()
-  }
+  ): Unit =
+    Using.resource(writerFactory(path, options))(_.write(data))
 
   @deprecated("2.0.0", "Use builder api by calling 'of[T]' or 'generic''")
   def writer[T](path: Path, options: ParquetWriter.Options = ParquetWriter.Options())(implicit
@@ -189,7 +222,19 @@ object ParquetWriter {
     */
   @deprecated("2.0.0", "Use builder api by calling 'of[T]' or 'generic'")
   implicit def writerFactory[T: ParquetRecordEncoder: ParquetSchemaResolver]: ParquetWriterFactory[T] =
-    (path, options) => new ParquetWriterImpl[T](path.toOutputFile(options), options)
+    (path, options) => {
+      val vcc = ValueCodecConfiguration(options)
+      new ParquetWriterImpl[T, RowParquetRecord](
+        internalWriter = internalWriter(
+          file           = path.toOutputFile(options),
+          schema         = ParquetSchemaResolver.resolveSchema[T],
+          metadataWriter = implicitly[ParquetRecordEncoder[T]],
+          options        = options
+        ),
+        encode          = entity => ParquetRecordEncoder.encode(entity, vcc),
+        fileDescription = path.toString
+      )
+    }
 
   /** Creates [[Builder]] of [[ParquetWriter]] for documents of type <i>T</i>.
     */
@@ -200,21 +245,17 @@ object ParquetWriter {
   def generic(message: MessageType): Builder[RowParquetRecord] =
     BuilderImpl()(RowParquetRecord.genericParquetRecordEncoder, RowParquetRecord.genericParquetSchemaResolver(message))
 
+  @experimental
+  def custom[T, B <: HadoopParquetWriter.Builder[T, B]](builder: B): CustomBuilder[T] = CustomBuilderImpl(builder)
+
 }
 
-private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
-    file: OutputFile,
-    options: ParquetWriter.Options
+private class ParquetWriterImpl[T, W](
+    internalWriter: HadoopParquetWriter[W],
+    encode: T => W,
+    fileDescription: String
 ) extends ParquetWriter[T] {
-  private val encoder                 = implicitly[ParquetRecordEncoder[T]]
-  private val valueCodecConfiguration = ValueCodecConfiguration(options)
-  private val logger                  = LoggerFactory.getLogger(this.getClass)
-  private val internalWriter = ParquetWriter.internalWriter(
-    file          = file,
-    schema        = ParquetSchemaResolver.resolveSchema[T],
-    extraMetadata = encoder,
-    options       = options
-  )
+  private val logger = LoggerFactory.getLogger(this.getClass)
   private var closed = false
 
   override def write(data: Iterable[T]): Unit =
@@ -222,7 +263,7 @@ private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
       throw new IllegalStateException("Attempted to write with a writer which was already closed")
     } else {
       data.foreach { elem =>
-        internalWriter.write(ParquetRecordEncoder.encode[T](elem, valueCodecConfiguration))
+        internalWriter.write(encode(elem))
       }
     }
 
@@ -233,7 +274,7 @@ private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
       logger.warn("Attempted to close a writer which was already closed")
     } else {
       if (logger.isDebugEnabled) {
-        logger.debug(s"Finished writing to $file and closing writer.")
+        logger.debug(s"Finished writing to $fileDescription and closing writer.")
       }
       closed = true
       internalWriter.close()
@@ -242,7 +283,7 @@ private class ParquetWriterImpl[T: ParquetRecordEncoder: ParquetSchemaResolver](
 
 }
 
-private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, String], extraMetadata: ExtraMetadata)
+private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, String], extraMetadata: MetadataWriter)
     extends WriteSupport[RowParquetRecord] {
   private var consumer: RecordConsumer = _
 
@@ -266,5 +307,5 @@ private class ParquetWriteSupport(schema: MessageType, metadata: Map[String, Str
     consumer = recordConsumer
 
   override def finalizeWrite(): FinalizedWriteContext =
-    new FinalizedWriteContext(extraMetadata.getExtraMetadata().asJava)
+    new FinalizedWriteContext(extraMetadata.getMetadata().asJava)
 }
