@@ -19,6 +19,36 @@ object ParquetIterable {
       decode                  = record => ParquetRecordDecoder.decode(record, valueCodecConfiguration)
     )
 
+  private[parquet4s] def apply[T, I](
+      iteratorFactory: () => Iterator[I] & Closeable,
+      decode: I           => T
+  ): ParquetIterable[T] =
+    new ParquetIterable[T] {
+      // TODO move those functions to internal trait
+      override private[parquet4s] def appendTransformation(
+          transformation: RowParquetRecord => Iterable[RowParquetRecord]
+      ): ParquetIterable[T] = ???
+      override private[parquet4s] def changeDecoder[U: ParquetRecordDecoder]: ParquetIterable[U] = ???
+      override private[parquet4s] def stats: Stats                                               = ???
+      override private[parquet4s] def valueCodecConfiguration: ValueCodecConfiguration           = ???
+
+      private var openCloseables: Set[Closeable] = Set.empty
+
+      override def iterator: Iterator[T] = {
+        val iterator = iteratorFactory()
+        this.synchronized {
+          openCloseables = openCloseables + iterator
+        }
+        iterator.map(decode)
+      }
+
+      override def close(): Unit =
+        openCloseables.synchronized {
+          openCloseables.foreach(_.close())
+          openCloseables = Set.empty
+        }
+    }
+
   def inMemory[T: ParquetRecordDecoder](
       data: => Iterable[RowParquetRecord],
       valueCodecConfiguration: ValueCodecConfiguration = ValueCodecConfiguration.Default
@@ -178,10 +208,9 @@ trait ParquetIterable[T] extends Iterable[T] with Closeable {
   def writeAndClose(path: Path, options: ParquetWriter.Options = ParquetWriter.Options())(implicit
       schemaResolver: ParquetSchemaResolver[T],
       encoder: ParquetRecordEncoder[T]
-  ): Unit = {
-    ParquetWriter.of[T].options(options).writeAndClose(path, this)
-    this.close()
-  }
+  ): Unit =
+    try ParquetWriter.of[T].options(options).writeAndClose(path, this)
+    finally this.close()
 
   private[parquet4s] def appendTransformation(
       transformation: RowParquetRecord => Iterable[RowParquetRecord]
@@ -235,7 +264,7 @@ private[parquet4s] class ParquetIterableImpl[T](
       decode                  = decode
     )
 
-  override def changeDecoder[U: ParquetRecordDecoder]: ParquetIterable[U] =
+  override private[parquet4s] def changeDecoder[U: ParquetRecordDecoder]: ParquetIterable[U] =
     new ParquetIterableImpl[U](
       iteratorFactory         = iteratorFactory,
       valueCodecConfiguration = valueCodecConfiguration,

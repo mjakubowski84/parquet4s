@@ -43,7 +43,7 @@ class ScalaPBParquetRecordDecoder[T <: GeneratedMessage: GeneratedMessageCompani
       case (ScalaType.Message(md), map: MapParquetRecord) if md.fields.size == 2 => decodeMap(md, map)
       case (_, NullValue) => if (fd.isRepeated) PRepeated(Vector.empty) else PEmpty
       case _ =>
-        throw ScalaPBParquetDecodeException(s"Unsupported combination of field and value: ${fd.scalaType}, ${value}")
+        throw ScalaPBParquetDecodeException(s"Unsupported combination of field and value: ${fd.scalaType}, $value")
     }
 
   private def decodeEnum(ed: EnumDescriptor, value: Binary): PEnum = {
@@ -51,10 +51,10 @@ class ScalaPBParquetRecordDecoder[T <: GeneratedMessage: GeneratedMessageCompani
     enumMetadata
       .get(ed.fullName)
       .flatMap(_.get(name))
-      .map(ed.findValueByNumberCreatingIfUnknown(_))
+      .map(ed.findValueByNumberCreatingIfUnknown)
       .orElse(ed.values.find(_.name == name))
-      .map(PEnum(_))
-      .getOrElse(throw ScalaPBParquetDecodeException(s"Unrecognized value (${name}) for Enum:${ed.fullName}"))
+      .map(PEnum.apply)
+      .getOrElse(throw ScalaPBParquetDecodeException(s"Unrecognized value ($name) for Enum:${ed.fullName}"))
   }
 
   private def decodeMap(md: Descriptor, record: MapParquetRecord) = {

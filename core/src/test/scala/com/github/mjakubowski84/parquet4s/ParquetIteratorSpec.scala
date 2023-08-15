@@ -15,7 +15,7 @@ class ParquetIteratorSpec extends AnyFlatSpec with Matchers {
   private def mock[T: ClassTag]: T = org.mockito.Mockito.mock(classTag[T].runtimeClass).asInstanceOf[T]
 
   private def mockTestBuilder(reader: org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]) = {
-    val builder = mock[parquet4s.ParquetIterator.HadoopBuilder]
+    val builder = mock[parquet4s.ParquetIterator.HadoopBuilder[RowParquetRecord]]
     when(builder.build()).thenReturn(reader)
     builder
   }

@@ -14,7 +14,7 @@ import scala.util.control.NonFatal
   "ParquetRecordDecoder. Cannot read data of type ${T}. " +
     "Please check if there is implicit ValueDecoder available for each field and subfield of ${T}."
 )
-trait ParquetRecordDecoder[T] {
+trait ParquetRecordDecoder[T] extends MetadataReader {
 
   /** @param record
     *   to be decoded to instance of given type

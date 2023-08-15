@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.ScalaPBImplicits._
+import com.github.mjakubowski84.parquet4s.ScalaPBImplicits.*
 import org.apache.parquet.schema.{Type, Types}
 import scalapb.{GeneratedMessage, GeneratedMessageCompanion}
 

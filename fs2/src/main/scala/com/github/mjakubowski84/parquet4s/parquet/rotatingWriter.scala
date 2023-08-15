@@ -270,10 +270,10 @@ object rotatingWriter {
           internalWrite <- F.delay(
             scala.concurrent.blocking(
               ParquetWriter.internalWriter(
-                basePath.append(newFileName(options)).toOutputFile(options),
-                schema,
-                ExtraMetadata.NoExtraMetadata,
-                options
+                file           = basePath.append(newFileName(options)).toOutputFile(options),
+                schema         = schema,
+                metadataWriter = MetadataWriter.NoOp,
+                options        = options
               )
             )
           )
