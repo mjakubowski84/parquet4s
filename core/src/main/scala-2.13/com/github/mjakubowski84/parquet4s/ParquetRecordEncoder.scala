@@ -15,7 +15,7 @@ import scala.util.control.NonFatal
   "Cannot write data of type ${T}. " +
     "Please check if there is implicit ValueEncoder available for each field and subfield of ${T}."
 )
-trait ParquetRecordEncoder[T] extends ExtraMetadata {
+trait ParquetRecordEncoder[T] extends MetadataWriter {
 
   /** @param entity
     *   data to be encoded
@@ -32,7 +32,7 @@ trait ParquetRecordEncoder[T] extends ExtraMetadata {
       configuration: ValueCodecConfiguration
   ): RowParquetRecord
 
-  override def getExtraMetadata(): Map[String, String] = Map.empty
+  override def getMetadata(): Map[String, String] = Map.empty
 }
 
 sealed trait EmptyRowParquetRecordResolver {

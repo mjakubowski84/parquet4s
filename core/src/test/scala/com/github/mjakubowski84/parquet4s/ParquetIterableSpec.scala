@@ -22,7 +22,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers {
   import ParquetIterableSpec.*
 
   "iterator" should "build instance of iterator over row class containing record reader" in {
-    val iteratorMock    = mock[ParquetIterator]
+    val iteratorMock    = mock[ParquetIterator[RowParquetRecord]]
     val testRowIterator = Iterator.empty
     when(iteratorMock.map(any[RowParquetRecord => TestRow]())).thenReturn(testRowIterator)
     ParquetIterable
@@ -35,8 +35,8 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "build a new iterator with new reader every time called" in {
-    val iteratorMock        = mock[ParquetIterator]
-    val iteratorFactoryMock = mock[() => ParquetIterator]
+    val iteratorMock        = mock[ParquetIterator[RowParquetRecord]]
+    val iteratorFactoryMock = mock[() => ParquetIterator[RowParquetRecord]]
     when(iteratorFactoryMock.apply()).thenReturn(iteratorMock)
     val testRowIterator = Iterator.empty
     when(iteratorMock.map(any[RowParquetRecord => TestRow]())).thenReturn(testRowIterator)
@@ -49,7 +49,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers {
   }
 
   "close" should "close reader created by iterator" in {
-    val iteratorMock = mock[ParquetIterator]
+    val iteratorMock = mock[ParquetIterator[RowParquetRecord]]
 
     val iterable = ParquetIterable.apply[TestRow](() => iteratorMock, vcc, mock[Stats])
     iterable.iterator
@@ -59,10 +59,10 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "close all readers created by multiple iterators" in {
-    val iteratorFactoryMock = mock[() => ParquetIterator]
-    val iteratorMock1       = mock[ParquetIterator]
-    val iteratorMock2       = mock[ParquetIterator]
-    val iteratorMock3       = mock[ParquetIterator]
+    val iteratorFactoryMock = mock[() => ParquetIterator[RowParquetRecord]]
+    val iteratorMock1       = mock[ParquetIterator[RowParquetRecord]]
+    val iteratorMock2       = mock[ParquetIterator[RowParquetRecord]]
+    val iteratorMock3       = mock[ParquetIterator[RowParquetRecord]]
     when(iteratorFactoryMock.apply())
       .thenReturn(iteratorMock1)
       .thenReturn(iteratorMock2)
@@ -84,7 +84,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers {
     val stats = mock[Stats]
     ParquetIterable
       .apply[TestRow](
-        iteratorFactory         = () => mock[ParquetIterator],
+        iteratorFactory         = () => mock[ParquetIterator[RowParquetRecord]],
         valueCodecConfiguration = vcc,
         stats                   = stats
       )
@@ -97,7 +97,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers {
     val stats = mock[Stats]
     ParquetIterable
       .apply[TestRow](
-        iteratorFactory         = () => mock[ParquetIterator],
+        iteratorFactory         = () => mock[ParquetIterator[RowParquetRecord]],
         valueCodecConfiguration = vcc,
         stats                   = stats
       )
@@ -110,7 +110,7 @@ class ParquetIterableSpec extends AnyFlatSpec with Matchers {
     val stats = mock[Stats]
     ParquetIterable
       .apply[TestRow](
-        iteratorFactory         = () => mock[ParquetIterator],
+        iteratorFactory         = () => mock[ParquetIterator[RowParquetRecord]],
         valueCodecConfiguration = vcc,
         stats                   = stats
       )

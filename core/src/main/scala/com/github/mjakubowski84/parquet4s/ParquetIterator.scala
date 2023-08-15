@@ -3,9 +3,9 @@ package com.github.mjakubowski84.parquet4s
 import java.io.Closeable
 
 private[parquet4s] object ParquetIterator {
-  private[parquet4s] type HadoopBuilder = org.apache.parquet.hadoop.ParquetReader.Builder[RowParquetRecord]
+  private[parquet4s] type HadoopBuilder[T] = org.apache.parquet.hadoop.ParquetReader.Builder[T]
 
-  def factory(builder: HadoopBuilder): () => Iterator[RowParquetRecord] & Closeable =
+  def factory[T](builder: HadoopBuilder[T]): () => Iterator[T] & Closeable =
     () => new ParquetIterator(builder)
 
   def from(records: RowParquetRecord*): Iterator[RowParquetRecord] & Closeable =
@@ -17,12 +17,12 @@ private[parquet4s] object ParquetIterator {
     }
 }
 
-private[parquet4s] class ParquetIterator(builder: ParquetIterator.HadoopBuilder)
-    extends Iterator[RowParquetRecord]
+private[parquet4s] class ParquetIterator[T](builder: ParquetIterator.HadoopBuilder[T])
+    extends Iterator[T]
     with Closeable {
-  private val reader                               = builder.build()
-  private var recordPreRead                        = false
-  private var nextRecord: Option[RowParquetRecord] = None
+  private val reader                = builder.build()
+  private var recordPreRead         = false
+  private var nextRecord: Option[T] = None
 
   private def preRead(): Unit =
     if (!recordPreRead) {
@@ -35,7 +35,7 @@ private[parquet4s] class ParquetIterator(builder: ParquetIterator.HadoopBuilder)
     nextRecord.nonEmpty
   }
 
-  override def next(): RowParquetRecord = {
+  override def next(): T = {
     preRead()
     nextRecord match {
       case None =>

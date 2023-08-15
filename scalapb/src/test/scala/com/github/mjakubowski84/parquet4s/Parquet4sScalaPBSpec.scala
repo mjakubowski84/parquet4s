@@ -1,34 +1,19 @@
 package com.github.mjakubowski84.parquet4s
 
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Sink, Source}
-import akka.testkit.TestKit
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.flatspec.AnyFlatSpecLike
+import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.time.{Millis, Seconds, Span}
-import com.github.mjakubowski84.parquet4s.DataOuterClass.Data as JData
 import com.github.mjakubowski84.parquet4s.ScalaPBImplicits.*
-import org.apache.hadoop.conf.Configuration
-import org.apache.parquet.proto.{ProtoParquetWriter, ProtoWriteSupport}
 
-import java.nio.file.Files
-import scala.jdk.CollectionConverters.*
-
-class Parquet4sScalaPBSpec
-    extends TestKit(ActorSystem("parquet4s-scalapb"))
-    with AnyFlatSpecLike
-    with Matchers
-    with ScalaFutures {
-  implicit override val patienceConfig = PatienceConfig(timeout = Span(3, Seconds), interval = Span(50, Millis))
+class Parquet4sScalaPBSpec extends AnyFlatSpec with Matchers {
 
   def testWithData(newData: Int => Data): Unit = {
-    val data   = (1 to 100).map(newData)
-    val tmpDir = Path(Files.createTempDirectory("example"))
-    val file   = tmpDir.append("data.parquet")
-    val sink   = ParquetStreams.toParquetSingleFile.of[Data].write(file)
-    Source(data).runWith(sink).futureValue
-    ParquetStreams.fromParquet.as[Data].read(file).runWith(Sink.seq).futureValue shouldBe data
+    val data = (1 to 100).map(newData)
+
+    val outFile = InMemoryOutputFile(initBufferSize = 4800)
+    ParquetWriter.of[Data].writeAndClose(outFile, data)
+
+    val inFile = InMemoryInputFile.fromBytes(outFile.take())
+    ParquetReader.as[Data].read(inFile).toSeq shouldBe data
   }
 
   "parquet4s-scalapb" should "work with primitive types" in {
@@ -66,42 +51,4 @@ class Parquet4sScalaPBSpec
     testWithData(i => Data(msgList = (i to i + 100).map(i => Data.Inner(i.toString))))
   }
 
-  it should "be compatible with parquet-protobuf" in {
-    val javaData = (1 to 100).map(i =>
-      JData
-        .newBuilder()
-        .setBool(i % 2 == 0)
-        .setInt(i)
-        .setLong(i.toLong)
-        .setFloat(i.toFloat)
-        .setDouble(i.toDouble)
-        .setText(i.toString)
-        .setAbcValue(i % JData.ABC.values().length)
-        .setInner(JData.Inner.newBuilder().setText(i.toString))
-        .addAllBoolList((i to i + 100).map(_ % 2 == 0).map(java.lang.Boolean.valueOf).asJava)
-        .addAllIntList((i to i + 100).map(Integer.valueOf).asJava)
-        .addAllLongList((i to i + 100).map(_.toLong).map(java.lang.Long.valueOf).asJava)
-        .addAllFloatList((i to i + 100).map(_.toFloat).map(java.lang.Float.valueOf).asJava)
-        .addAllDoubleList((i to i + 100).map(_.toDouble).map(java.lang.Double.valueOf).asJava)
-        .addAllTextList((i to i + 100).map(_.toString).asJava)
-        .addAllEnumListValue((i to i + 100).map(_ % JData.ABC.values().length).map(Integer.valueOf).asJava)
-        .addAllMsgList((i to i + 100).map(i => JData.Inner.newBuilder().setText(i.toString).build()).asJava)
-        .build()
-    )
-    val scalaData = javaData.map(d => Data.parseFrom(d.toByteArray))
-
-    val tmpDir = Path(Files.createTempDirectory("example"))
-    val file   = tmpDir.append("data.parquet")
-
-    val builder    = ProtoParquetWriter.builder[JData](file.hadoopPath).withMessage(classOf[JData])
-    val hadoopConf = new Configuration()
-    hadoopConf.setBoolean(ProtoWriteSupport.PB_SPECS_COMPLIANT_WRITE, true)
-    val sink = ParquetStreams.toParquetSingleFile
-      .custom[JData, ProtoParquetWriter.Builder[JData]](builder)
-      .options(ParquetWriter.Options(hadoopConf = hadoopConf))
-      .write
-    Source(javaData).runWith(sink).futureValue
-
-    ParquetStreams.fromParquet.as[Data].read(file).runWith(Sink.seq).futureValue shouldBe scalaData
-  }
 }

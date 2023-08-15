@@ -68,7 +68,6 @@ lazy val core = (project in file("core"))
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
       "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion,
-
       // tests
       "org.mockito" % "mockito-core" % mockitoVersion % "test",
       "org.scalatest" %% "scalatest" % scalatestVersion % "test,it",
@@ -131,26 +130,26 @@ lazy val fs2 = (project in file("fs2"))
   .settings(testReportSettings)
   .dependsOn(core % "compile->compile;test->test", testkit % "it->compile")
 
-lazy val scalapb = (project in file("scalapb"))
-  .configs(IntegrationTest)
+lazy val scalaPB = (project in file("scalapb"))
   .settings(
     name := "parquet4s-scalapb",
     crossScalaVersions := supportedScalaVersions,
+    compileOrder := CompileOrder.JavaThenScala,
     libraryDependencies ++= Seq(
-      "com.thesamet.scalapb" %% "scalapb-runtime" % "0.11.13",
-      "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
+      "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Test,
-      "org.apache.parquet" % "parquet-protobuf" % parquetVersion % Test
+      "org.apache.parquet" % "parquet-protobuf" % parquetVersion % Test,
+      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.5.0" % Test
     ),
     Test / PB.targets := Seq(
-      _root_.scalapb.gen(flatPackage = true, lenses = false) -> ((Test / sourceManaged).value / "protobuf/scala"),
+      scalapb.gen(flatPackage = true, lenses = false) -> ((Test / sourceManaged).value / "protobuf/scala"),
       PB.gens.java -> ((Test / sourceManaged).value / "protobuf/java")
     )
   )
   .settings(compilationSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
-  .dependsOn(core % "compile->compile;test->test", akka % "test->test", testkit % "it->compile")
+  .dependsOn(core % "compile->compile;test->test", akka % "test->compile", fs2 % "test->compile")
 
 lazy val testkit = (project in file("testkit"))
   .settings(
@@ -196,12 +195,12 @@ lazy val examples = (project in file("examples"))
     run / fork := true,
     compileOrder := CompileOrder.JavaThenScala,
     Compile / PB.targets := Seq(
-      _root_.scalapb.gen(flatPackage = true, lenses = false) -> ((Compile / sourceManaged).value / "protobuf/scala"),
-      PB.gens.java -> ((Test / sourceManaged).value / "protobuf/java")
+      scalapb.gen(flatPackage = true, lenses = false) -> ((Compile / sourceManaged).value / "protobuf/scala"),
+      PB.gens.java -> ((Compile / sourceManaged).value / "protobuf/java")
     )
   )
   .settings(compilationSettings)
-  .dependsOn(akka, fs2, scalapb)
+  .dependsOn(akka, fs2, scalaPB)
 
 lazy val coreBenchmarks = (project in file("coreBenchmarks"))
   .settings(
@@ -299,7 +298,7 @@ lazy val root = (project in file("."))
     core,
     akka,
     fs2,
-    scalapb,
+    scalaPB,
     testkit,
     examples,
     coreBenchmarks,

@@ -20,7 +20,7 @@ class ScalaPBParquetRecordEncoder[T <: GeneratedMessage] extends ParquetRecordEn
   ): RowParquetRecord =
     encodeMessage(entity.toPMessage)
 
-  override def getExtraMetadata(): Map[String, String] =
+  override def getMetadata(): Map[String, String] =
     enumMetadata.iterator.map { case (key, value) =>
       val metadataEnumKey    = MetadataEnumPrefix + key
       val metadataEnumValues = value.map { case (name, number) => s"$name:$number" }.mkString(",")
@@ -42,7 +42,7 @@ class ScalaPBParquetRecordEncoder[T <: GeneratedMessage] extends ParquetRecordEn
         BinaryValue(Binary.fromReusedByteBuffer(value.asReadOnlyByteBuffer()))
       case (ScalaType.Message(_), msg: PMessage)                                              => encodeMessage(msg)
       case (ScalaType.Message(md), PRepeated(values)) if fd.isMapField && md.fields.size == 2 => encodeMap(md, values)
-      case (_, PRepeated(values))            => ListParquetRecord(values.map(encodeField(fd, _)): _*)
+      case (_, PRepeated(values))            => ListParquetRecord(values.map(encodeField(fd, _))*)
       case (_, PEmpty)                       => NullValue
       case (ScalaType.Enum(_), PEnum(value)) => encodeEnumValue(value)
       case _ =>
@@ -54,14 +54,14 @@ class ScalaPBParquetRecordEncoder[T <: GeneratedMessage] extends ParquetRecordEn
       case msg: PMessage if msg.value.size == 2 => encodeMapEntry(md.fields(0), md.fields(1), msg)
       case value                                => throw ScalaPBParquetEncodeException(s"Invalid map entry: $value")
     }
-    MapParquetRecord(entries: _*)
+    MapParquetRecord(entries*)
   }
 
   private def encodeMapEntry(keyFd: FieldDescriptor, valueFd: FieldDescriptor, msg: PMessage) =
     (msg.value.get(keyFd), msg.value.get(valueFd)) match {
       case (Some(key), Some(value)) => (encodeField(keyFd, key), encodeField(valueFd, value))
       case _ =>
-        throw ScalaPBParquetEncodeException(s"Invaid map entry: key field: $keyFd, value field: $valueFd, msg: $msg")
+        throw ScalaPBParquetEncodeException(s"Invalid map entry: key field: $keyFd, value field: $valueFd, msg: $msg")
     }
 
   private def encodeEnumValue(value: EnumValueDescriptor) = {

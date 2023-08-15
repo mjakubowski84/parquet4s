@@ -12,22 +12,21 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.{
 }
 
 import java.math.MathContext
-import java.util
 import scala.jdk.CollectionConverters.*
 
 private[parquet4s] class ParquetReadSupport(
-    projectedSchemaOpt: Option[MessageType]             = None,
-    columnProjections: Seq[ColumnProjection]            = Seq.empty,
-    setMetadata: collection.Map[String, String] => Unit = _ => ()
+    projectedSchemaOpt: Option[MessageType],
+    columnProjections: Seq[ColumnProjection],
+    metadataReader: MetadataReader
 ) extends ReadSupport[RowParquetRecord] {
 
   override def prepareForRead(
       configuration: Configuration,
-      keyValueMetaData: util.Map[String, String],
+      keyValueMetaData: java.util.Map[String, String],
       fileSchema: MessageType,
       readContext: ReadSupport.ReadContext
   ): RecordMaterializer[RowParquetRecord] = {
-    setMetadata(keyValueMetaData.asScala)
+    metadataReader.setMetadata(keyValueMetaData.asScala)
     new ParquetRecordMaterializer(readContext.getRequestedSchema, columnProjections)
   }
 

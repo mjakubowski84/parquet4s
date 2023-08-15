@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.fs.FileAlreadyExistsException
-import org.apache.parquet.io.{OutputFile, PositionOutputStream}
+import org.apache.parquet.io.{InputFile, OutputFile, PositionOutputStream}
 
 import java.io.ByteArrayOutputStream
 
@@ -54,6 +54,10 @@ class InMemoryOutputFile private (initBufferSize: Int, maxBufferSize: Int, block
   def take(): Array[Byte] = os.take
 
   def contentLength: Int = os.size()
+
+  /** Creates an [[org.apache.parquet.io.InputFile]] from the content of this [[org.apache.parquet.io.OutputFile]].
+    */
+  def toInputFile: InputFile = InMemoryInputFile.fromBytes(take())
 }
 
 class ReusableByteArrayOutputStream(initBufferSize: Int, maxBufferSize: Int)

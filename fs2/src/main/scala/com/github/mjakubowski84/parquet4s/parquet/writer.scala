@@ -3,7 +3,6 @@ package com.github.mjakubowski84.parquet4s.parquet
 import cats.effect.{Resource, Sync}
 import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.{
-  ExtraMetadata,
   ParquetRecordEncoder,
   ParquetSchemaResolver,
   ParquetWriter,
@@ -53,7 +52,7 @@ private[parquet4s] object writer {
         sync           = Sync[F]
       )
     override def custom[T, B <: HadoopParquetWriter.Builder[T, B]](builder: B): CustomBuilder[F, T] =
-      CustomBuilderImpl(builder)
+      CustomBuilderImpl(builder = builder, options = ParquetWriter.Options())
   }
 
   trait Builder[F[_], T] {
@@ -105,17 +104,13 @@ private[parquet4s] object writer {
 
   private case class CustomBuilderImpl[F[_]: Sync, T, B <: HadoopParquetWriter.Builder[T, B]](
       builder: B,
-      maybeOptions: Option[ParquetWriter.Options] = None
+      options: ParquetWriter.Options
   ) extends CustomBuilder[F, T] {
     override def options(options: ParquetWriter.Options): CustomBuilder[F, T] =
-      this.copy(maybeOptions = Some(options))
+      this.copy(options = options)
 
     override def write: Pipe[F, T, Nothing] =
-      pipe(
-        maybeOptions
-          .fold(builder)(_.applyTo[T, B](builder))
-          .build()
-      )
+      pipe(options.applyTo[T, B](builder).build())
   }
 
   private class Writer[T, F[_]](internalWriter: HadoopParquetWriter[T])(implicit F: Sync[F]) extends AutoCloseable {
@@ -148,21 +143,21 @@ private[parquet4s] object writer {
       )
   }
 
-  private def rowParquetRecordPipe[F[_], T: ParquetRecordEncoder: ParquetSchemaResolver](
+  private def rowParquetRecordPipe[F[_], T: ParquetSchemaResolver](
       outputFile: OutputFile,
       options: ParquetWriter.Options
-  )(implicit F: Sync[F]): Pipe[F, T, Nothing] = { in =>
+  )(implicit F: Sync[F], encoder: ParquetRecordEncoder[T]): Pipe[F, T, Nothing] = { in =>
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     in
       .evalMapChunk(entity => F.catchNonFatal(ParquetRecordEncoder.encode[T](entity, valueCodecConfiguration)))
       .through(
-        pipe(
+        pipe[F, RowParquetRecord](
           ParquetWriter
             .internalWriter(
-              outputFile,
-              ParquetSchemaResolver.resolveSchema[T],
-              ExtraMetadata.NoExtraMetadata,
-              options
+              file           = outputFile,
+              schema         = ParquetSchemaResolver.resolveSchema[T],
+              metadataWriter = encoder,
+              options        = options
             )
         )
       )

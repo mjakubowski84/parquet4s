@@ -1,7 +1,7 @@
 object DependecyVersions {
   val parquetVersion               = "1.13.1"
   val shapelessVersion             = "2.3.10"
-  val sparkVersion                 = "3.4.0"
+  val sparkVersion                 = "3.4.1"
   val hadoopVersion                = "3.3.6"
   val slf4jVersion                 = "2.0.7"
   val logbackVersion               = "1.3.8" // stick to 1.3.x for JDK-8 compatibility

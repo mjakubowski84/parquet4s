@@ -95,15 +95,13 @@ object SingleFileParquetSink {
 
   private case class CustomBuilderImpl[T, B <: HadoopParquetWriter.Builder[T, B]](
       builder: B,
-      maybeOptions: Option[ParquetWriter.Options] = None
+      options: ParquetWriter.Options = ParquetWriter.Options()
   ) extends CustomBuilder[T] {
     override def options(options: ParquetWriter.Options): CustomBuilder[T] =
-      this.copy(maybeOptions = Some(options))
+      this.copy(options = options)
 
-    override def write: Sink[T, Future[Done]] = {
-      val writer = maybeOptions.fold(builder)(_.applyTo[T, B](builder)).build()
-      sink(writer)
-    }
+    override def write: Sink[T, Future[Done]] =
+      sink(options.applyTo[T, B](builder).build())
   }
 
   private val logger: Logger = LoggerFactory.getLogger(this.getClass)
@@ -125,7 +123,7 @@ object SingleFileParquetSink {
 
   private def sink[T](writer: HadoopParquetWriter[T]): Sink[T, Future[Done]] =
     Flow[T]
-      .fold(0) { case (acc, record) => writer.write(record); acc + 1 }
+      .fold(zero = 0) { case (acc, record) => writer.write(record); acc + 1 }
       .map { count =>
         if (logger.isDebugEnabled) logger.debug(s"$count records were successfully written")
         try writer.close()

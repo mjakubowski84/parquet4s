@@ -52,6 +52,11 @@ object ParquetSource extends IOOps {
      */
     // format: on  
     def projectedGeneric(col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Builder[RowParquetRecord]
+
+    /** Creates [[CustomBuilder]] of Parquet reader data using custom internal implementation.
+      */
+    @experimental
+    def custom[T](builder: org.apache.parquet.hadoop.ParquetReader.Builder[T]): CustomBuilder[T]
   }
 
   private[parquet4s] object FromParquetImpl extends FromParquet {
@@ -78,6 +83,13 @@ object ParquetSource extends IOOps {
         columnProjections          = columnProjections
       )
     }
+
+    override def custom[T](builder: org.apache.parquet.hadoop.ParquetReader.Builder[T]): CustomBuilder[T] =
+      CustomBuilderImpl(
+        builder = builder,
+        options = ParquetReader.Options(),
+        filter  = Filter.noopFilter
+      )
   }
 
   /** Builds instance of Parquet [[akka.stream.scaladsl.Source]]
@@ -131,6 +143,56 @@ object ParquetSource extends IOOps {
 
   }
 
+  trait CustomBuilder[T] {
+
+    /** @param options
+      *   configuration of how Parquet files should be read
+      */
+    def options(options: ParquetReader.Options): CustomBuilder[T]
+
+    /** @param filter
+      *   optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
+      */
+    def filter(filter: Filter): CustomBuilder[T]
+
+    /** @return
+      *   final [[akka.stream.scaladsl.Source]]
+      */
+    def read: Source[T, NotUsed]
+
+  }
+
+  private case class CustomBuilderImpl[T](
+      builder: org.apache.parquet.hadoop.ParquetReader.Builder[T],
+      options: ParquetReader.Options,
+      filter: Filter
+  ) extends CustomBuilder[T] {
+
+    /** @param options
+      *   configuration of how Parquet files should be read
+      */
+    def options(options: ParquetReader.Options): CustomBuilder[T] = this.copy(options = options)
+
+    /** @param filter
+      *   optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
+      */
+    def filter(filter: Filter): CustomBuilder[T] = this.copy(filter = filter)
+
+    /** @return
+      *   final [[akka.stream.scaladsl.Source]]
+      */
+    def read: Source[T, NotUsed] = {
+      val filterCompat = filter.toFilterCompat(ValueCodecConfiguration(options))
+      Source
+        .unfoldResource[T, org.apache.parquet.hadoop.ParquetReader[T]](
+          create = () => builder.withConf(options.hadoopConf).withFilter(filterCompat).build(),
+          read   = reader => Option(reader.read()),
+          close  = _.close()
+        )
+    }
+
+  }
+
   override protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   private def apply[T](
@@ -178,7 +240,7 @@ object ParquetSource extends IOOps {
   private def createPartitionedSource(
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
-      decoder: ParquetRecordDecoder[_]
+      decoder: ParquetRecordDecoder[?]
   ): (FilterCompat.Filter, PartitionedPath) => Source[RowParquetRecord, NotUsed] = { (filterCompat, partitionedPath) =>
     createSource(partitionedPath.inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder)
       .map(setPartitionValues(partitionedPath))
@@ -189,7 +251,7 @@ object ParquetSource extends IOOps {
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
       filterCompat: FilterCompat.Filter,
-      decoder: ParquetRecordDecoder[_]
+      decoder: ParquetRecordDecoder[?]
   ) =
     Source
       .unfoldResource[RowParquetRecord, org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]](
@@ -208,7 +270,7 @@ object ParquetSource extends IOOps {
       inputFile: InputFile,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
-      decoder: ParquetRecordDecoder[_]
+      decoder: ParquetRecordDecoder[?]
   ): org.apache.parquet.hadoop.ParquetReader[RowParquetRecord] =
-    HadoopParquetReader(inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder.setMetadata).build()
+    HadoopParquetReader(inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder).build()
 }

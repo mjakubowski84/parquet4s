@@ -506,14 +506,14 @@ final class RowParquetRecord private (
 }
 
 object ListParquetRecord {
-  object ElementName {
+  private[parquet4s] object ElementName {
     val Element      = "element"
     val Array        = "array"
     val ArrayElement = "array_element"
   }
 
-  private val ListFieldName = "list"
-  private val ElementNames  = Set(ElementName.Element, ElementName.Array, ElementName.ArrayElement)
+  private[parquet4s] val ListFieldName = "list"
+  private val ElementNames             = Set(ElementName.Element, ElementName.Array, ElementName.ArrayElement)
 
   /** @param elements
     *   to init the record with
@@ -664,9 +664,9 @@ final class ListParquetRecord private (private val values: Vector[Value])
 
 object MapParquetRecord {
 
-  private val MapKeyValueFieldName = "key_value"
-  private val KeyFieldName         = "key"
-  private val ValueFieldName       = "value"
+  private[parquet4s] val MapKeyValueFieldName = "key_value"
+  private[parquet4s] val KeyFieldName         = "key"
+  private[parquet4s] val ValueFieldName       = "value"
 
   def apply(entries: (Value, Value)*): MapParquetRecord =
     entries.foldLeft(MapParquetRecord.Empty) { case (record, (key, value)) =>
