@@ -169,6 +169,11 @@ workflows:
           project: fs2
           requires:
             - build
+      - test:
+          name: test_scala_pb
+          project: scalaPB
+          requires:
+            - build
 
   build-and-release:
     jobs:
@@ -208,14 +213,24 @@ workflows:
               only: /^v.*/
             branches:
               ignore: /.*/
-      - release:
+      - test:
+          name: test_scala_pb
+          project: scalaPB
           requires:
-            - test_core
-            - test_akka
-            - test_fs2
+            - build
           filters:
             tags:
               only: /^v.*/
             branches:
               ignore: /.*/
-
+      - release:
+          requires:
+            - test_core
+            - test_akka
+            - test_fs2
+            - test_scala_pb
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
