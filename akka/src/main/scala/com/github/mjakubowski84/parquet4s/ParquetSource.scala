@@ -156,10 +156,12 @@ object ParquetSource extends IOOps {
       */
     def filter(filter: Filter): CustomBuilder[T]
 
-    /** @return
+    /** @param readMap
+      *   called on each element immediately after it is read
+      * @return
       *   final [[akka.stream.scaladsl.Source]]
       */
-    def read: Source[T, NotUsed]
+    def read[X](readMap: T => X = identity _): Source[X, NotUsed]
 
   }
 
@@ -182,12 +184,12 @@ object ParquetSource extends IOOps {
     /** @return
       *   final [[akka.stream.scaladsl.Source]]
       */
-    def read: Source[T, NotUsed] = {
+    def read[X](readMap: T => X = identity _): Source[X, NotUsed] = {
       val filterCompat = filter.toFilterCompat(ValueCodecConfiguration(options))
       Source
-        .unfoldResource[T, org.apache.parquet.hadoop.ParquetReader[T]](
+        .unfoldResource[X, org.apache.parquet.hadoop.ParquetReader[T]](
           create = () => builder.withConf(options.hadoopConf).withFilter(filterCompat).build(),
-          read   = reader => Option(reader.read()),
+          read   = reader => Option(reader.read()).map(readMap),
           close  = _.close()
         )
     }

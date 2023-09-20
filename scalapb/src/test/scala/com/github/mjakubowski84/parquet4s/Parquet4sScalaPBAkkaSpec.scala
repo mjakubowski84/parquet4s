@@ -1,7 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
 import akka.actor.ActorSystem
-import akka.stream.Attributes
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import com.github.mjakubowski84.parquet4s.DataOuterClass.Data as JData
 import com.github.mjakubowski84.parquet4s.ScalaPBImplicits.*
@@ -53,13 +52,13 @@ class Parquet4sScalaPBAkkaSpec extends AsyncFlatSpec with Matchers with BeforeAn
         ParquetStreams.fromParquet
           .custom[JData.Builder](ProtoParquetReader.builder[JData.Builder](outFile.toInputFile))
           .options(ParquetReader.Options(hadoopConf = hadoopConf))
-          .read
-          .map(_.build())
+          .read(_.build())
       )
       .toMat(Sink.seq)(Keep.right)
-      .withAttributes(Attributes.inputBuffer(initial = 1, max = 1))
-    // due to bug in ProtoParquetReader - the fact that read elements are unsafe instances of JData.Builder
-    // we must limit stream buffer to 1 and read elements from a file one by one
+    // Due to bug in ProtoParquetReader - the fact that read elements are unsafe instances of JData.Builder - and
+    // as Akka Streams always try to read more than a single element from the stream (even when you change the buffer
+    // size), we have to call `build()` function as soon as it is possible. Otherwise the data from the next element
+    // will override properties of the previous one.
 
     for {
       _        <- Source.fromIterator(() => scalaData.iterator).runWith(writeSink)

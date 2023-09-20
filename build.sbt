@@ -131,6 +131,7 @@ lazy val fs2 = (project in file("fs2"))
   .dependsOn(core % "compile->compile;test->test", testkit % "it->compile")
 
 lazy val scalaPB = (project in file("scalapb"))
+  .configs(IntegrationTest)
   .settings(
     name := "parquet4s-scalapb",
     crossScalaVersions := supportedScalaVersions,
@@ -147,6 +148,7 @@ lazy val scalaPB = (project in file("scalapb"))
     )
   )
   .settings(compilationSettings)
+  .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
   .dependsOn(core % "compile->compile;test->test", akka % "test->compile", fs2 % "test->compile")
