@@ -143,6 +143,7 @@ object ParquetSource extends IOOps {
 
   }
 
+  @experimental
   trait CustomBuilder[T] {
 
     /** @param options

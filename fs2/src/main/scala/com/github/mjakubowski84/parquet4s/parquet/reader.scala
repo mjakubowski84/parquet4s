@@ -152,6 +152,7 @@ object reader {
       reader.read(inputFile, options, filter, chunkSize, projectedSchemaResolverOpt, columnProjections)
   }
 
+  @experimental
   trait CustomBuilder[F[_], T] {
 
     /** @param options

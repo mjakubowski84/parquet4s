@@ -8,6 +8,7 @@ import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
 
+import java.io.Closeable
 import java.util.TimeZone
 
 object ParquetReader extends IOOps {
@@ -171,12 +172,23 @@ object ParquetReader extends IOOps {
       )
   }
 
+  @experimental
   trait CustomBuilder[T] {
+
+    /** @param options
+      *   configuration of how Parquet files should be read
+      */
     def options(options: Options): CustomBuilder[T]
 
+    /** @param filter
+      *   optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
+      */
     def filter(filter: Filter): CustomBuilder[T]
 
-    def read: ParquetIterable[T]
+    /** @return
+      *   final closeable [[scala.collection.Iterable]]
+      */
+    def read: Iterable[T] & Closeable
   }
 
   private case class CustomBuilderImpl[T](
@@ -188,18 +200,36 @@ object ParquetReader extends IOOps {
 
     override def filter(filter: Filter): CustomBuilder[T] = this.copy(filter = filter)
 
-    override def read: ParquetIterable[T] = {
+    override def read: Iterable[T] & Closeable = {
       val vcc = ValueCodecConfiguration(options)
-      ParquetIterable[T, T](
+      closeableIterable(
         iteratorFactory = () =>
           new ParquetIterator[T](
             builder
               .withConf(options.hadoopConf)
               .withFilter(filter.toFilterCompat(vcc))
-          ),
-        decode = identity[T]
+          )
       )
     }
+
+    private def closeableIterable(iteratorFactory: () => Iterator[T] & Closeable): Iterable[T] & Closeable =
+      new Iterable[T] with Closeable {
+        private var openCloseables: Set[Closeable] = Set.empty
+
+        override def iterator: Iterator[T] = {
+          val iterator = iteratorFactory()
+          this.synchronized {
+            openCloseables = openCloseables + iterator
+          }
+          iterator
+        }
+
+        override def close(): Unit =
+          openCloseables.synchronized {
+            openCloseables.foreach(_.close())
+            openCloseables = Set.empty
+          }
+      }
   }
 
   override val logger: Logger = LoggerFactory.getLogger(this.getClass)
