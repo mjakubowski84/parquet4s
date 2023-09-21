@@ -11,8 +11,8 @@ lazy val three                  = "3.3.0"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.13.0-SNAPSHOT"
-ThisBuild / isSnapshot := true
+ThisBuild / version := "2.13.0"
+ThisBuild / isSnapshot := false
 ThisBuild / scalaVersion := twoThirteen
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -179,7 +179,7 @@ lazy val examples = (project in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.5.0",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.5.1",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.typesafe.akka" %% "akka-stream-kafka" % {
