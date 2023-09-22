@@ -6,7 +6,7 @@ permalink: docs/partitioning/
 
 # Partitioning
 
-Parquet4s supports both reading partitions and partitioning data during writing. Writing partitioned data is available **only** in Akka and FS2 modules. Reading partitions is enabled by default in Akka and FS2 but must be enabled explicitly in the core module.
+Parquet4s supports both reading partitions and partitioning data during writing. Writing partitioned data is available **only** in Akka and FS2 modules. Reading partitions is enabled by default in all Parquet4S modules.
 
 #### Akka & FS2
 
@@ -16,7 +16,7 @@ Writing partitioned data is available in `viaParquet`. You can specify by which 
 
 #### Core
 
-As the core module is commonly used in low-level applications enabling partition reading can add redundant overhead. Therefore, when using the core module, you have to tell Parquet4s explicitly to read partitions.
+Since version 2.12.0 Parquet4S always reads partitioned data. Writing partitions is not supported in core module.
 
 #### **Take note!** 
 
@@ -116,7 +116,7 @@ object CoreExample extends App {
 
   val path = Path("path/to/user/directory")
 
-  val users = ParquetReader.as[User].partitioned.read(path)
+  val users = ParquetReader.as[User].read(path)
   try users.foreach(println)
   finally users.close()
 

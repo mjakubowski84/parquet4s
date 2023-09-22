@@ -284,7 +284,7 @@ lazy val documentation = (project in file("site"))
       "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion
     )
   )
-  .dependsOn(core, akka, fs2)
+  .dependsOn(core, akka, fs2, scalaPB)
   .enablePlugins(MicrositesPlugin)
 
 lazy val root = (project in file("."))
