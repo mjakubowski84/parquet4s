@@ -37,3 +37,6 @@ options:
 
   - title: (Experimental) ETL
     url: docs/experimental
+
+  - title: (Experimental) Protobuf
+    url: docs/protobuf
