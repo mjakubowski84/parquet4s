@@ -10,6 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
 class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils with BeforeAndAfter with EitherValues {
 
   override protected val logger: Logger = LoggerFactory.getLogger(this.getClass)
+  val vcc: ValueCodecConfiguration      = ValueCodecConfiguration.Default
 
   before {
     clearTemp()
@@ -113,10 +114,18 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.exists(filePath.toHadoop) should be(false)
   }
 
-  "findPartitionedPaths" should "return no paths and no partitions for empty directory" in {
+  "listPartitionedDirectory" should "return no paths and no partitions for empty directory" in {
     fileSystem.mkdirs(tempPath.toHadoop)
 
-    val dir = findPartitionedPaths(tempPath, configuration).value
+    val dir = listPartitionedDirectory(tempPath, configuration, Filter.noopFilter, vcc).value
+    dir.paths should be(empty)
+    dir.schema should be(empty)
+  }
+
+  it should "accept a filter for empty directory" in {
+    fileSystem.mkdirs(tempPath.toHadoop)
+
+    val dir = listPartitionedDirectory(tempPath, configuration, Col("x") === "1", vcc).value
     dir.paths should be(empty)
     dir.schema should be(empty)
   }
@@ -125,7 +134,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val pathX1 = tempPath.append("x=1")
     fileSystem.mkdirs(pathX1.toHadoop)
 
-    val dir = findPartitionedPaths(tempPath, configuration).value
+    val dir = listPartitionedDirectory(tempPath, configuration, Filter.noopFilter, vcc).value
     dir.paths should be(empty)
     dir.schema should be(empty) // ???
   }
@@ -134,8 +143,17 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val pathX1 = tempPath.append("x=1").append("file.parquet")
     fileSystem.createNewFile(pathX1.toHadoop)
 
-    val dir = findPartitionedPaths(tempPath, configuration).value
-    dir.paths should be(List(PartitionedPath(pathX1, configuration, (Col("x") -> "1") :: Nil)))
+    val dir = listPartitionedDirectory(tempPath, configuration, Filter.noopFilter, vcc).value
+    dir.paths should be(
+      List(
+        PartitionedPath(
+          path               = pathX1,
+          configuration      = configuration,
+          partitions         = (Col("x") -> "1") :: Nil,
+          filterPredicateOpt = None
+        )
+      )
+    )
     dir.schema should be(Col("x") :: Nil)
   }
 
@@ -143,8 +161,10 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val pathX1 = tempPath.append("x=1").append("file.parquet")
     fileSystem.createNewFile(pathX1.toHadoop)
 
-    val dir = findPartitionedPaths(pathX1, configuration).value
-    dir.paths should be(List(PartitionedPath(pathX1, configuration, Nil)))
+    val dir = listPartitionedDirectory(pathX1, configuration, Filter.noopFilter, vcc).value
+    dir.paths should be(
+      List(PartitionedPath(path = pathX1, configuration = configuration, partitions = Nil, filterPredicateOpt = None))
+    )
     dir.schema should be(empty)
   }
 
@@ -158,12 +178,32 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.createNewFile(path3.toHadoop)
     fileSystem.createNewFile(path4.toHadoop)
 
-    val dir = findPartitionedPaths(tempPath, configuration).value
+    val dir = listPartitionedDirectory(tempPath, configuration, Filter.noopFilter, vcc).value
     dir.paths should contain theSameElementsAs List(
-      PartitionedPath(path1, configuration, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "1_1")),
-      PartitionedPath(path2, configuration, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_2")),
-      PartitionedPath(path3, configuration, List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_3")),
-      PartitionedPath(path4, configuration, List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "0_9"))
+      PartitionedPath(
+        path               = path1,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "1_1"),
+        filterPredicateOpt = None
+      ),
+      PartitionedPath(
+        path               = path2,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_2"),
+        filterPredicateOpt = None
+      ),
+      PartitionedPath(
+        path               = path3,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_3"),
+        filterPredicateOpt = None
+      ),
+      PartitionedPath(
+        path               = path4,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "0_9"),
+        filterPredicateOpt = None
+      )
     )
     dir.schema should be(List(Col("x"), Col("y"), Col("z")))
   }
@@ -174,7 +214,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.createNewFile(path1.toHadoop)
     fileSystem.createNewFile(path2.toHadoop)
 
-    findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
+    listPartitionedDirectory(tempPath, configuration, Filter.noopFilter, vcc) should be a Symbol("Left")
   }
 
   it should "fail to create partitions from inconsistent directory [case2]" in {
@@ -183,7 +223,157 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.createNewFile(path1.toHadoop)
     fileSystem.createNewFile(path2.toHadoop)
 
-    findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
+    listPartitionedDirectory(tempPath, configuration, Filter.noopFilter, vcc) should be a Symbol("Left")
+  }
+
+  it should "filter partitioned directory and leave only parition paths matching filter predicate" in {
+    val path1 = tempPath.append("x=1/y=a/z=0").append("file.parquet")
+    val path2 = tempPath.append("x=1/y=b/z=0").append("file.parquet")
+    val path3 = tempPath.append("x=1/y=c/z=1").append("file.parquet")
+    val path4 = tempPath.append("x=2/y=b/z=1").append("file.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
+    fileSystem.createNewFile(path3.toHadoop)
+    fileSystem.createNewFile(path4.toHadoop)
+
+    val filter = Col("x") === "1" && Col("z") === "1"
+
+    val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
+    dir.paths should contain theSameElementsAs List(
+      PartitionedPath(
+        path               = path3,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1"),
+        filterPredicateOpt = None // no predicate is left for filter the file
+      )
+    )
+    dir.schema should be(List(Col("x"), Col("y"), Col("z")))
+  }
+
+  it should "handle the situation when no parition path matches filter predicate" in {
+    val path1 = tempPath.append("x=1/y=a/z=0").append("file.parquet")
+    val path2 = tempPath.append("x=1/y=b/z=0").append("file.parquet")
+    val path3 = tempPath.append("x=1/y=c/z=1").append("file.parquet")
+    val path4 = tempPath.append("x=2/y=b/z=1").append("file.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
+    fileSystem.createNewFile(path3.toHadoop)
+    fileSystem.createNewFile(path4.toHadoop)
+
+    val filter = Col("x") === "2" && Col("z") === "0"
+
+    val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
+    dir.paths should be(empty)
+    dir.schema should be(empty)
+  }
+
+  it should "accept a predicate which doesn't refer to parition fields" in {
+    val path1 = tempPath.append("x=1/y=a/z=0").append("file.parquet")
+    val path2 = tempPath.append("x=1/y=b/z=0").append("file.parquet")
+    val path3 = tempPath.append("x=1/y=c/z=1").append("file.parquet")
+    val path4 = tempPath.append("x=2/y=b/z=1").append("file.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
+    fileSystem.createNewFile(path3.toHadoop)
+    fileSystem.createNewFile(path4.toHadoop)
+
+    val filter          = Col("a") === "1" && Col("b") === "X"
+    val filterPredicate = filter.toPredicate(vcc)
+
+    val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
+    dir.paths should contain theSameElementsAs List(
+      PartitionedPath(
+        path               = path1,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "0"),
+        filterPredicateOpt = Some(filterPredicate)
+      ),
+      PartitionedPath(
+        path               = path2,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "0"),
+        filterPredicateOpt = Some(filterPredicate)
+      ),
+      PartitionedPath(
+        path               = path3,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1"),
+        filterPredicateOpt = Some(filterPredicate)
+      ),
+      PartitionedPath(
+        path               = path4,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "2", Col("y") -> "b", Col("z") -> "1"),
+        filterPredicateOpt = Some(filterPredicate)
+      )
+    )
+    dir.schema should be(List(Col("x"), Col("y"), Col("z")))
+  }
+
+  it should "accept a predicate which partially refers to parition fields" in {
+    val path1 = tempPath.append("x=1/y=a/z=0").append("file.parquet")
+    val path2 = tempPath.append("x=1/y=b/z=0").append("file.parquet")
+    val path3 = tempPath.append("x=1/y=c/z=1").append("file.parquet")
+    val path4 = tempPath.append("x=2/y=b/z=1").append("file.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
+    fileSystem.createNewFile(path3.toHadoop)
+    fileSystem.createNewFile(path4.toHadoop)
+
+    val filter             = Col("x") === "1" && Col("b") === "X"
+    val rewrittenPredicate = (Col("b") === "X").toPredicate(vcc)
+
+    val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
+    dir.paths should contain theSameElementsAs List(
+      PartitionedPath(
+        path               = path1,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "0"),
+        filterPredicateOpt = Some(rewrittenPredicate)
+      ),
+      PartitionedPath(
+        path               = path2,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "0"),
+        filterPredicateOpt = Some(rewrittenPredicate)
+      ),
+      PartitionedPath(
+        path               = path3,
+        configuration      = configuration,
+        partitions         = List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1"),
+        filterPredicateOpt = Some(rewrittenPredicate)
+      )
+    )
+    dir.schema should be(List(Col("x"), Col("y"), Col("z")))
+  }
+
+  it should "accept a filter for non-partitioned directory" in {
+    val path1 = tempPath.append("file1.parquet")
+    val path2 = tempPath.append("file2.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
+
+    val filter          = Col("x") === "2" && Col("z") === "0"
+    val filterPredicate = filter.toPredicate(vcc)
+
+    val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
+    dir.paths should contain theSameElementsAs (
+      Seq(
+        PartitionedPath(
+          path               = path1,
+          configuration      = configuration,
+          partitions         = List.empty,
+          filterPredicateOpt = Some(filterPredicate)
+        ),
+        PartitionedPath(
+          path               = path2,
+          configuration      = configuration,
+          partitions         = List.empty,
+          filterPredicateOpt = Some(filterPredicate)
+        )
+      )
+    )
+    dir.schema should be(empty)
   }
 
 }

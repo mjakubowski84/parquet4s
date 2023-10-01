@@ -5,8 +5,9 @@ import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path}
 import java.nio.file.Files
 import scala.util.Random
 import scala.util.Using
+import com.github.mjakubowski84.parquet4s.RecordFilter
 
-object WriteAndReadApp extends App {
+object WriteAndReadUsingRecordFilterApp extends App {
 
   case class Data(id: Int, text: String)
 
@@ -17,6 +18,6 @@ object WriteAndReadApp extends App {
   // write
   ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
-  // read
-  Using.resource(ParquetReader.as[Data].read(path))(_.foreach(println))
+  // skips all but last 3 records (out of 100)
+  Using.resource(ParquetReader.as[Data].filter(RecordFilter(_ >= 97)).read(path))(_.foreach(println))
 }

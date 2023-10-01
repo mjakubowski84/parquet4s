@@ -27,7 +27,7 @@ You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, `i
 
 For custom filtering by a column of type `T` implement `UDP[T]` trait and use `udp` operator.
 
-```scala
+```scala mdoc:compile-only
 import com.github.mjakubowski84.parquet4s.{Col, FilterStatistics, ParquetReader, Path, UDP}
 
 case class MyRecord(int: Int)
@@ -59,4 +59,20 @@ ParquetReader
   .as[MyRecord]
   .filter(Col("int").udp(IntDividesBy10))
   .read(Path("my_ints.parquet"))
+```
+
+## Record filter \[experimental\]
+
+`RecordFilter` is an alternative to filter predicates. It allows to filter records based on record index, that is an ordinal of a record in the file.
+
+```scala mdoc:compile-only
+import com.github.mjakubowski84.parquet4s.{ParquetReader, Path, RecordFilter}
+
+case class User(id: Long, email: String, visits: Long)
+
+// skips first 10 users
+ParquetReader
+  .as[User]
+  .filter(RecordFilter(index => index >= 10))
+  .read(Path("file.parquet"))
 ```

@@ -166,7 +166,7 @@ trait ParquetIterable[T] extends Iterable[T] with Closeable {
     *   dataset to be concatenated with this
     */
   @experimental
-  def concat(other: ParquetIterable[T]): ParquetIterable[T] = new CompoundParquetIterable(Seq(this, other))
+  def concat(other: ParquetIterable[T]): ParquetIterable[T] = new CompoundParquetIterable(Iterable(this, other))
 
   /** Writes this dataset to given <i>path</i> and releases all opened resources.
     * @param path

@@ -4,7 +4,7 @@ import com.github.mjakubowski84.parquet4s.{ColumnPath, Stats, ValueDecoder}
 
 /** Calculates [[Stats]] from multiple files.
   */
-private[parquet4s] class CompoundStats(statsSeq: Seq[Stats]) extends Stats {
+private[parquet4s] class CompoundStats(statsSeq: Iterable[Stats]) extends Stats {
 
   override lazy val recordCount: Long = statsSeq.map(_.recordCount).sum
 

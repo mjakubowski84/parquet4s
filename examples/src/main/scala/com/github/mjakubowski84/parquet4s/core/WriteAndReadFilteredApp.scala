@@ -4,6 +4,7 @@ import com.github.mjakubowski84.parquet4s.{Col, ParquetReader, ParquetWriter, Pa
 
 import java.nio.file.Files
 import scala.util.Random
+import scala.util.Using
 
 object WriteAndReadFilteredApp extends App {
 
@@ -29,12 +30,10 @@ object WriteAndReadFilteredApp extends App {
   // read filtered
   println("""dict == "A"""")
   val dictIsOnlyA = ParquetReader.as[Data].filter(Col("dict") === Dict.A).read(path)
-  try dictIsOnlyA.foreach(println)
-  finally dictIsOnlyA.close()
+  Using.resource(dictIsOnlyA)(_.foreach(println))
 
   println("""id >= 20 && id < 40""")
   val idIsBetween10And90 = ParquetReader.as[Data].filter(Col("id") >= 20 && Col("id") < 40).read(path)
-  try idIsBetween10And90.foreach(println)
-  finally idIsBetween10And90.close()
+  Using.resource(idIsBetween10And90)(_.foreach(println))
 
 }

@@ -27,7 +27,7 @@ class DecimalValueSpec extends AnyFlatSpec with Matchers {
     val inputFile = outputFile.toInputFile
 
     // read
-    Using(ParquetReader.as[Data].read(inputFile)) { readData =>
+    Using.resource(ParquetReader.as[Data].read(inputFile)) { readData =>
       readData.toSeq shouldBe data
     }
   }
@@ -52,7 +52,7 @@ class DecimalValueSpec extends AnyFlatSpec with Matchers {
     val inputFile = outputFile.toInputFile
 
     // read
-    Using(ParquetReader.as[Data].read(inputFile)) { readData =>
+    Using.resource(ParquetReader.as[Data].read(inputFile)) { readData =>
       readData.toSeq shouldBe data
     }
   }

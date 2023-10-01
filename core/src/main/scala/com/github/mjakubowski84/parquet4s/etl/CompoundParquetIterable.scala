@@ -3,7 +3,8 @@ package com.github.mjakubowski84.parquet4s.etl
 import com.github.mjakubowski84.parquet4s.*
 import com.github.mjakubowski84.parquet4s.stats.CompoundStats
 
-private[parquet4s] class CompoundParquetIterable[T](components: Seq[ParquetIterable[T]]) extends ParquetIterable[T] {
+private[parquet4s] class CompoundParquetIterable[T](components: Iterable[ParquetIterable[T]])
+    extends ParquetIterable[T] {
 
   override val stats: Stats = new CompoundStats(components.map(_.stats))
 
@@ -24,5 +25,5 @@ private[parquet4s] class CompoundParquetIterable[T](components: Seq[ParquetItera
     new CompoundParquetIterable[U](components.map(_.changeDecoder[U]))
 
   override def concat(other: ParquetIterable[T]): ParquetIterable[T] =
-    new CompoundParquetIterable(components :+ other)
+    new CompoundParquetIterable(components ++ Iterable(other))
 }

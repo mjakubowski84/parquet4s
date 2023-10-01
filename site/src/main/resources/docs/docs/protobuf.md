@@ -31,7 +31,7 @@ val path: Path = ??? // path to write to / to read from
 ParquetWriter.of[GeneratedProtobufData].writeAndClose(path.append("data.parquet"), data)
 
 // read
-Using(ParquetReader.as[GeneratedProtobufData].read(path))(_.foreach(println))
+Using.resource(ParquetReader.as[GeneratedProtobufData].read(path))(_.foreach(println))
 ```
 
 Please follow the [examples](https://github.com/mjakubowski84/parquet4s/tree/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/scalapb) to learn more.

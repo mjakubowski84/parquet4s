@@ -39,7 +39,7 @@ options:
     url: docs/migration
 
   - title: (Experimental) ETL
-    url: docs/experimental
+    url: docs/etl
 
   - title: (Experimental) Protobuf
     url: docs/protobuf

@@ -223,24 +223,31 @@ object ParquetSource extends IOOps {
 
     val recordSource = inputFile match {
       case hadoopInputFile: HadoopInputFile =>
-        findPartitionedPaths(Path(hadoopInputFile.getPath), hadoopConf).fold(
+        listPartitionedDirectory(Path(hadoopInputFile.getPath), hadoopConf, filter, valueCodecConfiguration).fold(
           Source.failed,
           partitionedDirectory => {
             val projectedSchemaOpt = projectedSchemaResolverOpt
               .map(implicit resolver => ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))
-            val filteredPaths = Source
-              .fromIterator(() =>
-                PartitionFilter.filter(filter, valueCodecConfiguration, partitionedDirectory).iterator
-              )
+            val filteredPaths = Source.fromIterator(() => partitionedDirectory.paths.iterator)
 
             if (parallelism == 1) {
               filteredPaths.flatMapConcat(
-                createPartitionedSource(projectedSchemaOpt, columnProjections, decoder).tupled
+                createPartitionedSource(
+                  projectedSchemaOpt,
+                  columnProjections,
+                  decoder,
+                  filter.toNonPredicateFilterCompat
+                )
               )
             } else {
               filteredPaths.flatMapMerge(
                 breadth = parallelism,
-                createPartitionedSource(projectedSchemaOpt, columnProjections, decoder).tupled
+                createPartitionedSource(
+                  projectedSchemaOpt,
+                  columnProjections,
+                  decoder,
+                  filter.toNonPredicateFilterCompat
+                )
               )
             }
           }
@@ -263,11 +270,18 @@ object ParquetSource extends IOOps {
   private def createPartitionedSource(
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
-      decoder: ParquetRecordDecoder[?]
-  ): (FilterCompat.Filter, PartitionedPath) => Source[RowParquetRecord, NotUsed] = { (filterCompat, partitionedPath) =>
-    createSource(partitionedPath.inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder)
-      .map(setPartitionValues(partitionedPath))
-  }
+      decoder: ParquetRecordDecoder[?],
+      fallbackFilterCompat: => FilterCompat.Filter
+  ): PartitionedPath => Source[RowParquetRecord, NotUsed] =
+    partitionedPath =>
+      createSource(
+        inputFile          = partitionedPath.inputFile,
+        projectedSchemaOpt = projectedSchemaOpt,
+        columnProjections  = columnProjections,
+        filterCompat       = partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(FilterCompat.get),
+        decoder            = decoder
+      )
+        .map(setPartitionValues(partitionedPath))
 
   private def createSource(
       inputFile: InputFile,

@@ -96,7 +96,7 @@ object ParquetReader extends IOOps {
 
       inputFile match {
         case hadoopInputFile: HadoopInputFile =>
-          partitionedIterable(Path(hadoopInputFile.getPath), valueCodecConfiguration, hadoopConf)
+          partitionedIterable(Path(hadoopInputFile.getPath), valueCodecConfiguration, filter, hadoopConf)
         case _ =>
           singleIterable(
             inputFile               = inputFile,
@@ -112,27 +112,26 @@ object ParquetReader extends IOOps {
     private def partitionedIterable(
         path: Path,
         valueCodecConfiguration: ValueCodecConfiguration,
+        filter: Filter,
         hadoopConf: Configuration
     )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] =
-      findPartitionedPaths(path, hadoopConf) match {
+      listPartitionedDirectory(path, hadoopConf, filter, valueCodecConfiguration) match {
         case Left(exception) =>
           throw exception
         case Right(partitionedDirectory) =>
           val projectedSchemaOpt = projectedSchemaResolverOpt.map(implicit resolver =>
             ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema)
           )
-          val iterables = PartitionFilter
-            .filter(filter, valueCodecConfiguration, partitionedDirectory)
-            .toSeq
-            .map { case (filter, partitionedPath) =>
-              singleIterable(
-                inputFile               = partitionedPath.inputFile,
-                valueCodecConfiguration = valueCodecConfiguration,
-                projectedSchemaOpt      = projectedSchemaOpt,
-                filterCompat            = filter,
-                hadoopConf              = hadoopConf
-              ).appendTransformation(setPartitionValues(partitionedPath))
-            }
+          lazy val fallbackFilterCompat = filter.toNonPredicateFilterCompat
+          val iterables = partitionedDirectory.paths.map { partitionedPath =>
+            singleIterable(
+              inputFile               = partitionedPath.inputFile,
+              valueCodecConfiguration = valueCodecConfiguration,
+              projectedSchemaOpt      = projectedSchemaOpt,
+              filterCompat            = partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(FilterCompat.get),
+              hadoopConf              = hadoopConf
+            ).appendTransformation(setPartitionValues(partitionedPath))
+          }
           new CompoundParquetIterable[T](iterables)
       }
 

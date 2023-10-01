@@ -27,7 +27,7 @@ private[parquet4s] class LazyDelegateStats(
             FilteredFileStats(status, hadoopConf, vcc, projectionSchemaOpt, filter)
         }
         if (statsArray.length == 1) statsArray.head
-        else new CompoundStats(statsArray.toIndexedSeq)
+        else new CompoundStats(statsArray)
       case _ if filter.isInstanceOf[NoOpFilter] =>
         new FileStats(inputFile, vcc, projectionSchemaOpt)
       case _ =>

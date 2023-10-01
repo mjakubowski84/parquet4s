@@ -1,10 +1,9 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.FilterRewriter.{IsFalse, IsTrue}
 import com.github.mjakubowski84.parquet4s.PartitionedDirectory.PartitioningSchema
+import com.github.mjakubowski84.parquet4s.PartitionedPath.Partition
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileStatus
-import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators.Column
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Operators, UserDefinedPredicate}
 import org.apache.parquet.hadoop.util.HadoopInputFile
@@ -15,21 +14,47 @@ import org.slf4j.LoggerFactory
 
 object PartitionedPath {
 
+  type Partition = (ColumnPath, String)
+
   def apply(
       fileStatus: FileStatus,
       configuration: Configuration,
-      partitions: List[(ColumnPath, String)]
+      partitions: List[Partition],
+      filterPredicateOpt: Option[FilterPredicate]
   ): PartitionedPath =
-    apply(HadoopInputFile.fromStatus(fileStatus, configuration), partitions)
+    apply(HadoopInputFile.fromStatus(fileStatus, configuration), partitions, filterPredicateOpt)
 
-  def apply(path: Path, configuration: Configuration, partitions: List[(ColumnPath, String)]): PartitionedPath =
-    apply(HadoopInputFile.fromPath(path.toHadoop, configuration), partitions)
+  def apply(
+      path: Path,
+      configuration: Configuration,
+      partitions: List[Partition],
+      filterPredicateOpt: Option[FilterPredicate]
+  ): PartitionedPath =
+    apply(HadoopInputFile.fromPath(path.toHadoop, configuration), partitions, filterPredicateOpt)
 
-  def apply(hadoopInputFile: HadoopInputFile, partitions: List[(ColumnPath, String)]): PartitionedPath =
+  def apply(
+      hadoopInputFile: HadoopInputFile,
+      partitions: List[Partition],
+      filterPredicateOpt: Option[FilterPredicate]
+  ): PartitionedPath =
+    apply(
+      path               = Path(hadoopInputFile.getPath),
+      inputFile          = hadoopInputFile,
+      partitions         = partitions,
+      filterPredicateOpt = filterPredicateOpt
+    )
+
+  private def apply(
+      path: Path,
+      inputFile: HadoopInputFile,
+      partitions: List[Partition],
+      filterPredicateOpt: Option[FilterPredicate]
+  ): PartitionedPath =
     new PartitionedPathImpl(
-      path       = Path(hadoopInputFile.getPath),
-      inputFile  = hadoopInputFile,
-      partitions = partitions.map { case (name, value) => (name, Binary.fromString(value)) }
+      path               = path,
+      inputFile          = inputFile,
+      partitions         = partitions.map { case (name, value) => (name, Binary.fromString(value)) },
+      filterPredicateOpt = filterPredicateOpt
     )
 
 }
@@ -52,11 +77,13 @@ trait PartitionedPath {
   /** @return
     *   list of partition names
     */
+  @deprecated(message = "Use view.schema instead", since = "2.17.0")
   def schema: PartitionedDirectory.PartitioningSchema
 
   /** @return
     *   value of given partition or None if there is no such partition in that path
     */
+  @deprecated(message = "Use view.value instead", since = "2.17.0")
   def value(columnPath: ColumnPath): Option[Binary]
 
   /** @return
@@ -64,21 +91,57 @@ trait PartitionedPath {
     */
   def partitions: List[(ColumnPath, Binary)]
 
+  /** @return
+    *   Rewritten filter predicate, which is a simplified by removal of references to partition fields. To be used to
+    *   filter files in the partition.
+    */
+  def filterPredicateOpt: Option[FilterPredicate]
+
+  /** View over partition data.
+    */
+  def view: PartitionView
+
+}
+
+object PartitionView {
+  def apply(partitions: List[Partition]): PartitionView =
+    new PartitionView(partitions.map { case (name, value) => (name, Binary.fromString(value)) })
+  def apply(partitions: Partition*): PartitionView = PartitionView(partitions.toList)
+}
+
+/** View over partition data.
+  *
+  * @param partitions
+  */
+class PartitionView(partitions: List[(ColumnPath, Binary)]) {
+  private lazy val partitionMap: Map[ColumnPath, Binary] = partitions
+    .foldLeft(Map.newBuilder[ColumnPath, Binary])(_ += _)
+    .result()
+
+  /** The list of all partition fields in given [[PartitionedDirectory]] .
+    */
+  lazy val schema: PartitionedDirectory.PartitioningSchema = partitions.map(_._1)
+
+  /** @param columnPath
+    *   partition name
+    * @return
+    *   a value of given partion field
+    */
+  def value(columnPath: ColumnPath): Option[Binary] = partitionMap.get(columnPath)
 }
 
 private class PartitionedPathImpl(
     override val path: Path,
     override val inputFile: InputFile,
-    override val partitions: List[(ColumnPath, Binary)]
+    override val partitions: List[(ColumnPath, Binary)],
+    override val filterPredicateOpt: Option[FilterPredicate]
 ) extends PartitionedPath {
 
-  private val partitionMap: Map[ColumnPath, Binary] = partitions
-    .foldLeft(Map.newBuilder[ColumnPath, Binary])(_ += _)
-    .result()
+  override val view: PartitionView = new PartitionView(partitions)
 
-  override val schema: PartitioningSchema = partitions.map(_._1)
+  override val schema: PartitioningSchema = view.schema
 
-  override def value(columnPath: ColumnPath): Option[Binary] = partitionMap.get(columnPath)
+  override def value(columnPath: ColumnPath): Option[Binary] = view.value(columnPath)
 
   override lazy val toString: String = path.toString
 
@@ -88,12 +151,13 @@ private class PartitionedPathImpl(
     case that: PartitionedPathImpl =>
       (that canEqual this) &&
         path == that.path &&
-        partitions == that.partitions
+        partitions == that.partitions &&
+        filterPredicateOpt == that.filterPredicateOpt
     case _ => false
   }
 
   override def hashCode(): Int = {
-    val state = Seq(path, partitions)
+    val state = Seq(path, partitions, filterPredicateOpt)
     state.map(_.hashCode()).foldLeft(0)((a, b) => 31 * a + b)
   }
 }
@@ -115,7 +179,7 @@ object PartitionedDirectory {
     )
 
   def apply(partitionedPaths: Iterable[PartitionedPath]): Either[Exception, PartitionedDirectory] = {
-    val grouped = partitionedPaths.groupBy(_.schema)
+    val grouped = partitionedPaths.groupBy(_.view.schema)
     if (grouped.size <= 1)
       Right(
         new PartitionedDirectory {
@@ -153,58 +217,40 @@ private[parquet4s] object PartitionFilter {
 
   private def debug(msg: => String): Unit = if (logger.isDebugEnabled()) logger.debug(msg)
 
-  /** Generates an iterable of pairs: Parquet filter and [[PartitionedPath]] for given [[PartitionedDirectory]].
-    * @param filter
-    *   filter that shall be applied to both partitions and Parquet files
-    * @param valueCodecConfiguration
-    *   configuration used when decoding filter values
-    * @param partitionedDirectory
-    *   directory to read
+  /** @param filterPredicate
+    *   filter to be applied to each path
+    * @param commonPartitions
+    *   partitions resolved from parent directories
+    * @param partitionedPaths
+    *   partition paths to be filtered
     * @return
-    *   paths that meet the filter accompanied by rewritten filters that shall be used to process Parquet files
+    *   partition paths that meet the filter
     */
-  def filter(
-      filter: Filter,
-      valueCodecConfiguration: ValueCodecConfiguration,
-      partitionedDirectory: PartitionedDirectory
-  ): Iterable[(FilterCompat.Filter, PartitionedPath)] =
-    if (filter == Filter.noopFilter) {
-      val filterCompat = filter.toFilterCompat(valueCodecConfiguration)
-      partitionedDirectory.paths.map(pp => (filterCompat, pp))
-    } else filterNonEmptyPredicate(filter.toPredicate(valueCodecConfiguration), partitionedDirectory)
-
-  private def filterNonEmptyPredicate(
+  def filterPartitionPaths(
       filterPredicate: FilterPredicate,
-      partitionedDirectory: PartitionedDirectory
-  ): Iterable[(FilterCompat.Filter, PartitionedPath)] = {
-    val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, partitionedDirectory.schema)
-    debug(s"Using rewritten predicate to filter partitions: $partitionFilterPredicate")
-    partitionedDirectory.paths
-      .filter {
-        case _ if partitionFilterPredicate == AssumeTrue => true
-        case partitionedPath => partitionFilterPredicate.accept(new PartitionFilter(partitionedPath))
-      }
-      .map(partitionedPath => (FilterRewriter.rewrite(filterPredicate, partitionedPath), partitionedPath))
-      .flatMap {
-        case (IsTrue, partitionedPath) =>
-          debug(s"Filter $filterPredicate for $partitionedPath is always true, filter will be ignored")
-          Some(FilterCompat.NOOP, partitionedPath)
-        case (IsFalse, partitionedPath) =>
-          /*
-            Should never happen as filtering by partition covers this case but let's be safe in case some complex
-            (user defined?) predicate passes partition filtering
-           */
-          debug(s"Filter $filterPredicate for $partitionedPath is always false, path won't be read")
+      commonPartitions: List[Partition],
+      partitionedPaths: Vector[(Path, Partition)]
+  ): Vector[(Path, List[Partition])] =
+    partitionedPaths.flatMap { case (path, partition) =>
+      // TODO maybe using vector is better (we are appending here!)
+      val partitions               = commonPartitions :+ partition
+      val partitioningSchema       = partitions.map { case (columnPath, _) => columnPath }
+      val partitionFilterPredicate = PartitionFilterRewriter.rewrite(filterPredicate, partitioningSchema)
+      if (partitionFilterPredicate == AssumeTrue) {
+        Some(path, partitions)
+      } else {
+        if (partitionFilterPredicate.accept(new PartitionFilter(PartitionView(partitions)))) {
+          Some(path, partitions)
+        } else {
+          debug(s"Skipping $path as it doesn't match filter $filterPredicate")
           None
-        case (rewritten, partitionedPath) =>
-          debug(s"Filter $filterPredicate for $partitionedPath is rewritten to $rewritten")
-          Some(FilterCompat.get(rewritten), partitionedPath)
+        }
       }
-  }
+    }
 
 }
 
-private class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPredicate.Visitor[Boolean] {
+private class PartitionFilter(partitionView: PartitionView) extends FilterPredicate.Visitor[Boolean] {
 
   override def visit[T <: Comparable[T]](eq: Operators.Eq[T]): Boolean =
     applyOperator(eq.getColumn, eq.getValue)(_ == 0)
@@ -247,7 +293,7 @@ private class PartitionFilter(partitionedPath: PartitionedPath) extends FilterPr
   private def applyOperator[T <: Comparable[T]](column: Column[T])(op: Binary => Boolean): Boolean = {
     val columnPath = ColumnPath(column.getColumnPath)
     val filterType = column.getColumnType
-    partitionedPath.value(columnPath) match {
+    partitionView.value(columnPath) match {
       case None =>
         false
       case Some(partitionValue) if filterType == classOf[Binary] =>
@@ -367,25 +413,25 @@ private[parquet4s] object FilterRewriter {
     * Result shall be used to filter Parquet files.
     * @param filterPredicate
     *   predicate to rewrite
-    * @param partitionedPath
-    *   partitioned path against which filter has to be rewritten
+    * @param partitionView
+    *   partition data against which filter has to be rewritten
     * @return
     *   rewritten filter predicate
     */
-  def rewrite(filterPredicate: FilterPredicate, partitionedPath: PartitionedPath): FilterPredicate =
-    filterPredicate.accept(new FilterRewriter(partitionedPath))
+  def rewrite(filterPredicate: FilterPredicate, partitionView: PartitionView): FilterPredicate =
+    filterPredicate.accept(new FilterRewriter(partitionView))
 
 }
 
-private class FilterRewriter(partitionedPath: PartitionedPath) extends FilterPredicate.Visitor[FilterPredicate] {
+private class FilterRewriter(partitionView: PartitionView) extends FilterPredicate.Visitor[FilterPredicate] {
 
   import FilterRewriter.*
 
   private def isPartitionFilter(column: Column[?]): Boolean =
-    partitionedPath.schema.contains(ColumnPath(column.getColumnPath))
+    partitionView.schema.contains(ColumnPath(column.getColumnPath))
 
   private def evaluate(filterPredicate: FilterPredicate): FilterPredicate =
-    if (filterPredicate.accept(new PartitionFilter(partitionedPath))) IsTrue
+    if (filterPredicate.accept(new PartitionFilter(partitionView))) IsTrue
     else IsFalse
 
   override def visit[T <: Comparable[T]](eq: Operators.Eq[T]): FilterPredicate =
