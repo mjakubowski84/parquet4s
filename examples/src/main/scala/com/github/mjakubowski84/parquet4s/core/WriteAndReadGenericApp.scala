@@ -7,6 +7,7 @@ import org.apache.parquet.schema.{LogicalTypeAnnotation, MessageType, Types}
 
 import java.nio.file.Files
 import java.time.LocalDate
+import scala.util.Using
 
 object WriteAndReadGenericApp extends App {
 
@@ -41,12 +42,13 @@ object WriteAndReadGenericApp extends App {
   ParquetWriter.generic(schema).writeAndClose(path.append("users.parquet"), users)
 
   // read
-  val readData = ParquetReader.generic.read(path)
-  try readData.foreach { record =>
-    val id       = record.get[Long](ID, vcc)
-    val name     = record.get[String](Name, vcc)
-    val birthday = record.get[LocalDate](Birthday, vcc)
-    println(s"User[$ID=$id,$Name=$name,$Birthday=$birthday]")
-  } finally readData.close()
+  Using.resource(ParquetReader.generic.read(path)) { readData =>
+    readData.foreach { record =>
+      val id       = record.get[Long](ID, vcc)
+      val name     = record.get[String](Name, vcc)
+      val birthday = record.get[LocalDate](Birthday, vcc)
+      println(s"User[$ID=$id,$Name=$name,$Birthday=$birthday]")
+    }
+  }
 
 }

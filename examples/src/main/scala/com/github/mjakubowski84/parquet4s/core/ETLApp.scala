@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s.core
 import com.github.mjakubowski84.parquet4s.*
 
 import java.nio.file.Files
+import scala.util.Using
 
 object ETLApp extends App {
 
@@ -27,7 +28,7 @@ object ETLApp extends App {
     Pet(4L, "Sunshine", 4L)
   )
 
-  // write
+  // prepare input data
   ParquetWriter.of[Owner].writeAndClose(ownerPath, owners)
   ParquetWriter.of[Pet].writeAndClose(petsPath, pets)
 
@@ -48,12 +49,17 @@ object ETLApp extends App {
     )
     .read(petsPath)
 
-  readOwners
-    .innerJoin(right = readPets, onLeft = Col("id"), onRight = Col("ownerId")) // define join operation
-    .as[PetOwner] // set typed schema and codecs
-    .writeAndClose(outputPath) // execute all operations defined above and write results to disk
+  // perform ETL
+  Using.resources(readOwners, readPets) { case (owners, pets) =>
+    owners
+      .innerJoin(right = pets, onLeft = Col("id"), onRight = Col("ownerId")) // define join operation
+      .as[PetOwner] // set typed schema and codecs
+      .writeAndClose(outputPath) // execute all operations defined above and write results to disk
+  }
 
   // take note that all operations defined above writeAndClose are lazy and are not executed
-  // until writeAndClose is called
+  // before writeAndClose is called
 
+  // read ETL results
+  Using.resource(ParquetReader.as[PetOwner].read(outputPath))(_.foreach(println))
 }

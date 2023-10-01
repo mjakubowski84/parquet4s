@@ -4,6 +4,7 @@ import com.github.mjakubowski84.parquet4s.*
 
 import java.nio.file.Files
 import java.time.LocalDate
+import scala.util.Using
 
 object ColumnProjectionAndDataConcatenationApp extends App {
 
@@ -59,7 +60,6 @@ object ColumnProjectionAndDataConcatenationApp extends App {
   val readAllUserNames = readUsers1.concat(readUsers2)
 
   // execute
-  try readAllUserNames.foreach(println)
-  finally readAllUserNames.close()
+  Using.resource(readAllUserNames)(_.foreach(println))
 
 }

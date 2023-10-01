@@ -23,6 +23,7 @@ Please note that this is an experimental feature. API may change in the future, 
 
 ```scala mdoc:compile-only
 import com.github.mjakubowski84.parquet4s.{Col, ParquetReader, Path}
+import scala.util.Using
 
 case class PetOwner(id: Long, name: String, petId: Long, petName: String)
 
@@ -44,11 +45,13 @@ val readPets = ParquetReader
   .read(Path("/pets"))
 
 // join and write output dataset
-readOwners
-  .innerJoin(right = readPets, onLeft = Col("id"), onRight = Col("ownerId")) // define join operation
-  .as[PetOwner] // set typed schema and codecs
-  .writeAndClose(Path("/pet_owners/file.parquet")) // execute all including write to the disk
+Using.resources(readOwners, readPets) { case (owners, pets) =>
+  owners
+    .innerJoin(right = pets, onLeft = Col("id"), onRight = Col("ownerId")) // define join operation
+    .as[PetOwner] // set typed schema and codecs
+    .writeAndClose(Path("/pet_owners/file.parquet")) // execute all including write to the disk
+}
 
-// take note that all operations defined above writeAndClose are lazy and are not execute until 
+// take note that all operations defined above writeAndClose are lazy and are not executed before 
 // writeAndClose is called
 ```

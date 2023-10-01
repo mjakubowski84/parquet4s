@@ -4,6 +4,7 @@ import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path}
 
 import java.nio.file.Files
 import scala.util.Random
+import scala.util.Using
 
 object WriteIncrementallyAndReadApp extends App {
 
@@ -19,8 +20,6 @@ object WriteIncrementallyAndReadApp extends App {
   finally writer.close()
 
   // read
-  val readData = ParquetReader.as[Data].read(path)
-  try readData.foreach(println)
-  finally readData.close()
+  Using.resource(ParquetReader.as[Data].read(path))(_.foreach(println))
 
 }

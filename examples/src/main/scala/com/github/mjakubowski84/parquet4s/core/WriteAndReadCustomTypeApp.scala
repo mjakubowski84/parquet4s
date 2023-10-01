@@ -5,6 +5,7 @@ import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.*
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path}
 
 import java.nio.file.Files
+import scala.util.Using
 
 object WriteAndReadCustomTypeApp extends App {
 
@@ -20,9 +21,7 @@ object WriteAndReadCustomTypeApp extends App {
   ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
   // read
-  val readData = ParquetReader.as[Data].read(path)
   // hint: you can filter by dict using string value, for example: filter = Col("dict") === "A"
-  try readData.foreach(println)
-  finally readData.close()
+  Using.resource(ParquetReader.as[Data].read(path))(_.foreach(println))
 
 }

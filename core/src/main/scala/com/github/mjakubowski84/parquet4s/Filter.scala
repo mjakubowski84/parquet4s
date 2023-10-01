@@ -1,9 +1,55 @@
 package com.github.mjakubowski84.parquet4s
 
+import org.apache.parquet.filter.RecordFilter as ParquetRecordFilter
+import org.apache.parquet.filter.UnboundRecordFilter
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators.*
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
+
+/** Provides filtering of Parquet records based on their index. Cannot be joined with other filters using boolean
+  * algebra.
+  */
+@experimental
+trait RecordFilter extends Filter {
+
+  protected[parquet4s] def toUnboundedRecordFilter: UnboundRecordFilter
+
+  override protected[parquet4s] def toFilterCompat(
+      valueCodecConfiguration: ValueCodecConfiguration
+  ): FilterCompat.Filter =
+    FilterCompat.get(toUnboundedRecordFilter)
+
+  override private[parquet4s] def toNonPredicateFilterCompat: FilterCompat.Filter =
+    FilterCompat.get(toUnboundedRecordFilter)
+
+}
+
+object RecordFilter {
+
+  /** Creates a filter which drops Parquet records that do not match given `indexFilter`.
+    * @param indexFilter
+    *   to be applied to each record index
+    */
+  @experimental
+  def apply(indexFilter: Long => Boolean): RecordFilter = new RecordFilterImpl(indexFilter)
+}
+
+private class RecordFilterImpl(indexFilter: Long => Boolean) extends RecordFilter {
+
+  override protected[parquet4s] def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+    throw new UnsupportedOperationException("RecordFilter cannot be joined with predicates")
+
+  override protected[parquet4s] def toUnboundedRecordFilter: UnboundRecordFilter = _ =>
+    new ParquetRecordFilter {
+      private var counter: Long = 0L
+      override def isMatch: Boolean = {
+        val currentIndex = counter
+        counter = counter + 1
+        indexFilter(currentIndex)
+      }
+    }
+}
 
 /** Filter provides a way to define filtering predicates with a simple algebra. Use filters to process your files while
   * it is read from a file system and BEFORE its content is transferred to your application. <br/> You can filter by
@@ -21,8 +67,10 @@ trait Filter {
 
   protected[parquet4s] def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate
 
-  private[parquet4s] def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
+  protected[parquet4s] def toFilterCompat(valueCodecConfiguration: ValueCodecConfiguration): FilterCompat.Filter =
     FilterCompat.get(toPredicate(valueCodecConfiguration))
+
+  private[parquet4s] def toNonPredicateFilterCompat: FilterCompat.Filter = FilterCompat.NOOP
 
   /** @return
     *   New filter that passes data that match `this` <b>and<b> `other` filter.

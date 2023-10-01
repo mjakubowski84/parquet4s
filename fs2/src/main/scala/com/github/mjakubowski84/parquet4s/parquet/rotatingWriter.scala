@@ -537,7 +537,7 @@ object rotatingWriter {
       prewriteTransformation: T => Stream[F, W],
       postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
       options: ParquetWriter.Options
-  )(implicit F: Async[F]): Pipe[F, T, T] = // TODO check if we still need Async or can we go with Concurrent
+  )(implicit F: Async[F]): Pipe[F, T, T] =
     in =>
       for {
         schema                  <- Stream.eval(schemaF)

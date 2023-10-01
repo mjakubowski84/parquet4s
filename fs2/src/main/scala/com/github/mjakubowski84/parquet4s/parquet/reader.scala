@@ -313,20 +313,23 @@ object reader {
       vcc: ValueCodecConfiguration,
       chunkSize: Int,
       metadataReader: MetadataReader
-  )(implicit F: Sync[F]): Stream[F, Stream[F, RowParquetRecord]] =
+  )(implicit F: Sync[F]): Stream[F, Stream[F, RowParquetRecord]] = {
+    val fallbackFilterCompat = F.delay(filter.toNonPredicateFilterCompat)
     for {
       logger               <- Stream.eval(logger[F](this.getClass))
-      partitionedDirectory <- io.findPartitionedPaths(basePath, options.hadoopConf, logger)
+      partitionedDirectory <- io.listPartitionedDirectory(basePath, options.hadoopConf, logger, filter, vcc)
       projectedSchemaOpt <- Stream.eval(
         projectedSchemaResolverOpt
           .traverse(implicit resolver =>
             F.catchNonFatal(ParquetSchemaResolver.resolveSchema(toSkip = partitionedDirectory.schema))
           )
       )
-      partitionData <- Stream
-        .eval(F.catchNonFatal(PartitionFilter.filter(filter, vcc, partitionedDirectory)))
-        .flatMap(Stream.iterable)
-      (partitionFilter, partitionedPath) = partitionData
+      partitionedPath <- Stream.iterable(partitionedDirectory.paths)
+      partitionFilter <- Stream.eval(
+        partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(pathFilterPredicate =>
+          F.catchNonFatal(FilterCompat.get(pathFilterPredicate))
+        )
+      )
       parquetIterator <- Stream.resource(
         parquetIteratorResource(
           inputFile           = partitionedPath.inputFile,
@@ -337,6 +340,7 @@ object reader {
         )
       )
     } yield partitionedReaderStream[F](parquetIterator, partitionedPath, chunkSize)
+  }
 
   private def readSingleFile[F[_], T](
       inputFile: InputFile,

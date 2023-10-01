@@ -15,5 +15,5 @@ object WriteAndReadApp extends App {
   ParquetWriter.of[Data].writeAndClose(path.append("data.parquet"), data)
 
   // read
-  Using(ParquetReader.as[Data].read(path))(_.foreach(println))
+  Using.resource(ParquetReader.as[Data].read(path))(_.foreach(println))
 }
