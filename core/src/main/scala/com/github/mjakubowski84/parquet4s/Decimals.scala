@@ -27,11 +27,14 @@ object Decimals {
       Scale and precision is stored separately in metadata.
       Value needs to be rescaled with default scale and precision for BigDecimal before saving.
      */
+    println("Executing binaryFromDecimal: " + BigDecimal)
     val buf      = ByteBuffer.allocate(ByteArrayLength)
     val unscaled = rescale(decimal).bigDecimal.unscaledValue().toByteArray
     // BigInteger is stored in tail of byte array, sign is stored in unoccupied cells
     val sign: Byte = if (unscaled.head < 0) -1 else 0
     (0 until ByteArrayLength - unscaled.length).foreach(_ => buf.put(sign))
+
+    println("unscaled value: " + unscaled)
     buf.put(unscaled)
     Binary.fromReusedByteArray(buf.array())
   }
