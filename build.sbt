@@ -10,6 +10,9 @@ lazy val twoThirteen            = "2.13.11"
 lazy val three                  = "3.3.0"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
+val akkaLib  = ActorLibCross("-akka", "-akka")
+val pekkoLib = ActorLibCross("-pekko", "-pekko")
+
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / version := "2.14.0"
 ThisBuild / isSnapshot := true
@@ -57,11 +60,10 @@ lazy val sparkDeps = Seq(
     exclude (org = "org.apache.hadoop", name = "hadoop-client")
 )
 
-lazy val core = (project in file("core"))
+lazy val core = (projectMatrix in file("core"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-core",
-    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.parquet" % "parquet-hadoop" % parquetVersion
         exclude (org = "org.slf4j", name = "slf4j-api"),
@@ -73,15 +75,19 @@ lazy val core = (project in file("core"))
       "org.scalatest" %% "scalatest" % scalatestVersion % "test,it",
       "ch.qos.logback" % "logback-classic" % logbackVersion % "test,it",
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
-    ) ++ {
-      CrossVersion.partialVersion(scalaBinaryVersion.value) match {
-        case Some((2, 12 | 13)) => sparkDeps :+ ("com.chuusai" %% "shapeless" % shapelessVersion)
-        case _                  => Seq.empty
-      }
-    },
+    ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
     )
+  )
+  .jvmPlatform(
+    scalaVersions = Seq(twoTwelve, twoThirteen),
+    settings = Def.settings(
+      libraryDependencies ++= sparkDeps :+ ("com.chuusai" %% "shapeless" % shapelessVersion)
+    )
+  )
+  .jvmPlatform(
+    scalaVersions = Seq(three)
   )
   .settings(compilationSettings)
   .settings(itSettings)
@@ -89,17 +95,36 @@ lazy val core = (project in file("core"))
   .settings(testReportSettings)
   .dependsOn(testkit % "it->compile")
 
-lazy val akka = (project in file("akka"))
+lazy val akkaPekko = (projectMatrix in file("akkaPekko"))
   .configs(IntegrationTest)
   .settings(
-    name := "parquet4s-akka",
-    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-stream" % akkaVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
+    )
+  )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions,
+    axisValues    = Seq(akkaLib),
+    settings = Def.settings(
+      name := "parquet4s-akka",
+      libraryDependencies ++= Seq(
+        "com.typesafe.akka" %% "akka-actor" % "2.6.21",
+        "com.typesafe.akka" %% "akka-stream" % "2.6.21"
+      )
+    )
+  )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions,
+    axisValues    = Seq(pekkoLib),
+    settings = Def.settings(
+      name := "parquet4s-pekko",
+      libraryDependencies ++= Seq(
+        "org.apache.pekko" %% "pekko-actor" % "1.0.1",
+        "org.apache.pekko" %% "pekko-stream" % "1.0.1"
+      )
     )
   )
   .settings(compilationSettings)
@@ -108,11 +133,10 @@ lazy val akka = (project in file("akka"))
   .settings(testReportSettings)
   .dependsOn(core % "compile->compile;it->it")
 
-lazy val fs2 = (project in file("fs2"))
+lazy val fs2 = (projectMatrix in file("fs2"))
   .configs(IntegrationTest)
   .settings(
     name := "parquet4s-fs2",
-    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "co.fs2" %% "fs2-core" % fs2Version,
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
@@ -124,39 +148,53 @@ lazy val fs2 = (project in file("fs2"))
       ExclusionRule("org.slf4j", "slf4j-log4j12")
     )
   )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions
+  )
   .settings(compilationSettings)
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
   .dependsOn(core % "compile->compile;test->test", testkit % "it->compile")
 
-lazy val scalaPB = (project in file("scalapb"))
+lazy val scalaPB = (projectMatrix in file("scalapb"))
   .configs(IntegrationTest)
   .settings(
-    name := "parquet4s-scalapb",
-    crossScalaVersions := supportedScalaVersions,
-    compileOrder := CompileOrder.JavaThenScala,
     libraryDependencies ++= Seq(
       "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Test,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion % Test,
       "org.typelevel" %% "cats-effect-testing-scalatest" % "1.5.0" % Test
     ),
+    compileOrder := CompileOrder.JavaThenScala,
     Test / PB.targets := Seq(
       scalapb.gen(flatPackage = true, lenses = false) -> ((Test / sourceManaged).value / "protobuf/scala"),
       PB.gens.java -> ((Test / sourceManaged).value / "protobuf/java")
+    )
+  )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions,
+    axisValues    = Seq(akkaLib),
+    settings = Def.settings(
+      name := "parquet4s-scalapb-akka"
+    )
+  )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions,
+    axisValues    = Seq(pekkoLib),
+    settings = Def.settings(
+      name := "parquet4s-scalapb-pekko"
     )
   )
   .settings(compilationSettings)
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
-  .dependsOn(core % "compile->compile;test->test", akka % "test->compile", fs2 % "test->compile")
+  .dependsOn(core % "compile->compile;test->test", akkaPekko % "test->compile", fs2 % "test->compile")
 
-lazy val testkit = (project in file("testkit"))
+lazy val testkit = (projectMatrix in file("testkit"))
   .settings(
     name := "parquet4s-testkit",
-    crossScalaVersions := supportedScalaVersions,
     publish / skip := true,
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
@@ -169,29 +207,26 @@ lazy val testkit = (project in file("testkit"))
       "ch.qos.logback" % "logback-classic" % logbackVersion
     )
   )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions
+  )
 
-lazy val examples = (project in file("examples"))
+lazy val examples = (projectMatrix in file("examples"))
   .settings(
-    name := "parquet4s-examples",
-    crossScalaVersions := Seq(twoTwelve, twoThirteen),
-    publish / skip := true,
-    publishLocal / skip := true,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
       "io.github.embeddedkafka" %% "embedded-kafka" % "3.5.1",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.typesafe.akka" %% "akka-stream-kafka" % {
-        if (scalaVersion.value == twoThirteen) { "3.0.1" } // non-licensed version
-        else { "2.1.1" }
-      },
       "com.github.fd4s" %% "fs2-kafka" % "3.0.1",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
     ),
+    publish / skip := true,
+    publishLocal / skip := true,
     evictionErrorLevel := util.Level.Warn,
     run / cancelable := true,
     run / fork := true,
@@ -201,15 +236,39 @@ lazy val examples = (project in file("examples"))
       PB.gens.java -> ((Compile / sourceManaged).value / "protobuf/java")
     )
   )
+  .jvmPlatform(
+    scalaVersions = Seq(twoTwelve, twoThirteen),
+    axisValues    = Seq(akkaLib),
+    settings = Def.settings(
+      name := "parquet4s-examples-akka",
+      libraryDependencies ++= Seq(
+        "com.typesafe.akka" %% "akka-stream-kafka" % {
+          if (scalaVersion.value == twoThirteen) {
+            "3.0.1"
+          } // non-licensed version
+          else {
+            "2.1.1"
+          }
+        }
+      )
+    )
+  )
+  .jvmPlatform(
+    scalaVersions = Seq(twoTwelve, twoThirteen),
+    axisValues    = Seq(pekkoLib),
+    settings = Def.settings(
+      name := "parquet4s-examples-pekko",
+      libraryDependencies ++= Seq("org.apache.pekko" %% "pekko-connectors-kafka" % "1.0.0")
+    )
+  )
   .settings(compilationSettings)
-  .dependsOn(akka, fs2, scalaPB)
+  .dependsOn(akkaPekko, fs2, scalaPB)
 
-lazy val coreBenchmarks = (project in file("coreBenchmarks"))
+lazy val coreBenchmarks = (projectMatrix in file("coreBenchmarks"))
   .settings(
     name := "parquet4s-core-benchmarks",
     publish / skip := true,
     publishLocal / skip := true,
-    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
@@ -220,17 +279,18 @@ lazy val coreBenchmarks = (project in file("coreBenchmarks"))
     ),
     run / cancelable := true,
     run / fork := true
+  )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions
   )
   .settings(compilationSettings)
   .enablePlugins(JmhPlugin)
   .dependsOn(core)
 
-lazy val akkaBenchmarks = (project in file("akkaBenchmarks"))
+lazy val akkaPekkoBenchmarks = (projectMatrix in file("akkaPekkoBenchmarks"))
   .settings(
-    name := "parquet4s-akka-benchmarks",
     publish / skip := true,
     publishLocal / skip := true,
-    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
@@ -242,16 +302,29 @@ lazy val akkaBenchmarks = (project in file("akkaBenchmarks"))
     run / cancelable := true,
     run / fork := true
   )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions,
+    axisValues    = Seq(akkaLib),
+    settings = Def.settings(
+      name := "parquet4s-akka-benchmarks"
+    )
+  )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions,
+    axisValues    = Seq(pekkoLib),
+    settings = Def.settings(
+      name := "parquet4s-pekko-benchmarks"
+    )
+  )
   .settings(compilationSettings)
   .enablePlugins(JmhPlugin)
-  .dependsOn(akka)
+  .dependsOn(akkaPekko)
 
-lazy val fs2Benchmarks = (project in file("fs2Benchmarks"))
+lazy val fs2Benchmarks = (projectMatrix in file("fs2Benchmarks"))
   .settings(
     name := "parquet4s-fs2-benchmarks",
     publish / skip := true,
     publishLocal / skip := true,
-    crossScalaVersions := supportedScalaVersions,
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
@@ -262,12 +335,15 @@ lazy val fs2Benchmarks = (project in file("fs2Benchmarks"))
     ),
     run / cancelable := true,
     run / fork := true
+  )
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions
   )
   .settings(compilationSettings)
   .enablePlugins(JmhPlugin)
   .dependsOn(fs2)
 
-lazy val documentation = (project in file("site"))
+lazy val documentation = (projectMatrix in file("site"))
   .settings(documentationSettings)
   .settings(
     publish / skip := true,
@@ -284,11 +360,10 @@ lazy val documentation = (project in file("site"))
       "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion
     )
   )
-  .dependsOn(core, akka, fs2, scalaPB)
+  .dependsOn(core, akkaPekko, fs2, scalaPB)
   .enablePlugins(MicrositesPlugin)
 
-lazy val root = (project in file("."))
-  .settings(publishSettings)
+lazy val root = (projectMatrix in file("."))
   .settings(
     crossScalaVersions := Nil,
     publish / skip := true,
@@ -298,13 +373,17 @@ lazy val root = (project in file("."))
   )
   .aggregate(
     core,
-    akka,
+    akkaPekko,
     fs2,
     scalaPB,
     testkit,
     examples,
     coreBenchmarks,
-    akkaBenchmarks,
+    akkaPekkoBenchmarks,
     fs2Benchmarks,
     documentation
   )
+
+Compile / sources := Nil
+Test / sources := Nil
+publish / skip := true

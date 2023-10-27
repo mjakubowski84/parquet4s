@@ -8,6 +8,9 @@ options:
   - title: Integration with Akka Streams
     url: docs/akka
 
+  - title: Integration with Pekko Streams
+    url: docs/pekko
+
   - title: Integration with FS2
     url: docs/fs2
 
