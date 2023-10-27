@@ -6,7 +6,7 @@ permalink: docs/fs2/
 
 # Integration with FS2
 
-FS2 integration allows you to read and write Parquet using functional streams. Functionality is exactly the same as in the case of Akka module. In order to use it, please import the following:
+FS2 integration allows you to read and write Parquet using functional streams. Functionality is exactly the same as in the case of Akka / Pekko module. In order to use it, please import the following:
 
 ```scala
 "com.github.mjakubowski84" %% "parquet4s-fs2" % "@VERSION@"
@@ -93,11 +93,9 @@ object Example extends IOApp.Simple {
 }
 ```
 
+---
+What differentiates FS2 from Akka / Pekko is that, for better performance, FS2 processes stream elements in chunks. Therefore, `viaParquet` and `fromParquet` have a `chunkSize` property that allows a custom definition of the chunk size. The default value is `16`. Override the value to set up your own balance between memory consumption and performance.
 
 ---
-What differentiates FS2 from Akka is that, for better performance, FS2 processes stream elements in chunks. Therefore, `viaParquet` and `fromParquet` have a `chunkSize` property that allows a custom definition of the chunk size. The default value is `16`. Override the value to set up your own balance between memory consumption and performance.
-
----
-
 
 Please check the [examples](https://github.com/mjakubowski84/parquet4s/tree/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/fs2) to learn more.

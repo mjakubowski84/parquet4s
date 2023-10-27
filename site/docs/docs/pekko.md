@@ -1,24 +1,24 @@
 ---
 layout: docs
-title: Integration with Akka Streams
-permalink: docs/akka/
+title: Integration with Pekko Streams
+permalink: docs/pekko/
 ---
 
-# Integration with Akka Streams
+# Integration with Pekko Streams
 
-Parquet4s has an integration module that allows you to read and write Parquet files using Akka Streams. Just import:
+Parquet4s has an integration module that allows you to read and write Parquet files using Pekko Streams. Just import:
 
 ```scala
-"com.github.mjakubowski84" %% "parquet4s-akka" % "@VERSION@"
+"com.github.mjakubowski84" %% "parquet4s-pekko" % "@VERSION@"
 "org.apache.hadoop" % "hadoop-client" % yourHadoopVersion
 ```
 
 `ParquetStreams` has a single `Source` for reading a single file or a directory (can be [partitioned]({% link docs/partitioning.md %})), a `Sink`s for writing a single file and a sophisticated `Flow` for performing complex writes.
 
 ```scala mdoc:compile-only
-import akka.NotUsed
-import akka.actor.ActorSystem
-import akka.stream.scaladsl.Source
+import org.apache.pekko.NotUsed
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.stream.scaladsl.Source
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetStreams, ParquetWriter, Path}
 import org.apache.parquet.hadoop.ParquetFileWriter.Mode
 import org.apache.parquet.hadoop.metadata.CompressionCodecName

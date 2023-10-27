@@ -12,7 +12,7 @@ Based on official [Parquet library](https://github.com/apache/parquet-mr), [Hado
 
 As it is based on Hadoop Client then you can connect to any Hadoop-compatible storage like AWS S3 or Google Cloud Storage.
 
-Integrations for [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html) and [FS2](https://fs2.io/).
+Integrations for [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html), [Pekko Streams](https://pekko.apache.org/docs/pekko/current/stream/index.html), and [FS2](https://fs2.io/).
 
 Released for Scala 2.12.x, 2.13.x and 3.2.x.
 
