@@ -14,7 +14,7 @@ val akkaLib  = ActorLibCross("-akka", "-akka")
 val pekkoLib = ActorLibCross("-pekko", "-pekko")
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.14.0"
+ThisBuild / version := "2.14.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
 

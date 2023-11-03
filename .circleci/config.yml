@@ -7,8 +7,10 @@ executors:
         auth:
           username: $DOCKERHUB_USER
           password: $DOCKERHUB_PASSWORD
+    resource_class: large
     environment:
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=90.0
+      SBT_OPTS: -XX:MaxRAMPercentage=90.0
       TERM: dumb
     working_directory: /tmp
 
@@ -82,7 +84,6 @@ commands:
 jobs:
 
   build:
-    resource_class: large
     executor:
       name: jdk
     steps:
@@ -109,7 +110,6 @@ jobs:
             - repo
 
   test:
-    resource_class: large
     executor:
       name: jdk
     parameters:
@@ -125,7 +125,6 @@ jobs:
           project: << parameters.project >>
 
   release:
-    resource_class: large
     executor:
       name: jdk
     steps:
