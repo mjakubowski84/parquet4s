@@ -9,7 +9,7 @@ executors:
           password: $DOCKERHUB_PASSWORD
     resource_class: large
     environment:
-      JAVA_TOOL_OPTIONS: -XX:+PrintFlagsFinal -XX:MinRAMPercentage=80.0 -XX:MaxRAMPercentage=90.0 -XshowSettings:vm
+      JAVA_TOOL_OPTIONS: -XX:+PrintFlagsFinal -XX:MinRAMPercentage=80.0 -XX:MaxRAMPercentage=90.0 -verbose:sizes
       TERM: dumb
     working_directory: /tmp
 
