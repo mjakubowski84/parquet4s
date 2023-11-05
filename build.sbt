@@ -6,8 +6,8 @@ import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
 lazy val twoTwelve              = "2.12.18"
-lazy val twoThirteen            = "2.13.11"
-lazy val three                  = "3.3.0"
+lazy val twoThirteen            = "2.13.12"
+lazy val three                  = "3.3.1"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 val akkaLib  = ActorLibCross("-akka", "-akka")
@@ -111,8 +111,8 @@ lazy val akkaPekko = (projectMatrix in file("akkaPekko"))
     settings = Def.settings(
       name := "parquet4s-akka",
       libraryDependencies ++= Seq(
-        "com.typesafe.akka" %% "akka-actor" % "2.6.21",
-        "com.typesafe.akka" %% "akka-stream" % "2.6.21"
+        "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+        "com.typesafe.akka" %% "akka-stream" % akkaVersion
       )
     )
   )
@@ -122,8 +122,8 @@ lazy val akkaPekko = (projectMatrix in file("akkaPekko"))
     settings = Def.settings(
       name := "parquet4s-pekko",
       libraryDependencies ++= Seq(
-        "org.apache.pekko" %% "pekko-actor" % "1.0.1",
-        "org.apache.pekko" %% "pekko-stream" % "1.0.1"
+        "org.apache.pekko" %% "pekko-actor" % pekkoVersion,
+        "org.apache.pekko" %% "pekko-stream" % pekkoVersion
       )
     )
   )
@@ -216,10 +216,10 @@ lazy val examples = (projectMatrix in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.5.1",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.6.0",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.github.fd4s" %% "fs2-kafka" % "3.0.1",
+      "com.github.fd4s" %% "fs2-kafka" % "3.2.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(
@@ -348,7 +348,7 @@ lazy val documentation = (projectMatrix in file("site"))
   .settings(
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "mdoc" % "2.3.7",
+      "org.scalameta" %% "mdoc" % "2.4.0",
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion

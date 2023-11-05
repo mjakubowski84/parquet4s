@@ -5,7 +5,7 @@ import com.github.mjakubowski84.parquet4s.stats.CompoundStats
 
 private[parquet4s] class CompoundParquetIterable[T](components: Seq[ParquetIterable[T]]) extends ParquetIterable[T] {
 
-  override val stats = new CompoundStats(components.map(_.stats))
+  override val stats: Stats = new CompoundStats(components.map(_.stats))
 
   override lazy val valueCodecConfiguration: ValueCodecConfiguration =
     components.headOption.map(_.valueCodecConfiguration).getOrElse(ValueCodecConfiguration.Default)
@@ -15,7 +15,9 @@ private[parquet4s] class CompoundParquetIterable[T](components: Seq[ParquetItera
 
   override def close(): Unit = components.foreach(_.close())
 
-  override private[parquet4s] def appendTransformation(transformation: RowParquetRecord => Iterable[RowParquetRecord]) =
+  override private[parquet4s] def appendTransformation(
+      transformation: RowParquetRecord => Iterable[RowParquetRecord]
+  ): ParquetIterable[T] =
     new CompoundParquetIterable[T](components.map(_.appendTransformation(transformation)))
 
   override private[parquet4s] def changeDecoder[U: ParquetRecordDecoder]: ParquetIterable[U] =

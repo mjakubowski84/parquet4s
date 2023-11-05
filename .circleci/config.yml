@@ -9,7 +9,6 @@ executors:
           password: $DOCKERHUB_PASSWORD
     resource_class: large
     environment:
-      SBT_OPTS: -Xmx4G -XX:+UseG1GC -XX:MaxInlineLevel=20
       TERM: dumb
     working_directory: /tmp
 

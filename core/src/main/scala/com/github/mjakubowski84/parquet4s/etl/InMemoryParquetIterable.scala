@@ -10,7 +10,9 @@ private[parquet4s] class InMemoryParquetIterable[T](
     decode: RowParquetRecord => T                                        = identity[RowParquetRecord] _
 ) extends ParquetIterable[T] {
 
-  override private[parquet4s] def appendTransformation(transformation: RowParquetRecord => Iterable[RowParquetRecord]) =
+  override private[parquet4s] def appendTransformation(
+      transformation: RowParquetRecord => Iterable[RowParquetRecord]
+  ): ParquetIterable[T] =
     new InMemoryParquetIterable[T](
       data                    = data,
       valueCodecConfiguration = valueCodecConfiguration,
@@ -18,7 +20,7 @@ private[parquet4s] class InMemoryParquetIterable[T](
       decode                  = decode
     )
 
-  override private[parquet4s] def changeDecoder[U: ParquetRecordDecoder] =
+  override private[parquet4s] def changeDecoder[U: ParquetRecordDecoder]: ParquetIterable[U] =
     new InMemoryParquetIterable[U](
       data                    = data,
       valueCodecConfiguration = valueCodecConfiguration,
@@ -26,7 +28,7 @@ private[parquet4s] class InMemoryParquetIterable[T](
       decode                  = record => ParquetRecordDecoder.decode[U](record, valueCodecConfiguration)
     )
 
-  override private[parquet4s] lazy val stats = new InMemoryStats(data, valueCodecConfiguration)
+  override private[parquet4s] lazy val stats: Stats = new InMemoryStats(data, valueCodecConfiguration)
 
   override def close(): Unit = ()
 

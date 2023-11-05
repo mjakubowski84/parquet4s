@@ -225,7 +225,9 @@ private[parquet4s] class ParquetIterableImpl[T](
       openCloseables = Set.empty
     }
 
-  override private[parquet4s] def appendTransformation(transformation: RowParquetRecord => Iterable[RowParquetRecord]) =
+  override private[parquet4s] def appendTransformation(
+      transformation: RowParquetRecord => Iterable[RowParquetRecord]
+  ): ParquetIterable[T] =
     new ParquetIterableImpl[T](
       iteratorFactory         = iteratorFactory,
       valueCodecConfiguration = valueCodecConfiguration,

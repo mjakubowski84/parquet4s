@@ -12,7 +12,8 @@ object Compilation {
         "-feature",
         "-language:implicitConversions",
         "-language:higherKinds",
-        "-Xfatal-warnings"
+        "-Xfatal-warnings",
+        "-Wconf:src=src_managed/.*:silent"
       ) ++ {
         CrossVersion.partialVersion(scalaVersion.value) match {
           case Some((3, _)) =>
