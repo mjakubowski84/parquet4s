@@ -4,7 +4,7 @@ import org.scalatest.enablers.Sequencing
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.Inspectors
 import org.scalatest.matchers.should.Matchers
-import com.github.mjakubowski84.parquet4s.ValueImplicits._
+import com.github.mjakubowski84.parquet4s.ValueImplicits.*
 
 class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
 
@@ -182,6 +182,13 @@ class ParquetRecordSpec extends AnyFlatSpec with Matchers with Inspectors {
     val b1  = "a string".value
     val b2  = "another string".value
     val lst = ListParquetRecord.Empty.add("array", b1).add("array", b2)
+    lst should contain theSameElementsInOrderAs Seq(b1, b2)
+  }
+
+  it should "accumulate apache arrow primitive values" in {
+    val b1  = "a string".value
+    val b2  = "another string".value
+    val lst = ListParquetRecord.Empty.add("item", b1).add("item", b2)
     lst should contain theSameElementsInOrderAs Seq(b1, b2)
   }
 

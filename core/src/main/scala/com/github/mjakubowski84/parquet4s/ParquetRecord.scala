@@ -510,10 +510,11 @@ object ListParquetRecord {
     val Element      = "element"
     val Array        = "array"
     val ArrayElement = "array_element"
+    val Item         = "item"
   }
 
   private[parquet4s] val ListFieldName = "list"
-  private val ElementNames             = Set(ElementName.Element, ElementName.Array, ElementName.ArrayElement)
+  private val ElementNames = Set(ElementName.Element, ElementName.Array, ElementName.ArrayElement, ElementName.Item)
 
   /** @param elements
     *   to init the record with
