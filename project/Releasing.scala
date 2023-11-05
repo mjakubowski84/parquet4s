@@ -1,5 +1,5 @@
 import sbt.Keys._
-import sbt.{Credentials, Def, Developer, IntegrationTest, Keys, Opts, ScmInfo, Test, url}
+import sbt.{Credentials, Def, Developer, IntegrationTest, Opts, ScmInfo, Test, url}
 import xerial.sbt.Sonatype._
 import xerial.sbt.Sonatype.autoImport.{sonatypeProfileName, sonatypeProjectHosting}
 
@@ -7,13 +7,13 @@ object Releasing {
 
   lazy val publishSettings: Seq[Def.Setting[_]] = {
     Seq(
-      Keys.credentials ++= Seq(
+      credentials ++= Seq(
         Credentials(
           realm = "Sonatype Nexus Repository Manager",
           host  = "oss.sonatype.org",
           userName = sys.env.getOrElse(
-            "SONATYPE_USER_NAME", {
-              streams.value.log.warn("Undefined environment variable: SONATYPE_USER_NAME")
+            "SONATYPE_USERNAME", {
+              streams.value.log.warn("Undefined environment variable: SONATYPE_USERNAME")
               "UNDEFINED"
             }
           ),
@@ -54,7 +54,7 @@ object Releasing {
       ),
       Test / publishArtifact := false,
       IntegrationTest / publishArtifact := false
-    ) ++ (if (sys.env contains "SONATYPE_USER_NAME") Signing.signingSettings else Seq.empty)
+    ) ++ (if (sys.env contains "SONATYPE_USERNAME") Signing.signingSettings else Seq.empty)
   }
 
 }
