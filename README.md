@@ -14,7 +14,7 @@ As it is based on Hadoop Client then you can connect to any Hadoop-compatible st
 
 Integrations for [Akka Streams](https://doc.akka.io/docs/akka/current/stream/index.html), [Pekko Streams](https://pekko.apache.org/docs/pekko/current/stream/index.html), and [FS2](https://fs2.io/).
 
-Released for Scala 2.12.x, 2.13.x and 3.2.x.
+Released for Scala 2.12.x, 2.13.x and 3.3.x.
 
 ## Documentation
 
