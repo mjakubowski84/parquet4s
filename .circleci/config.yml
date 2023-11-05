@@ -133,7 +133,7 @@ jobs:
       - setup_gpg
       - run:
           name: Sign & publish artifacts
-          command: cat /dev/null | sbt +publish
+          command: cat /dev/null | sbt publish
           working_directory: workspace/repo
       - run:
           name: Release on Sonatype
