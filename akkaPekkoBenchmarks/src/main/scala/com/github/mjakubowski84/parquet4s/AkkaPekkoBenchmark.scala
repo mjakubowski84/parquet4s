@@ -4,13 +4,12 @@ import com.github.mjakubowski84.parquet4s.ScalaCompat.Done
 import com.github.mjakubowski84.parquet4s.ScalaCompat.actor.ActorSystem
 import com.github.mjakubowski84.parquet4s.ScalaCompat.stream.ActorAttributes
 import com.github.mjakubowski84.parquet4s.ScalaCompat.stream.scaladsl.{Keep, Sink, Source}
-
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import org.openjdk.jmh.annotations.*
 
 import java.io.IOException
 import java.nio.file.attribute.BasicFileAttributes
-import java.nio.file.{Path as NioPath, _}
+import java.nio.file.{Path as NioPath, *}
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.collection.immutable
@@ -22,11 +21,11 @@ case class Embedded(fraction: Double, text: String)
 case class Record(i: Int, dict: String, embedded: Option[Embedded])
 
 object AkkaPekkoBenchmark {
-  val isAkkaSystem = Done.getClass().getPackage().getName() == "akka"
-
-  val Fractioner = 100.12
-  val Dict       = List("a", "b", "c", "d")
-  val Dispatcher = if (isAkkaSystem) "akka.actor.single-thread-dispatcher" else "pekko.actor.single-thread-dispatcher"
+  val isAkkaSystem: Boolean = Done.getClass.getPackage.getName == "akka"
+  val Fractioner            = 100.12
+  val Dict: Seq[String]     = List("a", "b", "c", "d")
+  val Dispatcher: String =
+    if (isAkkaSystem) "akka.actor.single-thread-dispatcher" else "pekko.actor.single-thread-dispatcher"
 
   @State(Scope.Benchmark)
   class Dataset {
@@ -37,7 +36,7 @@ object AkkaPekkoBenchmark {
     var basePath: Path                      = _
     var records: immutable.Iterable[Record] = _
     var actorSystem: ActorSystem            = _
-    val actorSystemConfig = if (isAkkaSystem) {
+    val actorSystemConfig: Config = if (isAkkaSystem) {
       ConfigFactory.parseString(
         """
           akka.actor.single-thread-dispatcher {
