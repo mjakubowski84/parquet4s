@@ -346,9 +346,10 @@ lazy val fs2Benchmarks = (projectMatrix in file("fs2Benchmarks"))
 lazy val documentation = (projectMatrix in file("site"))
   .settings(documentationSettings)
   .settings(
+    name := "documentation",
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "mdoc" % "2.4.0",
+      "org.scalameta" %% "mdoc" % "2.3.7",
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
@@ -361,6 +362,9 @@ lazy val documentation = (projectMatrix in file("site"))
     )
   )
   .dependsOn(core, akkaPekko, fs2, scalaPB)
+  .jvmPlatform(
+    scalaVersions = Seq(twoThirteen)
+  )
   .enablePlugins(MicrositesPlugin)
 
 lazy val root = (projectMatrix in file("."))

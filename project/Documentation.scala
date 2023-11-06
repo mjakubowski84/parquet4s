@@ -3,6 +3,7 @@ import mdoc.MdocPlugin.autoImport._
 import microsites.MicrositeFavicon
 import microsites.MicrositeKeys._
 import sbt.Keys._
+import sbt.Compile
 import sbt.{Def, url}
 import sbt.io.FileFilter._
 import sbt.io.syntax._
@@ -15,7 +16,7 @@ object Documentation {
       description := "Read and write Parquet files using Scala",
       organizationName := "Marcin Jakubowski",
       organizationHomepage := Some(url("https://github.com/mjakubowski84")),
-      micrositeDocumentationUrl := "docs",
+      micrositeDocumentationUrl := "grem",
       micrositeFooterText := None,
       micrositeBaseUrl := "parquet4s",
       micrositeGitterChannel := false,
@@ -24,8 +25,8 @@ object Documentation {
       micrositeGithubToken := sys.env.get("PARQUET4S_DOCS_GITHUB_TOKEN"),
       micrositePushSiteWith := GitHub4s,
       makeSite / includeFilter := "*.html" || "*.css" || "*.png" || "*.jpg" || "*.gif" || "*.js" || "*.md" || "*.svg",
-      micrositeDataDirectory := baseDirectory.value / "docs" / "data",
-      micrositeImgDirectory := baseDirectory.value / "docs" / "images",
+      micrositeDataDirectory := (Compile / resourceDirectory).value / "docs" / "data",
+      micrositeImgDirectory := (Compile / resourceDirectory).value / "docs" / "images",
       micrositePalette := Map(
         "brand-primary" -> "#F1606A",
         "brand-secondary" -> "#F1606A",
@@ -37,7 +38,8 @@ object Documentation {
       ),
       mdocVariables := Map(
         "VERSION" -> version.value
-      )
+      ),
+      mdocIn := (Compile / resourceDirectory).value / "docs"
     )
 
 }
