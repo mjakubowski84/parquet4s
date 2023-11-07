@@ -351,8 +351,7 @@ lazy val documentation = (projectMatrix in file("site"))
       "org.scalameta" %% "mdoc" % "2.4.0",
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
-      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-
+      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.scala-lang.modules", "scala-collection-compat_2.13")
