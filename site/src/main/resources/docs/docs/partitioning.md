@@ -30,7 +30,7 @@ In Akka:
 ```scala mdoc:compile-only
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Sink, Source}
+import akka.stream.scaladsl.Source
 import com.github.mjakubowski84.parquet4s.{Col, ParquetStreams, Path}
 
 object AkkaExample extends App {
@@ -50,13 +50,13 @@ object AkkaExample extends App {
       .of[User]
       .partitionBy(Col("date.year"), Col("date.month"), Col("date.day"))
       .write(path)
-  ).runWith(Sink.foreach(user => println(s"Just wrote $user")))
+  ).runForeach(user => println(s"Just wrote $user"))
 
   def readPartitionedData = ParquetStreams
     .fromParquet
     .as[User]
     .read(path)
-    .runWith(Sink.foreach(user => println(s"Just read $user")))
+    .runForeach(user => println(s"Just read $user"))
 
   for {
     _ <- writePartitionedData
@@ -69,10 +69,10 @@ object AkkaExample extends App {
 
 In Pekko:
 
-```scala mdoc:compile-only
+```scala
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.stream.scaladsl.{Sink, Source}
+import org.apache.pekko.stream.scaladsl.Source
 import com.github.mjakubowski84.parquet4s.{Col, ParquetStreams, Path}
 
 object PekkoExample extends App {
@@ -92,13 +92,13 @@ object PekkoExample extends App {
       .of[User]
       .partitionBy(Col("date.year"), Col("date.month"), Col("date.day"))
       .write(path)
-  ).runWith(Sink.foreach(user => println(s"Just wrote $user")))
+  ).runForeach(user => println(s"Just wrote $user")))
 
   def readPartitionedData = ParquetStreams
     .fromParquet
     .as[User]
     .read(path)
-    .runWith(Sink.foreach(user => println(s"Just read $user")))
+    .runForeach(user => println(s"Just read $user"))
 
   for {
     _ <- writePartitionedData

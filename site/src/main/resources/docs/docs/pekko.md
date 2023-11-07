@@ -15,7 +15,7 @@ Parquet4s has an integration module that allows you to read and write Parquet fi
 
 `ParquetStreams` has a single `Source` for reading a single file or a directory (can be [partitioned]({% link docs/partitioning.md %})), a `Sink`s for writing a single file and a sophisticated `Flow` for performing complex writes.
 
-```scala mdoc:compile-only
+```scala
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.scaladsl.Source
@@ -51,19 +51,6 @@ users.runWith(
     .write(Path("file:///data/users/user-303.parquet"))
 )
 
-// (Experimental API) Writes a single file using a custom ParquetWriter.
-class UserParquetWriterBuilder(path: Path) extends HadoopParquetWriter.Builder[User, UserParquetWriterBuilder](path.toHadoop) {
-  override def self() = this
-  override def getWriteSupport(conf: Configuration) = ???
-}
-users.runWith(
-  ParquetStreams
-    .toParquetSingleFile
-    .custom[User, UserParquetWriterBuilder](new UserParquetWriterBuilder(Path("file:///data/users/custom.parquet")))
-    .options(writeOptions)
-    .write
-)
-
 // Tailored for writing indefinite streams.
 // Writes file when chunk reaches size limit and when defined time period elapses.
 // Can also partition files!
@@ -86,6 +73,20 @@ ParquetStreams
   .options(ParquetReader.Options(hadoopConf = conf))
   .read(Path("file:///data/users"))
   .runForeach(println)
+
+// (Experimental API) Writes a single file using a custom ParquetWriter.
+class UserParquetWriterBuilder(path: Path) extends HadoopParquetWriter.Builder[User, UserParquetWriterBuilder](path.toHadoop) {
+  override def self() = this
+  override def getWriteSupport(conf: Configuration) = ???
+}
+users.runWith(
+  ParquetStreams
+    .toParquetSingleFile
+    .custom[User, UserParquetWriterBuilder](new UserParquetWriterBuilder(Path("file:///data/users/custom.parquet")))
+    .options(writeOptions)
+    .write
+)
+
 ```
 
 Please check [examples](https://github.com/mjakubowski84/parquet4s/tree/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/akkaPekko) to learn more.

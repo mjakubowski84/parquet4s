@@ -51,19 +51,6 @@ users.runWith(
     .write(Path("file:///data/users/user-303.parquet"))
 )
 
-// (Experimental API) Writes a single file using a custom ParquetWriter.
-class UserParquetWriterBuilder(path: Path) extends HadoopParquetWriter.Builder[User, UserParquetWriterBuilder](path.toHadoop) {
-  override def self() = this
-  override def getWriteSupport(conf: Configuration) = ???
-}
-users.runWith(
-  ParquetStreams
-    .toParquetSingleFile
-    .custom[User, UserParquetWriterBuilder](new UserParquetWriterBuilder(Path("file:///data/users/custom.parquet")))
-    .options(writeOptions)
-    .write
-)
-
 // Tailored for writing indefinite streams.
 // Writes file when chunk reaches size limit and when defined time period elapses.
 // Can also partition files!
@@ -86,6 +73,19 @@ ParquetStreams
   .options(ParquetReader.Options(hadoopConf = conf))
   .read(Path("file:///data/users"))
   .runForeach(println)
+
+// (Experimental API) Writes a single file using a custom ParquetWriter.
+class UserParquetWriterBuilder(path: Path) extends HadoopParquetWriter.Builder[User, UserParquetWriterBuilder](path.toHadoop) {
+  override def self() = this
+  override def getWriteSupport(conf: Configuration) = ???
+}
+users.runWith(
+  ParquetStreams
+    .toParquetSingleFile
+    .custom[User, UserParquetWriterBuilder](new UserParquetWriterBuilder(Path("file:///data/users/custom.parquet")))
+    .options(writeOptions)
+    .write
+)  
 ```
 
 Please check [examples](https://github.com/mjakubowski84/parquet4s/tree/master/examples/src/main/scala/com/github/mjakubowski84/parquet4s/akkaPekko) to learn more.
