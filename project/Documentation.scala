@@ -16,7 +16,7 @@ object Documentation {
       description := "Read and write Parquet files using Scala",
       organizationName := "Marcin Jakubowski",
       organizationHomepage := Some(url("https://github.com/mjakubowski84")),
-      micrositeDocumentationUrl := "grem",
+      micrositeDocumentationUrl := "docs",
       micrositeFooterText := None,
       micrositeBaseUrl := "parquet4s",
       micrositeGitterChannel := false,
