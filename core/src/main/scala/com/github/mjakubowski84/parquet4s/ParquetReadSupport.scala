@@ -152,17 +152,18 @@ abstract private class RowParquetRecordConverter(schema: GroupType)
 private class RootRowParquetRecordConverter(schema: GroupType, columnProjections: Seq[ColumnProjection])
     extends RowParquetRecordConverter(schema) {
 
+  private lazy val emptyProjectionRow = RowParquetRecord.emptyWithSchema(columnProjections.map(cp => cp.alias.getOrElse(cp.columnPath.elements.last)))
+
   override def end(): Unit =
-    columnProjections.foreach { case ColumnProjection(columnPath, ordinal, aliasOpt) =>
-      record.get(columnPath) match {
-        case Some(value) if columnPath.elements.length > 1 =>
-          record = record.updated(ordinal, aliasOpt.getOrElse(columnPath.elements.last), value)
-        case Some(_) =>
-          aliasOpt.foreach { alias =>
-            record = record.rename(ordinal, alias)
+    if (columnProjections.nonEmpty) {
+      record = columnProjections.foldLeft(emptyProjectionRow) {
+        case (newRecord, ColumnProjection(columnPath, _, aliasOpt)) =>
+          record.get(columnPath) match {
+            case Some(value) =>
+              newRecord.add(aliasOpt.getOrElse(columnPath.elements.last), value)
+            case None =>
+              throw new IllegalArgumentException(s"""Invalid column projection: "$columnPath".""")
           }
-        case None =>
-          throw new IllegalArgumentException(s"""Invalid column projection: "$columnPath".""")
       }
     }
 

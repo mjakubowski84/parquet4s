@@ -83,7 +83,10 @@ lazy val core = (projectMatrix in file("core"))
   .jvmPlatform(
     scalaVersions = Seq(twoTwelve, twoThirteen),
     settings = Def.settings(
-      libraryDependencies ++= sparkDeps :+ ("com.chuusai" %% "shapeless" % shapelessVersion)
+      libraryDependencies ++= sparkDeps :+ ("com.chuusai" %% "shapeless" % shapelessVersion),
+      excludeDependencies ++= Seq(
+        ExclusionRule("org.apache.logging.log4j", "log4j-slf4j2-impl")
+      )
     )
   )
   .jvmPlatform(

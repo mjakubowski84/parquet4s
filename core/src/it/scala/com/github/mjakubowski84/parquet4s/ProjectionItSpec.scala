@@ -147,10 +147,11 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll 
 
     val expectedNestedRecord = RowParquetRecord(
       "b" -> ListParquetRecord(
-        RowParquetRecord("x" -> 1.value),
-        RowParquetRecord("x" -> 2.value),
-        RowParquetRecord("x" -> 3.value)
-      )
+        RowParquetRecord("x" -> 1.value, "y" -> "a".value),
+        RowParquetRecord("x" -> 2.value, "y" -> "b".value),
+        RowParquetRecord("x" -> 3.value, "y" -> "c".value)
+      ),
+      "c" -> true.value
     )
 
     try records.toList should be(
@@ -162,6 +163,21 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll 
         )
       )
     )
+    finally records.close()
+  }
+
+  it should "allow to project complex fields for different subfields" in {
+    val records = ParquetReader
+      .projectedGeneric(
+        Col("nested.b").as[List[FullElem]],
+        Col("nested.c").as[Boolean]
+      )
+      .read(complexFilePath)
+      .as[FullNested]
+
+    val expectedRecord = FullNested(b = List(FullElem(1, "a"), FullElem(2, "b"), FullElem(3, "c")), c = true)
+
+    try records.toList should be(List(expectedRecord))
     finally records.close()
   }
 
