@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.SchemaDef.Meta
-import org.apache.parquet.schema.{Types, *}
+import org.apache.parquet.schema.*
 import org.apache.parquet.schema.LogicalTypeAnnotation.{
   DateLogicalTypeAnnotation,
   DecimalLogicalTypeAnnotation,
@@ -14,6 +14,7 @@ import org.apache.parquet.schema.Type.Repetition
 
 import scala.annotation.nowarn
 import scala.reflect.ClassTag
+import scala.jdk.CollectionConverters.*
 
 object Message {
 
@@ -22,8 +23,9 @@ object Message {
   def apply(name: Option[String], fields: Type*): MessageType =
     Types.buildMessage().addFields(fields*).named(name.getOrElse(DefaultName))
 
-  /** Merges the fields before creating a schema. Merge is done by unifying types of columns that are define in a
-    * projection more than once. Type of the first mentioned column is chosen for each duplicate.
+  /** Merges the fields before creating a schema. Merge is done by unifying types of columns that are defined in a
+    * projection more than once. The first mentioned column of primitive type is chosen in the case of duplicates.
+    * Union of of member fields is executed in the case of complex types.
     * @param fields
     *   fields to be merged and then used for defining the schema
     * @return
@@ -37,6 +39,10 @@ object Message {
       .foldLeft(Map.empty[String, Type], Vector.empty[Type]) { case ((register, merged), tpe) =>
         val fieldName = tpe.getName
         register.get(fieldName) match {
+          case Some(group: GroupType) if !tpe.isPrimitive() =>
+            val newMemberFields = mergeFields(group.getFields().asScala.toSeq ++ tpe.asGroupType().getFields().asScala)
+            val mergedGroup = group.withNewFields(newMemberFields.asJava)
+            register.updated(fieldName, mergedGroup) -> (merged.filterNot(_ == group) :+ mergedGroup)
           case Some(firstSeen) =>
             register -> (merged :+ firstSeen)
           case None =>
