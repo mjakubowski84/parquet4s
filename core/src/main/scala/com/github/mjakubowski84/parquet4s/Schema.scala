@@ -24,8 +24,8 @@ object Message {
     Types.buildMessage().addFields(fields*).named(name.getOrElse(DefaultName))
 
   /** Merges the fields before creating a schema. Merge is done by unifying types of columns that are defined in a
-    * projection more than once. The first mentioned column of primitive type is chosen in the case of duplicates.
-    * Union of of member fields is executed in the case of complex types.
+    * projection more than once. The first mentioned column of primitive type is chosen in the case of duplicates. Union
+    * of of member fields is executed in the case of complex types.
     * @param fields
     *   fields to be merged and then used for defining the schema
     * @return
@@ -41,7 +41,7 @@ object Message {
         register.get(fieldName) match {
           case Some(group: GroupType) if !tpe.isPrimitive() =>
             val newMemberFields = mergeFields(group.getFields().asScala.toSeq ++ tpe.asGroupType().getFields().asScala)
-            val mergedGroup = group.withNewFields(newMemberFields.asJava)
+            val mergedGroup     = group.withNewFields(newMemberFields.asJava)
             register.updated(fieldName, mergedGroup) -> (merged.filterNot(_ == group) :+ mergedGroup)
           case Some(firstSeen) =>
             register -> (merged :+ firstSeen)
