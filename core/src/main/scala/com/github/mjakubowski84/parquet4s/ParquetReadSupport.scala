@@ -152,7 +152,8 @@ abstract private class RowParquetRecordConverter(schema: GroupType)
 private class RootRowParquetRecordConverter(schema: GroupType, columnProjections: Seq[ColumnProjection])
     extends RowParquetRecordConverter(schema) {
 
-  private lazy val emptyProjectionRow = RowParquetRecord.emptyWithSchema(columnProjections.map(cp => cp.alias.getOrElse(cp.columnPath.elements.last)))
+  private lazy val emptyProjectionRow =
+    RowParquetRecord.emptyWithSchema(columnProjections.map(cp => cp.alias.getOrElse(cp.columnPath.elements.last)))
 
   override def end(): Unit =
     if (columnProjections.nonEmpty) {
