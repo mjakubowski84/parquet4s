@@ -14,7 +14,7 @@ val akkaLib  = ActorLibCross("-akka", "-akka")
 val pekkoLib = ActorLibCross("-pekko", "-pekko")
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.15.0-SNAPSHOT"
+ThisBuild / version := "2.14.2-SNAPSHOT"
 ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
 
@@ -163,6 +163,7 @@ lazy val fs2 = (projectMatrix in file("fs2"))
 lazy val scalaPB = (projectMatrix in file("scalapb"))
   .configs(IntegrationTest)
   .settings(
+    name := "parquet4s-scalapb",
     libraryDependencies ++= Seq(
       "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Test,
@@ -175,24 +176,13 @@ lazy val scalaPB = (projectMatrix in file("scalapb"))
       PB.gens.java -> ((Test / sourceManaged).value / "protobuf/java")
     )
   )
-  .jvmPlatform(
-    scalaVersions = supportedScalaVersions,
-    axisValues    = Seq(akkaLib),
-    settings = Def.settings(
-      name := "parquet4s-scalapb-akka"
-    )
-  )
-  .jvmPlatform(
-    scalaVersions = supportedScalaVersions,
-    axisValues    = Seq(pekkoLib),
-    settings = Def.settings(
-      name := "parquet4s-scalapb-pekko"
-    )
-  )
   .settings(compilationSettings)
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
+  .jvmPlatform(
+    scalaVersions = supportedScalaVersions
+  )
   .dependsOn(core % "compile->compile;test->test", akkaPekko % "test->compile", fs2 % "test->compile")
 
 lazy val testkit = (projectMatrix in file("testkit"))
