@@ -172,13 +172,8 @@ workflows:
           requires:
             - build
       - test:
-          name: test_scala_pb_akka
-          project: scalaPB-akka
-          requires:
-            - build
-      - test:
-          name: test_scala_pb_pekko
-          project: scalaPB-pekko
+          name: test_scala_pb
+          project: scalaPB
           requires:
             - build
 
@@ -231,18 +226,8 @@ workflows:
             branches:
               ignore: /.*/
       - test:
-          name: test_scala_pb_akka
-          project: scalaPB-akka
-          requires:
-            - build
-          filters:
-            tags:
-              only: /^v.*/
-            branches:
-              ignore: /.*/
-      - test:
-          name: test_scala_pb_pekko
-          project: scalaPB-pekko
+          name: test_scala_pb
+          project: scalaPB
           requires:
             - build
           filters:
@@ -256,8 +241,7 @@ workflows:
             - test_akka
             - test_pekko
             - test_fs2
-            - test_scala_pb_akka
-            - test_scala_pb_pekko
+            - test_scala_pb
           filters:
             tags:
               only: /^v.*/
