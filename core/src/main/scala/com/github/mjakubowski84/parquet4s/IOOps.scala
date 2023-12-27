@@ -71,10 +71,12 @@ trait IOOps {
           .toList
       }
     }
-  /**
-   * @param path a location in a file tree from which `findPartitionedPaths` collects descendant paths recursively
-   * @param pathFilter  `findPartitionedPaths` traverses paths that match this predicate
-  */
+
+  /** @param path
+    *   a location in a file tree from which `findPartitionedPaths` collects descendant paths recursively
+    * @param pathFilter
+    *   `findPartitionedPaths` traverses paths that match this predicate
+    */
   protected def findPartitionedPaths(
       path: Path,
       configuration: Configuration,
