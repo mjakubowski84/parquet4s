@@ -24,7 +24,7 @@ object Path {
 
 /** Represents path/URI to Parquet file or directory containing Parquet files.
   */
-class Path private (val hadoopPath: HadoopPath) {
+class Path private (val hadoopPath: HadoopPath) extends AnyVal {
 
   def append(element: String): Path = new Path(new HadoopPath(hadoopPath, element))
 
@@ -47,15 +47,6 @@ class Path private (val hadoopPath: HadoopPath) {
   def toInputFile(conf: Configuration): InputFile = HadoopInputFile.fromPath(hadoopPath, conf)
 
   def toInputFile(options: ParquetReader.Options): InputFile = HadoopInputFile.fromPath(hadoopPath, options.hadoopConf)
-
-  override def equals(other: Any): Boolean = other match {
-    case that: Path =>
-      (that canEqual this) &&
-        hadoopPath == that.toHadoop
-    case _ => false
-  }
-
-  override def hashCode(): Int = hadoopPath.hashCode()
 
   override def toString: String = hadoopPath.toString
 
