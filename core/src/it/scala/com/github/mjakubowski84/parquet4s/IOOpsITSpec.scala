@@ -2,10 +2,12 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.fs.FileAlreadyExistsException
 import org.apache.parquet.hadoop.ParquetFileWriter.Mode
+import org.scalatest.BeforeAndAfter
+import org.scalatest.EitherValues
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import org.scalatest.{BeforeAndAfter, EitherValues}
-import org.slf4j.{Logger, LoggerFactory}
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils with BeforeAndAfter with EitherValues {
 
@@ -139,6 +141,26 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     dir.schema should be(Col("x") :: Nil)
   }
 
+  it should "ignore paths that do not match the pathFilter predicate" in {
+    val path_X1 = tempPath.append("_x=1").append("file.parquet")
+    val pathX1  = tempPath.append("x=1").append("file.parquet")
+    fileSystem.createNewFile(path_X1.toHadoop)
+    fileSystem.createNewFile(pathX1.toHadoop)
+
+    val dir = findPartitionedPaths(tempPath, configuration, !_.getName().startsWith("_")).value
+    dir.paths should be(List(PartitionedPath(pathX1, configuration, (Col("x") -> "1") :: Nil)))
+    dir.schema should be(List(Col("x")))
+  }
+
+  it should "accept hadoop default hidden paths when pathFilter always returns true" in {
+    val pathX1 = tempPath.append("_x=1/.y=1").append("file.parquet")
+    fileSystem.createNewFile(pathX1.toHadoop)
+
+    val dir = findPartitionedPaths(tempPath, configuration, _ => true).value
+    dir.paths should be(List(PartitionedPath(pathX1, configuration, List(Col("_x") -> "1", Col(".y") -> "1"))))
+    dir.schema should be(List(Col("_x"), Col(".y")))
+  }
+
   it should "return a partitioned directory with single file of no partitions values" in {
     val pathX1 = tempPath.append("x=1").append("file.parquet")
     fileSystem.createNewFile(pathX1.toHadoop)
@@ -184,6 +206,17 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.createNewFile(path2.toHadoop)
 
     findPartitionedPaths(tempPath, configuration) should be a Symbol("Left")
+  }
+
+  it should "fail to create partitions from inconsistent directory [case3]" in {
+    val path1 = tempPath.append("x=1/file.parquet")
+    val path2 = tempPath.append("_x=1/file.parquet")
+    fileSystem.createNewFile(path1.toHadoop)
+    fileSystem.createNewFile(path2.toHadoop)
+    // This case ignores `_x=1`, so there's no inconsistent directory.
+    findPartitionedPaths(tempPath, configuration) should be a Symbol("Right")
+    // This case regards `_x=1` an as ordinary directory, so it conflicts with `x=1`.
+    findPartitionedPaths(tempPath, configuration, _ => true) should be a Symbol("Left")
   }
 
 }
