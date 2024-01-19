@@ -6,7 +6,7 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.TimestampLogicalTypeAnnot
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64
 
 import java.sql.Timestamp
-import java.time.{LocalDateTime, ZonedDateTime}
+import java.time.{Instant, LocalDateTime, ZonedDateTime}
 
 object TimestampFormat {
 
@@ -33,9 +33,16 @@ object TimestampFormat {
           .primitive(INT64, required = false, logicalTypeAnnotation = Option(logicalTypeAnnotation))
           .typed[LocalDateTime]
 
+      implicit val instantSchemaDef: TypedSchemaDef[Instant] =
+        SchemaDef
+          .primitive(INT64, required = false, logicalTypeAnnotation = Option(logicalTypeAnnotation))
+          .typed[Instant]
+
       implicit def sqlTimestampEncoder: OptionalValueEncoder[Timestamp]
 
       implicit def localDateTimeEncoder: OptionalValueEncoder[LocalDateTime]
+
+      implicit def instantEncoder: OptionalValueEncoder[Instant]
 
       implicit val sqlTimestampFilterCodec: FilterCodec[Timestamp, java.lang.Long, LongColumn] =
         FilterCodec[Timestamp, java.lang.Long, LongColumn](
@@ -49,6 +56,11 @@ object TimestampFormat {
           decode = (v, vcc) => ValueDecoder.localDateTimeDecoder.decode(DateTimeValue(v, timestampFormat), vcc)
         )
 
+      implicit val instantFilterCodec: FilterCodec[Instant, java.lang.Long, LongColumn] =
+        FilterCodec[Instant, java.lang.Long, LongColumn](
+          encode = instantEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Long]].value,
+          decode = (v, vcc) => ValueDecoder.instantDecoder.decode(DateTimeValue(v, timestampFormat), vcc)
+        )
     }
 
     object Millis extends base(LogicalTypes.TimestampMillisType, Int64Millis) {
@@ -66,6 +78,11 @@ object TimestampFormat {
           }
         }
 
+      implicit val instantEncoder: OptionalValueEncoder[Instant] =
+        new OptionalValueEncoder[Instant] {
+          def encodeNonNull(data: Instant, configuration: ValueCodecConfiguration): Value =
+            DateTimeValue(data.toEpochMilli, Int64Millis)
+        }
     }
 
     object Micros extends base(LogicalTypes.TimestampMicrosType, Int64Micros) {
@@ -87,6 +104,13 @@ object TimestampFormat {
           }
         }
 
+      implicit val instantEncoder: OptionalValueEncoder[Instant] =
+        new OptionalValueEncoder[Instant] {
+          def encodeNonNull(data: Instant, configuration: ValueCodecConfiguration): Value = {
+            val micros = (data.getEpochSecond * MicrosPerSecond) + (data.getNano / NanosPerMicro)
+            DateTimeValue(micros, Int64Micros)
+          }
+        }
     }
 
     object Nanos extends base(LogicalTypes.TimestampNanosType, Int64Nanos) {
@@ -95,7 +119,7 @@ object TimestampFormat {
         def encodeNonNull(data: Timestamp, configuration: ValueCodecConfiguration): Value = {
           val instant = data.toInstant
           val nanos   = (instant.getEpochSecond * MicrosPerSecond * NanosPerMicro) + instant.getNano
-          DateTimeValue(nanos, Int64Micros)
+          DateTimeValue(nanos, Int64Nanos)
         }
       }
 
@@ -104,9 +128,16 @@ object TimestampFormat {
           def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value = {
             val zoned = ZonedDateTime.of(data, configuration.timeZone.toZoneId)
             val nanos = (zoned.toEpochSecond * MicrosPerSecond * NanosPerMicro) + zoned.getNano
-            DateTimeValue(nanos, Int64Micros)
+            DateTimeValue(nanos, Int64Nanos)
           }
         }
+
+      implicit override val instantEncoder: OptionalValueEncoder[Instant] = new OptionalValueEncoder[Instant] {
+        def encodeNonNull(data: Instant, configuration: ValueCodecConfiguration): Value = {
+          val nanos = (data.getEpochSecond * MicrosPerSecond * NanosPerMicro) + data.getNano
+          DateTimeValue(nanos, Int64Nanos)
+        }
+      }
     }
   }
 

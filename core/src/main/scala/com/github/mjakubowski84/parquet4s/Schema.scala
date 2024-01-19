@@ -305,6 +305,9 @@ trait TimeValueSchemaDefs {
   implicit val localDateTimeSchema: TypedSchemaDef[java.time.LocalDateTime] =
     SchemaDef.primitive(INT96, required = false).withMetadata(SchemaDef.Meta.Generated).typed[java.time.LocalDateTime]
 
+  implicit val instantSchema: TypedSchemaDef[java.time.Instant] =
+    SchemaDef.primitive(INT96, required = false).withMetadata(SchemaDef.Meta.Generated).typed[java.time.Instant]
+
   implicit val sqlTimestampSchema: TypedSchemaDef[java.sql.Timestamp] =
     SchemaDef.primitive(INT96, required = false).withMetadata(SchemaDef.Meta.Generated).typed[java.sql.Timestamp]
 }
