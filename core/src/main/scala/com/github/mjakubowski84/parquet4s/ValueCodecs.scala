@@ -1,6 +1,11 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.TimeValueCodecs.{localDateTimeToTimestamp, timestampToLocalDateTime}
+import com.github.mjakubowski84.parquet4s.TimeValueCodecs.{
+  instantToLocalDateTime,
+  localDateTimeToInstant,
+  localDateTimeToTimestamp,
+  timestampToLocalDateTime
+}
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.sql.{Date, Timestamp}
@@ -217,6 +222,12 @@ private[parquet4s] object TimeValueCodecs {
 
   def encodeLocalDate(data: LocalDate): Value = IntValue(data.toEpochDay.toInt)
 
+  def localDateTimeToInstant(dateTime: LocalDateTime, timeZone: TimeZone): Instant =
+    ZonedDateTime.of(dateTime, timeZone.toZoneId).toInstant
+
+  def instantToLocalDateTime(instant: Instant, timeZone: TimeZone): LocalDateTime =
+    LocalDateTime.ofInstant(instant, timeZone.toZoneId)
+
   def localDateTimeToTimestamp(dateTime: LocalDateTime, timeZone: TimeZone): Timestamp =
     Timestamp.from(ZonedDateTime.of(dateTime, timeZone.toZoneId).toInstant)
 
@@ -229,6 +240,13 @@ trait TimeValueDecoders {
   implicit val localDateTimeDecoder: OptionalValueDecoder[LocalDateTime] = new OptionalValueDecoder[LocalDateTime] {
     def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): LocalDateTime =
       TimeValueCodecs.decodeLocalDateTime(value, configuration.timeZone)
+  }
+
+  implicit val instantDecoder: OptionalValueDecoder[Instant] = new OptionalValueDecoder[Instant] {
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Instant = {
+      val timeZone = configuration.timeZone
+      localDateTimeToInstant(TimeValueCodecs.decodeLocalDateTime(value, timeZone), timeZone)
+    }
   }
 
   implicit val sqlTimestampDecoder: OptionalValueDecoder[java.sql.Timestamp] = new OptionalValueDecoder[Timestamp] {
@@ -255,6 +273,13 @@ trait TimeValueEncoders {
   implicit val localDateTimeEncoder: OptionalValueEncoder[LocalDateTime] = new OptionalValueEncoder[LocalDateTime] {
     def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value =
       TimeValueCodecs.encodeLocalDateTime(data, configuration.timeZone)
+  }
+
+  implicit val instantEncoder: OptionalValueEncoder[Instant] = new OptionalValueEncoder[Instant] {
+    def encodeNonNull(data: Instant, configuration: ValueCodecConfiguration): Value = {
+      val timeZone = configuration.timeZone
+      TimeValueCodecs.encodeLocalDateTime(instantToLocalDateTime(data, timeZone), timeZone)
+    }
   }
 
   implicit val sqlTimestampEncoder: OptionalValueEncoder[java.sql.Timestamp] = new OptionalValueEncoder[Timestamp] {

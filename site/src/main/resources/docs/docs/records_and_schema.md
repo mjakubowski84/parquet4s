@@ -37,6 +37,8 @@ If you do not wish to map the schema of your data to Scala case classes, then Pa
 | BigDecimal                            |      &#x2611;       | &#x2611;  |
 | java.time.LocalDateTime [*with INT96] |      &#x2611;       | &#x2612;  |
 | java.time.LocalDateTime [*with INT64] |      &#x2611;       | &#x2611;  |
+| java.time.Instant [*with INT96]       |      &#x2611;       | &#x2612;  |
+| java.time.Instant [*with INT64]       |      &#x2611;       | &#x2611;  |
 | java.time.LocalDate                   |      &#x2611;       | &#x2611;  |
 | java.sql.Timestamp [*with INT96]      |      &#x2611;       | &#x2612;  |
 | java.sql.Timestamp [*with INT64]      |      &#x2611;       | &#x2611;  |
