@@ -5,9 +5,9 @@ import com.github.mjakubowski84.parquet4s.ScalaCompat.stream.{Attributes, FlowSh
 import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow.PostWriteState
 import org.apache.parquet.schema.MessageType
 import org.slf4j.{Logger, LoggerFactory}
-
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+
 import scala.concurrent.duration.FiniteDuration
 import scala.collection.concurrent.TrieMap
 
@@ -275,17 +275,32 @@ private class ParquetPartitioningFlow[T, W](
     private def newFileName: String          = UUID.randomUUID().toString + compressionExtension + ".parquet"
 
     private def partition(record: RowParquetRecord): (Path, RowParquetRecord) =
-      partitionBy.foldLeft(basePath -> record) { case ((currentPath, currentRecord), partitionPath) =>
-        currentRecord.removed(partitionPath) match {
-          case (Some(BinaryValue(binary)), modifiedRecord) =>
-            Path(currentPath, s"$partitionPath=${binary.toStringUsingUTF8}") -> modifiedRecord
-          case (None, _) =>
-            throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
-          case (Some(NullValue), _) =>
-            throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
-          case _ =>
-            throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
+      if (partitionBy.nonEmpty) {
+        val builder = new StringBuilder()
+
+        val updatedRecord = partitionBy.foldLeft(record) { case (currentRecord, partitionPath) =>
+          currentRecord.removed(partitionPath) match {
+            case (Some(BinaryValue(binary)), modifiedRecord) =>
+              builder.append(partitionPath.toString)
+              builder.append("=")
+              builder.append(binary.toStringUsingUTF8)
+              builder.append(Path.Separator)
+
+              modifiedRecord
+            case (None, _) =>
+              throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
+            case (Some(NullValue), _) =>
+              throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
+            case _ =>
+              throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
+          }
         }
+
+        builder.setLength(builder.length - 1) // removes the trailing separator
+
+        Path(basePath, builder.toString()) -> updatedRecord
+      } else {
+        basePath -> record
       }
 
     private def scheduleNextRotation(path: Path, delay: FiniteDuration): Unit =

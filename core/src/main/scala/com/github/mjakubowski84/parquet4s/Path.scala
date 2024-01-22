@@ -20,6 +20,7 @@ object Path {
 
   def apply(parent: Path, child: String): Path = apply(new HadoopPath(parent.toHadoop, child))
 
+  val Separator: String = HadoopPath.SEPARATOR
 }
 
 /** Represents path/URI to Parquet file or directory containing Parquet files.
