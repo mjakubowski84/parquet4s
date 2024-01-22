@@ -20,6 +20,17 @@ import scala.util.Random
 case class Embedded(fraction: Double, text: String)
 case class Record(i: Int, dict: String, embedded: Option[Embedded])
 
+case class LargeRecord(
+    i: Int,
+    dict: String,
+    embedded: Option[Embedded],
+    a: String,
+    b: String,
+    c: String,
+    d: String,
+    e: String
+)
+
 object AkkaPekkoBenchmark {
   val isAkkaSystem: Boolean = Done.getClass.getPackage.getName == "akka"
   val Fractioner            = 100.12
@@ -32,10 +43,11 @@ object AkkaPekkoBenchmark {
 
     // 512 * 1024
     @Param(Array("524288"))
-    var datasetSize: Int                    = _
-    var basePath: Path                      = _
-    var records: immutable.Iterable[Record] = _
-    var actorSystem: ActorSystem            = _
+    var datasetSize: Int                              = _
+    var basePath: Path                                = _
+    var records: immutable.Iterable[Record]           = _
+    var largeRecords: immutable.Iterable[LargeRecord] = _
+    var actorSystem: ActorSystem                      = _
     val actorSystemConfig: Config = if (isAkkaSystem) {
       ConfigFactory.parseString(
         """
@@ -72,6 +84,20 @@ object AkkaPekkoBenchmark {
           embedded =
             if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
             else None
+        )
+      }
+      largeRecords = (1 to datasetSize).map { i =>
+        LargeRecord(
+          i    = i,
+          dict = Dict(Random.nextInt(Dict.size - 1)),
+          embedded =
+            if (i % 2 == 0) Some(Embedded(1.toDouble / Fractioner, UUID.randomUUID().toString))
+            else None,
+          a = Dict(Random.nextInt(Dict.size - 1)),
+          b = Dict(Random.nextInt(Dict.size - 1)),
+          c = Dict(Random.nextInt(Dict.size - 1)),
+          d = Dict(Random.nextInt(Dict.size - 1)),
+          e = Dict(Random.nextInt(Dict.size - 1))
         )
       }
       actorSystem = ActorSystem(
@@ -128,6 +154,17 @@ object AkkaPekkoBenchmark {
         .toMat(Sink.last)(Keep.right)
         .withAttributes(ActorAttributes.dispatcher(Dispatcher))
 
+    private def writePartitionedLargeRecordGraph =
+      Source(dataset.largeRecords)
+        .via(
+          ParquetStreams.viaParquet
+            .of[LargeRecord]
+            .partitionBy(ColumnPath("a"), ColumnPath("b"), ColumnPath("c"), ColumnPath("d"), ColumnPath("e"))
+            .write(dataset.basePath)
+        )
+        .toMat(Sink.last)(Keep.right)
+        .withAttributes(ActorAttributes.dispatcher(Dispatcher))
+
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = fetchDataset(dataset)
 
@@ -142,6 +179,9 @@ object AkkaPekkoBenchmark {
     def akkaPekkoWritePartitioned(): Record =
       Await.result(writePartitionedGraph.run(), Duration.Inf)
 
+    @CompilerControl(CompilerControl.Mode.DONT_INLINE)
+    def akkaPekkoWritePartitionedLargeRecord(): LargeRecord =
+      Await.result(writePartitionedLargeRecordGraph.run(), Duration.Inf)
   }
 
   @State(Scope.Benchmark)
@@ -192,5 +232,11 @@ class AkkaPekkoBenchmark {
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   def writePartitioned(state: WriteState): Record =
     state.akkaPekkoWritePartitioned()
+
+  @Benchmark
+  @BenchmarkMode(Array(Mode.AverageTime))
+  @OutputTimeUnit(TimeUnit.MILLISECONDS)
+  def writePartitionedLargeRecord(state: WriteState): LargeRecord =
+    state.akkaPekkoWritePartitionedLargeRecord()
 
 }
