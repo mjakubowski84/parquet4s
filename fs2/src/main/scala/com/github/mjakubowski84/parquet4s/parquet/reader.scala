@@ -123,6 +123,13 @@ object reader {
       */
     def read(path: Path): Stream[F, T]
 
+    /** @param path
+      *   [[Path]] to Parquet files, e.g.: {{{Path("file:///data/users")}}}
+      * @return
+      *   final nested [[fs2.Stream]]
+      */
+    def readPartitioned(path: Path): Stream[F, Stream[F, T]]
+
     /** @param inputFile
       *   file to read
       * @return
@@ -130,6 +137,14 @@ object reader {
       */
     @experimental
     def read(inputFile: InputFile): Stream[F, T]
+
+    /** @param inputFile
+      *   file to read
+      * @return
+      *   final nested [[fs2.Stream]]
+      */
+    @experimental
+    def readPartitioned(inputFile: InputFile): Stream[F, Stream[F, T]]
   }
 
   private case class BuilderImpl[F[_]: Sync, T: ParquetRecordDecoder](
@@ -148,8 +163,21 @@ object reader {
     override def read(path: Path): Stream[F, T] =
       read(path.toInputFile(options))
 
+    def readPartitioned(path: Path): Stream[F, Stream[F, T]] =
+      readPartitioned(path.toInputFile(options))
+
     override def read(inputFile: InputFile): Stream[F, T] =
       reader.read(inputFile, options, filter, chunkSize, projectedSchemaResolverOpt, columnProjections)
+
+    override def readPartitioned(inputFile: InputFile): Stream[F, Stream[F, T]] =
+      reader.readPartitioned(
+        inputFile,
+        options,
+        filter,
+        chunkSize,
+        projectedSchemaResolverOpt,
+        columnProjections
+      )
   }
 
   @experimental
@@ -177,6 +205,8 @@ object reader {
       */
     def read: Stream[F, T]
 
+    def readPartitioned: Stream[F, Stream[F, T]]
+
   }
 
   private case class CustomBuilderImpl[F[_]: Sync, T](
@@ -193,13 +223,11 @@ object reader {
 
     override def read: Stream[F, T] = {
       val parquetIteratorResource = Resource.fromAutoCloseable(
-        Sync[F].delay(
-          scala.concurrent.blocking(
-            new ParquetIterator[T](
-              builder
-                .withConf(options.hadoopConf)
-                .withFilter(filter.toFilterCompat(ValueCodecConfiguration(options)))
-            )
+        Sync[F].blocking(
+          new ParquetIterator[T](
+            builder
+              .withConf(options.hadoopConf)
+              .withFilter(filter.toFilterCompat(ValueCodecConfiguration(options)))
           )
         )
       )
@@ -208,6 +236,22 @@ object reader {
         parquetIterator <- Stream.resource(parquetIteratorResource)
         stream          <- Stream.fromBlockingIterator[F](parquetIterator, chunkSize)
       } yield stream
+    }
+
+    override def readPartitioned: Stream[F, Stream[F, T]] = {
+      val parquetIteratorResource = Resource.fromAutoCloseable(
+        Sync[F].blocking(
+          new ParquetIterator[T](
+            builder
+              .withConf(options.hadoopConf)
+              .withFilter(filter.toFilterCompat(ValueCodecConfiguration(options)))
+          )
+        )
+      )
+
+      Stream
+        .resource(parquetIteratorResource)
+        .map(parquetIterator => Stream.fromBlockingIterator[F](parquetIterator, chunkSize))
     }
   }
 
@@ -247,6 +291,45 @@ object reader {
       }
       entity <- records.evalMapChunk(decode)
     } yield entity
+
+  private[parquet4s] def readPartitioned[F[_], T](
+      inputFile: InputFile,
+      options: ParquetReader.Options,
+      filter: Filter,
+      chunkSize: Int,
+      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
+      columnProjections: Seq[ColumnProjection]
+  )(implicit F: Sync[F], decoder: ParquetRecordDecoder[T]): Stream[F, Stream[F, T]] = {
+    val vcc    = ValueCodecConfiguration(options)
+    val decode = (record: RowParquetRecord) => F.delay(decoder.decode(record, vcc))
+
+    val streamOfStreamsParquetRecord = inputFile match {
+      case hadoopInputFile: HadoopInputFile =>
+        readPartitioned[F, T](
+          basePath                   = Path(hadoopInputFile.getPath),
+          options                    = options,
+          filter                     = filter,
+          projectedSchemaResolverOpt = projectedSchemaResolverOpt,
+          columnProjections          = columnProjections,
+          vcc                        = vcc,
+          chunkSize                  = chunkSize,
+          metadataReader             = decoder
+        )
+      case _ =>
+        readSingleFile(
+          inputFile                  = inputFile,
+          filter                     = filter,
+          projectedSchemaResolverOpt = projectedSchemaResolverOpt,
+          columnProjections          = columnProjections,
+          vcc                        = vcc,
+          chunkSize                  = chunkSize,
+          metadataReader             = decoder
+        )
+    }
+
+    streamOfStreamsParquetRecord
+      .map(_.evalMapChunk(decode))
+  }
 
   private def readPartitioned[F[_], T](
       basePath: Path,
