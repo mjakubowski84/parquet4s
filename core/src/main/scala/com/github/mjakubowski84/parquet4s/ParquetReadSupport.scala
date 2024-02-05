@@ -114,6 +114,9 @@ abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](schema: 
         else value
       record = record.add(name, BinaryValue(rescaled))
     }
+
+    override def addLong(value: Long): Unit =
+      record = record.add(name, BinaryValue(Decimals.binaryFromDecimal(BigDecimal(value, scale, mathContext))))
   }
 
   private class DateTimeConverter(name: String, timeUnit: LogicalTypeAnnotation.TimeUnit)

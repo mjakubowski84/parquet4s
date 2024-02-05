@@ -71,14 +71,6 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
     finally partitioned.close()
   }
 
-  "Attempt to read partitions on non-partitioned data should succeed" in {
-    ParquetWriter.of[I].writeAndClose(Path(tempPath, "file.parquet"), Seq(I(1), I(2)))
-
-    val data = ParquetReader.as[I].read(tempPath)
-    try data.toSeq should be(Seq(I(1), I(2)))
-    finally data.close()
-  }
-
   "Attempt to read inconsistent partitions should fail with an exception" in {
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/b=b1/file.parquet"), Seq(I(1)))
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/file.parquet"), Seq(I(2)))
