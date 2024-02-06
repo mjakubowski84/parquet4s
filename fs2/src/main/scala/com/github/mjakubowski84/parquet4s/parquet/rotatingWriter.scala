@@ -329,14 +329,8 @@ object rotatingWriter {
 
     private def write(entity: W): F[(Path, Long)] =
       for {
-        record <- encode(entity)
-        partitioning <- partitionBy.foldLeft(F.pure(basePath -> record)) { case (f, currentPartition) =>
-          f.flatMap { case (currentPath, currentRecord) =>
-            partition(currentRecord, currentPartition).map { case (partitionPath, partitionValue, modifiedRecord) =>
-              currentPath.append(s"$partitionPath=$partitionValue") -> modifiedRecord
-            }
-          }
-        }
+        record       <- encode(entity)
+        partitioning <- partition(record)
         (path, partitionedRecord) = partitioning
         count <- writersRef.access.flatMap { case (writers, setter) =>
           writers.get(path) match {
@@ -371,6 +365,30 @@ object rotatingWriter {
           }
         }
       } yield path -> count
+
+    private def partition(record: RowParquetRecord): F[(Path, RowParquetRecord)] =
+      if (partitionBy.nonEmpty) {
+        val builder = new StringBuilder()
+
+        val updatedRecord = partitionBy.foldLeft(F.pure(record)) { case (f, currentPartition) =>
+          f.flatMap { currentRecord =>
+            partition(currentRecord, currentPartition).map { case (partitionPath, partitionValue, modifiedRecord) =>
+              builder.append(partitionPath.toString)
+              builder.append("=")
+              builder.append(partitionValue)
+              builder.append(Path.Separator)
+              modifiedRecord
+            }
+          }
+        }
+
+        updatedRecord.map { record =>
+          builder.setLength(builder.length - 1) // removes the trailing separator
+          Path(basePath, builder.toString()) -> record
+        }
+      } else {
+        F.pure(basePath -> record)
+      }
 
     private def partition(
         record: RowParquetRecord,
