@@ -60,8 +60,12 @@ class ParquetStreamsITSpec
     .range(start = 0L, end = count, step = 1L)
     .map(i => Data(i = i, s = dict(Random.nextInt(4))))
 
-  def read[T: ParquetRecordDecoder](path: Path, filter: Filter = Filter.noopFilter): Future[immutable.Seq[T]] =
-    ParquetStreams.fromParquet.as[T].filter(filter).parallelism(n = 2).read(path).runWith(Sink.seq)
+  def read[T: ParquetRecordDecoder](
+      path: Path,
+      filter: Filter   = Filter.noopFilter,
+      parallelism: Int = 2
+  ): Future[immutable.Seq[T]] =
+    ParquetStreams.fromParquet.as[T].filter(filter).parallelism(n = parallelism).read(path).runWith(Sink.seq)
 
   before {
     clearTemp()
@@ -76,13 +80,16 @@ class ParquetStreamsITSpec
       )
 
     for {
-      _        <- write()
-      files    <- filesAtPath(tempPath, configuration)
-      readData <- read[Data](tempPath)
+      _                <- write()
+      files            <- filesAtPath(tempPath, configuration)
+      readDataSync     <- read[Data](tempPath, parallelism = 1)
+      readDataParallel <- read[Data](tempPath, parallelism = 2)
     } yield {
       files should be(List(outputFileName))
-      readData should have size count
-      readData should contain theSameElementsInOrderAs data
+      readDataSync should have size count
+      readDataSync should contain theSameElementsInOrderAs data
+      readDataParallel should have size count
+      readDataParallel should contain theSameElementsInOrderAs data
     }
   }
 
@@ -90,11 +97,13 @@ class ParquetStreamsITSpec
     fileSystem.mkdirs(tempPath.toHadoop)
 
     for {
-      files    <- filesAtPath(tempPath, configuration)
-      readData <- read[Data](tempPath)
+      files            <- filesAtPath(tempPath, configuration)
+      readDataSync     <- read[Data](tempPath, parallelism = 1)
+      readDataParallel <- read[Data](tempPath, parallelism = 1)
     } yield {
       files should be(empty)
-      readData should be(empty)
+      readDataSync should be(empty)
+      readDataParallel should be(empty)
     }
   }
 
@@ -126,18 +135,24 @@ class ParquetStreamsITSpec
           .write(tempPath.append(s"a=$a/b=$b/$outputFileName"))
       )
 
-    for {
-      _        <- write("A", "1")
-      _        <- write("A", "2")
-      _        <- write("B", "1")
-      _        <- write("B", "2")
-      readData <- read[DataPartitioned](tempPath)
-    } yield {
+    val testReadData = (readData: Seq[DataPartitioned]) => {
       readData should have size count * 4
       readData.filter(d => d.a == "A" && d.b == "1") should have size count
       readData.filter(d => d.a == "A" && d.b == "2") should have size count
       readData.filter(d => d.a == "B" && d.b == "1") should have size count
       readData.filter(d => d.a == "B" && d.b == "2") should have size count
+    }
+
+    for {
+      _                <- write("A", "1")
+      _                <- write("A", "2")
+      _                <- write("B", "1")
+      _                <- write("B", "2")
+      readDataSync     <- read[DataPartitioned](tempPath, parallelism = 1)
+      readDataParallel <- read[DataPartitioned](tempPath, parallelism = 2)
+    } yield {
+      testReadData(readDataSync)
+      testReadData(readDataParallel)
     }
   }
 
