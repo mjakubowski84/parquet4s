@@ -209,7 +209,7 @@ lazy val examples = (projectMatrix in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.6.0",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.6.1",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.github.fd4s" %% "fs2-kafka" % "3.2.0",
@@ -341,7 +341,7 @@ lazy val documentation = (projectMatrix in file("site"))
   .settings(
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "mdoc" % "2.4.0",
+      "org.scalameta" %% "mdoc" % "2.5.2",
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion
