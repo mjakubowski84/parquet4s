@@ -23,3 +23,7 @@ Documentation is available at [here](https://mjakubowski84.github.io/parquet4s/)
 ## Contributing
 
 Do you want to contribute? Please read the [contribution guidelines](CONTRIBUTING.md).
+
+## Sponsors
+
+ - [calvinlfer](https://github.com/calvinlfer)

@@ -43,3 +43,6 @@ options:
 
   - title: (Experimental) Protobuf
     url: docs/protobuf
+
+  - title: Distinguished Sponsors
+    url: docs/sponsors
