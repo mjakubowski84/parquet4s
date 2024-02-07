@@ -10,6 +10,8 @@ import org.slf4j.{Logger, LoggerFactory}
 
 object ParquetSource extends IOOps {
 
+  val DefaultParallelism = 1
+
   /** Factory of builders of Parquet readers.
     */
   trait FromParquet {
@@ -108,6 +110,11 @@ object ParquetSource extends IOOps {
       */
     def filter(filter: Filter): Builder[T]
 
+    /** @param n
+      *   how many files at most shall be read in parallel; defaults to 1
+      */
+    def parallelism(n: Int): Builder[T]
+
     /** @param path
       *   [[Path]] to Parquet files, e.g.: {{{Path("file:///data/users")}}}
       * @return
@@ -127,7 +134,8 @@ object ParquetSource extends IOOps {
       options: ParquetReader.Options                               = ParquetReader.Options(),
       filter: Filter                                               = Filter.noopFilter,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None,
-      columnProjections: Seq[ColumnProjection]                     = Seq.empty
+      columnProjections: Seq[ColumnProjection]                     = Seq.empty,
+      parallelism: Int                                             = DefaultParallelism
   ) extends Builder[T] {
     override def options(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
@@ -135,11 +143,13 @@ object ParquetSource extends IOOps {
     override def filter(filter: Filter): Builder[T] =
       this.copy(filter = filter)
 
+    override def parallelism(n: Int): Builder[T] = this.copy(parallelism = n)
+
     override def read(path: Path): Source[T, NotUsed] =
       read(path.toInputFile(options))
 
     override def read(inputFile: InputFile): Source[T, NotUsed] =
-      ParquetSource(inputFile, options, filter, projectedSchemaResolverOpt, columnProjections)
+      ParquetSource(inputFile, options, filter, projectedSchemaResolverOpt, columnProjections, parallelism)
 
   }
 
@@ -203,7 +213,8 @@ object ParquetSource extends IOOps {
       options: ParquetReader.Options,
       filter: Filter,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
-      columnProjections: Seq[ColumnProjection]
+      columnProjections: Seq[ColumnProjection],
+      parallelism: Int
   )(implicit decoder: ParquetRecordDecoder[T]): Source[T, NotUsed] = {
     val valueCodecConfiguration = ValueCodecConfiguration(options)
     val hadoopConf              = options.hadoopConf
@@ -217,12 +228,21 @@ object ParquetSource extends IOOps {
           partitionedDirectory => {
             val projectedSchemaOpt = projectedSchemaResolverOpt
               .map(implicit resolver => ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))
-            val sources = PartitionFilter
-              .filter(filter, valueCodecConfiguration, partitionedDirectory)
-              .map(createPartitionedSource(projectedSchemaOpt, columnProjections, decoder).tupled)
+            val filteredPaths = Source
+              .fromIterator(() =>
+                PartitionFilter.filter(filter, valueCodecConfiguration, partitionedDirectory).iterator
+              )
 
-            if (sources.isEmpty) Source.empty
-            else sources.reduceLeft(_.concat(_))
+            if (parallelism == 1) {
+              filteredPaths.flatMapConcat(
+                createPartitionedSource(projectedSchemaOpt, columnProjections, decoder).tupled
+              )
+            } else {
+              filteredPaths.flatMapMerge(
+                breadth = parallelism,
+                createPartitionedSource(projectedSchemaOpt, columnProjections, decoder).tupled
+              )
+            }
           }
         )
       case _ =>
