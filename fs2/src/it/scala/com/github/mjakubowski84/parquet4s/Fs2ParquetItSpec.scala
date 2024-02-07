@@ -68,10 +68,10 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
 
   def read[T: ParquetRecordDecoder](path: Path): Stream[IO, Vector[T]] =
-    parquet.fromParquet[IO].as[T].read(path).fold(Vector.empty[T])(_ :+ _)
+    parquet.fromParquet[IO].as[T].parallelism(n = 2).read(path).fold(Vector.empty[T])(_ :+ _)
 
   def readSize[T: ParquetRecordDecoder](path: Path): Stream[IO, Long] =
-    parquet.fromParquet[IO].as[T].read(path).fold(0L) { case (acc, _) => acc + 1L }
+    parquet.fromParquet[IO].as[T].parallelism(n = 2).read(path).fold(0L) { case (acc, _) => acc + 1L }
 
   def listParquetFiles(path: Path): Stream[IO, Vector[Path]] =
     Files[IO]
@@ -349,6 +349,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       parquet
         .fromParquet[IO]
         .projectedAs[DataTransformed]
+        .parallelism(n = 2)
         .read(path)
         .map { case DataTransformed(i, s, partition) => Map(partition -> Vector(Data(i, s))) }
         .reduceSemigroup
