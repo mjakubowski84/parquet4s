@@ -1,6 +1,6 @@
 package com.github.mjakubowski84.parquet4s.parquet
 
-import cats.effect.{Resource, Sync}
+import cats.effect.{Concurrent, Resource, Sync}
 import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.*
 import fs2.Stream
@@ -116,6 +116,14 @@ object reader {
       */
     def chunkSize(chunkSize: Int): Builder[F, T]
 
+    /** How many files at most shall be read in parallel. Default value is `1`.
+      * @param n
+      *   desired parallelism
+      * @param concurrent
+      *   parallel reading requires concurrency
+      */
+    def parallelism(n: Int)(implicit concurrent: Concurrent[F]): Builder[F, T]
+
     /** @param path
       *   [[Path]] to Parquet files, e.g.: {{{Path("file:///data/users")}}}
       * @return
@@ -126,9 +134,9 @@ object reader {
     /** @param path
       *   [[Path]] to Parquet files, e.g.: {{{Path("file:///data/users")}}}
       * @return
-      *   final nested [[fs2.Stream]]
+      *   [[fs2.Stream]] of streams of content of each individual Parquet file
       */
-    def readPartitioned(path: Path): Stream[F, Stream[F, T]]
+    def readFileStreams(path: Path): Stream[F, Stream[F, T]]
 
     /** @param inputFile
       *   file to read
@@ -141,16 +149,17 @@ object reader {
     /** @param inputFile
       *   file to read
       * @return
-      *   final nested [[fs2.Stream]]
+      *   [[fs2.Stream]] of streams of content of each individual Parquet file
       */
     @experimental
-    def readPartitioned(inputFile: InputFile): Stream[F, Stream[F, T]]
+    def readFileStreams(inputFile: InputFile): Stream[F, Stream[F, T]]
   }
 
   private case class BuilderImpl[F[_]: Sync, T: ParquetRecordDecoder](
       options: ParquetReader.Options                               = ParquetReader.Options(),
       filter: Filter                                               = Filter.noopFilter,
       chunkSize: Int                                               = DefaultChunkSize,
+      parallelism: Option[(Int, Concurrent[F])]                    = None,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None,
       columnProjections: Seq[ColumnProjection]                     = Seq.empty
   ) extends Builder[F, T] {
@@ -160,17 +169,20 @@ object reader {
 
     override def chunkSize(chunkSize: Int): Builder[F, T] = this.copy(chunkSize = chunkSize)
 
+    override def parallelism(n: Int)(implicit concurrent: Concurrent[F]): Builder[F, T] =
+      this.copy(parallelism = Some(n -> concurrent))
+
     override def read(path: Path): Stream[F, T] =
       read(path.toInputFile(options))
 
-    def readPartitioned(path: Path): Stream[F, Stream[F, T]] =
-      readPartitioned(path.toInputFile(options))
+    def readFileStreams(path: Path): Stream[F, Stream[F, T]] =
+      readFileStreams(path.toInputFile(options))
 
     override def read(inputFile: InputFile): Stream[F, T] =
-      reader.read(inputFile, options, filter, chunkSize, projectedSchemaResolverOpt, columnProjections)
+      reader.read(inputFile, options, filter, chunkSize, parallelism, projectedSchemaResolverOpt, columnProjections)
 
-    override def readPartitioned(inputFile: InputFile): Stream[F, Stream[F, T]] =
-      reader.readPartitioned(
+    override def readFileStreams(inputFile: InputFile): Stream[F, Stream[F, T]] =
+      reader.readStreamOfFiles(
         inputFile,
         options,
         filter,
@@ -205,8 +217,6 @@ object reader {
       */
     def read: Stream[F, T]
 
-    def readPartitioned: Stream[F, Stream[F, T]]
-
   }
 
   private case class CustomBuilderImpl[F[_]: Sync, T](
@@ -238,21 +248,6 @@ object reader {
       } yield stream
     }
 
-    override def readPartitioned: Stream[F, Stream[F, T]] = {
-      val parquetIteratorResource = Resource.fromAutoCloseable(
-        Sync[F].blocking(
-          new ParquetIterator[T](
-            builder
-              .withConf(options.hadoopConf)
-              .withFilter(filter.toFilterCompat(ValueCodecConfiguration(options)))
-          )
-        )
-      )
-
-      Stream
-        .resource(parquetIteratorResource)
-        .map(parquetIterator => Stream.fromBlockingIterator[F](parquetIterator, chunkSize))
-    }
   }
 
   private[parquet4s] def read[F[_], T](
@@ -260,39 +255,18 @@ object reader {
       options: ParquetReader.Options,
       filter: Filter,
       chunkSize: Int,
+      parallelism: Option[(Int, Concurrent[F])],
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
       columnProjections: Seq[ColumnProjection]
-  )(implicit F: Sync[F], decoder: ParquetRecordDecoder[T]): Stream[F, T] =
-    for {
-      vcc <- Stream(ValueCodecConfiguration(options))
-      decode = (record: RowParquetRecord) => F.delay(decoder.decode(record, vcc))
-      records <- inputFile match {
-        case hadoopInputFile: HadoopInputFile =>
-          readPartitioned[F, T](
-            basePath                   = Path(hadoopInputFile.getPath),
-            options                    = options,
-            filter                     = filter,
-            projectedSchemaResolverOpt = projectedSchemaResolverOpt,
-            columnProjections          = columnProjections,
-            vcc                        = vcc,
-            chunkSize                  = chunkSize,
-            metadataReader             = decoder
-          )
-        case _ =>
-          readSingleFile(
-            inputFile                  = inputFile,
-            filter                     = filter,
-            projectedSchemaResolverOpt = projectedSchemaResolverOpt,
-            columnProjections          = columnProjections,
-            vcc                        = vcc,
-            chunkSize                  = chunkSize,
-            metadataReader             = decoder
-          )
-      }
-      entity <- records.evalMapChunk(decode)
-    } yield entity
+  )(implicit F: Sync[F], decoder: ParquetRecordDecoder[T]): Stream[F, T] = {
+    val streamOfFiles =
+      readStreamOfFiles(inputFile, options, filter, chunkSize, projectedSchemaResolverOpt, columnProjections)
+    parallelism.fold(streamOfFiles.flatten) { case (maxOpen, concurrent) =>
+      streamOfFiles.parJoin(maxOpen)(concurrent)
+    }
+  }
 
-  private[parquet4s] def readPartitioned[F[_], T](
+  private[parquet4s] def readStreamOfFiles[F[_], T](
       inputFile: InputFile,
       options: ParquetReader.Options,
       filter: Filter,
@@ -305,7 +279,7 @@ object reader {
 
     val streamOfStreamsParquetRecord = inputFile match {
       case hadoopInputFile: HadoopInputFile =>
-        readPartitioned[F, T](
+        readMultipleFiles[F, T](
           basePath                   = Path(hadoopInputFile.getPath),
           options                    = options,
           filter                     = filter,
@@ -327,11 +301,10 @@ object reader {
         )
     }
 
-    streamOfStreamsParquetRecord
-      .map(_.evalMapChunk(decode))
+    streamOfStreamsParquetRecord.map(_.evalMapChunk(decode))
   }
 
-  private def readPartitioned[F[_], T](
+  private def readMultipleFiles[F[_], T](
       basePath: Path,
       options: ParquetReader.Options,
       filter: Filter,
@@ -417,16 +390,14 @@ object reader {
       metadataReader: MetadataReader
   ): Resource[F, ParquetIterator[RowParquetRecord]] =
     Resource.fromAutoCloseable(
-      Sync[F].delay(
-        scala.concurrent.blocking(
-          new ParquetIterator[RowParquetRecord](
-            HadoopParquetReader(
-              inputFile          = inputFile,
-              projectedSchemaOpt = projectionSchemaOpt,
-              columnProjections  = columnProjections,
-              filter             = filter,
-              metadataReader     = metadataReader
-            )
+      Sync[F].blocking(
+        new ParquetIterator[RowParquetRecord](
+          HadoopParquetReader(
+            inputFile          = inputFile,
+            projectedSchemaOpt = projectionSchemaOpt,
+            columnProjections  = columnProjections,
+            filter             = filter,
+            metadataReader     = metadataReader
           )
         )
       )
