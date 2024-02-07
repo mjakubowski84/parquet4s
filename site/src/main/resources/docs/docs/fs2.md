@@ -73,11 +73,13 @@ object Example extends IOApp.Simple {
       .write(Path("file:///data/users"))
 
   // Reads a file, files from the directory or a partitioned directory. 
+  // Allows reading multiple files in parallel for speed.
   // Please also have a look at the rest of parameters.
   val readAllStream =
     fromParquet[IO]
       .as[User]
       .options(ParquetReader.Options(hadoopConf = conf))
+      .parallelism(n = 4)
       .read(Path("file:///data/users"))
       .printlns
 

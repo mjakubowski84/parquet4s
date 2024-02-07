@@ -14,7 +14,7 @@ val akkaLib  = ActorLibCross("-akka", "-akka")
 val pekkoLib = ActorLibCross("-pekko", "-pekko")
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.16.0-SNAPSHOT"
+ThisBuild / version := "2.17.0-SNAPSHOT"
 ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
 
@@ -341,7 +341,7 @@ lazy val documentation = (projectMatrix in file("site"))
   .settings(
     publish / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalameta" %% "mdoc" % "2.5.2",
+      "org.scalameta" %% "mdoc" % "2.4.0", // 2.5.0+ causes problems with JDK8
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.slf4j" % "slf4j-nop" % slf4jVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion

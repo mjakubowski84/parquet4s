@@ -65,12 +65,14 @@ users.via(
     .write(Path("file:///data/users"))
 ).runForeach(user => println(s"Just wrote user ${user.userId}..."))
   
-// Reads a file, files from the directory or a partitioned directory. 
+// Reads a file, files from the directory or a partitioned directory.
+// Allows parallel reading of Parquet files for speed.
 // Please also have a look at the rest of parameters.
 ParquetStreams
   .fromParquet
   .as[User]
   .options(ParquetReader.Options(hadoopConf = conf))
+  .parallelism(n = 4)
   .read(Path("file:///data/users"))
   .runForeach(println)
 
