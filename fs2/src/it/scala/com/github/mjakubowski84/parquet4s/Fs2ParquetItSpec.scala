@@ -67,8 +67,8 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     )
   val vcc: ValueCodecConfiguration = ValueCodecConfiguration.Default
 
-  def read[T: ParquetRecordDecoder](path: Path): Stream[IO, Vector[T]] =
-    parquet.fromParquet[IO].as[T].parallelism(n = 2).read(path).fold(Vector.empty[T])(_ :+ _)
+  def read[T: ParquetRecordDecoder](path: Path, parallelism: Int = 2): Stream[IO, Vector[T]] =
+    parquet.fromParquet[IO].as[T].parallelism(n = parallelism).read(path).fold(Vector.empty[T])(_ :+ _)
 
   def readSize[T: ParquetRecordDecoder](path: Path): Stream[IO, Long] =
     parquet.fromParquet[IO].as[T].parallelism(n = 2).read(path).fold(0L) { case (acc, _) => acc + 1L }
@@ -80,7 +80,23 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
       .filter(_.toString.endsWith(".parquet"))
       .fold(Vector.empty[Path])(_ :+ _)
 
-  "FS2 Parquet" should "write and read single parquet file" in {
+  def createTempDirectory: Stream[IO, Path] = Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+
+  "FS2 Parquet" should "read empty directory" in {
+    val testStream =
+      for {
+        path             <- createTempDirectory
+        readDataSync     <- read[Data](path, parallelism = 1)
+        readDataParallel <- read[Data](path, parallelism = 2)
+      } yield {
+        readDataSync should be(empty)
+        readDataParallel should be(empty)
+      }
+
+    testStream.compile.lastOrError
+  }
+
+  it should "write and read single parquet file" in {
     val outputFileName = "data.parquet"
     def write(path: Path): Stream[IO, Nothing] =
       Stream
@@ -89,9 +105,13 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path     <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
-        readData <- write(path) ++ read[Data](path)
-      } yield readData should contain theSameElementsInOrderAs data
+        path             <- createTempDirectory
+        readDataSync     <- write(path) ++ read[Data](path, parallelism = 1)
+        readDataParallel <- read[Data](path, parallelism = 2)
+      } yield {
+        readDataSync should contain theSameElementsInOrderAs data
+        readDataParallel should contain theSameElementsInOrderAs data
+      }
 
     testStream.compile.lastOrError
   }
@@ -117,7 +137,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path     <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path     <- createTempDirectory
         readData <- write(path) ++ readProjected[RowParquetRecord](path)
       } yield readData should contain theSameElementsInOrderAs expectedRecords
 
@@ -140,7 +160,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path     <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path     <- createTempDirectory
         readData <- write(path) ++ readProjected(path)
       } yield {
         readData should have size count
@@ -166,7 +186,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path     <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path     <- createTempDirectory
         readData <- write(path) ++ read[Data](path)
       } yield readData should contain theSameElementsInOrderAs data.take(numberOfProcessedElementsBeforeFailure)
 
@@ -192,7 +212,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path         <- createTempDirectory
         writtenData  <- write(path)
         readData     <- read[Data](path)
         parquetFiles <- listParquetFiles(path)
@@ -223,7 +243,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path         <- createTempDirectory
         writtenData  <- write(path)
         readData     <- read[Data](path)
         parquetFiles <- listParquetFiles(path)
@@ -263,7 +283,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path         <- createTempDirectory
         gaugeRef     <- Stream.eval(Ref.of[IO, Vector[Long]](Vector.empty))
         writtenData  <- write(path, gaugeRef)
         readData     <- read[Data](path)
@@ -301,13 +321,16 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
-        writtenData  <- write(path)
-        parquetFiles <- listParquetFiles(path)
-        readData     <- read[DataPartitioned](path)
+        path             <- createTempDirectory
+        writtenData      <- write(path)
+        parquetFiles     <- listParquetFiles(path)
+        readDataSync     <- read[DataPartitioned](path, parallelism = 1)
+        readDataParallel <- read[DataPartitioned](path, parallelism = 2)
+        fileCount <- parquet.fromParquet[IO].as[DataPartitioned].readFileStreams(path).fold(0) { case (i, _) => i + 1 }
       } yield {
         writtenData should contain theSameElementsAs dataPartitioned
         parquetFiles.size should be > 1
+        parquetFiles.size should be(fileCount)
         val partitions = parquetFiles.map { path =>
           (partitionValue(path.parent.get.parent.get), partitionValue(path.parent.get))
         }
@@ -317,7 +340,8 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
           dictA should contain(aVal)
           dictB should contain(bVal)
         }
-        readData should contain theSameElementsAs dataPartitioned
+        readDataSync should contain theSameElementsAs dataPartitioned
+        readDataParallel should contain theSameElementsAs dataPartitioned
       }
 
     testStream.compile.lastOrError
@@ -356,7 +380,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path            <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path            <- createTempDirectory
         writtenData     <- write(path)
         partitionPaths  <- Files[IO].list(path).map(_.toPath).fold(Vector.empty[Path])(_ :+ _)
         partitionedData <- read(path)
@@ -401,7 +425,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     val testStream =
       for {
         counter    <- Stream.eval(Ref.of[IO, Long](0L))
-        path       <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path       <- createTempDirectory
         outputData <- write(path, counter)
         readData   <- read[Data](path)
       } yield {
@@ -434,7 +458,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path        <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path        <- createTempDirectory
         writtenData <- write(path)
         readData    <- read[Data](path)
       } yield {
@@ -468,7 +492,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path         <- createTempDirectory
         _            <- write(path)
         parquetFiles <- listParquetFiles(path)
         count <- Stream.iterable(parquetFiles).evalMap { path =>
@@ -505,7 +529,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path         <- createTempDirectory
         _            <- write(path)
         parquetFiles <- listParquetFiles(path)
         total        <- readSize[I](path)
@@ -532,7 +556,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path         <- createTempDirectory
         _            <- write(path) >> write(path) >> write(path)
         parquetFiles <- listParquetFiles(path)
       } yield parquetFiles should have size 3
@@ -555,7 +579,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
 
     val testStream =
       for {
-        path         <- Stream.resource(Files[IO].tempDirectory(None, "", None)).map(_.toPath)
+        path         <- createTempDirectory
         _            <- write(path) >> write(path) >> write(path)
         parquetFiles <- listParquetFiles(path)
       } yield parquetFiles should have size 1
