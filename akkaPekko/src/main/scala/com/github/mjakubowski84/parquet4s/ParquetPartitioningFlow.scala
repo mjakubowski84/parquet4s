@@ -275,32 +275,38 @@ private class ParquetPartitioningFlow[T, W](
     private def newFileName: String          = UUID.randomUUID().toString + compressionExtension + ".parquet"
 
     private def partition(record: RowParquetRecord): (Path, RowParquetRecord) =
-      if (partitionBy.nonEmpty) {
-        val builder = new StringBuilder()
+      partitionBy.headOption match {
+        case Some(firstPartitionPath) =>
+          val (firstPartitionValue, recordWithoutFirstPartition) = extractPartitionValue(record, firstPartitionPath)
+          val builder = new StringBuilder()
+          builder.append(firstPartitionPath.toString)
+          builder.append("=")
+          builder.append(firstPartitionValue.value.toStringUsingUTF8)
 
-        val updatedRecord = partitionBy.foldLeft(record) { case (currentRecord, partitionPath) =>
-          currentRecord.removed(partitionPath) match {
-            case (Some(BinaryValue(binary)), modifiedRecord) =>
-              builder.append(partitionPath.toString)
-              builder.append("=")
-              builder.append(binary.toStringUsingUTF8)
-              builder.append(Path.Separator)
-
-              modifiedRecord
-            case (None, _) =>
-              throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
-            case (Some(NullValue), _) =>
-              throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
-            case _ =>
-              throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
+          val updatedRecord = partitionBy.tail.foldLeft(recordWithoutFirstPartition) { case (currentRecord, currentPartitionPath) =>
+            val (partitionValue, modifiedRecord) = extractPartitionValue(currentRecord, currentPartitionPath)
+            builder.append(Path.Separator)
+            builder.append(currentPartitionPath.toString)
+            builder.append("=")
+            builder.append(partitionValue.value.toStringUsingUTF8)
+            modifiedRecord
           }
-        }
 
-        builder.setLength(builder.length - 1) // removes the trailing separator
+          Path(basePath, builder.toString()) -> updatedRecord
+        case _ =>
+          basePath -> record  
+      }
 
-        Path(basePath, builder.toString()) -> updatedRecord
-      } else {
-        basePath -> record
+    private def extractPartitionValue(record: RowParquetRecord, partitionPath: ColumnPath): (BinaryValue, RowParquetRecord) =
+      record.removed(partitionPath) match {
+        case (Some(value: BinaryValue), modifiedRecord) =>
+          value -> modifiedRecord
+        case (None, _) =>
+          throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
+        case (Some(NullValue), _) =>
+          throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
+        case _ =>
+          throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
       }
 
     private def scheduleNextRotation(path: Path, delay: FiniteDuration): Unit =
