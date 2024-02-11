@@ -278,26 +278,30 @@ private class ParquetPartitioningFlow[T, W](
       partitionBy.headOption match {
         case Some(firstPartitionPath) =>
           val (firstPartitionValue, recordWithoutFirstPartition) = extractPartitionValue(record, firstPartitionPath)
-          val builder = new StringBuilder()
+          val builder                                            = new StringBuilder()
           builder.append(firstPartitionPath.toString)
           builder.append("=")
           builder.append(firstPartitionValue.value.toStringUsingUTF8)
 
-          val updatedRecord = partitionBy.tail.foldLeft(recordWithoutFirstPartition) { case (currentRecord, currentPartitionPath) =>
-            val (partitionValue, modifiedRecord) = extractPartitionValue(currentRecord, currentPartitionPath)
-            builder.append(Path.Separator)
-            builder.append(currentPartitionPath.toString)
-            builder.append("=")
-            builder.append(partitionValue.value.toStringUsingUTF8)
-            modifiedRecord
+          val updatedRecord = partitionBy.tail.foldLeft(recordWithoutFirstPartition) {
+            case (currentRecord, currentPartitionPath) =>
+              val (partitionValue, modifiedRecord) = extractPartitionValue(currentRecord, currentPartitionPath)
+              builder.append(Path.Separator)
+              builder.append(currentPartitionPath.toString)
+              builder.append("=")
+              builder.append(partitionValue.value.toStringUsingUTF8)
+              modifiedRecord
           }
 
-          Path(basePath, builder.toString()) -> updatedRecord
+          Path(basePath, builder.result()) -> updatedRecord
         case _ =>
-          basePath -> record  
+          basePath -> record
       }
 
-    private def extractPartitionValue(record: RowParquetRecord, partitionPath: ColumnPath): (BinaryValue, RowParquetRecord) =
+    private def extractPartitionValue(
+        record: RowParquetRecord,
+        partitionPath: ColumnPath
+    ): (BinaryValue, RowParquetRecord) =
       record.removed(partitionPath) match {
         case (Some(value: BinaryValue), modifiedRecord) =>
           value -> modifiedRecord

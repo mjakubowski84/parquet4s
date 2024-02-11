@@ -14,6 +14,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import fs2.Chunk
+import cats.data.NonEmptyList
 
 object rotatingWriter {
 
@@ -311,7 +312,7 @@ object rotatingWriter {
       chunkSize: Int,
       maxCount: Long,
       maxDuration: FiniteDuration,
-      partitionBy: List[ColumnPath],
+      partitionByOpt: Option[NonEmptyList[ColumnPath]],
       schema: MessageType,
       encode: W => F[RowParquetRecord],
       eventQueue: Queue[F, WriterEvent[F, T, W]],
@@ -367,40 +368,47 @@ object rotatingWriter {
       } yield path -> count
 
     private def partition(record: RowParquetRecord): F[(Path, RowParquetRecord)] =
-      if (partitionBy.nonEmpty) {
-        val builder = new StringBuilder()
+      partitionByOpt.fold(F.pure(basePath -> record)) { partitionBy =>
+        partition(record, partitionBy.head).flatMap { case (firstPartitionPath, firstPartitionValue, modifiedRecord) =>
+          val builder = new StringBuilder()
+          builder.append(firstPartitionPath.toString)
+          builder.append("=")
+          builder.append(firstPartitionValue)
+          partitionRec(modifiedRecord, partitionBy.tail, builder)
+        }
+      }
 
-        val updatedRecord = partitionBy.foldLeft(F.pure(record)) { case (f, currentPartition) =>
-          f.flatMap { currentRecord =>
-            partition(currentRecord, currentPartition).map { case (partitionPath, partitionValue, modifiedRecord) =>
-              builder.append(partitionPath.toString)
-              builder.append("=")
-              builder.append(partitionValue)
-              builder.append(Path.Separator)
-              modifiedRecord
-            }
+    private def partitionRec(
+        record: RowParquetRecord,
+        partitionBy: List[ColumnPath],
+        builder: StringBuilder
+    ): F[(Path, RowParquetRecord)] =
+      partitionBy match {
+        case columnPath :: rest =>
+          partition(record, columnPath).flatMap { case (partitionPath, partitionValue, modifiedRecord) =>
+            builder.append(Path.Separator)
+            builder.append(partitionPath.toString)
+            builder.append("=")
+            builder.append(partitionValue)
+            partitionRec(modifiedRecord, rest, builder)
           }
-        }
-
-        updatedRecord.map { record =>
-          builder.setLength(builder.length - 1) // removes the trailing separator
-          Path(basePath, builder.toString()) -> record
-        }
-      } else {
-        F.pure(basePath -> record)
+        case Nil =>
+          F.pure(Path(basePath, builder.result()) -> record)
       }
 
     private def partition(
         record: RowParquetRecord,
-        partitionPath: ColumnPath
+        partitionColumnPath: ColumnPath
     ): F[(ColumnPath, String, RowParquetRecord)] =
-      record.removed(partitionPath) match {
-        case (None, _) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' does not exist."))
-        case (Some(NullValue), _) => F.raiseError(new IllegalArgumentException(s"Field '$partitionPath' is null."))
+      record.removed(partitionColumnPath) match {
+        case (None, _) =>
+          F.raiseError(new IllegalArgumentException(s"Field '$partitionColumnPath' does not exist."))
+        case (Some(NullValue), _) =>
+          F.raiseError(new IllegalArgumentException(s"Field '$partitionColumnPath' is null."))
         case (Some(BinaryValue(binary)), modifiedRecord) =>
-          F.catchNonFatal((partitionPath, binary.toStringUsingUTF8, modifiedRecord))
+          F.catchNonFatal((partitionColumnPath, binary.toStringUsingUTF8, modifiedRecord))
         case _ =>
-          F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning."))
+          F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionColumnPath' used for partitioning."))
       }
 
     private def disposeAll: F[Unit] =
@@ -546,7 +554,7 @@ object rotatingWriter {
             chunkSize           = chunkSize,
             maxCount            = maxCount,
             maxDuration         = maxDuration,
-            partitionBy         = partitionBy.toList,
+            partitionByOpt      = NonEmptyList.fromList(partitionBy.toList),
             schema              = schema,
             encode              = encode,
             eventQueue          = eventQueue,
