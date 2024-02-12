@@ -2,11 +2,15 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.etl.CompoundParquetIterable
 import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.PathFilter
 import org.apache.parquet.filter2.compat.FilterCompat
+import org.apache.parquet.hadoop
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.io.InputFile
-import org.apache.parquet.schema.{MessageType, Type}
-import org.slf4j.{Logger, LoggerFactory}
+import org.apache.parquet.schema.MessageType
+import org.apache.parquet.schema.Type
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import java.io.Closeable
 import java.util.TimeZone
@@ -41,6 +45,12 @@ object ParquetReader extends IOOps {
       *   optional before-read filter; no filtering is applied by default; check [[Filter]] for more details
       */
     def filter(filter: Filter): Builder[T]
+
+    /** @param pathFilter
+      *   optional path filter; ParquetReader traverses paths that match this predicate to resolve partitions. It uses
+      *   org.apache.parquet.hadoop.util.HiddenFileFilter by default.
+      */
+    def pathFilter(filter: PathFilter): Builder[T]
 
     /** Attempt to read data as partitioned. Partition names must follow Hive format. Partition values will be set in
       * read records to corresponding fields.
@@ -77,13 +87,16 @@ object ParquetReader extends IOOps {
       options: ParquetReader.Options                               = ParquetReader.Options(),
       filter: Filter                                               = Filter.noopFilter,
       projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None,
-      columnProjections: Seq[ColumnProjection]                     = Seq.empty
+      columnProjections: Seq[ColumnProjection]                     = Seq.empty,
+      pathFilter: PathFilter                                       = hadoop.util.HiddenFileFilter.INSTANCE
   ) extends Builder[T] {
     override def options(options: ParquetReader.Options): Builder[T] =
       this.copy(options = options)
 
     override def filter(filter: Filter): Builder[T] =
       this.copy(filter = filter)
+
+    override def pathFilter(filter: PathFilter): Builder[T] = this.copy(pathFilter = pathFilter)
 
     override def partitioned: Builder[T] = this
 
@@ -96,7 +109,7 @@ object ParquetReader extends IOOps {
 
       inputFile match {
         case hadoopInputFile: HadoopInputFile =>
-          partitionedIterable(Path(hadoopInputFile.getPath), valueCodecConfiguration, hadoopConf)
+          partitionedIterable(Path(hadoopInputFile.getPath), valueCodecConfiguration, hadoopConf, pathFilter)
         case _ =>
           singleIterable(
             inputFile               = inputFile,
@@ -112,9 +125,10 @@ object ParquetReader extends IOOps {
     private def partitionedIterable(
         path: Path,
         valueCodecConfiguration: ValueCodecConfiguration,
-        hadoopConf: Configuration
+        hadoopConf: Configuration,
+        pathFilter: PathFilter
     )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] =
-      findPartitionedPaths(path, hadoopConf) match {
+      findPartitionedPaths(path, hadoopConf, pathFilter) match {
         case Left(exception) =>
           throw exception
         case Right(partitionedDirectory) =>

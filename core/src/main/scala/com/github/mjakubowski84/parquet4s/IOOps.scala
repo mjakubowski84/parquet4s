@@ -1,12 +1,17 @@
 package com.github.mjakubowski84.parquet4s
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileAlreadyExistsException, FileStatus, FileSystem, RemoteIterator}
+import org.apache.hadoop.fs.FileAlreadyExistsException
+import org.apache.hadoop.fs.FileStatus
+import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.PathFilter
+import org.apache.hadoop.fs.RemoteIterator
 import org.apache.parquet.hadoop.ParquetFileWriter
 import org.apache.parquet.hadoop.util.HiddenFileFilter
 import org.slf4j.Logger
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
+import scala.concurrent.Future
 import scala.util.matching.Regex
 
 private[parquet4s] object IOOps {
@@ -67,12 +72,18 @@ trait IOOps {
       }
     }
 
+  /** @param path
+    *   a location in a file tree from which `findPartitionedPaths` collects descendant paths recursively
+    * @param pathFilter
+    *   `findPartitionedPaths` traverses paths that match this predicate
+    */
   protected def findPartitionedPaths(
       path: Path,
-      configuration: Configuration
+      configuration: Configuration,
+      pathFilter: PathFilter = HiddenFileFilter.INSTANCE
   ): Either[Exception, PartitionedDirectory] = {
     val fs = path.toHadoop.getFileSystem(configuration)
-    findPartitionedPaths(fs, configuration, path, List.empty).fold(
+    findPartitionedPaths(fs, configuration, path, pathFilter, List.empty).fold(
       PartitionedDirectory.failed,
       PartitionedDirectory.apply
     )
@@ -82,10 +93,11 @@ trait IOOps {
       fs: FileSystem,
       configuration: Configuration,
       path: Path,
+      pathFilter: PathFilter,
       partitions: List[Partition]
   ): Either[List[Path], List[PartitionedPath]] = {
     val (dirs, files) = fs
-      .listStatus(path.toHadoop, HiddenFileFilter.INSTANCE)
+      .listStatus(path.toHadoop, pathFilter)
       .toList
       .partition(_.isDirectory)
     if (dirs.nonEmpty && files.nonEmpty)
@@ -96,11 +108,11 @@ trait IOOps {
         Right(List.empty) // empty leaf dir
       else if (partitionedDirs.isEmpty)
         // leaf files
-        Right(files.map(fileStatus => PartitionedPath(fileStatus, configuration, partitions)))
+        Right(files.map(PartitionedPath(_, configuration, partitions)))
       else
         partitionedDirs
           .map { case (subPath, partition) =>
-            findPartitionedPaths(fs, configuration, subPath, partitions :+ partition)
+            findPartitionedPaths(fs, configuration, subPath, pathFilter, partitions :+ partition)
           }
           .foldLeft[Either[List[Path], List[PartitionedPath]]](Right(List.empty)) {
             case (Left(invalidPaths), Left(moreInvalidPaths)) =>
