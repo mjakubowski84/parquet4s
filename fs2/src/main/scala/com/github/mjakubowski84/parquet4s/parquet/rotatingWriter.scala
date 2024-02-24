@@ -477,7 +477,7 @@ object rotatingWriter {
       entityChunksStream.pull.uncons1.flatMap {
         case Some((chunk, tail)) =>
           Pull.eval(write(chunk)).flatMap { chunkModifiedPartitions =>
-            writeEntityChunksAndOutputPull(tail, outChunk, modifiedPartitions.combine(chunkModifiedPartitions))
+            writeEntityChunksAndOutputPull(tail, outChunk, modifiedPartitions ++ chunkModifiedPartitions)
           }
         case None if postWriteHandlerOpt.isEmpty =>
           Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
