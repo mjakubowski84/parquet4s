@@ -12,6 +12,7 @@ import org.apache.parquet.schema.MessageType
 
 import scala.collection.compat.*
 import scala.jdk.CollectionConverters.*
+import scala.util.Using
 
 private[parquet4s] object FileStats {
   def apply(
@@ -33,10 +34,10 @@ private[parquet4s] class FileStats(
 
   private val readerOptions = ParquetReadOptions.builder().build()
 
-  abstract private class StatsReader {
+  abstract private class StatsReader extends AutoCloseable {
     protected val reader: ParquetFileReader = ParquetFileReader.open(inputFile, readerOptions)
     projectionSchemaOpt.foreach(reader.setRequestedSchema)
-    def close(): Unit = reader.close()
+    override def close(): Unit = reader.close()
   }
 
   private class RecordCountReader extends StatsReader {
@@ -68,8 +69,7 @@ private[parquet4s] class FileStats(
 
   override def recordCount: Long = {
     val reader = new RecordCountReader
-    try reader.recordCount
-    finally reader.close()
+    Using.resource(reader)(_.recordCount)
   }
 
   override def min[V](columnPath: ColumnPath, currentMin: Option[V])(implicit
@@ -77,8 +77,7 @@ private[parquet4s] class FileStats(
       ordering: Ordering[V]
   ): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMin)
-    try reader.min
-    finally reader.close()
+    Using.resource(reader)(_.min)
   }
 
   override def max[V](columnPath: ColumnPath, currentMax: Option[V])(implicit
@@ -86,7 +85,6 @@ private[parquet4s] class FileStats(
       ordering: Ordering[V]
   ): Option[V] = {
     val reader = new MinMaxReader[V](columnPath, currentMax)
-    try reader.max
-    finally reader.close()
+    Using.resource(reader)(_.max)
   }
 }

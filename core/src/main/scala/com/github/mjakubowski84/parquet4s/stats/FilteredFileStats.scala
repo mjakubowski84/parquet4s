@@ -43,25 +43,25 @@ private[parquet4s] class FilteredFileStats(
     private val messageSchema                  = fileMetaData.getSchema
     protected val requestedSchema: MessageType = projectionSchemaOpt.getOrElse(messageSchema)
     private val columnIOFactory                = new ColumnIOFactory(fileMetaData.getCreatedBy)
-    protected val columnIO: MessageColumnIO    = columnIOFactory.getColumnIO(requestedSchema, messageSchema, true)
+    // strict type checking should come from Hadoop Configuration or readerOptions.isEnabled(STRICT_TYPE_CHECKING, true);
+    // but we enforce it for now (true flag)
+    protected val columnIO: MessageColumnIO = columnIOFactory.getColumnIO(requestedSchema, messageSchema, true)
 
     def close(): Unit = reader.close()
   }
 
   private class RecordCountReader extends StatsReader {
+    private val rowCountMaterializer = new RowCountMaterializer(requestedSchema)
     def filteredRecordCount: Long =
       Iterator
         .continually(reader.readNextFilteredRowGroup())
         .takeWhile(_ != null)
         .flatMap { store =>
-          val recordReader = columnIO.getRecordReader(
-            store,
-            new RowCountMaterializer(requestedSchema),
-            filter
-          )
+          val recordReader = columnIO.getRecordReader(store, rowCountMaterializer, filter)
           (0L until store.getRowCount.longValue()).iterator
-            .map(_ => Option(recordReader.read()))
-            .collect { case Some(v) => v.value }
+            .map(_ => Option(recordReader.read())) // unmaterialised record counter, catching errors, etc
+            // TODO test with filters because missing shouldSkipCurrentRecord was not found in tests
+            .collect { case Some(v) if !recordReader.shouldSkipCurrentRecord => v.value }
         }
         .sum
   }
@@ -70,6 +70,8 @@ private[parquet4s] class FilteredFileStats(
       decoder: ValueDecoder[V],
       ordering: Ordering[V]
   ) extends StatsReader {
+    private val recordMaterializer =
+      new ParquetRecordMaterializer(schema = requestedSchema, columnProjections = Seq.empty)
     private val dotString = columnPath.toString
     private lazy val currentBlockField = {
       val f = reader.getClass.getDeclaredField("currentBlock")
@@ -93,17 +95,13 @@ private[parquet4s] class FilteredFileStats(
       currentRowGroupStatistics.flatMap(statsMaxValue).map(value => decoder.decode(value, vcc))
 
     private def extremeOfRowGroup(currentExtremeOpt: Option[V], choose: (V, V) => V) = {
-      val store = reader.readNextFilteredRowGroup()
-      val recordReader =
-        columnIO.getRecordReader(
-          store,
-          new ParquetRecordMaterializer(schema = requestedSchema, columnProjections = Seq.empty),
-          filter
-        )
+      val store        = reader.readNextFilteredRowGroup()
+      val recordReader = columnIO.getRecordReader(store, recordMaterializer, filter)
       (0L until store.getRowCount.longValue()).iterator
-        .map(_ => Option(recordReader.read()))
-        .collect { case Some(record) =>
-          record.get(columnPath)
+        .map(_ => Option(recordReader.read())) // TODO unmaterializableRecordCounter or similar
+        .collect {
+          // TODO more tests about filtering because missing shouldSkipCurrentRecord was not found!
+          case Some(record) if !recordReader.shouldSkipCurrentRecord => record.get(columnPath)
         }
         .collect {
           case Some(value) if value != NullValue => decoder.decode(value, vcc)
@@ -112,6 +110,8 @@ private[parquet4s] class FilteredFileStats(
           case (None, v)    => Some(v)
           case (Some(a), v) => Some(choose(a, v))
         }
+      // TODO do we have a test for an empty file?
+      // TODO should catch any RuntimeException and throw ParquetDecodingException
     }
 
     @tailrec
@@ -160,7 +160,7 @@ private[parquet4s] class FilteredFileStats(
 
   override def recordCount: Long = {
     val reader = new RecordCountReader
-    try reader.filteredRecordCount
+    try reader.filteredRecordCount // TODO Using here and there
     finally reader.close()
   }
 
