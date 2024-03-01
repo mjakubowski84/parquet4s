@@ -5,9 +5,9 @@ import Compilation._
 import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
-lazy val twoTwelve              = "2.12.18"
-lazy val twoThirteen            = "2.13.12"
-lazy val three                  = "3.3.1"
+lazy val twoTwelve              = "2.12.19"
+lazy val twoThirteen            = "2.13.14"
+lazy val three                  = "3.3.3"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 val akkaLib  = ActorLibCross("-akka", "-akka")
@@ -52,9 +52,9 @@ lazy val testReportSettings = Project.inConfig(Test)(
 // used only for testing in core module
 lazy val sparkDeps = Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "it"
-    exclude (org = "org.apache.hadoop", name = "hadoop-client")
-    exclude (org = "org.apache.hadoop", name = "hadoop-client-api")
-    exclude (org = "org.slf4j", name = "slf4j-api")
+    exclude (org = "org.apache.hadoop", name  = "hadoop-client")
+    exclude (org = "org.apache.hadoop", name  = "hadoop-client-api")
+    exclude (org = "org.slf4j", name          = "slf4j-api")
     exclude (org = "org.apache.parquet", name = "parquet-hadoop"),
   "org.apache.spark" %% "spark-sql" % sparkVersion % "it"
     exclude (org = "org.apache.hadoop", name = "hadoop-client")

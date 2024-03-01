@@ -103,8 +103,9 @@ object ParquetReader extends IOOps {
             valueCodecConfiguration = valueCodecConfiguration,
             projectedSchemaOpt =
               projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T]),
-            filterCompat = filter.toFilterCompat(valueCodecConfiguration),
-            hadoopConf   = hadoopConf
+            filterCompat     = filter.toFilterCompat(valueCodecConfiguration),
+            hadoopConf       = hadoopConf,
+            partitionViewOpt = None
           )
       }
     }
@@ -129,7 +130,8 @@ object ParquetReader extends IOOps {
               valueCodecConfiguration = valueCodecConfiguration,
               projectedSchemaOpt      = projectedSchemaOpt,
               filterCompat            = partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(FilterCompat.get),
-              hadoopConf              = hadoopConf
+              hadoopConf              = hadoopConf,
+              partitionViewOpt        = Option(partitionedPath.view)
             ).appendTransformation(setPartitionValues(partitionedPath))
           }
           new CompoundParquetIterable[T](iterables)
@@ -140,24 +142,17 @@ object ParquetReader extends IOOps {
         valueCodecConfiguration: ValueCodecConfiguration,
         projectedSchemaOpt: Option[MessageType],
         filterCompat: FilterCompat.Filter,
-        hadoopConf: Configuration
+        hadoopConf: Configuration,
+        partitionViewOpt: Option[PartitionView]
     )(implicit decoder: ParquetRecordDecoder[T]): ParquetIterable[T] = {
       if (logger.isDebugEnabled) {
         logger.debug(s"Creating ParquetIterable for file $inputFile")
       }
       ParquetIterable[T](
-        iteratorFactory = () =>
-          new ParquetIterator[RowParquetRecord](
-            HadoopParquetReader(
-              inputFile          = inputFile,
-              projectedSchemaOpt = projectedSchemaOpt,
-              columnProjections  = columnProjections,
-              filter             = filterCompat,
-              metadataReader     = decoder
-            ).withConf(hadoopConf)
-          ),
+        iteratorFactory =
+          ParquetIterator.factory(inputFile, hadoopConf, projectedSchemaOpt, columnProjections, filterCompat, decoder),
         valueCodecConfiguration = valueCodecConfiguration,
-        stats = Stats(inputFile, valueCodecConfiguration, hadoopConf, projectedSchemaOpt, filterCompat)
+        stats = Stats(inputFile, valueCodecConfiguration, projectedSchemaOpt, filterCompat, partitionViewOpt)
       )
     }
 
