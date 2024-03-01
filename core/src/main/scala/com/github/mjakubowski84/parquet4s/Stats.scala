@@ -1,11 +1,12 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.stats.LazyDelegateStats
-import org.apache.hadoop.conf.Configuration
+import com.github.mjakubowski84.parquet4s.stats.{CompoundStats, LazyDelegateStats}
 import org.apache.parquet.column.statistics.*
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.MessageType
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 /** Utilises statistics of Parquet files to provide number of records and minimum and maximum value of columns. Values
   * are provided for both unfiltered and filtered reads. Reading statistics from unfiltered files is usually faster as
@@ -103,6 +104,8 @@ object Stats {
       */
     def projection[T: ParquetSchemaResolver]: Builder
 
+    def projection(projectedSchema: MessageType): Builder
+
     /** @param path
       *   [[Path]] to Parquet files, e.g.: {{{Path("file:///data/users")}}}
       * @return
@@ -119,30 +122,61 @@ object Stats {
     def stats(inputFile: InputFile): Stats
   }
 
-  private case class BuilderImpl(
-      options: ParquetReader.Options           = ParquetReader.Options(),
-      filter: Filter                           = Filter.noopFilter,
-      projectionSchemaOpt: Option[MessageType] = None
-  ) extends Builder {
+  private case class BuilderImpl[T](
+      options: ParquetReader.Options                                = ParquetReader.Options(),
+      filter: Filter                                                = Filter.noopFilter,
+      projectionSchemaResolverOpt: Option[ParquetSchemaResolver[T]] = None
+  ) extends Builder
+      with IOOps {
+
+    override protected val logger: Logger = LoggerFactory.getLogger(this.getClass())
+
     override def options(options: ParquetReader.Options): Builder = this.copy(options = options)
     override def filter(filter: Filter): Builder                  = this.copy(filter = filter)
-    override def projection[T: ParquetSchemaResolver]: Builder =
-      this.copy(projectionSchemaOpt = Option(ParquetSchemaResolver.resolveSchema[T]))
-    override def stats(path: Path): Stats = stats(path.toInputFile(options))
+    override def projection[P: ParquetSchemaResolver]: Builder =
+      this.copy(projectionSchemaResolverOpt = Option(implicitly[ParquetSchemaResolver[P]]))
+    override def projection(projectionSchema: MessageType): Builder =
+      this.copy(projectionSchemaResolverOpt = Option(RowParquetRecord.genericParquetSchemaResolver(projectionSchema)))
+    override def stats(path: Path): Stats =
+      listPartitionedDirectory(path, options.hadoopConf, filter, ValueCodecConfiguration(options)) match {
+        case Left(exception) =>
+          throw exception
+        case Right(directory) =>
+          val projectionSchemaOpt =
+            projectionSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema(directory.schema))
+          lazy val fallbackFilterCompat = filter.toNonPredicateFilterCompat
+          val multiStats = directory.paths.map { partitionedPath =>
+            apply(
+              inputFile           = partitionedPath.inputFile,
+              vcc                 = ValueCodecConfiguration(options),
+              projectionSchemaOpt = projectionSchemaOpt,
+              filter              = partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(FilterCompat.get),
+              partitionViewOpt    = Option(partitionedPath.view)
+            )
+          }
+          new CompoundStats(multiStats)
+      }
     override def stats(inputFile: InputFile): Stats = {
       val vcc = ValueCodecConfiguration(options)
-      apply(inputFile, vcc, options.hadoopConf, projectionSchemaOpt, filter.toFilterCompat(vcc))
+      apply(
+        inputFile = inputFile,
+        vcc       = vcc,
+        projectionSchemaOpt =
+          projectionSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T]),
+        filter           = filter.toFilterCompat(vcc),
+        partitionViewOpt = None
+      )
     }
   }
 
   private[parquet4s] def apply(
       inputFile: InputFile,
       vcc: ValueCodecConfiguration,
-      hadoopConf: Configuration,
       projectionSchemaOpt: Option[MessageType],
-      filter: FilterCompat.Filter
-  ): Stats = new LazyDelegateStats(inputFile, vcc, hadoopConf, projectionSchemaOpt, filter)
+      filter: FilterCompat.Filter,
+      partitionViewOpt: Option[PartitionView]
+  ): Stats = new LazyDelegateStats(inputFile, vcc, projectionSchemaOpt, filter, partitionViewOpt)
 
-  def builder: Builder = BuilderImpl()
+  def builder: Builder = BuilderImpl[RowParquetRecord]()
 
 }

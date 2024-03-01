@@ -5,7 +5,7 @@ import xerial.sbt.Sonatype.autoImport.{sonatypeProfileName, sonatypeProjectHosti
 
 object Releasing {
 
-  lazy val publishSettings: Seq[Def.Setting[_]] = {
+  lazy val publishSettings: Seq[Def.Setting[_]] =
     Seq(
       credentials ++= Seq(
         Credentials(
@@ -55,6 +55,5 @@ object Releasing {
       Test / publishArtifact := false,
       IntegrationTest / publishArtifact := false
     ) ++ (if (sys.env contains "SONATYPE_USERNAME") Signing.signingSettings else Seq.empty)
-  }
 
 }
