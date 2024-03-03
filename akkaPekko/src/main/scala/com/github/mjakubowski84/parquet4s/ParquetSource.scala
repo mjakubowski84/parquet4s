@@ -7,6 +7,8 @@ import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
+import org.apache.hadoop.conf.Configuration
+import java.io.Closeable
 
 object ParquetSource extends IOOps {
 
@@ -233,6 +235,7 @@ object ParquetSource extends IOOps {
             if (parallelism == 1) {
               filteredPaths.flatMapConcat(
                 createPartitionedSource(
+                  hadoopConf,
                   projectedSchemaOpt,
                   columnProjections,
                   decoder,
@@ -243,6 +246,7 @@ object ParquetSource extends IOOps {
               filteredPaths.flatMapMerge(
                 breadth = parallelism,
                 createPartitionedSource(
+                  hadoopConf,
                   projectedSchemaOpt,
                   columnProjections,
                   decoder,
@@ -257,6 +261,7 @@ object ParquetSource extends IOOps {
           projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T])
         createSource(
           inputFile,
+          hadoopConf,
           projectedSchemaOpt,
           columnProjections,
           filter.toFilterCompat(valueCodecConfiguration),
@@ -268,6 +273,7 @@ object ParquetSource extends IOOps {
   }
 
   private def createPartitionedSource(
+      configuration: Configuration,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
       decoder: ParquetRecordDecoder[?],
@@ -276,6 +282,7 @@ object ParquetSource extends IOOps {
     partitionedPath =>
       createSource(
         inputFile          = partitionedPath.inputFile,
+        configuration      = configuration,
         projectedSchemaOpt = projectedSchemaOpt,
         columnProjections  = columnProjections,
         filterCompat       = partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(FilterCompat.get),
@@ -285,15 +292,16 @@ object ParquetSource extends IOOps {
 
   private def createSource(
       inputFile: InputFile,
+      configuration: Configuration,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
       filterCompat: FilterCompat.Filter,
       decoder: ParquetRecordDecoder[?]
   ) =
     Source
-      .unfoldResource[RowParquetRecord, org.apache.parquet.hadoop.ParquetReader[RowParquetRecord]](
-        ()     => createReader(filterCompat, inputFile, projectedSchemaOpt, columnProjections, decoder),
-        reader => Option(reader.read()),
+      .unfoldResource[RowParquetRecord, Iterator[RowParquetRecord] & Closeable](
+        ParquetIterator.factory(inputFile, configuration, projectedSchemaOpt, columnProjections, filterCompat, decoder),
+        iterator => if (iterator.hasNext) Option(iterator.next()) else None,
         _.close()
       )
 
@@ -302,12 +310,4 @@ object ParquetSource extends IOOps {
       currentRecord.updated(columnPath, BinaryValue(value))
     }
 
-  private def createReader(
-      filterCompat: FilterCompat.Filter,
-      inputFile: InputFile,
-      projectedSchemaOpt: Option[MessageType],
-      columnProjections: Seq[ColumnProjection],
-      decoder: ParquetRecordDecoder[?]
-  ): org.apache.parquet.hadoop.ParquetReader[RowParquetRecord] =
-    HadoopParquetReader(inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder).build()
 }
