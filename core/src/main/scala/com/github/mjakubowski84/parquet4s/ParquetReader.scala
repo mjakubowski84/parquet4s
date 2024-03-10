@@ -146,7 +146,8 @@ object ParquetReader extends IOOps {
         logger.debug(s"Creating ParquetIterable for file $inputFile")
       }
       ParquetIterable[T](
-        iteratorFactory = ParquetIterator.factory(inputFile, hadoopConf, projectedSchemaOpt, columnProjections, filterCompat, decoder),
+        iteratorFactory =
+          ParquetIterator.factory(inputFile, hadoopConf, projectedSchemaOpt, columnProjections, filterCompat, decoder),
         valueCodecConfiguration = valueCodecConfiguration,
         stats = Stats(inputFile, valueCodecConfiguration, hadoopConf, projectedSchemaOpt, filterCompat)
       )

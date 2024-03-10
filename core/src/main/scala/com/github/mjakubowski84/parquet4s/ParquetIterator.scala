@@ -16,6 +16,7 @@ import java.util.Map as JMap
 import java.util.Map.Entry as JEntry
 import java.util.Set as JSet
 import scala.annotation.tailrec
+import compat.IteratorCompat
 
 private[parquet4s] object ParquetIterator {
   private[parquet4s] type HadoopBuilder[T] = org.apache.parquet.hadoop.ParquetReader.Builder[T]
@@ -98,6 +99,7 @@ private[parquet4s] class InternalParquetIterator(
   // TODO building options should happen only once, not per each file
 
   val reader = ParquetFileReader.open(inputFile, options)
+
   projectedSchemaOpt.foreach(reader.setRequestedSchema)
   val fileMetadata = reader.getFooter().getFileMetaData();
   val fileSchema   = fileMetadata.getSchema()
@@ -140,7 +142,7 @@ private[parquet4s] class InternalParquetIterator(
   }
 
   lazy val wrappedIterator =
-    Iterator.unfold[RowParquetRecord, Paginator](new Paginator(reader.readNextFilteredRowGroup()))(_.next())
+    IteratorCompat.unfold[RowParquetRecord, Paginator](new Paginator(reader.readNextFilteredRowGroup()))(_.next())
 
   override def hasNext: Boolean = wrappedIterator.hasNext
 
@@ -157,5 +159,11 @@ private[parquet4s] class InternalParquetIterator(
           m.put(entry.getKey(), Collections.singleton(entry.getValue())),
         (m1: JMap[String, JSet[String]], m2: JMap[String, JSet[String]]) => m1.putAll(m2)
       )
+
+  // private def getUnsafe: Unsafe = {
+  //   val f = classOf[Unsafe].getDeclaredField("theUnsafe");
+  //   f.setAccessible(true);
+  //   f.get(null).asInstanceOf[Unsafe];
+  // }
 
 }
