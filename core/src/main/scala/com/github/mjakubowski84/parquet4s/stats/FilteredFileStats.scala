@@ -13,6 +13,7 @@ import org.apache.parquet.schema.{GroupType, MessageType}
 
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters.*
+import scala.util.Using
 
 private[parquet4s] object FilteredFileStats {
   def apply(
@@ -35,7 +36,7 @@ private[parquet4s] class FilteredFileStats(
 
   private val readerOptions = ParquetReadOptions.builder().withRecordFilter(filter).build()
 
-  abstract private class StatsReader {
+  abstract private class StatsReader extends AutoCloseable {
     protected val reader: ParquetFileReader = ParquetFileReader.open(inputFile, readerOptions)
     projectionSchemaOpt.foreach(reader.setRequestedSchema)
 
@@ -158,29 +159,20 @@ private[parquet4s] class FilteredFileStats(
 
   }
 
-  override def recordCount: Long = {
-    val reader = new RecordCountReader
-    try reader.filteredRecordCount // TODO Using here and there
-    finally reader.close()
-  }
-
+  override def recordCount: Long =
+    Using.resource(new RecordCountReader)(_.filteredRecordCount)
+  
   override def min[V](columnPath: ColumnPath, currentMin: Option[V])(implicit
       decoder: ValueDecoder[V],
       ordering: Ordering[V]
-  ): Option[V] = {
-    val reader = new MinMaxReader[V](columnPath, currentMin)
-    try reader.min
-    finally reader.close()
-  }
+  ): Option[V] =
+    Using.resource(new MinMaxReader[V](columnPath, currentMin))(_.min)
 
   override def max[V](columnPath: ColumnPath, currentMax: Option[V])(implicit
       decoder: ValueDecoder[V],
       ordering: Ordering[V]
-  ): Option[V] = {
-    val reader = new MinMaxReader[V](columnPath, currentMax)
-    try reader.max
-    finally reader.close()
-  }
+  ): Option[V] =
+    Using.resource(new MinMaxReader[V](columnPath, currentMax))(_.max)
 
 }
 

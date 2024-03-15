@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s.etl
 import com.github.mjakubowski84.parquet4s.*
 import com.github.mjakubowski84.parquet4s.stats.CompoundStats
 
+// TODO add support for partition columns (re stats)
 private[parquet4s] class CompoundParquetIterable[T](components: Iterable[ParquetIterable[T]])
     extends ParquetIterable[T] {
 

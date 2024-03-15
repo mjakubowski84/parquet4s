@@ -67,24 +67,19 @@ private[parquet4s] class FileStats(
 
   }
 
-  override def recordCount: Long = {
-    val reader = new RecordCountReader
-    Using.resource(reader)(_.recordCount)
-  }
+  override def recordCount: Long =
+    Using.resource(new RecordCountReader)(_.recordCount)
 
   override def min[V](columnPath: ColumnPath, currentMin: Option[V])(implicit
       decoder: ValueDecoder[V],
       ordering: Ordering[V]
-  ): Option[V] = {
-    val reader = new MinMaxReader[V](columnPath, currentMin)
-    Using.resource(reader)(_.min)
-  }
+  ): Option[V] =
+    Using.resource(new MinMaxReader[V](columnPath, currentMin))(_.min)
 
   override def max[V](columnPath: ColumnPath, currentMax: Option[V])(implicit
       decoder: ValueDecoder[V],
       ordering: Ordering[V]
-  ): Option[V] = {
-    val reader = new MinMaxReader[V](columnPath, currentMax)
-    Using.resource(reader)(_.max)
-  }
+  ): Option[V] =
+    Using.resource(new MinMaxReader[V](columnPath, currentMax))(_.max)
+  
 }
