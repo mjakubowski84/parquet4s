@@ -150,9 +150,9 @@ private class PartitionedPathImpl(
   override def equals(other: Any): Boolean = other match {
     case that: PartitionedPathImpl =>
       (that canEqual this) &&
-        path == that.path &&
-        partitions == that.partitions &&
-        filterPredicateOpt == that.filterPredicateOpt
+      path == that.path &&
+      partitions == that.partitions &&
+      filterPredicateOpt == that.filterPredicateOpt
     case _ => false
   }
 

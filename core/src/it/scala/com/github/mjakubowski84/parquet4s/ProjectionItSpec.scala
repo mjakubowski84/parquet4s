@@ -50,11 +50,12 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll 
 
     val records = ParquetReader.projectedGeneric(partialSchema).read(simpleFilePath)
 
-    try records should contain theSameElementsAs List(
-      RowParquetRecord("b" -> 1.value),
-      RowParquetRecord("b" -> 2.value),
-      RowParquetRecord("b" -> 3.value)
-    )
+    try
+      records should contain theSameElementsAs List(
+        RowParquetRecord("b" -> 1.value),
+        RowParquetRecord("b" -> 2.value),
+        RowParquetRecord("b" -> 3.value)
+      )
     finally records.close()
   }
 
@@ -63,17 +64,18 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll 
 
     val records = ParquetReader.projectedGeneric(partialSchema).read(complexFilePath)
 
-    try records should contain theSameElementsAs List(
-      RowParquetRecord(
-        "nested" -> RowParquetRecord(
-          "b" -> ListParquetRecord(
-            RowParquetRecord("x" -> 1.value),
-            RowParquetRecord("x" -> 2.value),
-            RowParquetRecord("x" -> 3.value)
+    try
+      records should contain theSameElementsAs List(
+        RowParquetRecord(
+          "nested" -> RowParquetRecord(
+            "b" -> ListParquetRecord(
+              RowParquetRecord("x" -> 1.value),
+              RowParquetRecord("x" -> 2.value),
+              RowParquetRecord("x" -> 3.value)
+            )
           )
         )
       )
-    )
     finally records.close()
   }
 
@@ -81,44 +83,48 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll 
     val records =
       ParquetReader.projectedGeneric(Col("a").as[String], Col("nested").as[PartialNested]).read(complexFilePath)
 
-    try records should contain theSameElementsAs List(
-      RowParquetRecord(
-        "a" -> "A".value,
-        "nested" -> RowParquetRecord(
-          "b" -> ListParquetRecord(
-            RowParquetRecord("x" -> 1.value),
-            RowParquetRecord("x" -> 2.value),
-            RowParquetRecord("x" -> 3.value)
+    try
+      records should contain theSameElementsAs List(
+        RowParquetRecord(
+          "a" -> "A".value,
+          "nested" -> RowParquetRecord(
+            "b" -> ListParquetRecord(
+              RowParquetRecord("x" -> 1.value),
+              RowParquetRecord("x" -> 2.value),
+              RowParquetRecord("x" -> 3.value)
+            )
           )
         )
       )
-    )
     finally records.close()
   }
 
   it should "apply aliases to projected field names" in {
     val records = ParquetReader.projectedGeneric(Col("a").as[String].alias("alias")).read(simpleFilePath)
-    try records should contain theSameElementsAs List(
-      RowParquetRecord("alias" -> "x".value),
-      RowParquetRecord("alias" -> "y".value),
-      RowParquetRecord("alias" -> "z".value)
-    )
+    try
+      records should contain theSameElementsAs List(
+        RowParquetRecord("alias" -> "x".value),
+        RowParquetRecord("alias" -> "y".value),
+        RowParquetRecord("alias" -> "z".value)
+      )
     finally records.close()
   }
 
   it should "be able to project to nested field" in {
     val records = ParquetReader.projectedGeneric(Col("nested.c").as[Boolean]).read(complexFilePath)
-    try records should contain theSameElementsAs List(
-      RowParquetRecord("c" -> true.value)
-    )
+    try
+      records should contain theSameElementsAs List(
+        RowParquetRecord("c" -> true.value)
+      )
     finally records.close()
   }
 
   it should "be able to project to nested field and give a new name to it" in {
     val records = ParquetReader.projectedGeneric(Col("nested.c").as[Boolean].alias("x")).read(complexFilePath)
-    try records should contain theSameElementsAs List(
-      RowParquetRecord("x" -> true.value)
-    )
+    try
+      records should contain theSameElementsAs List(
+        RowParquetRecord("x" -> true.value)
+      )
     finally records.close()
   }
 
@@ -130,9 +136,10 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll 
         Col("a").as[Long].alias("x") // even though Long is used here - it is discarded and first `as` is used
       )
       .read(complexFilePath)
-    try records should contain theSameElementsAs List(
-      RowParquetRecord("a" -> "A".value, "a" -> "A".value, "x" -> "A".value)
-    )
+    try
+      records should contain theSameElementsAs List(
+        RowParquetRecord("a" -> "A".value, "a" -> "A".value, "x" -> "A".value)
+      )
     finally records.close()
   }
 
@@ -154,15 +161,16 @@ class ProjectionItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll 
       "c" -> true.value
     )
 
-    try records.toList should be(
-      List(
-        RowParquetRecord(
-          "nested" -> expectedNestedRecord,
-          "nested" -> expectedNestedRecord,
-          "renamed" -> expectedNestedRecord
+    try
+      records.toList should be(
+        List(
+          RowParquetRecord(
+            "nested" -> expectedNestedRecord,
+            "nested" -> expectedNestedRecord,
+            "renamed" -> expectedNestedRecord
+          )
         )
       )
-    )
     finally records.close()
   }
 

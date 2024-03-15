@@ -15,7 +15,7 @@ private[parquet4s] class LazyDelegateStats(
     projectionSchemaOpt: Option[MessageType],
     filter: FilterCompat.Filter
 ) extends Stats {
-  private lazy val delegate: Stats = {
+  private lazy val delegate: Stats =
     inputFile match {
       case hadoopInputFile: HadoopInputFile =>
         val hadoopPath = hadoopInputFile.getPath
@@ -34,8 +34,6 @@ private[parquet4s] class LazyDelegateStats(
         new FilteredFileStats(inputFile, vcc, projectionSchemaOpt, filter)
 
     }
-
-  }
 
   override def recordCount: Long = delegate.recordCount
 

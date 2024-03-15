@@ -29,13 +29,14 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
     ParquetWriter.of[Record].writeAndClose(path, records)
 
     val readRecords = ParquetReader.generic.read(path)
-    try readRecords.toSeq should be(
-      Seq(
-        RowParquetRecord("i" -> 1.value, "d" -> 2.1.value, "nested" -> RowParquetRecord("s" -> "non-null".value)),
-        RowParquetRecord("i" -> 1.value, "d" -> NullValue, "nested" -> RowParquetRecord("s" -> NullValue)),
-        RowParquetRecord("i" -> 1.value, "d" -> NullValue, "nested" -> NullValue)
+    try
+      readRecords.toSeq should be(
+        Seq(
+          RowParquetRecord("i" -> 1.value, "d" -> 2.1.value, "nested" -> RowParquetRecord("s" -> "non-null".value)),
+          RowParquetRecord("i" -> 1.value, "d" -> NullValue, "nested" -> RowParquetRecord("s" -> NullValue)),
+          RowParquetRecord("i" -> 1.value, "d" -> NullValue, "nested" -> NullValue)
+        )
       )
-    )
     finally readRecords.close()
   }
 
@@ -46,13 +47,14 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b2/file.parquet"), Seq(I(4)))
 
     val partitioned = ParquetReader.as[Partitioned].read(tempPath)
-    try partitioned.toSeq should contain theSameElementsAs
-      Seq(
-        Partitioned(a = "a1", b = "b1", i = 1),
-        Partitioned(a = "a1", b = "b2", i = 2),
-        Partitioned(a = "a2", b = "b1", i = 3),
-        Partitioned(a = "a2", b = "b2", i = 4)
-      )
+    try
+      partitioned.toSeq should contain theSameElementsAs
+        Seq(
+          Partitioned(a = "a1", b = "b1", i = 1),
+          Partitioned(a = "a1", b = "b2", i = 2),
+          Partitioned(a = "a2", b = "b1", i = 3),
+          Partitioned(a = "a2", b = "b2", i = 4)
+        )
     finally partitioned.close()
   }
 
@@ -63,11 +65,12 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
     ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b2/file.parquet"), Seq(I(4)))
 
     val partitioned = ParquetReader.as[Partitioned].filter(Col("b") === "b1").read(tempPath)
-    try partitioned.toSeq should contain theSameElementsAs
-      Seq(
-        Partitioned(a = "a1", b = "b1", i = 1),
-        Partitioned(a = "a2", b = "b1", i = 3)
-      )
+    try
+      partitioned.toSeq should contain theSameElementsAs
+        Seq(
+          Partitioned(a = "a1", b = "b1", i = 1),
+          Partitioned(a = "a2", b = "b1", i = 3)
+        )
     finally partitioned.close()
   }
 

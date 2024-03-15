@@ -36,11 +36,11 @@ object CompatibilityTestCases extends TestCaseSupport {
       obj match {
         case other @ Collections(otherList, otherSeq, otherVector, otherSet, otherArray) =>
           (other canEqual this) &&
-            list == otherList &&
-            seq == otherSeq &&
-            vector == otherVector &&
-            set == otherSet &&
-            ((array == null && otherArray == null) || array.sameElements(otherArray))
+          list == otherList &&
+          seq == otherSeq &&
+          vector == otherVector &&
+          set == otherSet &&
+          ((array == null && otherArray == null) || array.sameElements(otherArray))
         case _ => false
       }
   }
@@ -55,11 +55,11 @@ object CompatibilityTestCases extends TestCaseSupport {
       obj match {
         case other @ CollectionsOfStrings(otherList, otherSeq, otherVector, otherSet, otherArray) =>
           (other canEqual this) &&
-            list == otherList &&
-            seq == otherSeq &&
-            vector == otherVector &&
-            set == otherSet &&
-            ((array == null && otherArray == null) || array.sameElements(otherArray))
+          list == otherList &&
+          seq == otherSeq &&
+          vector == otherVector &&
+          set == otherSet &&
+          ((array == null && otherArray == null) || array.sameElements(otherArray))
         case _ => false
       }
   }
@@ -97,11 +97,11 @@ object CompatibilityTestCases extends TestCaseSupport {
       obj match {
         case other @ CollectionsOfNestedClass(otherList, otherSeq, otherVector, otherSet, otherArray) =>
           (other canEqual this) &&
-            list == otherList &&
-            seq == otherSeq &&
-            vector == otherVector &&
-            set == otherSet &&
-            array.sameElements(otherArray)
+          list == otherList &&
+          seq == otherSeq &&
+          vector == otherVector &&
+          set == otherSet &&
+          array.sameElements(otherArray)
         case _ => false
       }
   }

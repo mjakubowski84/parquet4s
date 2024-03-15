@@ -68,7 +68,7 @@ class ColumnPath protected (val elements: Seq[String]) extends FilterOps {
   override def equals(other: Any): Boolean = other match {
     case that: ColumnPath =>
       (that canEqual this) &&
-        elements == that.elements
+      elements == that.elements
     case _ => false
   }
 
