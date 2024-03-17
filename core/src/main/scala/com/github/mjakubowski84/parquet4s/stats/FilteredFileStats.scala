@@ -62,6 +62,7 @@ private[parquet4s] class FilteredFileStats(
           (0L until store.getRowCount.longValue()).iterator
             .map(_ => Option(recordReader.read())) // unmaterialised record counter, catching errors, etc
             // TODO test with filters because missing shouldSkipCurrentRecord was not found in tests
+            // shouldSkipCurrentRecord is just null check, but let's keep it for futere compatibility
             .collect { case Some(v) if !recordReader.shouldSkipCurrentRecord => v.value }
         }
         .sum
@@ -101,7 +102,6 @@ private[parquet4s] class FilteredFileStats(
       (0L until store.getRowCount.longValue()).iterator
         .map(_ => Option(recordReader.read())) // TODO unmaterializableRecordCounter or similar
         .collect {
-          // TODO more tests about filtering because missing shouldSkipCurrentRecord was not found!
           case Some(record) if !recordReader.shouldSkipCurrentRecord => record.get(columnPath)
         }
         .collect {

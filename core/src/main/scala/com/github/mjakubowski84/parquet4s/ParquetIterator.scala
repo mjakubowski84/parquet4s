@@ -130,6 +130,7 @@ private[parquet4s] class InternalParquetIterator(
       } else if (currentRecordIndex < size) {
         val record = recordReader.read()
         currentRecordIndex = currentRecordIndex + 1L
+        // shouldSkipCurrentRecord is actually yet anothet null check, but let's keep it in case the implementation changes in the future
         if (record == null || recordReader.shouldSkipCurrentRecord()) {
           next()
         } else {
