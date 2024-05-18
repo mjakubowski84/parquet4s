@@ -6,7 +6,6 @@ import org.apache.parquet.ParquetReadOptions
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.MessageType
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.hadoop.api.InitContext
 import java.util.Collections
 import org.apache.parquet.io.ColumnIOFactory
@@ -26,20 +25,20 @@ private[parquet4s] object ParquetIterator {
 
   def factory(
       inputFile: InputFile,
-      configuration: Configuration,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
       filter: FilterCompat.Filter,
-      metadataReader: MetadataReader
+      metadataReader: MetadataReader,
+      readerOptions: ParquetReader.Options
   ): () => Iterator[RowParquetRecord] & Closeable =
     () =>
       new InternalParquetIterator(
         inputFile,
-        configuration,
         projectedSchemaOpt,
         columnProjections,
         filter,
-        metadataReader
+        metadataReader,
+        readerOptions
       )
 
   def from(records: RowParquetRecord*): Iterator[RowParquetRecord] & Closeable =
@@ -86,15 +85,20 @@ private[parquet4s] class ParquetIterator[T](builder: ParquetIterator.HadoopBuild
 
 private[parquet4s] class InternalParquetIterator(
     inputFile: InputFile,
-    configuration: Configuration,
     projectedSchemaOpt: Option[MessageType],
     columnProjections: Seq[ColumnProjection],
     filter: FilterCompat.Filter,
-    metadataReader: MetadataReader
+    metadataReader: MetadataReader,
+    readerOptions: ParquetReader.Options
 ) extends Iterator[RowParquetRecord]
     with Closeable {
 
-  val options = ParquetReadOptions.builder().withRecordFilter(filter).build()
+  val configuration = readerOptions.hadoopConf
+  val options = ParquetReadOptions
+    .builder()
+    .withRecordFilter(filter)
+    .withUseHadoopVectoredIo(readerOptions.useHadoopVectoredIo)
+    .build()
   options.getPropertyNames().forEach(property => configuration.set(property, options.getProperty(property)))
   // TODO building options should happen only once, not per each file
 

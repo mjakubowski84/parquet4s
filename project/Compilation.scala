@@ -40,7 +40,8 @@ object Compilation {
               "-Wunused:locals", // Warn if a local definition is unused.
               "-Wunused:params", // Warn if a value parameter is unused.
               "-Wunused:patvars", // Warn if a variable bound in a pattern is unused.
-              "-Wunused:privates" // Warn if a private member is unused.
+              "-Wunused:privates", // Warn if a private member is unused.
+              "-Wunnamed-boolean-literal" // Warn if boolean literal is unnamed.
             )
           case _ =>
             Seq(

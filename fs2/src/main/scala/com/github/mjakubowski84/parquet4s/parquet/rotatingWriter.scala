@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import fs2.Chunk
 import cats.data.NonEmptyList
+import scala.util.control.NonFatal
 
 object rotatingWriter {
 
@@ -300,8 +301,8 @@ object rotatingWriter {
     def dispose: F[Unit] =
       F.uncancelable { _ =>
         disposed = true
-        rotationFiber.cancel >> F.delay(scala.concurrent.blocking(internalWriter.close())).recover {
-          case _: NullPointerException => () // ignores bug in Parquet
+        rotationFiber.cancel >> F.delay(scala.concurrent.blocking(internalWriter.close())).recover { case NonFatal(_) =>
+          () // ignores bug in Parquet
         }
       }
   }

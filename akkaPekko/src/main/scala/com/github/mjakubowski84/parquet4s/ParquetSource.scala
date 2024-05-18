@@ -7,7 +7,6 @@ import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
-import org.apache.hadoop.conf.Configuration
 import java.io.Closeable
 
 object ParquetSource extends IOOps {
@@ -235,22 +234,22 @@ object ParquetSource extends IOOps {
             if (parallelism == 1) {
               filteredPaths.flatMapConcat(
                 createPartitionedSource(
-                  hadoopConf,
                   projectedSchemaOpt,
                   columnProjections,
                   decoder,
-                  filter.toNonPredicateFilterCompat
+                  filter.toNonPredicateFilterCompat,
+                  options
                 )
               )
             } else {
               filteredPaths.flatMapMerge(
                 breadth = parallelism,
                 createPartitionedSource(
-                  hadoopConf,
                   projectedSchemaOpt,
                   columnProjections,
                   decoder,
-                  filter.toNonPredicateFilterCompat
+                  filter.toNonPredicateFilterCompat,
+                  options
                 )
               )
             }
@@ -261,11 +260,11 @@ object ParquetSource extends IOOps {
           projectedSchemaResolverOpt.map(implicit resolver => ParquetSchemaResolver.resolveSchema[T])
         createSource(
           inputFile,
-          hadoopConf,
           projectedSchemaOpt,
           columnProjections,
           filter.toFilterCompat(valueCodecConfiguration),
-          decoder
+          decoder,
+          options
         )
     }
 
@@ -273,34 +272,34 @@ object ParquetSource extends IOOps {
   }
 
   private def createPartitionedSource(
-      configuration: Configuration,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
       decoder: ParquetRecordDecoder[?],
-      fallbackFilterCompat: => FilterCompat.Filter
+      fallbackFilterCompat: => FilterCompat.Filter,
+      options: ParquetReader.Options
   ): PartitionedPath => Source[RowParquetRecord, NotUsed] =
     partitionedPath =>
       createSource(
         inputFile          = partitionedPath.inputFile,
-        configuration      = configuration,
         projectedSchemaOpt = projectedSchemaOpt,
         columnProjections  = columnProjections,
         filterCompat       = partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(FilterCompat.get),
-        decoder            = decoder
+        decoder            = decoder,
+        options            = options
       )
         .map(setPartitionValues(partitionedPath))
 
   private def createSource(
       inputFile: InputFile,
-      configuration: Configuration,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
       filterCompat: FilterCompat.Filter,
-      decoder: ParquetRecordDecoder[?]
+      decoder: ParquetRecordDecoder[?],
+      options: ParquetReader.Options
   ) =
     Source
       .unfoldResource[RowParquetRecord, Iterator[RowParquetRecord] & Closeable](
-        ParquetIterator.factory(inputFile, configuration, projectedSchemaOpt, columnProjections, filterCompat, decoder),
+        ParquetIterator.factory(inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder, options),
         iterator => if (iterator.hasNext) Option(iterator.next()) else None,
         _.close()
       )

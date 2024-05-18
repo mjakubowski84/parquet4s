@@ -15,6 +15,7 @@ import java.util.TimeZone
 import scala.annotation.implicitNotFound
 import scala.jdk.CollectionConverters.*
 import scala.util.Using
+import scala.util.control.NonFatal
 
 /** Type class that allows to write data which schema is represented by type <i>T</i>. Path and options are meant to be
   * set by implementation of the trait.
@@ -277,7 +278,10 @@ private class ParquetWriterImpl[T, W](
         logger.debug(s"Finished writing to $fileDescription and closing writer.")
       }
       closed = true
-      internalWriter.close()
+      try internalWriter.close()
+      catch {
+        case NonFatal(_) => // ignores bug in Parquet
+      }
     }
   }
 

@@ -209,10 +209,10 @@ lazy val examples = (projectMatrix in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.6.1",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.7.0",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.github.fd4s" %% "fs2-kafka" % "3.2.0",
+      "com.github.fd4s" %% "fs2-kafka" % "3.5.1",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(

@@ -26,6 +26,10 @@ object CoreBenchmark {
     var datasetSize: Int                    = _
     var basePath: Path                      = _
     var records: immutable.Iterable[Record] = _
+    def writerOptions = ParquetWriter.Options(
+      pageSize     = datasetSize / 16,
+      rowGroupSize = datasetSize / 8L
+    )
 
     @Setup(Level.Trial)
     def setup(): Unit = {
@@ -63,6 +67,8 @@ object CoreBenchmark {
   trait BaseState {
     var dataset: Dataset = _
     var filePath: Path   = _
+    // val readerOptions    = ParquetReader.Options(useHadoopVectoredIo = true)
+    val readerOptions = ParquetReader.Options()
 
     def fetchDataset(dataset: Dataset): Unit = {
       this.dataset  = dataset
@@ -91,7 +97,7 @@ object CoreBenchmark {
     @Setup(Level.Trial)
     def setup(dataset: Dataset): Unit = {
       fetchDataset(dataset)
-      ParquetWriter.of[Record].writeAndClose(filePath, dataset.records)
+      ParquetWriter.of[Record].options(dataset.writerOptions).writeAndClose(filePath, dataset.records)
     }
 
     @TearDown(Level.Trial)
@@ -99,7 +105,7 @@ object CoreBenchmark {
 
     @CompilerControl(CompilerControl.Mode.DONT_INLINE)
     def read(): Record =
-      ParquetReader.as[Record].read(dataset.basePath).last
+      ParquetReader.as[Record].options(readerOptions).read(dataset.basePath).last
   }
 
 }
