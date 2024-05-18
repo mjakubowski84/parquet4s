@@ -15,6 +15,7 @@ import fs2.{Chunk, Pipe, Pull, Stream}
 import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.io.OutputFile
 import org.apache.parquet.schema.MessageType
+import scala.util.control.NonFatal
 
 private[parquet4s] object writer {
 
@@ -131,7 +132,7 @@ private[parquet4s] object writer {
     override def close(): Unit =
       try internalWriter.close()
       catch {
-        case _: NullPointerException => // ignores bug in Parquet
+        case NonFatal(_) => // ignores bug in Parquet
       }
   }
   private object Writer {

@@ -128,7 +128,7 @@ object SingleFileParquetSink {
         if (logger.isDebugEnabled) logger.debug(s"$count records were successfully written")
         try writer.close()
         catch {
-          case _: NullPointerException => // ignores bug in Parquet
+          case NonFatal(_) => // ignores bug in Parquet
         }
       }
       .recover { case NonFatal(e) =>

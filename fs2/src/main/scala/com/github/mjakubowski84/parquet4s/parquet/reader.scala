@@ -297,7 +297,8 @@ object reader {
           columnProjections          = columnProjections,
           vcc                        = vcc,
           chunkSize                  = chunkSize,
-          metadataReader             = decoder
+          metadataReader             = decoder,
+          options                    = options
         )
     }
 
@@ -336,7 +337,8 @@ object reader {
           filter              = partitionFilter,
           projectionSchemaOpt = projectedSchemaOpt,
           columnProjections   = columnProjections,
-          metadataReader      = metadataReader
+          metadataReader      = metadataReader,
+          options             = options
         )
       )
     } yield partitionedReaderStream[F](parquetIterator, partitionedPath, chunkSize)
@@ -349,7 +351,8 @@ object reader {
       columnProjections: Seq[ColumnProjection],
       vcc: ValueCodecConfiguration,
       chunkSize: Int,
-      metadataReader: MetadataReader
+      metadataReader: MetadataReader,
+      options: ParquetReader.Options
   )(implicit F: Sync[F]): Stream[F, Stream[F, RowParquetRecord]] =
     for {
       projectedSchemaOpt <- Stream.eval(
@@ -362,13 +365,14 @@ object reader {
           filter              = filter.toFilterCompat(vcc),
           projectionSchemaOpt = projectedSchemaOpt,
           columnProjections   = columnProjections,
-          metadataReader      = metadataReader
+          metadataReader      = metadataReader,
+          options             = options
         )
       )
     } yield Stream.fromBlockingIterator[F](parquetIterator, chunkSize)
 
   private def partitionedReaderStream[F[_]](
-      parquetIterator: ParquetIterator[RowParquetRecord],
+      parquetIterator: Iterator[RowParquetRecord],
       partitionedPath: PartitionedPath,
       chunkSize: Int
   )(implicit F: Sync[F]): Stream[F, RowParquetRecord] = {
@@ -391,18 +395,18 @@ object reader {
       filter: FilterCompat.Filter,
       projectionSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
-      metadataReader: MetadataReader
-  ): Resource[F, ParquetIterator[RowParquetRecord]] =
+      metadataReader: MetadataReader,
+      options: ParquetReader.Options
+  ): Resource[F, Iterator[RowParquetRecord]] =
     Resource.fromAutoCloseable(
       Sync[F].blocking(
-        new ParquetIterator[RowParquetRecord](
-          HadoopParquetReader(
-            inputFile          = inputFile,
-            projectedSchemaOpt = projectionSchemaOpt,
-            columnProjections  = columnProjections,
-            filter             = filter,
-            metadataReader     = metadataReader
-          )
+        new InternalParquetIterator(
+          inputFile          = inputFile,
+          filter             = filter,
+          projectedSchemaOpt = projectionSchemaOpt,
+          columnProjections  = columnProjections,
+          metadataReader     = metadataReader,
+          readerOptions      = options
         )
       )
     )

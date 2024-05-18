@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit
 
 import scala.concurrent.duration.FiniteDuration
 import scala.collection.concurrent.TrieMap
+import scala.util.control.NonFatal
 
 object ParquetPartitioningFlow {
 
@@ -357,7 +358,7 @@ private class ParquetPartitioningFlow[T, W](
           cancelTimer(path)
           try writerState.writer.close()
           catch {
-            case _: NullPointerException => // ignores bug in Parquet
+            case NonFatal(_) => // ignores bug in Parquet
           }
         case None =>
           logger.debug("Trying to close a writer for a path [{}], no state was found", path)
