@@ -69,6 +69,11 @@ object ParquetWriter {
     * Parquet</a> to understand what every configuration entry is responsible for. <br> <b>NOTE!</b> Please be careful
     * when using OVERWRITE mode. All data at given path (either file or directory) are deleted before writing in the
     * OVERWRITE mode. <br> Apart from options specific for Parquet file format there are some other:
+    * @param retryEnabled
+    *   can be used to programmatically enable or disable the retry mechanism for the writer in case of an exception
+    *   during writing, it is disabled by default
+    * @param maxRetries
+    *   can be used to programmatically set the amount of max retries for the retry mechanism, it is set to 3 by default
     * @param hadoopConf
     *   can be used to programmatically set Hadoop's [[org.apache.hadoop.conf.Configuration]]
     * @param timeZone
@@ -83,6 +88,8 @@ object ParquetWriter {
       pageSize: Int                              = HadoopParquetWriter.DEFAULT_PAGE_SIZE,
       rowGroupSize: Long                         = HadoopParquetWriter.DEFAULT_BLOCK_SIZE,
       validationEnabled: Boolean                 = HadoopParquetWriter.DEFAULT_IS_VALIDATING_ENABLED,
+      retryEnabled: Boolean                      = false,
+      maxRetries: Int                            = 3,
       hadoopConf: Configuration                  = new Configuration(),
       timeZone: TimeZone                         = TimeZone.getDefault
   ) {
