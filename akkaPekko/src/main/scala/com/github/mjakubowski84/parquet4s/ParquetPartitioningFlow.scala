@@ -5,11 +5,13 @@ import com.github.mjakubowski84.parquet4s.ScalaCompat.stream.{Attributes, FlowSh
 import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow.PostWriteState
 import org.apache.parquet.schema.MessageType
 import org.slf4j.{Logger, LoggerFactory}
+
 import java.util.UUID
 import java.util.concurrent.TimeUnit
-
 import scala.concurrent.duration.FiniteDuration
 import scala.collection.concurrent.TrieMap
+import scala.reflect.ClassTag
+import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
 object ParquetPartitioningFlow {
@@ -24,7 +26,7 @@ object ParquetPartitioningFlow {
       * @return
       *   builder of flow that processes data of given schema
       */
-    def of[T]: TypedBuilder[T, T]
+    def of[T: ClassTag]: TypedBuilder[T, T]
 
     /** @return
       *   builder of flow that processes generic records
@@ -33,7 +35,7 @@ object ParquetPartitioningFlow {
   }
 
   private[parquet4s] object ViaParquetImpl extends ViaParquet {
-    override def of[T]: TypedBuilder[T, T] = TypedBuilderImpl(
+    override def of[T: ClassTag]: TypedBuilder[T, T] = TypedBuilderImpl(
       maxCount               = DefaultMaxCount,
       maxDuration            = DefaultMaxDuration,
       preWriteTransformation = t => Iterable(t),
@@ -182,7 +184,7 @@ object ParquetPartitioningFlow {
     }
   }
 
-  private case class TypedBuilderImpl[T, W](
+  private case class TypedBuilderImpl[T: ClassTag, W](
       maxCount: Long,
       maxDuration: FiniteDuration,
       preWriteTransformation: T => Iterable[W],
@@ -244,7 +246,7 @@ object ParquetPartitioningFlow {
 
 }
 
-private class ParquetPartitioningFlow[T, W](
+private class ParquetPartitioningFlow[T: ClassTag, W](
     basePath: Path,
     maxCount: Long,
     maxDuration: FiniteDuration,
@@ -265,7 +267,8 @@ private class ParquetPartitioningFlow[T, W](
   private class Logic extends TimerGraphStageLogic(shape) with InHandler with OutHandler {
     case class WriterState(
         writer: ParquetWriter.InternalWriter,
-        var written: Long
+        var written: Long,
+        var retries: Int
     )
 
     private val writers = TrieMap.empty[Path, WriterState]
@@ -317,6 +320,9 @@ private class ParquetPartitioningFlow[T, W](
     private def scheduleNextRotation(path: Path, delay: FiniteDuration): Unit =
       scheduleOnce(timerKey = path, delay = delay)
 
+    private def scheduleRetry(msg: T, delay: FiniteDuration): Unit =
+      scheduleOnce(timerKey = msg, delay = delay)
+
     private def write(msg: T): Map[Path, Long] = {
       val valuesToWrite              = preWriteTransformation(msg)
       val records                    = valuesToWrite.map(value => encode(value, vcc))
@@ -337,7 +343,8 @@ private class ParquetPartitioningFlow[T, W](
 
               val state = WriterState(
                 writer  = writer,
-                written = 0L
+                written = 0L,
+                retries = 0
               )
 
               scheduleNextRotation(writerPath, maxDuration)
@@ -345,10 +352,26 @@ private class ParquetPartitioningFlow[T, W](
             }
           )
 
-          state.writer.write(partitionedRecord)
-          state.written += 1
-
-          modifiedPartitions.updated(writerPath, state.written)
+          Try {
+            state.writer.write(partitionedRecord)
+          } match {
+            case Failure(exception) =>
+              logger.error(
+                "Failed to write record with exception: [{}]",
+                exception.getMessage
+              )
+              if (writeOptions.retryEnabled && state.retries <= writeOptions.maxRetries) {
+                logger.info("Rescheduling failed record")
+                scheduleRetry(msg, maxDuration)
+                state.retries += 1
+                modifiedPartitions
+              } else {
+                modifiedPartitions
+              }
+            case Success(_) =>
+              state.written += 1
+              modifiedPartitions.updated(writerPath, state.written)
+          }
       }
     }
 
@@ -367,6 +390,7 @@ private class ParquetPartitioningFlow[T, W](
     override def onTimer(timerKey: Any): Unit =
       timerKey match {
         case path: Path => close(path)
+        case msg: T     => write(msg)
         case _          => // ignore
       }
 
