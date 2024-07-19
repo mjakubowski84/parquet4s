@@ -10,6 +10,8 @@ import org.slf4j.Logger
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.matching.Regex
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 private[parquet4s] object IOOps {
 
@@ -18,7 +20,7 @@ private[parquet4s] object IOOps {
     override def next(): T        = wrapped.next()
   }
 
-  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!?\-+_.,*'()&$@:;/ ]+)""".r
+  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!?\-+_.,*'()&$@:;/ %]+)""".r
 
 }
 
@@ -176,8 +178,9 @@ trait IOOps {
   private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
     val path = Path(fileStatus.getPath)
     path.name match {
-      case PartitionRegexp(name, value) => Some(path, (ColumnPath(name), value))
-      case _                            => None
+      case PartitionRegexp(name, value) =>
+        Some(path -> (ColumnPath(name) -> URLDecoder.decode(value, StandardCharsets.UTF_8.name())))
+      case _ => None
     }
   }
 

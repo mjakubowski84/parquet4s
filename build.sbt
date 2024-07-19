@@ -14,8 +14,8 @@ val akkaLib  = ActorLibCross("-akka", "-akka")
 val pekkoLib = ActorLibCross("-pekko", "-pekko")
 
 ThisBuild / organization := "com.github.mjakubowski84"
-ThisBuild / version := "2.18.0"
-ThisBuild / isSnapshot := false
+ThisBuild / version := "2.19.0-SNAPSHOT"
+ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -57,7 +57,9 @@ lazy val sparkDeps = Seq(
     exclude (org = "org.slf4j", name          = "slf4j-api")
     exclude (org = "org.apache.parquet", name = "parquet-hadoop"),
   "org.apache.spark" %% "spark-sql" % sparkVersion % "it"
-    exclude (org = "org.apache.hadoop", name = "hadoop-client")
+    exclude (org = "org.apache.hadoop", name = "hadoop-client"),
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % jacksonVersion % "it",
+  "com.fasterxml.jackson.core" % "jackson-databind" % jacksonVersion % "it"
 )
 
 lazy val core = (projectMatrix in file("core"))

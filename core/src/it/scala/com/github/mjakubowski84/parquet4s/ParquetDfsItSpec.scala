@@ -18,7 +18,7 @@ class ParquetDfsItSpec extends AnyFlatSpec with ForAllMiniDfsCluster {
 
   behavior of "parquet4s-core"
 
-  it should "concurrently read and write files" in {
+  it should "read and write files" in {
     // Given
     val inPath  = Path(s"/${UUID.randomUUID()}.parquet")
     val outPath = Path(s"/${UUID.randomUUID()}.parquet")

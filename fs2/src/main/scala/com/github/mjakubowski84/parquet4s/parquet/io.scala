@@ -12,6 +12,8 @@ import org.apache.hadoop.conf.Configuration
 import fs2.Stream
 import org.apache.parquet.hadoop.util.HiddenFileFilter
 
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import scala.util.matching.Regex
 
 private[parquet] object io {
@@ -24,7 +26,7 @@ private[parquet] object io {
   private case class Dirs(partitionPaths: Vector[(Path, Partition)]) extends StatusAccumulator
   private case class Files(files: Vector[FileStatus]) extends StatusAccumulator
 
-  private[parquet4s] val PartitionRegexp: Regex = """([a-zA-Z0-9._]+)=([a-zA-Z0-9!?\-+_.,*'()&$@:;/ ]+)""".r
+  private[parquet4s] val PartitionRegexp: Regex = IOOps.PartitionRegexp
 
   def validateWritePath[F[_]](path: Path, writeOptions: ParquetWriter.Options, logger: Logger[F])(implicit
       F: Sync[F]
@@ -200,8 +202,9 @@ private[parquet] object io {
   private def matchPartition(fileStatus: FileStatus): Option[(Path, Partition)] = {
     val path = Path(fileStatus.getPath)
     path.name match {
-      case PartitionRegexp(name, value) => Some(path, (ColumnPath(name), value))
-      case _                            => None
+      case PartitionRegexp(name, value) =>
+        Some(path -> (ColumnPath(name) -> URLDecoder.decode(value, StandardCharsets.UTF_8.name())))
+      case _ => None
     }
   }
 

@@ -14,6 +14,8 @@ import org.scalatest.Inspectors
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import scala.collection.compat.immutable.LazyList
 import scala.concurrent.duration.*
 import scala.util.Random
@@ -51,7 +53,7 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
   val count: Long            = RowGroupsPerFile * writeOptions.rowGroupSize
   val dictS: Seq[String]     = Vector("a", "b", "c", "d")
   val dictA: Seq[String]     = Vector("1", "2", "3")
-  val dictB: Seq[String]     = Vector("x", "y", "z")
+  val dictB: Seq[String]     = Vector("x=0", "y=6", "z=3")
   val data: LazyList[Data] = LazyList
     .range(start = 0L, end = count, step = 1L)
     .map(i => Data(i = i, s = dictS(Random.nextInt(4))))
@@ -338,7 +340,8 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
           a should be("a")
           b should be("b")
           dictA should contain(aVal)
-          dictB should contain(bVal)
+          dictB should not contain bVal
+          dictB should contain(URLDecoder.decode(bVal, StandardCharsets.UTF_8.name()))
         }
         readDataSync should contain theSameElementsAs dataPartitioned
         readDataParallel should contain theSameElementsAs dataPartitioned

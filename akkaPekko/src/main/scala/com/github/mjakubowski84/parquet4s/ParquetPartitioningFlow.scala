@@ -11,6 +11,8 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.collection.concurrent.TrieMap
 import scala.util.control.NonFatal
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 object ParquetPartitioningFlow {
 
@@ -280,17 +282,13 @@ private class ParquetPartitioningFlow[T, W](
         case Some(firstPartitionPath) =>
           val (firstPartitionValue, recordWithoutFirstPartition) = extractPartitionValue(record, firstPartitionPath)
           val builder                                            = new StringBuilder()
-          builder.append(firstPartitionPath.toString)
-          builder.append("=")
-          builder.append(firstPartitionValue.value.toStringUsingUTF8)
+          appendPartition(builder, firstPartitionPath, firstPartitionValue)
 
           val updatedRecord = partitionBy.tail.foldLeft(recordWithoutFirstPartition) {
             case (currentRecord, currentPartitionPath) =>
               val (partitionValue, modifiedRecord) = extractPartitionValue(currentRecord, currentPartitionPath)
               builder.append(Path.Separator)
-              builder.append(currentPartitionPath.toString)
-              builder.append("=")
-              builder.append(partitionValue.value.toStringUsingUTF8)
+              appendPartition(builder, currentPartitionPath, partitionValue)
               modifiedRecord
           }
 
@@ -313,6 +311,12 @@ private class ParquetPartitioningFlow[T, W](
         case _ =>
           throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
       }
+
+    private def appendPartition(builder: StringBuilder, columnPath: ColumnPath, partitionValue: BinaryValue) = {
+      builder.append(columnPath.toString)
+      builder.append("=")
+      builder.append(URLEncoder.encode(partitionValue.value.toStringUsingUTF8, StandardCharsets.UTF_8.name()))
+    }
 
     private def scheduleNextRotation(path: Path, delay: FiniteDuration): Unit =
       scheduleOnce(timerKey = path, delay = delay)

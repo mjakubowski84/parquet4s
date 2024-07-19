@@ -1,5 +1,5 @@
 object DependecyVersions {
-  val parquetVersion               = "1.14.0"
+  val parquetVersion               = "1.14.1"
   val shapelessVersion             = "2.3.12"
   val sparkVersion                 = "3.5.1"
   val hadoopVersion                = "3.3.6"
@@ -9,7 +9,8 @@ object DependecyVersions {
   val fs2Version                   = "3.10.2"
   val catsEffectVersion            = "3.5.4"
   val scalaCollectionCompatVersion = "2.12.0"
-  val scalatestVersion             = "3.2.18"
+  val scalatestVersion             = "3.2.19"
   val mockitoVersion               = "4.11.0" // stick to 4.x for JDK-8 compatibility
-  val pekkoVersion                 = "1.0.2"
+  val pekkoVersion                 = "1.0.3"
+  val jacksonVersion               = "2.17.2"
 }
