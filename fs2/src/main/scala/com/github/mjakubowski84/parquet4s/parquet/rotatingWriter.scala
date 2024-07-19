@@ -16,6 +16,8 @@ import scala.concurrent.duration.FiniteDuration
 import fs2.Chunk
 import cats.data.NonEmptyList
 import scala.util.control.NonFatal
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 object rotatingWriter {
 
@@ -374,7 +376,7 @@ object rotatingWriter {
           val builder = new StringBuilder()
           builder.append(firstPartitionPath.toString)
           builder.append("=")
-          builder.append(firstPartitionValue)
+          builder.append(URLEncoder.encode(firstPartitionValue, StandardCharsets.UTF_8.name()))
           partitionRec(modifiedRecord, partitionBy.tail, builder)
         }
       }
@@ -390,7 +392,7 @@ object rotatingWriter {
             builder.append(Path.Separator)
             builder.append(partitionPath.toString)
             builder.append("=")
-            builder.append(partitionValue)
+            builder.append(URLEncoder.encode(partitionValue, StandardCharsets.UTF_8.name()))
             partitionRec(modifiedRecord, rest, builder)
           }
         case Nil =>

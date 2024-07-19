@@ -8,6 +8,7 @@ private[parquet] object logger {
 
   class Logger[F[_]](wrapped: org.slf4j.Logger)(implicit F: Sync[F]) {
 
+    // FIXME replace with debug with format and params
     def debug(msg: => String): F[Unit] =
       F.catchNonFatal(wrapped.isDebugEnabled).flatMap {
         case true =>

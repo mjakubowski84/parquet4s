@@ -236,24 +236,28 @@ class ParquetStreamsITSpec
       .write(tempPath)
 
     val users = Seq(
-      User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456"))
+      User(name = "John", address = Address(street = Street("Broad St", "12"), country = "ABC", postCode = "123456")),
+      User(name = "Paul", address = Address(street = Street("Narrow St", "1"), country = "ABC", postCode = "pc=123"))
     ).toList
 
-    val firstPartitionPath  = tempPath.append("address.country=ABC")
-    val secondPartitionPath = firstPartitionPath.append("address.postCode=123456")
+    val firstPartitionPath   = tempPath.append("address.country=ABC")
+    val secondPartitionPath1 = firstPartitionPath.append("address.postCode=123456")
+    val secondPartitionPath2 = firstPartitionPath.append("address.postCode=pc%3D123")
 
     for {
       writtenData <- Source(users).via(flow).runWith(Sink.seq)
       readData    <- read[User](tempPath)
-      rootFiles            = fileSystem.listStatus(tempPath.toHadoop).map(_.getPath).map(Path.apply)
-      firstPartitionFiles  = fileSystem.listStatus(firstPartitionPath.toHadoop).map(_.getPath).map(Path.apply)
-      secondPartitionFiles = fileSystem.listStatus(secondPartitionPath.toHadoop).map(_.getPath.getName).toSeq
+      rootFiles             = fileSystem.listStatus(tempPath.toHadoop).map(_.getPath).map(Path.apply)
+      firstPartitionFiles   = fileSystem.listStatus(firstPartitionPath.toHadoop).map(_.getPath).map(Path.apply)
+      secondPartitionFiles1 = fileSystem.listStatus(secondPartitionPath1.toHadoop).map(_.getPath.getName).toSeq
+      secondPartitionFiles2 = fileSystem.listStatus(secondPartitionPath2.toHadoop).map(_.getPath.getName).toSeq
     } yield {
       rootFiles should be(Seq(firstPartitionPath))
-      firstPartitionFiles should be(Seq(secondPartitionPath))
-      every(secondPartitionFiles) should endWith(".snappy.parquet")
-      writtenData should be(users)
-      readData should be(users)
+      firstPartitionFiles should contain theSameElementsAs Seq(secondPartitionPath1, secondPartitionPath2)
+      every(secondPartitionFiles1) should endWith(".snappy.parquet")
+      every(secondPartitionFiles2) should endWith(".snappy.parquet")
+      writtenData should contain theSameElementsAs users
+      readData should contain theSameElementsAs users
     }
   }
 
