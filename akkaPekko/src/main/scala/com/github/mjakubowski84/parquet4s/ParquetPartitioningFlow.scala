@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import com.github.mjakubowski84.parquet4s.ScalaCompat.stream.stage.*
 import com.github.mjakubowski84.parquet4s.ScalaCompat.stream.{Attributes, FlowShape, Inlet, Outlet}
 import com.github.mjakubowski84.parquet4s.ParquetPartitioningFlow.PostWriteState
+import org.apache.parquet.hadoop.ParquetWriter as HadoopParquetWriter
 import org.apache.parquet.schema.MessageType
 import org.slf4j.{Logger, LoggerFactory}
 import java.util.UUID
@@ -32,6 +33,16 @@ object ParquetPartitioningFlow {
       *   builder of flow that processes generic records
       */
     def generic: GenericBuilder
+
+    /** @tparam T
+      *   schema type
+      * @param writerBuilderFactory
+      *   the factory of custom writer
+      * @return
+      *   builder of flow that processes data using custom writer implementation
+      */
+    @experimental
+    def custom[T, B <: HadoopParquetWriter.Builder[T, B]](writerBuilderFactory: Path => B): CustomBuilder[T]
   }
 
   private[parquet4s] object ViaParquetImpl extends ViaParquet {
@@ -48,9 +59,18 @@ object ParquetPartitioningFlow {
       maxDuration            = DefaultMaxDuration,
       preWriteTransformation = record => Iterable(record),
       partitionBy            = Seq.empty,
-      options                = ParquetWriter.Options(),
+      writeOptions           = ParquetWriter.Options(),
       postWriteHandler       = None
     )
+    override def custom[T, B <: HadoopParquetWriter.Builder[T, B]](writerBuilderFactory: Path => B): CustomBuilder[T] =
+      CustomBuilderImpl[T, B](
+        maxCount             = DefaultMaxCount,
+        maxDuration          = DefaultMaxDuration,
+        writeOptions         = ParquetWriter.Options(),
+        postWriteHandler     = None,
+        partitioning         = (path, t) => (path, t),
+        writerBuilderFactory = writerBuilderFactory
+      )
   }
 
   /** Builds an instance of [[ParquetPartitioningFlow]]
@@ -76,29 +96,6 @@ object ParquetPartitioningFlow {
       */
     def options(options: ParquetWriter.Options): Self
 
-    /** Sets partition paths that flow partitions data by. Can be empty. Partition path can be a simple string column
-      * (e.g. "color") or a path pointing nested string field (e.g. "user.address.postcode"). Partition path is used to
-      * extract data from the entity and to create a tree of subdirectories for partitioned files. Using aforementioned
-      * partitions effects in creation of (example) following tree:
-      * {{{
-      * ../color=blue
-      *       /user.address.postcode=XY1234/
-      *       /user.address.postcode=AB4321/
-      *   /color=green
-      *       /user.address.postcode=XY1234/
-      *       /user.address.postcode=CV3344/
-      *       /user.address.postcode=GH6732/
-      * }}}
-      * Take <b>note</b>: <ol> <li>PartitionBy must point a string field.</li> <li>Partitioning removes partition fields
-      * from the schema. Data is stored in name of subdirectory instead of Parquet file.</li> <li>Partitioning cannot
-      * end in having empty schema. If you remove all fields of the message you will get an error.</li> <li>Partitioned
-      * directories can be filtered effectively during reading.</li> </ol>
-      *
-      * @param partitionBy
-      *   [[ColumnPath]]s to partition by
-      */
-    def partitionBy(partitionBy: ColumnPath*): Self
-
     /** Adds a handler after record writes, exposing some of the internal state of the flow. Intended for lower level
       * monitoring and control.
       *
@@ -113,7 +110,23 @@ object ParquetPartitioningFlow {
 
   }
 
-  trait GenericBuilder extends Builder[RowParquetRecord, RowParquetRecord, GenericBuilder] {
+  trait CustomBuilder[T] extends Builder[T, T, CustomBuilder[T]] {
+
+    /** @param partitioning
+      *   a function which can be used for manipulation of path where the given object T will be written to and the
+      *   content of the object before it is written
+      * @return
+      */
+    def partitionUsing(partitioning: (Path, T) => (Path, T)): CustomBuilder[T]
+
+    /** Builds a final flow
+      */
+    def write(basePath: Path): GraphStage[FlowShape[T, T]]
+  }
+
+  trait GenericBuilder
+      extends Builder[RowParquetRecord, RowParquetRecord, GenericBuilder]
+      with ParquetRecordPartitioning[RowParquetRecord, GenericBuilder] {
 
     /** @param transformation
       *   function that is called by flow in order to transform record to final write format. Identity by default.
@@ -125,7 +138,9 @@ object ParquetPartitioningFlow {
     def write(basePath: Path, schema: MessageType): GraphStage[FlowShape[RowParquetRecord, RowParquetRecord]]
   }
 
-  trait TypedBuilder[T, W] extends Builder[T, W, TypedBuilder[T, W]] {
+  trait TypedBuilder[T, W]
+      extends Builder[T, W, TypedBuilder[T, W]]
+      with ParquetRecordPartitioning[W, TypedBuilder[T, W]] {
 
     /** @param transformation
       *   function that is called by flow in order to transform data to final write format. Identity by default.
@@ -141,18 +156,53 @@ object ParquetPartitioningFlow {
     )(implicit schemaResolver: ParquetSchemaResolver[W], encoder: ParquetRecordEncoder[W]): GraphStage[FlowShape[T, T]]
   }
 
+  private case class CustomBuilderImpl[T, B <: HadoopParquetWriter.Builder[T, B]](
+      maxCount: Long,
+      maxDuration: FiniteDuration,
+      writeOptions: ParquetWriter.Options,
+      postWriteHandler: Option[PostWriteState[T] => Unit],
+      partitioning: (Path, T)    => (Path, T),
+      writerBuilderFactory: Path => B
+  ) extends CustomBuilder[T] {
+
+    override def maxCount(maxCount: Long): CustomBuilder[T] = copy(maxCount = maxCount)
+
+    override def maxDuration(maxDuration: FiniteDuration): CustomBuilder[T] = copy(maxDuration = maxDuration)
+
+    override def options(options: ParquetWriter.Options): CustomBuilder[T] = copy(writeOptions = options)
+
+    override def partitionUsing(partitioning: (Path, T) => (Path, T)): CustomBuilder[T] =
+      copy(partitioning = partitioning)
+
+    override def postWriteHandler(handler: PostWriteState[T] => Unit): CustomBuilder[T] =
+      copy(postWriteHandler = Option(handler))
+
+    override def write(basePath: Path): GraphStage[FlowShape[T, T]] =
+      new ParquetPartitioningFlow[T, T, T](
+        basePath               = basePath,
+        maxCount               = maxCount,
+        maxDuration            = maxDuration,
+        preWriteTransformation = t => Iterable(t),
+        encodeAndPartition     = partitioning,
+        writeOptions           = writeOptions,
+        postWriteHandler       = postWriteHandler,
+        createWriter           = filePath => writeOptions.applyTo[T, B](writerBuilderFactory(filePath)).build()
+      )
+
+  }
+
   private case class GenericBuilderImpl(
       maxCount: Long,
       maxDuration: FiniteDuration,
       preWriteTransformation: RowParquetRecord => Iterable[RowParquetRecord],
       partitionBy: Seq[ColumnPath],
-      options: ParquetWriter.Options,
+      writeOptions: ParquetWriter.Options,
       postWriteHandler: Option[PostWriteState[RowParquetRecord] => Unit]
   ) extends GenericBuilder {
 
     override def maxCount(maxCount: Long): GenericBuilder                 = copy(maxCount = maxCount)
     override def maxDuration(maxDuration: FiniteDuration): GenericBuilder = copy(maxDuration = maxDuration)
-    override def options(options: ParquetWriter.Options): GenericBuilder  = copy(options = options)
+    override def options(options: ParquetWriter.Options): GenericBuilder  = copy(writeOptions = options)
     override def partitionBy(partitionBy: ColumnPath*): GenericBuilder    = copy(partitionBy = partitionBy)
     override def preWriteTransformation(
         transformation: RowParquetRecord => Iterable[RowParquetRecord]
@@ -170,16 +220,21 @@ object ParquetPartitioningFlow {
       val finalSchema = ParquetSchemaResolver.resolveSchema[RowParquetRecord](toSkip = partitionBy)
       val encode      = (record: RowParquetRecord, _: ValueCodecConfiguration) => record
 
-      new ParquetPartitioningFlow[RowParquetRecord, RowParquetRecord](
+      new ParquetPartitioningFlow[RowParquetRecord, RowParquetRecord, RowParquetRecord](
         basePath,
         maxCount,
         maxDuration,
         preWriteTransformation,
-        partitionBy,
-        encode,
-        finalSchema,
-        options,
-        postWriteHandler
+        encodeAndPartition = (_, record: RowParquetRecord) => encodeAndPartition(record, basePath, encode),
+        writeOptions,
+        postWriteHandler,
+        createWriter = filePath =>
+          ParquetWriter.internalWriter(
+            file           = filePath.toOutputFile(writeOptions),
+            schema         = finalSchema,
+            metadataWriter = MetadataWriter.NoOp,
+            options        = writeOptions
+          )
       )
     }
   }
@@ -188,8 +243,8 @@ object ParquetPartitioningFlow {
       maxCount: Long,
       maxDuration: FiniteDuration,
       preWriteTransformation: T => Iterable[W],
-      partitionBy: Seq[ColumnPath],
-      writeOptions: ParquetWriter.Options,
+      override protected val partitionBy: Seq[ColumnPath],
+      override protected val writeOptions: ParquetWriter.Options,
       postWriteHandler: Option[PostWriteState[T] => Unit]
   ) extends TypedBuilder[T, W] {
 
@@ -216,18 +271,24 @@ object ParquetPartitioningFlow {
       val schema = ParquetSchemaResolver.resolveSchema[W](toSkip = partitionBy)
       val encode = (obj: W, vcc: ValueCodecConfiguration) => ParquetRecordEncoder.encode(obj, vcc)
 
-      new ParquetPartitioningFlow[T, W](
+      new ParquetPartitioningFlow[T, W, RowParquetRecord](
         basePath,
         maxCount,
         maxDuration,
         preWriteTransformation,
-        partitionBy,
-        encode,
-        schema,
+        encodeAndPartition = (_: Path, obj: W) => encodeAndPartition(obj, basePath, encode),
         writeOptions,
-        postWriteHandler
+        postWriteHandler,
+        createWriter = filePath =>
+          ParquetWriter.internalWriter(
+            file           = filePath.toOutputFile(writeOptions),
+            schema         = schema,
+            metadataWriter = MetadataWriter.NoOp,
+            options        = writeOptions
+          )
       )
     }
+
   }
 
   /** Represent the state of writer after processing of `processedData`.
@@ -246,29 +307,108 @@ object ParquetPartitioningFlow {
 
 }
 
-private class ParquetPartitioningFlow[T, W](
+trait ParquetRecordPartitioning[W, Self] {
+
+  /** Sets partition paths that flow partitions data by. Can be empty. Partition path can be a simple string column
+    * (e.g. "color") or a path pointing nested string field (e.g. "user.address.postcode"). Partition path is used to
+    * extract data from the entity and to create a tree of subdirectories for partitioned files. Using aforementioned
+    * partitions effects in creation of (example) following tree:
+    * {{{
+    * ../color=blue
+    *       /user.address.postcode=XY1234/
+    *       /user.address.postcode=AB4321/
+    *   /color=green
+    *       /user.address.postcode=XY1234/
+    *       /user.address.postcode=CV3344/
+    *       /user.address.postcode=GH6732/
+    * }}}
+    * Take <b>note</b>: <ol> <li>PartitionBy must point a string field.</li> <li>Partitioning removes partition fields
+    * from the schema. Data is stored in name of subdirectory instead of Parquet file.</li> <li>Partitioning cannot end
+    * in having empty schema. If you remove all fields of the message you will get an error.</li> <li>Partitioned
+    * directories can be filtered effectively during reading.</li> </ol>
+    *
+    * @param partitionBy
+    *   [[ColumnPath]]s to partition by
+    */
+  def partitionBy(partitionBy: ColumnPath*): Self
+
+  protected def partitionBy: Seq[ColumnPath]
+  protected def writeOptions: ParquetWriter.Options
+  private lazy val vcc: ValueCodecConfiguration = ValueCodecConfiguration(writeOptions)
+
+  protected def encodeAndPartition(
+      valueToWrite: W,
+      basePath: Path,
+      encode: (W, ValueCodecConfiguration) => RowParquetRecord
+  ): (Path, RowParquetRecord) =
+    partition(record = encode(valueToWrite, vcc), basePath = basePath)
+
+  private def partition(record: RowParquetRecord, basePath: Path): (Path, RowParquetRecord) =
+    partitionBy.headOption match {
+      case Some(firstPartitionPath) =>
+        val (firstPartitionValue, recordWithoutFirstPartition) = extractPartitionValue(record, firstPartitionPath)
+        val builder                                            = new StringBuilder()
+        appendPartition(builder, firstPartitionPath, firstPartitionValue)
+
+        val updatedRecord = partitionBy.tail.foldLeft(recordWithoutFirstPartition) {
+          case (currentRecord, currentPartitionPath) =>
+            val (partitionValue, modifiedRecord) = extractPartitionValue(currentRecord, currentPartitionPath)
+            builder.append(Path.Separator)
+            appendPartition(builder, currentPartitionPath, partitionValue)
+            modifiedRecord
+        }
+
+        Path(basePath, builder.result()) -> updatedRecord
+      case _ =>
+        basePath -> record
+    }
+
+  private def extractPartitionValue(
+      record: RowParquetRecord,
+      partitionPath: ColumnPath
+  ): (BinaryValue, RowParquetRecord) =
+    record.removed(partitionPath) match {
+      case (Some(value: BinaryValue), modifiedRecord) =>
+        value -> modifiedRecord
+      case (None, _) =>
+        throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
+      case (Some(NullValue), _) =>
+        throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
+      case _ =>
+        throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
+    }
+
+  private def appendPartition(builder: StringBuilder, columnPath: ColumnPath, partitionValue: BinaryValue) = {
+    builder.append(columnPath.toString)
+    builder.append("=")
+    builder.append(URLEncoder.encode(partitionValue.value.toStringUsingUTF8, StandardCharsets.UTF_8.name()))
+  }
+
+}
+
+private class ParquetPartitioningFlow[T, W, R](
     basePath: Path,
     maxCount: Long,
     maxDuration: FiniteDuration,
-    preWriteTransformation: T => Iterable[W],
-    partitionBy: Seq[ColumnPath],
-    encode: (W, ValueCodecConfiguration) => RowParquetRecord,
-    schema: MessageType,
+    preWriteTransformation: T     => Iterable[W],
+    encodeAndPartition: (Path, W) => (Path, R),
     writeOptions: ParquetWriter.Options,
-    postWriteHandler: Option[PostWriteState[T] => Unit]
+    postWriteHandler: Option[PostWriteState[T] => Unit],
+    createWriter: Path => HadoopParquetWriter[R]
 ) extends GraphStage[FlowShape[T, T]]
     with IOOps {
+
+  case class WriterState(
+      writer: HadoopParquetWriter[R],
+      var written: Long
+  )
+
   val in: Inlet[T]            = Inlet[T]("ParquetPartitioningFlow.in")
   val out: Outlet[T]          = Outlet[T]("ParquetPartitioningFlow.out")
   val shape: FlowShape[T, T]  = FlowShape.of(in, out)
   override val logger: Logger = LoggerFactory.getLogger("ParquetPartitioningFlow")
-  private val vcc             = ValueCodecConfiguration(writeOptions)
 
   private class Logic extends TimerGraphStageLogic(shape) with InHandler with OutHandler {
-    case class WriterState(
-        writer: ParquetWriter.InternalWriter,
-        var written: Long
-    )
 
     private val writers = TrieMap.empty[Path, WriterState]
 
@@ -277,54 +417,12 @@ private class ParquetPartitioningFlow[T, W](
     private val compressionExtension: String = writeOptions.compressionCodecName.getExtension
     private def newFileName: String          = UUID.randomUUID().toString + compressionExtension + ".parquet"
 
-    private def partition(record: RowParquetRecord): (Path, RowParquetRecord) =
-      partitionBy.headOption match {
-        case Some(firstPartitionPath) =>
-          val (firstPartitionValue, recordWithoutFirstPartition) = extractPartitionValue(record, firstPartitionPath)
-          val builder                                            = new StringBuilder()
-          appendPartition(builder, firstPartitionPath, firstPartitionValue)
-
-          val updatedRecord = partitionBy.tail.foldLeft(recordWithoutFirstPartition) {
-            case (currentRecord, currentPartitionPath) =>
-              val (partitionValue, modifiedRecord) = extractPartitionValue(currentRecord, currentPartitionPath)
-              builder.append(Path.Separator)
-              appendPartition(builder, currentPartitionPath, partitionValue)
-              modifiedRecord
-          }
-
-          Path(basePath, builder.result()) -> updatedRecord
-        case _ =>
-          basePath -> record
-      }
-
-    private def extractPartitionValue(
-        record: RowParquetRecord,
-        partitionPath: ColumnPath
-    ): (BinaryValue, RowParquetRecord) =
-      record.removed(partitionPath) match {
-        case (Some(value: BinaryValue), modifiedRecord) =>
-          value -> modifiedRecord
-        case (None, _) =>
-          throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
-        case (Some(NullValue), _) =>
-          throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
-        case _ =>
-          throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
-      }
-
-    private def appendPartition(builder: StringBuilder, columnPath: ColumnPath, partitionValue: BinaryValue) = {
-      builder.append(columnPath.toString)
-      builder.append("=")
-      builder.append(URLEncoder.encode(partitionValue.value.toStringUsingUTF8, StandardCharsets.UTF_8.name()))
-    }
-
     private def scheduleNextRotation(path: Path, delay: FiniteDuration): Unit =
       scheduleOnce(timerKey = path, delay = delay)
 
     private def write(msg: T): Map[Path, Long] = {
       val valuesToWrite              = preWriteTransformation(msg)
-      val records                    = valuesToWrite.map(value => encode(value, vcc))
-      val pathsAndPartitionedRecords = records.map(partition)
+      val pathsAndPartitionedRecords = valuesToWrite.map(value => encodeAndPartition(basePath, value))
 
       pathsAndPartitionedRecords.foldLeft(Map.empty[Path, Long]) {
         case (modifiedPartitions, (writerPath, partitionedRecord)) =>
@@ -332,12 +430,7 @@ private class ParquetPartitioningFlow[T, W](
             writerPath, {
               logger.debug("Creating writer to write to [{}]", writerPath)
 
-              val writer = ParquetWriter.internalWriter(
-                file           = Path(writerPath, newFileName).toOutputFile(writeOptions),
-                schema         = schema,
-                metadataWriter = MetadataWriter.NoOp,
-                options        = writeOptions
-              )
+              val writer = createWriter(Path(writerPath, newFileName))
 
               val state = WriterState(
                 writer  = writer,
@@ -409,7 +502,6 @@ private class ParquetPartitioningFlow[T, W](
       writers.keySet.foreach { path =>
         close(path)
       }
-
       super.postStop()
     }
 
