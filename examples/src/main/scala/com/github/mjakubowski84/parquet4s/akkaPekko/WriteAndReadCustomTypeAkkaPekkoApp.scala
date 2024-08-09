@@ -20,7 +20,7 @@ object WriteAndReadCustomTypeAkkaPekkoApp extends App {
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher
 
-  for {
+  val stream = for {
     // write
     _ <- Source
       .fromIterator(data)
@@ -28,8 +28,11 @@ object WriteAndReadCustomTypeAkkaPekkoApp extends App {
     // read
     // hint: you can filter by dict using string value, for example: filter = Col("dict") === "A"
     _ <- ParquetStreams.fromParquet.as[Data].read(path).runWith(Sink.foreach(println))
-    // finish
-    _ <- system.terminate()
   } yield ()
+
+  stream.andThen {
+    // finish
+    case _ => system.terminate()
+  }
 
 }

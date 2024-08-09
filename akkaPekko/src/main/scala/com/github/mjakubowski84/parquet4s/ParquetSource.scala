@@ -8,6 +8,9 @@ import org.apache.parquet.io.InputFile
 import org.apache.parquet.schema.{MessageType, Type}
 import org.slf4j.{Logger, LoggerFactory}
 import java.io.Closeable
+import scala.util.Success
+import scala.util.Try
+import scala.util.Failure
 
 object ParquetSource extends IOOps {
 
@@ -199,8 +202,15 @@ object ParquetSource extends IOOps {
       val filterCompat = filter.toFilterCompat(ValueCodecConfiguration(options))
       Source
         .unfoldResource[X, org.apache.parquet.hadoop.ParquetReader[T]](
-          ()     => builder.withConf(options.hadoopConf).withFilter(filterCompat).build(),
-          reader => Option(reader.read()).map(readMap),
+          () => builder.withConf(options.hadoopConf).withFilter(filterCompat).build(),
+          reader =>
+            Try(Option(reader.read()).map(readMap)) match {
+              case Success(xOpt) =>
+                xOpt
+              case Failure(e) =>
+                logger.error("Read failure.", e)
+                None
+            },
           _.close()
         )
     }

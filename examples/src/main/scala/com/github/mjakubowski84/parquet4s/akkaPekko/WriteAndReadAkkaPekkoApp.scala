@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s.akkaPekko
 
 import com.github.mjakubowski84.parquet4s.ScalaCompat.actor.ActorSystem
-import com.github.mjakubowski84.parquet4s.ScalaCompat.stream.scaladsl.{Sink, Source}
+import com.github.mjakubowski84.parquet4s.ScalaCompat.stream.scaladsl.Source
 import com.github.mjakubowski84.parquet4s.{ParquetStreams, Path}
 
 import java.nio.file.Files
@@ -18,13 +18,16 @@ object WriteAndReadAkkaPekkoApp extends App {
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher
 
-  for {
+  val stream = for {
     // write
     _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile.of[Data].write(path.append("data.parquet")))
     // read
-    _ <- ParquetStreams.fromParquet.as[Data].read(path).runWith(Sink.foreach(println))
-    // finish
-    _ <- system.terminate()
+    _ <- ParquetStreams.fromParquet.as[Data].read(path).runForeach(println)
   } yield ()
+
+  stream.andThen {
+    // finish
+    case _ => system.terminate()
+  }
 
 }

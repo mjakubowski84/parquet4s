@@ -31,7 +31,7 @@ object WriteAndReadFilteredAkkaPekkoApp extends App {
 
   val printingSink = Sink.foreach(println)
 
-  for {
+  val stream = for {
     // write
     _ <- Source(data).runWith(ParquetStreams.toParquetSingleFile.of[Data].write(path.append("data.parquet")))
     // read filtered
@@ -39,8 +39,11 @@ object WriteAndReadFilteredAkkaPekkoApp extends App {
     _ <- ParquetStreams.fromParquet.as[Data].filter(Col("dict") === Dict.A).read(path).runWith(printingSink)
     _ <- Future(println("""id >= 20 && id < 40"""))
     _ <- ParquetStreams.fromParquet.as[Data].filter(Col("id") >= 20 && Col("id") < 40).read(path).runWith(printingSink)
-    // finish
-    _ <- system.terminate()
   } yield ()
+
+  stream.andThen {
+    // finish
+    case _ => system.terminate()
+  }
 
 }

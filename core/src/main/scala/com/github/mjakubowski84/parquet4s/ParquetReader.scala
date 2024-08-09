@@ -27,7 +27,7 @@ object ParquetReader extends IOOps {
       timeZone: TimeZone           = TimeZone.getDefault,
       useHadoopVectoredIo: Boolean = org.apache.parquet.hadoop.ParquetInputFormat.HADOOP_VECTORED_IO_DEFAULT,
       hadoopConf: Configuration    = new Configuration()
-  )
+  ) // TODO applyTo as in writer so all options are applied EVERYWHERE!
 
   /** Builds an instance of [[ParquetIterable]]
     * @tparam T
