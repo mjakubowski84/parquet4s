@@ -211,6 +211,7 @@ lazy val examples = (projectMatrix in file("examples"))
     libraryDependencies ++= Seq(
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
+      "org.apache.parquet" % "parquet-avro" % parquetVersion,
       "io.github.embeddedkafka" %% "embedded-kafka" % "3.7.0",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,

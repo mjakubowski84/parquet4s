@@ -43,13 +43,15 @@ object WriteAndReadGenericAkkaPekkoApp extends App {
   implicit val system: ActorSystem = ActorSystem()
   import system.dispatcher
 
-  for {
+  val stream = for {
     // write
     _ <- Source(users).runWith(ParquetStreams.toParquetSingleFile.generic(Schema).write(path.append("data.parquet")))
     // read
     _ <- ParquetStreams.fromParquet.generic.read(path).runWith(Sink.foreach(println))
-    // finish
-    _ <- system.terminate()
   } yield ()
 
+  stream.andThen {
+    // finish
+    case _ => system.terminate()
+  }
 }
