@@ -202,7 +202,7 @@ object ParquetSource extends IOOps {
       val filterCompat = filter.toFilterCompat(ValueCodecConfiguration(options))
       Source
         .unfoldResource[X, org.apache.parquet.hadoop.ParquetReader[T]](
-          () => builder.withConf(options.hadoopConf).withFilter(filterCompat).build(),
+          () => options.applyTo(builder).withFilter(filterCompat).build(),
           reader =>
             Try(Option(reader.read()).map(readMap)) match {
               case Success(xOpt) =>

@@ -235,9 +235,7 @@ object reader {
       val parquetIteratorResource = Resource.fromAutoCloseable(
         Sync[F].blocking(
           new ParquetIterator[T](
-            builder
-              .withConf(options.hadoopConf)
-              .withFilter(filter.toFilterCompat(ValueCodecConfiguration(options)))
+            options.applyTo(builder).withFilter(filter.toFilterCompat(ValueCodecConfiguration(options)))
           )
         )
       )
