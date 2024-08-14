@@ -27,7 +27,10 @@ object ParquetReader extends IOOps {
       timeZone: TimeZone           = TimeZone.getDefault,
       useHadoopVectoredIo: Boolean = org.apache.parquet.hadoop.ParquetInputFormat.HADOOP_VECTORED_IO_DEFAULT,
       hadoopConf: Configuration    = new Configuration()
-  ) // TODO applyTo as in writer so all options are applied EVERYWHERE!
+  ) {
+    private[parquet4s] def applyTo[T](builder: ParquetIterator.HadoopBuilder[T]): ParquetIterator.HadoopBuilder[T] =
+      builder.withConf(hadoopConf)
+  }
 
   /** Builds an instance of [[ParquetIterable]]
     * @tparam T
@@ -199,12 +202,7 @@ object ParquetReader extends IOOps {
     override def read: Iterable[T] & Closeable = {
       val vcc = ValueCodecConfiguration(options)
       closeableIterable(
-        iteratorFactory = () =>
-          new ParquetIterator[T](
-            builder
-              .withConf(options.hadoopConf)
-              .withFilter(filter.toFilterCompat(vcc))
-          )
+        iteratorFactory = () => new ParquetIterator[T](options.applyTo(builder).withFilter(filter.toFilterCompat(vcc)))
       )
     }
 
