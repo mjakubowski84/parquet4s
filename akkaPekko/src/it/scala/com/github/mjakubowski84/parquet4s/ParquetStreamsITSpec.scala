@@ -385,6 +385,44 @@ class ParquetStreamsITSpec
     recoverToSucceededIf[org.apache.parquet.schema.InvalidSchemaException](fut)
   }
 
+  it should "fail to partition a case class on null value and no default partitioning defined" in {
+
+    case class User(id: Int, name: Option[String])
+
+    val flow = ParquetStreams.viaParquet
+      .of[User]
+      .options(writeOptions)
+      .partitionBy(Col("name"))
+      .write(tempPath)
+
+    val users = Seq(User(id = 1, name = None)).toList
+
+    val fut = Source(users).via(flow).runWith(Sink.ignore)
+    recoverToSucceededIf[IllegalArgumentException](fut)
+  }
+
+  it should "write and read data partitioned by default column" in {
+
+    case class User(id: Int, name: Option[String])
+
+    val flow = ParquetStreams.viaParquet
+      .of[User]
+      .options(writeOptions)
+      .partitionBy(Col("name"))
+      .defaultPartition { case Col("name") => "Doe" }
+      .write(tempPath)
+
+    val user = User(id = 1, name = None)
+
+    for {
+      writtenData <- Source.single(user).via(flow).runWith(Sink.seq)
+      readData    <- ParquetStreams.fromParquet.as[User].read(tempPath).runWith(Sink.seq)
+    } yield {
+      writtenData should contain only user
+      readData should contain only User(id = 1, name = Some("Doe"))
+    }
+  }
+
   it should "write and read data using partitioning flow but with no partition defined" in {
 
     case class User(name: String, address: Address)

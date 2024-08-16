@@ -13,6 +13,8 @@ object Col {
     *   {{{Col("user.address.postcode")}}}
     */
   def apply(column: String): ColumnPath = ColumnPath(column)
+
+  def unapply(columnPath: ColumnPath): Option[String] = Option(columnPath.dotString)
 }
 
 object ColumnPath {
@@ -31,7 +33,7 @@ object ColumnPath {
   private[parquet4s] def apply(internal: org.apache.parquet.hadoop.metadata.ColumnPath): ColumnPath =
     this.apply(internal.asScala.toSeq)
 
-  def unapply(columnPath: ColumnPath): Option[Product2[String, ColumnPath]] =
+  private[parquet4s] def unapply(columnPath: ColumnPath): Option[Product2[String, ColumnPath]] =
     columnPath.elements match {
       case Nil =>
         None
@@ -64,6 +66,8 @@ class ColumnPath protected (val elements: Seq[String]) extends FilterOps {
   def canEqual(other: Any): Boolean = other.isInstanceOf[ColumnPath]
 
   def as[T: TypedSchemaDef]: TypedColumnPath[T] = TypedColumnPath(this)
+
+  def dotString: String = elements.mkString(ColumnPath.Separator.toString())
 
   override def equals(other: Any): Boolean = other match {
     case that: ColumnPath =>

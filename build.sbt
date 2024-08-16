@@ -212,7 +212,7 @@ lazy val examples = (projectMatrix in file("examples"))
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
       "org.apache.parquet" % "parquet-avro" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.7.0",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.7.1.1",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.github.fd4s" %% "fs2-kafka" % "3.5.1",
