@@ -51,6 +51,7 @@ object ParquetPartitioningFlow {
       maxDuration            = DefaultMaxDuration,
       preWriteTransformation = t => Iterable(t),
       partitionBy            = Seq.empty,
+      defaultPartition       = PartialFunction.empty[ColumnPath, String],
       writeOptions           = ParquetWriter.Options(),
       postWriteHandler       = None
     )
@@ -59,6 +60,7 @@ object ParquetPartitioningFlow {
       maxDuration            = DefaultMaxDuration,
       preWriteTransformation = record => Iterable(record),
       partitionBy            = Seq.empty,
+      defaultPartition       = PartialFunction.empty[ColumnPath, String],
       writeOptions           = ParquetWriter.Options(),
       postWriteHandler       = None
     )
@@ -196,6 +198,7 @@ object ParquetPartitioningFlow {
       maxDuration: FiniteDuration,
       preWriteTransformation: RowParquetRecord => Iterable[RowParquetRecord],
       partitionBy: Seq[ColumnPath],
+      defaultPartition: PartialFunction[ColumnPath, String],
       writeOptions: ParquetWriter.Options,
       postWriteHandler: Option[PostWriteState[RowParquetRecord] => Unit]
   ) extends GenericBuilder {
@@ -204,6 +207,8 @@ object ParquetPartitioningFlow {
     override def maxDuration(maxDuration: FiniteDuration): GenericBuilder = copy(maxDuration = maxDuration)
     override def options(options: ParquetWriter.Options): GenericBuilder  = copy(writeOptions = options)
     override def partitionBy(partitionBy: ColumnPath*): GenericBuilder    = copy(partitionBy = partitionBy)
+    override def defaultPartition(defaultPartition: PartialFunction[ColumnPath, String]): GenericBuilder =
+      copy(defaultPartition = defaultPartition)
     override def preWriteTransformation(
         transformation: RowParquetRecord => Iterable[RowParquetRecord]
     ): GenericBuilder =
@@ -244,6 +249,7 @@ object ParquetPartitioningFlow {
       maxDuration: FiniteDuration,
       preWriteTransformation: T => Iterable[W],
       override protected val partitionBy: Seq[ColumnPath],
+      override protected val defaultPartition: PartialFunction[ColumnPath, String],
       override protected val writeOptions: ParquetWriter.Options,
       postWriteHandler: Option[PostWriteState[T] => Unit]
   ) extends TypedBuilder[T, W] {
@@ -252,12 +258,15 @@ object ParquetPartitioningFlow {
     override def maxDuration(maxDuration: FiniteDuration): TypedBuilder[T, W] = copy(maxDuration = maxDuration)
     override def options(options: ParquetWriter.Options): TypedBuilder[T, W]  = copy(writeOptions = options)
     override def partitionBy(partitionBy: ColumnPath*): TypedBuilder[T, W]    = copy(partitionBy = partitionBy)
+    override def defaultPartition(defaultPartition: PartialFunction[ColumnPath, String]): TypedBuilder[T, W] =
+      copy(defaultPartition = defaultPartition)
     override def preWriteTransformation[X](transformation: T => Iterable[X]): TypedBuilder[T, X] =
       TypedBuilderImpl(
         maxCount,
         maxDuration,
         transformation,
         partitionBy,
+        defaultPartition,
         writeOptions,
         postWriteHandler
       )
@@ -332,7 +341,15 @@ trait ParquetRecordPartitioning[W, Self] {
     */
   def partitionBy(partitionBy: ColumnPath*): Self
 
+  /** Allows to define default partition values for optional or nullable columns.
+    * @param defaultPartition
+    *   partial function, which Parquet4s will call to attempt to resolve a partition value when it encouters a null
+    *   column value
+    */
+  def defaultPartition(defaultPartition: PartialFunction[ColumnPath, String]): Self
+
   protected def partitionBy: Seq[ColumnPath]
+  protected def defaultPartition: PartialFunction[ColumnPath, String]
   protected def writeOptions: ParquetWriter.Options
   private lazy val vcc: ValueCodecConfiguration = ValueCodecConfiguration(writeOptions)
 
@@ -370,10 +387,12 @@ trait ParquetRecordPartitioning[W, Self] {
     record.removed(partitionPath) match {
       case (Some(value: BinaryValue), modifiedRecord) =>
         value -> modifiedRecord
+      case (Some(NullValue), modifiedRecord) if defaultPartition.isDefinedAt(partitionPath) =>
+        BinaryValue(defaultPartition(partitionPath)) -> modifiedRecord
+      case (Some(NullValue), _) =>
+        throw new IllegalArgumentException(s"Field '$partitionPath' is null and has no default partition defined.")
       case (None, _) =>
         throw new IllegalArgumentException(s"Field '$partitionPath' does not exist.")
-      case (Some(NullValue), _) =>
-        throw new IllegalArgumentException(s"Field '$partitionPath' is null.")
       case _ =>
         throw new IllegalArgumentException(s"Non-string field '$partitionPath' used for partitioning.")
     }

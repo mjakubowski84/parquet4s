@@ -47,6 +47,7 @@ object rotatingWriter {
       maxDuration            = DefaultMaxDuration,
       preWriteTransformation = t => Stream.emit(t),
       partitionBy            = Seq.empty,
+      defaultPartition       = PartialFunction.empty[ColumnPath, String],
       postWriteHandlerOpt    = None,
       writeOptions           = ParquetWriter.Options()
     )
@@ -56,6 +57,7 @@ object rotatingWriter {
       maxDuration            = DefaultMaxDuration,
       preWriteTransformation = Stream.emit,
       partitionBy            = Seq.empty,
+      defaultPartition       = PartialFunction.empty[ColumnPath, String],
       postWriteHandlerOpt    = None,
       writeOptions           = ParquetWriter.Options()
     )
@@ -100,6 +102,13 @@ object rotatingWriter {
       *   [[ColumnPath]]s to partition by
       */
     def partitionBy(partitionBy: ColumnPath*): Self
+
+    /** Allows to define default partition values for optional or nullable columns.
+      * @param defaultPartition
+      *   partial function, which Parquet4s will call to attempt to resolve a partition value when it encouters a null
+      *   column value
+      */
+    def defaultPartition(defaultPartition: PartialFunction[ColumnPath, String]): Self
 
     /** Adds a handler that is invoked after write of each chunk of records. Handler exposes some of the internal state
       * of the flow. Intended for lower level monitoring and control.
@@ -156,6 +165,7 @@ object rotatingWriter {
       maxDuration: FiniteDuration,
       preWriteTransformation: RowParquetRecord => Stream[F, RowParquetRecord],
       partitionBy: Seq[ColumnPath],
+      defaultPartition: PartialFunction[ColumnPath, String],
       postWriteHandlerOpt: Option[PostWriteHandler[F, RowParquetRecord]],
       writeOptions: ParquetWriter.Options
   ) extends GenericBuilder[F] {
@@ -164,6 +174,8 @@ object rotatingWriter {
     override def maxDuration(maxDuration: FiniteDuration): GenericBuilder[F]     = copy(maxDuration = maxDuration)
     override def options(writeOptions: ParquetWriter.Options): GenericBuilder[F] = copy(writeOptions = writeOptions)
     override def partitionBy(partitionBy: ColumnPath*): GenericBuilder[F]        = copy(partitionBy = partitionBy)
+    override def defaultPartition(defaultPartition: PartialFunction[ColumnPath, String]): GenericBuilder[F] =
+      copy(defaultPartition = defaultPartition)
     override def preWriteTransformation(
         transformation: RowParquetRecord => Stream[F, RowParquetRecord]
     ): GenericBuilder[F] =
@@ -178,6 +190,7 @@ object rotatingWriter {
         maxCount,
         maxDuration,
         partitionBy,
+        defaultPartition,
         preWriteTransformation,
         postWriteHandlerOpt,
         writeOptions
@@ -190,6 +203,7 @@ object rotatingWriter {
       maxDuration: FiniteDuration,
       preWriteTransformation: T => Stream[F, W],
       partitionBy: Seq[ColumnPath],
+      defaultPartition: PartialFunction[ColumnPath, String],
       postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
       writeOptions: ParquetWriter.Options
   ) extends TypedBuilder[F, T, W] {
@@ -198,6 +212,8 @@ object rotatingWriter {
     override def maxDuration(maxDuration: FiniteDuration): TypedBuilder[F, T, W]     = copy(maxDuration = maxDuration)
     override def options(writeOptions: ParquetWriter.Options): TypedBuilder[F, T, W] = copy(writeOptions = writeOptions)
     override def partitionBy(partitionBy: ColumnPath*): TypedBuilder[F, T, W]        = copy(partitionBy = partitionBy)
+    override def defaultPartition(defaultPartition: PartialFunction[ColumnPath, String]): TypedBuilder[F, T, W] =
+      copy(defaultPartition = defaultPartition)
     override def preWriteTransformation[X](transformation: T => Stream[F, X]): TypedBuilder[F, T, X] =
       TypedBuilderImpl(
         chunkSize              = chunkSize,
@@ -205,6 +221,7 @@ object rotatingWriter {
         maxDuration            = maxDuration,
         preWriteTransformation = transformation,
         partitionBy            = partitionBy,
+        defaultPartition       = defaultPartition,
         writeOptions           = writeOptions,
         postWriteHandlerOpt    = postWriteHandlerOpt
       )
@@ -221,6 +238,7 @@ object rotatingWriter {
         maxCount,
         maxDuration,
         partitionBy,
+        defaultPartition,
         preWriteTransformation,
         postWriteHandlerOpt,
         writeOptions
@@ -316,6 +334,7 @@ object rotatingWriter {
       maxCount: Long,
       maxDuration: FiniteDuration,
       partitionByOpt: Option[NonEmptyList[ColumnPath]],
+      defaultPartition: PartialFunction[ColumnPath, String],
       schema: MessageType,
       encode: W => F[RowParquetRecord],
       eventQueue: Queue[F, WriterEvent[F, T, W]],
@@ -404,12 +423,14 @@ object rotatingWriter {
         partitionColumnPath: ColumnPath
     ): F[(ColumnPath, String, RowParquetRecord)] =
       record.removed(partitionColumnPath) match {
-        case (None, _) =>
-          F.raiseError(new IllegalArgumentException(s"Field '$partitionColumnPath' does not exist."))
-        case (Some(NullValue), _) =>
-          F.raiseError(new IllegalArgumentException(s"Field '$partitionColumnPath' is null."))
         case (Some(BinaryValue(binary)), modifiedRecord) =>
           F.catchNonFatal((partitionColumnPath, binary.toStringUsingUTF8, modifiedRecord))
+        case (Some(NullValue), modifiedRecord) if defaultPartition.isDefinedAt(partitionColumnPath) =>
+          F.pure((partitionColumnPath, defaultPartition(partitionColumnPath), modifiedRecord))
+        case (Some(NullValue), _) =>
+          F.raiseError(new IllegalArgumentException(s"Field '$partitionColumnPath' is null."))
+        case (None, _) =>
+          F.raiseError(new IllegalArgumentException(s"Field '$partitionColumnPath' does not exist."))
         case _ =>
           F.raiseError(new IllegalArgumentException(s"Non-string field '$partitionColumnPath' used for partitioning."))
       }
@@ -486,7 +507,8 @@ object rotatingWriter {
           Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
         case None =>
           postWriteHandlerPull(outChunk, modifiedPartitions).flatMap {
-            case Nil => Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
+            case Nil =>
+              Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
             case partitionsToRotate =>
               rotatePull(partitionsToRotate) >> Pull.output(outChunk) >> Pull.pure(modifiedPartitions)
           }
@@ -537,6 +559,7 @@ object rotatingWriter {
       maxCount: Long,
       maxDuration: FiniteDuration,
       partitionBy: Seq[ColumnPath],
+      defaultPartition: PartialFunction[ColumnPath, String],
       prewriteTransformation: T => Stream[F, W],
       postWriteHandlerOpt: Option[PostWriteHandler[F, T]],
       options: ParquetWriter.Options
@@ -558,6 +581,7 @@ object rotatingWriter {
             maxCount            = maxCount,
             maxDuration         = maxDuration,
             partitionByOpt      = NonEmptyList.fromList(partitionBy.toList),
+            defaultPartition    = defaultPartition,
             schema              = schema,
             encode              = encode,
             eventQueue          = eventQueue,

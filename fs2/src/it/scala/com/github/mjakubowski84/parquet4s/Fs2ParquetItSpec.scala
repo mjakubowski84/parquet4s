@@ -350,6 +350,63 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     testStream.compile.lastOrError
   }
 
+  it should "fail to partition data by null column when no default is" in {
+    case class User(id: Int, name: Option[String])
+
+    val user = User(id = 1, name = None)
+
+    def write(path: Path): Stream[IO, Nothing] =
+      Stream(user)
+        .through(
+          parquet
+            .viaParquet[IO]
+            .of[User]
+            .partitionBy(Col("name"))
+            .options(writeOptions)
+            .write(path)
+        )
+        .drain
+
+    val testStream =
+      for {
+        path <- createTempDirectory
+        _    <- write(path)
+      } yield ()
+
+    recoverToSucceededIf[IllegalArgumentException](testStream.compile.lastOrError)
+  }
+
+  it should "use provided default partition for null column values" in {
+    case class User(id: Int, name: Option[String])
+
+    val user = User(id = 1, name = None)
+
+    def write(path: Path) =
+      Stream(user)
+        .through(
+          parquet
+            .viaParquet[IO]
+            .of[User]
+            .partitionBy(Col("name"))
+            .defaultPartition { case Col("name") => "Doe" }
+            .options(writeOptions)
+            .write(path)
+        )
+        .fold(Vector.empty[User])(_ :+ _)
+
+    val testStream =
+      for {
+        path    <- createTempDirectory
+        written <- write(path)
+        result  <- read[User](path, parallelism = 1)
+      } yield {
+        written should contain only user
+        result should contain only User(id = 1, name = Some("Doe"))
+      }
+
+    testStream.compile.lastOrError
+  }
+
   it should "transform data before writing" in {
     val partitions          = Set("x", "y", "z")
     val partitionSize: Long = count / partitions.size
