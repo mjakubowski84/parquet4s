@@ -14,7 +14,6 @@ As it is based on Hadoop Client, Parquet4s can read and write from a variety of 
 - [Google Storage](https://cloud.google.com/dataproc/docs/concepts/connectors/cloud-storage)
 - [Azure Blob Storage](https://hadoop.apache.org/docs/stable/hadoop-azure/index.html)
 - [Azure Data Lake Storage](https://hadoop.apache.org/docs/stable/hadoop-azure-datalake/index.html)
-- [OpenStack Swift](https://hadoop.apache.org/docs/stable/hadoop-openstack/index.html)
 - and any other storage compatible with Hadoop...
 
 Please refer to Hadoop Client documentation or your storage provider to check how to connect to your storage.

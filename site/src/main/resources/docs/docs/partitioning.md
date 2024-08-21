@@ -21,7 +21,8 @@ Since version 2.12.0 Parquet4S always reads partitioned data. Writing partitions
 #### **Take note!**
 
 - The partition field must be a String.
-- The field cannot be null, be an Option or belong to the collection.
+- The field cannot belong to the collection.
+- The field cannot be null, be an Option - unless you have defined a default partitioning using `viaParquet`'s `defaultPartition` setting.
 - When reading partitioned data make sure that partition directory names follow Hive format.
 - Parquet4s takes care of building proper schemas for partitioned data. However, when you use a custom type and a custom schema definition remember not to include the partition field in the schema — because it is supposed to be encoded as a directory name.
 

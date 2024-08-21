@@ -49,7 +49,7 @@ object Example extends IOApp.Simple {
       .options(writeOptions)
       .write(Path("file:///data/users/single.parquet"))
 
-  // (Experimental API) Writes a single file using a custom ParquetWriter.
+  // (Experimental API) Writes a single file using a custom ParquetWriter. 
   class UserParquetWriterBuilder(path: Path) extends HadoopParquetWriter.Builder[User, UserParquetWriterBuilder](path.toHadoop) {
     override def self() = this
     override def getWriteSupport(conf: Configuration) = ???

@@ -1,7 +1,7 @@
 ---
 layout: docs
 title: (Experimental) ETL
-permalink: docs/experimental/
+permalink: docs/etl/
 ---
 
 # (Experimental) ETL

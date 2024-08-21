@@ -6,7 +6,7 @@ permalink: docs/protobuf/
 
 # Read and write Parquet from and to Protobuf
 
-Using the original Java Parquet library, you can read and write parquet to and from Protbuf. Parquet4s has `custom` functions in its API, which could be leveraged for that. However, Protobuf Parquet can only be used with Java models, not to mention other issues that make it hard to use, especially in Scala. You would prefer to use [ScalaPB](https://scalapb.github.io/) in Scala projects, right? Thanks to Parquet4S, you can! Import ScalaPB extension to any Parquet4S project, either it is Akka / Pekko, FS2 or plain Scala:
+Using the original Java Parquet library, you can read and write parquet to and from Protbuf. Parquet4s has `custom` functions in its API, which could be leveraged for that. However, Parquet Protobuf can only be used with Java models, not to mention other issues that make it hard to use, especially in Scala. You would prefer to use [ScalaPB](https://scalapb.github.io/) in Scala projects, right? Thanks to Parquet4S, you can! Import ScalaPB extension to any Parquet4S project, either it is Akka / Pekko, FS2 or plain Scala:
 
 ```scala
 "com.github.mjakubowski84" %% "parquet4s-scalapb" % "@VERSION@"
@@ -22,7 +22,7 @@ import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter, Path}
 
 import scala.util.Using
 
-case class GeneratedProtobufData()
+case class GeneratedProtobufData(someField: Int)
 
 val data: Iterable[GeneratedProtobufData] = ??? // your data
 val path: Path = ??? // path to write to / to read from

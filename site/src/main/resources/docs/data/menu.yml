@@ -41,7 +41,7 @@ options:
   - title: (Experimental) ETL
     url: docs/etl
 
-  - title: (Experimental) Protobuf
+  - title: (Experimental) Protobuf with ScalaPB
     url: docs/protobuf
 
   - title: Distinguished Sponsors
