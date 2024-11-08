@@ -47,7 +47,7 @@ object CustomAvroWriteAndReadAkkaPekkoApp extends App {
 
   lazy val readerSource = ParquetStreams.fromParquet
     .custom[GenericRecord](readerBuilder)
-    .read[GenericRecord](identity _)
+    .read()
 
   val stream = for {
     _ <- Source(data).runWith(writerSink)

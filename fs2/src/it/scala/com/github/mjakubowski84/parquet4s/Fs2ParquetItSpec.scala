@@ -231,12 +231,12 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
         .iterable[IO, Data](data)
-        .metered(50.nanos)
+        .metered(1.milli)
         .through(
           parquet
             .viaParquet[IO]
             .of[Data]
-            .maxDuration(50.millis)
+            .maxDuration(500.millis)
             .maxCount(count)
             .options(writeOptions)
             .write(path)
@@ -574,13 +574,13 @@ class Fs2ParquetItSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers with
     def write(path: Path): Stream[IO, Vector[Data]] =
       Stream
         .iterable[IO, Data](data)
-        .metered(50.nanos)
+        .metered(1.milli)
         .through(
           parquet
             .viaParquet[IO]
             .of[Data]
             .maxCount(count)
-            .maxDuration(50.millis)
+            .maxDuration(500.millis)
             .options(writeOptions)
             .partitionBy(Col("s"))
             .write(path)
