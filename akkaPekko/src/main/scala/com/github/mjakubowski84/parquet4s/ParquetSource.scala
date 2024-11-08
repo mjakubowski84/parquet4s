@@ -175,7 +175,7 @@ object ParquetSource extends IOOps {
       * @return
       *   final [[com.github.mjakubowski84.parquet4s.ScalaCompat.stream.scaladsl.Source]]
       */
-    def read[X](readMap: T => X = identity _): Source[X, NotUsed]
+    def read[X](readMap: T => X = (elem: T) => elem): Source[X, NotUsed]
 
   }
 

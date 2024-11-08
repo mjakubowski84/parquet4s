@@ -11,6 +11,9 @@ import scala.util.Random
 import org.apache.parquet.proto.ProtoParquetReader
 import com.google.protobuf.TextFormat
 
+/** Please note! This is an example of Java Protobuf + Parquet4s using custom readers and writers. You can also use
+  * Scala Protobuf with regular Parquet4s functions thanks to ScalaPB module of Parquet4s.
+  */
 object CustomProtobufWriteAndReadAkkaPekkoApp extends App {
   val count = 100
   val data  = (1 to count).map(i => Data.newBuilder.setId(i).setText(Random.nextString(4)).build)

@@ -4,6 +4,7 @@ import cats.effect.{Concurrent, Resource, Sync}
 import cats.implicits.*
 import com.github.mjakubowski84.parquet4s.*
 import fs2.Stream
+import fs2.Chunk
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.schema.{MessageType, Type}
 import org.apache.parquet.hadoop.util.HadoopInputFile
@@ -212,10 +213,12 @@ object reader {
       */
     def chunkSize(chunkSize: Int): CustomBuilder[F, T]
 
-    /** @return
+    /** @param readMap
+      *   called on each element immediately after it is read
+      * @return
       *   final [[fs2.Stream]]
       */
-    def read: Stream[F, T]
+    def read[X](readMap: T => X = (elem: T) => elem): Stream[F, X]
 
   }
 
@@ -231,18 +234,34 @@ object reader {
 
     override def chunkSize(chunkSize: Int): CustomBuilder[F, T] = this.copy(chunkSize = chunkSize)
 
-    override def read: Stream[F, T] = {
-      val parquetIteratorResource = Resource.fromAutoCloseable(
+    override def read[X](readMap: T => X = identity _): Stream[F, X] = {
+      val readerResource = Resource.fromAutoCloseable(
         Sync[F].blocking(
-          new ParquetIterator[T](
-            options.applyTo(builder).withFilter(filter.toFilterCompat(ValueCodecConfiguration(options)))
-          )
+          options.applyTo(builder).withFilter(filter.toFilterCompat(ValueCodecConfiguration(options))).build()
         )
       )
 
       for {
-        parquetIterator <- Stream.resource(parquetIteratorResource)
-        stream          <- Stream.fromBlockingIterator[F](parquetIterator, chunkSize)
+        reader <- Stream.resource(readerResource)
+        stream <- Stream.unfoldChunkEval(reader) { r =>
+          Sync[F].blocking {
+            val vbx   = Vector.newBuilder[X]
+            var count = 0
+            var break = false
+
+            while (count < chunkSize && !break) {
+              val record = r.read()
+              if (record == null) {
+                break = true
+              } else {
+                vbx += readMap(record)
+                count += 1
+              }
+            }
+
+            if (count == 0) None else Some((Chunk.from(vbx.result()), r))
+          }
+        }
       } yield stream
     }
 

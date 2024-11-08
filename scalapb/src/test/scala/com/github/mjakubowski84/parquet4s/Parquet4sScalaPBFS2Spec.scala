@@ -58,11 +58,8 @@ class Parquet4sScalaPBFS2Spec extends AsyncFlatSpec with AsyncIOSpec with Matche
         .fromParquet[IO]
         .custom[JData.Builder](ProtoParquetReader.builder[JData.Builder](outFile.toInputFile))
         .options(ParquetReader.Options(hadoopConf = hadoopConf))
-        .chunkSize(chunkSize = 1)
-        // due to bug in ProtoParquetReader - the fact that read elements are unsafe instances of JData.Builder
-        // we must limit chunk size to 1 and read elements from a file one by one
-        .read
-        .fold(Vector.empty[JData])(_ :+ _.build())
+        .read(_.build)
+        .fold(Vector.empty[JData])(_ :+ _)
 
     (write ++ read)
       .map(_ should be(javaData))
