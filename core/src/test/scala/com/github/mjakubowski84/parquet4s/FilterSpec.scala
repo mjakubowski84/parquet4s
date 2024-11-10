@@ -40,6 +40,16 @@ class FilterSpec extends AnyFlatSpec with Matchers {
     predicate.toString should be("lteq(i, 1)")
   }
 
+  it should "build isNull predicate" in {
+    val predicate = Col("i").isNull[Int].toPredicate(valueCodecConfiguration)
+    predicate.toString should be("eq(i, null)")
+  }
+
+  it should "build isNotNull predicate" in {
+    val predicate = Col("i").isNotNull[Int].toPredicate(valueCodecConfiguration)
+    predicate.toString should be("not(eq(i, null))")
+  }
+
   it should "build in predicate with varargs" in {
     val predicate = Col("i").in(1, 2, 3).toPredicate(valueCodecConfiguration)
     predicate.toString should be("userdefinedbyinstance(i, in(1, 2, 3))")
@@ -51,7 +61,9 @@ class FilterSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "build not predicate" in {
+    // format: off
     val predicate = (!(Col("i") === 1)).toPredicate(valueCodecConfiguration)
+    // format: on
     predicate.toString should be("not(eq(i, 1))")
   }
 
