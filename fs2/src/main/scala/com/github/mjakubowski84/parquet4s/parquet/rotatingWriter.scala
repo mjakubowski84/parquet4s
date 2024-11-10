@@ -474,16 +474,6 @@ object rotatingWriter {
     )(implicit F: Async[F]): F[RecordWriter[F, R]] =
       F.uncancelable { _ =>
         for {
-          // internalWriter <- F.delay(
-          //   scala.concurrent.blocking(
-          //     ParquetWriter.internalWriter(
-          //       file           = basePath.append(newFileName(options)).toOutputFile(options),
-          //       schema         = schema,
-          //       metadataWriter = MetadataWriter.NoOp,
-          //       options        = options
-          //     )
-          //   )
-          // )
           internalWriter <- createWriter(basePath.append(newFileName(options)))
           rotationFiber  <- F.delayBy(eventDequeue.offerFront(RotateEvent[F, T, W](basePath)), maxDuration).start
         } yield new RecordWriter(internalWriter, rotationFiber)

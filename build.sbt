@@ -5,9 +5,9 @@ import Compilation._
 import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
-lazy val twoTwelve              = "2.12.19"
-lazy val twoThirteen            = "2.13.14"
-lazy val three                  = "3.3.3"
+lazy val twoTwelve              = "2.12.20"
+lazy val twoThirteen            = "2.13.15"
+lazy val three                  = "3.3.4"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 val akkaLib  = ActorLibCross("-akka", "-akka")
@@ -212,7 +212,7 @@ lazy val examples = (projectMatrix in file("examples"))
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
       "org.apache.parquet" % "parquet-avro" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.7.1.1",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.8.1",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
       "com.github.fd4s" %% "fs2-kafka" % "3.5.1",
@@ -254,7 +254,7 @@ lazy val examples = (projectMatrix in file("examples"))
     axisValues    = Seq(pekkoLib),
     settings = Def.settings(
       name := "parquet4s-examples-pekko",
-      libraryDependencies ++= Seq("org.apache.pekko" %% "pekko-connectors-kafka" % "1.0.0")
+      libraryDependencies ++= Seq("org.apache.pekko" %% "pekko-connectors-kafka" % "1.1.0")
     )
   )
   .settings(compilationSettings)

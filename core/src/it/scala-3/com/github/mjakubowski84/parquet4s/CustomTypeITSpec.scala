@@ -5,7 +5,6 @@ import org.scalatest.BeforeAndAfter
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import ValueImplicits.*
-import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.BINARY
 
 class CustomTypeITSpec extends AnyFlatSpec with Matchers with BeforeAndAfter with TestUtils:
 

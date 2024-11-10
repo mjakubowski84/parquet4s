@@ -166,6 +166,18 @@ trait FilterOps {
   ): Filter =
     Filter.udpFilter[In, V, C](this, udp)
 
+  /** @return
+    *   Returns [[Filter]] that passes data that, in `this` column, is <b>null</b>
+    */
+  def isNull[In](implicit codec: FilterCodec[In, ?, ?]): Filter =
+    Filter.isNullFilter(this)(codec)
+
+  /** @return
+    *   Returns [[Filter]] that passes data that, in `this` column, is <b>not null</b>
+    */
+  def isNotNull[In](implicit codec: FilterCodec[In, ?, ?]): Filter =
+    Filter.isNotNullFilter(this)(codec)
+
 }
 
 object Filter {
@@ -266,6 +278,18 @@ object Filter {
       FilterCompat.NOOP
   }
 
+  def isNullFilter[In](columnPath: ColumnPath)(implicit codec: FilterCodec[In, ?, ?]): Filter =
+    new Filter {
+      def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
+        new Eq[codec.Value](
+          codec.columnFactory(columnPath).asInstanceOf[Column[codec.Value]],
+          null.asInstanceOf[codec.Value]
+        )
+    }
+
+  def isNotNullFilter[In](columnPath: ColumnPath)(implicit codec: FilterCodec[In, ?, ?]): Filter =
+    notFilter(isNullFilter(columnPath))
+
 }
 
 /** Constructs instance of [[org.apache.parquet.filter2.predicate.Operators.Column]] af given column path and type.
@@ -311,6 +335,9 @@ trait FilterDecoder[+In, -V] {
   *   Column type
   */
 trait FilterCodec[In, V <: Comparable[V], C <: Column[V]] extends FilterEncoder[In, V] with FilterDecoder[In, V] {
+
+  private[parquet4s] type Value  = V
+  private[parquet4s] type Column = C
 
   def columnFactory: ColumnFactory[V, C]
 }

@@ -23,7 +23,8 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
       date: LocalDate,
       dateTime: LocalDateTime,
       decimal: BigDecimal,
-      embedded: Embedded
+      embedded: Embedded,
+      nullable: Option[Int]
   )
 
   val `enum`: Seq[String]         = List("a", "b", "c", "d")
@@ -55,7 +56,8 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
         date     = zeroDate.plusDays(i.toLong),
         dateTime = zeroDateTime.plusSeconds(i.toLong),
         decimal  = BigDecimal.valueOf(0.001 * (i - halfSize)),
-        embedded = Embedded(i)
+        embedded = Embedded(i),
+        nullable = if (i % 2 == 0) None else Some(i)
       )
     }
 
@@ -212,6 +214,19 @@ class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll wit
     forExactly((dataSize / 10) + 1, read(Col("idx").udp(IntDividesBy10))) { dataRecord =>
       dataRecord.idx % 10 should be(0)
     }
+  }
+
+  it should "filter data by null values" in {
+    val filteredEmpty = read(Col("enum").isNull[String])
+    filteredEmpty should be(empty)
+    val filteredFull = read(Col("enum").isNotNull[String])
+    filteredFull should have size dataSize.toLong
+
+    val filteredSomeEmpty = read(Col("nullable").isNull[Int])
+    filteredSomeEmpty should have size dataSize.toLong / 2
+
+    val filteredSomeFull = read(Col("nullable").isNotNull[Int])
+    filteredSomeFull should have size dataSize.toLong / 2
   }
 
 }
