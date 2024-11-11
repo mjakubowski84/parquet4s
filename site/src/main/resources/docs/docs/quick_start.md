@@ -77,12 +77,9 @@ val users: Iterable[User] = Seq(
   User("1", "parquet", new java.sql.Timestamp(1L))
 )
 
-val hadoopConf = new Configuration()
-hadoopConf.set("fs.s3a.path.style.access", "true")
-
 val writerOptions = ParquetWriter.Options(
   compressionCodecName = CompressionCodecName.SNAPPY,
-  hadoopConf = hadoopConf
+  hadoopConf = new Configuration()
 )
 
 ParquetWriter

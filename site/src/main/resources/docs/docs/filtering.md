@@ -23,7 +23,7 @@ ParquetReader
   .read(Path("file.parquet"))
 ```
 
-You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, `in` and `udp` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Please mind that filtering on `java.sql.Timestamp` and `java.time.LocalDateTime` is not supported for `Int96` timestamps which is a default type used for timestamps. Consider a different timestamp [format]({% link docs/records_and_schema.md %}) for your data to enable filtering.
+You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, `in`, `isNull`, `isNotNull` and `udp` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Please mind that filtering on `java.sql.Timestamp` and `java.time.LocalDateTime` is not supported for `Int96` timestamps which is a default type used for timestamps. Consider a different timestamp [format]({% link docs/records_and_schema.md %}) for your data to enable filtering.
 
 For custom filtering by a column of type `T` implement `UDP[T]` trait and use `udp` operator.
 
