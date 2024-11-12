@@ -1,0 +1,178 @@
+<!DOCTYPE html><html><head><title>documentation: Partitioning</title><meta charset="utf-8" /><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="author" content="Marcin Jakubowski" /><meta name="description" content="Read and write Parquet files using Scala" /><meta name="og:image" content="/parquet4s/img/poster.png" /><meta name="image" property="og:image" content="/parquet4s/img/poster.png" /><meta name="og:title" content="documentation: Partitioning" /><meta name="title" property="og:title" content="documentation: Partitioning" /><meta name="og:site_name" content="documentation" /><meta name="og:url" content="" /><meta name="og:type" content="website" /><meta name="og:description" content="Read and write Parquet files using Scala" /><link rel="icon" type="image/png" href="/parquet4s/img/favicon.png" /><meta name="twitter:title" content="documentation: Partitioning" /><meta name="twitter:image" content="/parquet4s/img/poster.png" /><meta name="twitter:description" content="Read and write Parquet files using Scala" /><meta name="twitter:card" content="summary_large_image" /><link rel="icon" type="image/png" sizes="16x16" href="/parquet4s/img/favicon-16x16.png" /><link rel="icon" type="image/png" sizes="32x32" href="/parquet4s/img/favicon-32x32.png" /><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" /><link rel="stylesheet" href="/parquet4s/highlight/styles/vs.css" /><link rel="stylesheet" href="/parquet4s/css/light-style.css" /></head><body class="docs"><div id="wrapper"><div id="sidebar-wrapper"><div id="sidebar-brand"><a href="/parquet4s/" class="brand"><div class="brand-wrapper"></div><span>documentation</span></a><button id="main-toggle" class="sidebar-toggle"><span class="close"></span></button></div><div class="sidebar-nav"> <div class="sidebar-nav-item  "><a href="/parquet4s/docs" title="Introduction" class="">Introduction</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/quick_start" title="Quick Start" class="">Quick Start</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/akka" title="Integration with Akka Streams" class="">Integration with Akka Streams</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/pekko" title="Integration with Pekko Streams" class="">Integration with Pekko Streams</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/fs2" title="Integration with FS2" class="">Integration with FS2</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/storage_types" title="Supported storage types" class="">Supported storage types</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/records_and_schema" title="Records, types and schema" class="">Records, types and schema</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/projection" title="Projection" class="">Projection</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/filtering" title="Filtering" class="">Filtering</a></div> <div class="sidebar-nav-item active "><a href="/parquet4s/docs/partitioning" title="Partitioning" class="active">Partitioning</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/statistics" title="Statistics" class="">Statistics</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/examples" title="Examples" class="">Examples</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/migration" title="Migration from 1.x" class="">Migration from 1.x</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/etl" title="(Experimental) ETL" class="">(Experimental) ETL</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/protobuf" title="(Experimental) Protobuf with ScalaPB" class="">(Experimental) Protobuf with ScalaPB</a></div> <div class="sidebar-nav-item  "><a href="/parquet4s/docs/sponsors" title="Distinguished Sponsors" class="">Distinguished Sponsors</a></div></div></div><div id="page-content-wrapper"><div class="nav"><div class="container-fluid"><div class="row"><div class="col-lg-12"><div class="action-menu pull-left clearfix"><a href="#menu-toggle" id="menu-toggle"><i class="fa fa-bars" aria-hidden="true"></i></a></div><ul class="pull-right"><li class="search-nav"><div id="search-dropdown"><label><i class="fa fa-search"></i>Search</label><input id="search-bar" type="text" placeholder="Enter keywords here..." onclick="displayToggleSearch(event)" /><ul id="search-dropdown-content" class="dropdown dropdown-content"></ul></div></li><li id="gh-eyes-item" class="hidden-xs to-uppercase"><a href="https://github.com/mjakubowski84/parquet4s" target="_blank" rel="noopener noreferrer"><i class="fa fa-eye"></i><span>Watchers<span id="eyes" class="label label-default">--</span></span></a></li><li id="gh-stars-item" class="hidden-xs to-uppercase"><a href="https://github.com/mjakubowski84/parquet4s" target="_blank" rel="noopener noreferrer"><i class="fa fa-star-o"></i><span>Stars<span id="stars" class="label label-default">--</span></span></a></li></ul></div></div></div></div><div id="content" data-github-owner="mjakubowski84" data-github-repo="parquet4s"><div class="content-wrapper"><section><h1 id="partitioning">Partitioning</h1>
+
+<p>Parquet4s supports both reading partitions and partitioning data during writing. Writing partitioned data is available <strong>only</strong> in Akka / Pekko and FS2 modules. Reading partitions is enabled by default in all Parquet4S modules.</p>
+
+<h4 id="akka--pekko--fs2">Akka / Pekko &amp; FS2</h4>
+
+<p>Reading partitions is handled by default by <code class="language-plaintext highlighter-rouge">fromParquet</code> function. Before data is read Parquet4s scans the directory and resolves partition fields and values. After reading, each record is enriched according to the partition directory tree the file resides in.</p>
+
+<p>Writing partitioned data is available in <code class="language-plaintext highlighter-rouge">viaParquet</code>. You can specify by which columns data shall be partitioned and Parquet4s will automatically create the proper directory structure, and it will remove the fields from the written records (so that there is no data redundancy).</p>
+
+<h4 id="core">Core</h4>
+
+<p>Since version 2.12.0 Parquet4S always reads partitioned data. Writing partitions is not supported in core module.</p>
+
+<h4 id="take-note"><strong>Take note!</strong></h4>
+
+<ul>
+  <li>The partition field must be a String.</li>
+  <li>The field cannot belong to the collection.</li>
+  <li>The field cannot be null, be an Option - unless you have defined a default partitioning using <code class="language-plaintext highlighter-rouge">viaParquet</code>’s <code class="language-plaintext highlighter-rouge">defaultPartition</code> setting.</li>
+  <li>When reading partitioned data make sure that partition directory names follow Hive format.</li>
+  <li>Parquet4s takes care of building proper schemas for partitioned data. However, when you use a custom type and a custom schema definition remember not to include the partition field in the schema — because it is supposed to be encoded as a directory name.</li>
+</ul>
+
+<p>In Akka:</p>
+
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="nn">akka.NotUsed</span>
+<span class="k">import</span> <span class="nn">akka.actor.ActorSystem</span>
+<span class="k">import</span> <span class="nn">akka.stream.scaladsl.Source</span>
+<span class="k">import</span> <span class="nn">com.github.mjakubowski84.parquet4s.</span><span class="o">{</span><span class="nc">Col</span><span class="o">,</span> <span class="nc">ParquetStreams</span><span class="o">,</span> <span class="nc">Path</span><span class="o">}</span>
+
+<span class="k">object</span> <span class="nc">AkkaExample</span> <span class="k">extends</span> <span class="nc">App</span> <span class="o">{</span>
+
+  <span class="k">implicit</span> <span class="k">val</span> <span class="nv">actorSystem</span><span class="k">:</span> <span class="kt">ActorSystem</span> <span class="o">=</span> <span class="nc">ActorSystem</span><span class="o">()</span>
+  <span class="k">import</span> <span class="nn">actorSystem.dispatcher</span>
+
+  <span class="k">case</span> <span class="k">class</span> <span class="nc">PartitionDate</span><span class="o">(</span><span class="n">year</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">month</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">day</span><span class="k">:</span> <span class="kt">String</span><span class="o">)</span>
+  <span class="k">case</span> <span class="k">class</span> <span class="nc">User</span><span class="o">(</span><span class="n">id</span><span class="k">:</span> <span class="kt">Long</span><span class="o">,</span> <span class="n">name</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">date</span><span class="k">:</span> <span class="kt">PartitionDate</span><span class="o">)</span>
+
+  <span class="k">val</span> <span class="nv">users</span><span class="k">:</span> <span class="kt">Source</span><span class="o">[</span><span class="kt">User</span>, <span class="kt">NotUsed</span><span class="o">]</span> <span class="k">=</span> <span class="o">???</span>
+  <span class="k">val</span> <span class="nv">path</span> <span class="k">=</span> <span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/user/directory"</span><span class="o">)</span>
+
+  <span class="k">def</span> <span class="nf">writePartitionedData</span> <span class="k">=</span> <span class="nv">users</span><span class="o">.</span><span class="py">via</span><span class="o">(</span>
+    <span class="nc">ParquetStreams</span>
+      <span class="o">.</span><span class="py">viaParquet</span>
+      <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">User</span><span class="o">]</span>
+      <span class="o">.</span><span class="py">partitionBy</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"date.year"</span><span class="o">),</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"date.month"</span><span class="o">),</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"date.day"</span><span class="o">))</span>
+      <span class="o">.</span><span class="py">write</span><span class="o">(</span><span class="n">path</span><span class="o">)</span>
+  <span class="o">).</span><span class="py">runForeach</span><span class="o">(</span><span class="n">user</span> <span class="k">=&gt;</span> <span class="nf">println</span><span class="o">(</span><span class="n">s</span><span class="s">"Just wrote $user"</span><span class="o">))</span>
+
+  <span class="k">def</span> <span class="nf">readPartitionedData</span> <span class="k">=</span> <span class="nc">ParquetStreams</span>
+    <span class="o">.</span><span class="py">fromParquet</span>
+    <span class="o">.</span><span class="py">as</span><span class="o">[</span><span class="kt">User</span><span class="o">]</span>
+    <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="n">path</span><span class="o">)</span>
+    <span class="o">.</span><span class="py">runForeach</span><span class="o">(</span><span class="n">user</span> <span class="k">=&gt;</span> <span class="nf">println</span><span class="o">(</span><span class="n">s</span><span class="s">"Just read $user"</span><span class="o">))</span>
+
+  <span class="k">for</span> <span class="o">{</span>
+    <span class="k">_</span> <span class="k">&lt;-</span> <span class="n">writePartitionedData</span>
+    <span class="k">_</span> <span class="k">&lt;-</span> <span class="n">readPartitionedData</span>
+    <span class="k">_</span> <span class="k">&lt;-</span> <span class="nv">actorSystem</span><span class="o">.</span><span class="py">terminate</span><span class="o">()</span>
+  <span class="o">}</span> <span class="nf">yield</span> <span class="o">()</span>
+
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>In Pekko:</p>
+
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="nn">org.apache.pekko.NotUsed</span>
+<span class="k">import</span> <span class="nn">org.apache.pekko.actor.ActorSystem</span>
+<span class="k">import</span> <span class="nn">org.apache.pekko.stream.scaladsl.Source</span>
+<span class="k">import</span> <span class="nn">com.github.mjakubowski84.parquet4s.</span><span class="o">{</span><span class="nc">Col</span><span class="o">,</span> <span class="nc">ParquetStreams</span><span class="o">,</span> <span class="nc">Path</span><span class="o">}</span>
+
+<span class="k">object</span> <span class="nc">PekkoExample</span> <span class="k">extends</span> <span class="nc">App</span> <span class="o">{</span>
+
+  <span class="k">implicit</span> <span class="k">val</span> <span class="nv">actorSystem</span><span class="k">:</span> <span class="kt">ActorSystem</span> <span class="o">=</span> <span class="nc">ActorSystem</span><span class="o">()</span>
+  <span class="k">import</span> <span class="nn">actorSystem.dispatcher</span>
+
+  <span class="k">case</span> <span class="k">class</span> <span class="nc">PartitionDate</span><span class="o">(</span><span class="n">year</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">month</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">day</span><span class="k">:</span> <span class="kt">String</span><span class="o">)</span>
+  <span class="k">case</span> <span class="k">class</span> <span class="nc">User</span><span class="o">(</span><span class="n">id</span><span class="k">:</span> <span class="kt">Long</span><span class="o">,</span> <span class="n">name</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">date</span><span class="k">:</span> <span class="kt">PartitionDate</span><span class="o">)</span>
+
+  <span class="k">val</span> <span class="nv">users</span><span class="k">:</span> <span class="kt">Source</span><span class="o">[</span><span class="kt">User</span>, <span class="kt">NotUsed</span><span class="o">]</span> <span class="k">=</span> <span class="o">???</span>
+  <span class="k">val</span> <span class="nv">path</span> <span class="k">=</span> <span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/user/directory"</span><span class="o">)</span>
+
+  <span class="k">def</span> <span class="nf">writePartitionedData</span> <span class="k">=</span> <span class="nv">users</span><span class="o">.</span><span class="py">via</span><span class="o">(</span>
+    <span class="nc">ParquetStreams</span>
+      <span class="o">.</span><span class="py">viaParquet</span>
+      <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">User</span><span class="o">]</span>
+      <span class="o">.</span><span class="py">partitionBy</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"date.year"</span><span class="o">),</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"date.month"</span><span class="o">),</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"date.day"</span><span class="o">))</span>
+      <span class="o">.</span><span class="py">write</span><span class="o">(</span><span class="n">path</span><span class="o">)</span>
+  <span class="o">).</span><span class="py">runForeach</span><span class="o">(</span><span class="n">user</span> <span class="k">=&gt;</span> <span class="nf">println</span><span class="o">(</span><span class="n">s</span><span class="s">"Just wrote $user"</span><span class="o">)))</span>
+
+  <span class="k">def</span> <span class="nf">readPartitionedData</span> <span class="k">=</span> <span class="nc">ParquetStreams</span>
+    <span class="o">.</span><span class="py">fromParquet</span>
+    <span class="o">.</span><span class="py">as</span><span class="o">[</span><span class="kt">User</span><span class="o">]</span>
+    <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="n">path</span><span class="o">)</span>
+    <span class="o">.</span><span class="py">runForeach</span><span class="o">(</span><span class="n">user</span> <span class="k">=&gt;</span> <span class="nf">println</span><span class="o">(</span><span class="n">s</span><span class="s">"Just read $user"</span><span class="o">))</span>
+
+  <span class="k">for</span> <span class="o">{</span>
+    <span class="k">_</span> <span class="k">&lt;-</span> <span class="n">writePartitionedData</span>
+    <span class="k">_</span> <span class="k">&lt;-</span> <span class="n">readPartitionedData</span>
+    <span class="k">_</span> <span class="k">&lt;-</span> <span class="nv">actorSystem</span><span class="o">.</span><span class="py">terminate</span><span class="o">()</span>
+  <span class="o">}</span> <span class="nf">yield</span> <span class="o">()</span>
+
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>In FS2:</p>
+
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="nn">cats.effect.</span><span class="o">{</span><span class="nc">IO</span><span class="o">,</span> <span class="nc">IOApp</span><span class="o">}</span>
+<span class="k">import</span> <span class="nn">com.github.mjakubowski84.parquet4s.parquet.</span><span class="o">{</span><span class="n">fromParquet</span><span class="o">,</span> <span class="n">viaParquet</span><span class="o">}</span>
+<span class="k">import</span> <span class="nn">com.github.mjakubowski84.parquet4s.</span><span class="o">{</span><span class="nc">Col</span><span class="o">,</span> <span class="nc">Path</span><span class="o">}</span>
+<span class="k">import</span> <span class="nn">fs2.Stream</span>
+
+<span class="k">object</span> <span class="nc">FS2Example</span> <span class="k">extends</span> <span class="nv">IOApp</span><span class="o">.</span><span class="py">Simple</span> <span class="o">{</span>
+
+  <span class="k">case</span> <span class="k">class</span> <span class="nc">PartitionDate</span><span class="o">(</span><span class="n">year</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">month</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">day</span><span class="k">:</span> <span class="kt">String</span><span class="o">)</span>
+  <span class="k">case</span> <span class="k">class</span> <span class="nc">User</span><span class="o">(</span><span class="n">id</span><span class="k">:</span> <span class="kt">Long</span><span class="o">,</span> <span class="n">name</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">date</span><span class="k">:</span> <span class="kt">PartitionDate</span><span class="o">)</span>
+
+  <span class="k">val</span> <span class="nv">users</span><span class="k">:</span> <span class="kt">Stream</span><span class="o">[</span><span class="kt">IO</span>, <span class="kt">User</span><span class="o">]</span> <span class="k">=</span> <span class="o">???</span>
+  <span class="k">val</span> <span class="nv">path</span> <span class="k">=</span> <span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/user/directory"</span><span class="o">)</span>
+  
+  <span class="k">val</span> <span class="nv">writePipe</span> <span class="k">=</span>
+    <span class="n">viaParquet</span><span class="o">[</span><span class="kt">IO</span><span class="o">]</span>
+      <span class="o">.</span><span class="py">of</span><span class="o">[</span><span class="kt">User</span><span class="o">]</span>
+      <span class="o">.</span><span class="py">partitionBy</span><span class="o">(</span><span class="nc">Col</span><span class="o">(</span><span class="s">"date.year"</span><span class="o">),</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"date.month"</span><span class="o">),</span> <span class="nc">Col</span><span class="o">(</span><span class="s">"date.day"</span><span class="o">))</span>
+      <span class="o">.</span><span class="py">write</span><span class="o">(</span><span class="n">path</span><span class="o">)</span>
+  
+  <span class="k">val</span> <span class="nv">readStream</span> <span class="k">=</span>
+    <span class="n">fromParquet</span><span class="o">[</span><span class="kt">IO</span><span class="o">]</span>
+      <span class="o">.</span><span class="py">as</span><span class="o">[</span><span class="kt">User</span><span class="o">]</span>
+      <span class="o">.</span><span class="py">read</span><span class="o">(</span><span class="n">path</span><span class="o">)</span>
+      <span class="o">.</span><span class="py">printlns</span>
+
+  <span class="k">def</span> <span class="nf">run</span><span class="k">:</span> <span class="kt">IO</span><span class="o">[</span><span class="kt">Unit</span><span class="o">]</span> <span class="k">=</span>  
+    <span class="n">users</span>
+      <span class="o">.</span><span class="py">through</span><span class="o">(</span><span class="n">writePipe</span><span class="o">)</span>
+      <span class="o">.</span><span class="py">append</span><span class="o">(</span><span class="n">readStream</span><span class="o">)</span>
+      <span class="o">.</span><span class="py">compile</span>
+      <span class="o">.</span><span class="py">drain</span>
+  
+<span class="o">}</span>
+</code></pre></div></div>
+
+<p>In core:</p>
+
+<div class="language-scala highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">import</span> <span class="nn">com.github.mjakubowski84.parquet4s.</span><span class="o">{</span><span class="nc">Col</span><span class="o">,</span> <span class="nc">ParquetReader</span><span class="o">,</span> <span class="nc">ParquetStreams</span><span class="o">,</span> <span class="nc">Path</span><span class="o">}</span>
+
+<span class="k">object</span> <span class="nc">CoreExample</span> <span class="k">extends</span> <span class="nc">App</span> <span class="o">{</span>
+
+  <span class="k">case</span> <span class="k">class</span> <span class="nc">PartitionDate</span><span class="o">(</span><span class="n">year</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">month</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">day</span><span class="k">:</span> <span class="kt">String</span><span class="o">)</span>
+  <span class="k">case</span> <span class="k">class</span> <span class="nc">User</span><span class="o">(</span><span class="n">id</span><span class="k">:</span> <span class="kt">Long</span><span class="o">,</span> <span class="n">name</span><span class="k">:</span> <span class="kt">String</span><span class="o">,</span> <span class="n">date</span><span class="k">:</span> <span class="kt">PartitionDate</span><span class="o">)</span>
+
+  <span class="k">val</span> <span class="nv">path</span> <span class="k">=</span> <span class="nc">Path</span><span class="o">(</span><span class="s">"path/to/user/directory"</span><span class="o">)</span>
+
+  <span class="k">val</span> <span class="nv">users</span> <span class="k">=</span> <span class="nv">ParquetReader</span><span class="o">.</span><span class="py">as</span><span class="o">[</span><span class="kt">User</span><span class="o">].</span><span class="py">read</span><span class="o">(</span><span class="n">path</span><span class="o">)</span>
+  <span class="k">try</span> <span class="nv">users</span><span class="o">.</span><span class="py">foreach</span><span class="o">(</span><span class="n">println</span><span class="o">)</span>
+  <span class="k">finally</span> <span class="nv">users</span><span class="o">.</span><span class="py">close</span><span class="o">()</span>
+
+<span class="o">}</span>
+</code></pre></div></div>
+</section></div></div></div></div><script src="/parquet4s/highlight/highlight.pack.js"></script><script src="/parquet4s/lunr/lunr.js"></script><script>
+// For all code blocks, copy the language from the containing div
+// to the inner code tag (where hljs expects it to be)
+const langPrefix = 'language-';
+document.querySelectorAll(`div[class^='${langPrefix}']`).forEach(function(div) {
+  div.classList.forEach(function(cssClass) {
+    if (cssClass.startsWith(langPrefix)) {
+      const lang = cssClass.substring(langPrefix.length);
+      div.querySelectorAll('pre code').forEach(function(code) {
+        code.classList.add(lang);
+      });
+    }
+  });
+});
+
+hljs.configure({languages:['scala','java','bash']});
+hljs.initHighlightingOnLoad();
+      </script><script>console.info('\x57\x65\x62\x73\x69\x74\x65\x20\x62\x75\x69\x6c\x74\x20\x77\x69\x74\x68\x3a\x0a\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x5f\x20\x20\x20\x20\x5f\x5f\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x20\x5f\x20\x5f\x5f\x0a\x20\x20\x20\x5f\x5f\x5f\x5f\x5f\x2f\x20\x2f\x5f\x20\x20\x2f\x20\x2f\x5f\x20\x20\x20\x20\x20\x20\x5f\x5f\x5f\x5f\x20\x5f\x5f\x5f\x20\x20\x28\x5f\x29\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x5f\x20\x20\x5f\x5f\x5f\x5f\x5f\x28\x5f\x29\x20\x2f\x5f\x5f\x5f\x5f\x20\x20\x5f\x5f\x5f\x5f\x5f\x0a\x20\x20\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x5c\x2f\x20\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x60\x5f\x5f\x20\x5c\x2f\x20\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x5f\x2f\x20\x5f\x5f\x20\x5c\x2f\x20\x5f\x5f\x5f\x2f\x20\x2f\x20\x5f\x5f\x2f\x20\x5f\x20\x5c\x2f\x20\x5f\x5f\x5f\x2f\x0a\x20\x28\x5f\x5f\x20\x20\x29\x20\x2f\x5f\x2f\x20\x2f\x20\x2f\x5f\x2f\x5f\x5f\x5f\x5f\x5f\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x20\x2f\x5f\x5f\x2f\x20\x2f\x20\x20\x2f\x20\x2f\x5f\x2f\x20\x28\x5f\x5f\x20\x20\x29\x20\x2f\x20\x2f\x5f\x2f\x20\x20\x5f\x5f\x28\x5f\x5f\x20\x20\x29\x0a\x2f\x5f\x5f\x5f\x5f\x2f\x5f\x2e\x5f\x5f\x5f\x2f\x5c\x5f\x5f\x2f\x20\x20\x20\x20\x20\x2f\x5f\x2f\x20\x2f\x5f\x2f\x20\x2f\x5f\x2f\x5f\x2f\x5c\x5f\x5f\x5f\x2f\x5f\x2f\x20\x20\x20\x5c\x5f\x5f\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x2f\x5f\x2f\x5c\x5f\x5f\x2f\x5c\x5f\x5f\x5f\x2f\x5f\x5f\x5f\x5f\x2f\x0a\x0a\x68\x74\x74\x70\x73\x3a\x2f\x2f\x34\x37\x64\x65\x67\x2e\x67\x69\x74\x68\x75\x62\x2e\x69\x6f\x2f\x73\x62\x74\x2d\x6d\x69\x63\x72\x6f\x73\x69\x74\x65\x73')</script><script src="/parquet4s/js/search.js"></script><script src="/parquet4s/js/docs.js"></script></body></html>
