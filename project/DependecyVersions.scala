@@ -1,5 +1,5 @@
 object DependecyVersions {
-  val parquetVersion               = "1.14.3"
+  val parquetVersion               = "1.14.4"
   val shapelessVersion             = "2.3.12"
   val sparkVersion                 = "3.5.3"
   val hadoopVersion                = "3.3.6"
