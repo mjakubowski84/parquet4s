@@ -38,8 +38,8 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
         Types.primitive(INT32, REQUIRED).as(Int32Type).named("char"),
         Types
           .primitive(FIXED_LEN_BYTE_ARRAY, OPTIONAL)
-          .as(DecimalType)
-          .length(Decimals.ByteArrayLength)
+          .as(DefaultDecimalType)
+          .length(DecimalFormat.Default.byteArrayLength)
           .named("bigDecimal")
       )
     )

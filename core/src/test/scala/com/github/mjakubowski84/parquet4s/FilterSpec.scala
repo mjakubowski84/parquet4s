@@ -117,9 +117,25 @@ class FilterSpec extends AnyFlatSpec with Matchers {
     predicate.toString should be("eq(bool, true)")
   }
 
-  it should "build predicate for decimal column" in {
-    val predicate = (Col("dec") === BigDecimal("0.0")).toPredicate(valueCodecConfiguration)
-    predicate.toString should be("eq(dec, Binary{16 reused bytes, [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]})")
+  it should "build predicate for decimal column (binary format)" in {
+    val predicate = (Col("dec") === BigDecimal("0.01")).toPredicate(valueCodecConfiguration)
+    predicate.toString should be(
+      "eq(dec, Binary{16 reused bytes, [0, 0, 0, 0, 0, 0, 0, 0, 0, 35, -122, -14, 111, -63, 0, 0]})"
+    )
+  }
+
+  it should "build predicate for decimal column (int format)" in {
+    val intFormat = DecimalFormat.intFormat(scale = 2, precision = 6, rescaleOnRead = true)
+    import intFormat.Implicits.*
+    val predicate = (Col("dec") === BigDecimal("0.01")).toPredicate(valueCodecConfiguration)
+    predicate.toString should be("eq(dec, 1)")
+  }
+
+  it should "build predicate for decimal column (long format)" in {
+    val longFormat = DecimalFormat.longFormat(scale = 2, precision = 6, rescaleOnRead = true)
+    import longFormat.Implicits.*
+    val predicate = (Col("dec") === BigDecimal("0.01")).toPredicate(valueCodecConfiguration)
+    predicate.toString should be("eq(dec, 1)")
   }
 
   it should "build predicate for java.time.LocalDate" in {

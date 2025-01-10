@@ -2,6 +2,7 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.io.api.{Binary, RecordConsumer}
 import org.apache.parquet.schema.Type
+import java.math.BigInteger
 
 /** Basic structure element which Parquet data is built from. Represents any data element that can be read from or can
   * be written to Parquet files.
@@ -61,8 +62,15 @@ case class BooleanValue(value: Boolean) extends AnyVal with PrimitiveValue[Boole
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addBoolean(value)
 }
 
-case class DateTimeValue(value: Long, format: TimestampFormat.Format) extends PrimitiveValue[Long] {
+case class DateTimeValue(value: Long, format: TimestampFormat.Format) extends Value {
   override def write(schema: Type, recordConsumer: RecordConsumer): Unit = recordConsumer.addLong(value)
+}
+
+case class DecimalValue(value: BigInteger, format: DecimalFormat.Format) extends Value {
+
+  override def write(schema: Type, recordConsumer: RecordConsumer): Unit = format.write(recordConsumer, value)
+
+  def toBigDecimal: BigDecimal = BigDecimal(value, format.scale, format.mathContext)
 }
 
 /** Special instance of [[Value]] that represents lack of the value. [[NullValue]] does not hold any data so it cannot

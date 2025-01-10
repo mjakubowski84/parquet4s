@@ -57,16 +57,18 @@ trait PrimitiveValueDecoders {
   implicit val doubleDecoder: RequiredValueDecoder[Double] = new RequiredValueDecoder[Double] {
     def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Double =
       value match {
-        case DoubleValue(double) => double
-        case FloatValue(float)   => float.toDouble
+        case DoubleValue(double)        => double
+        case FloatValue(float)          => float.toDouble
+        case decimalValue: DecimalValue => decimalValue.toBigDecimal.toDouble
       }
   }
 
   implicit val floatDecoder: RequiredValueDecoder[Float] = new RequiredValueDecoder[Float] {
     def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Float =
       value match {
-        case DoubleValue(double) => double.toFloat
-        case FloatValue(float)   => float
+        case DoubleValue(double)        => double.toFloat
+        case FloatValue(float)          => float
+        case decimalValue: DecimalValue => decimalValue.toBigDecimal.toFloat
       }
   }
 
@@ -84,16 +86,8 @@ trait PrimitiveValueDecoders {
       }
   }
 
-  implicit val decimalDecoder: OptionalValueDecoder[BigDecimal] = new OptionalValueDecoder[BigDecimal] {
-    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): BigDecimal =
-      value match {
-        case IntValue(int)       => BigDecimal(int)
-        case LongValue(long)     => BigDecimal.decimal(long)
-        case DoubleValue(double) => BigDecimal.decimal(double)
-        case FloatValue(float)   => BigDecimal.decimal(float)
-        case BinaryValue(binary) => Decimals.decimalFromBinary(binary)
-      }
-  }
+  implicit val decimalDecoder: OptionalValueDecoder[BigDecimal] = DecimalFormat.Default.Implicits.decimalDecoder
+
 }
 trait PrimitiveValueEncoders {
 
@@ -133,10 +127,7 @@ trait PrimitiveValueEncoders {
     def encodeNonNull(data: Byte, configuration: ValueCodecConfiguration): Value = IntValue(data.toInt)
   }
 
-  implicit val decimalEncoder: OptionalValueEncoder[BigDecimal] = new OptionalValueEncoder[BigDecimal] {
-    def encodeNonNull(data: BigDecimal, configuration: ValueCodecConfiguration): Value =
-      BinaryValue(Decimals.binaryFromDecimal(data))
-  }
+  implicit val decimalEncoder: OptionalValueEncoder[BigDecimal] = DecimalFormat.Default.Implicits.decimalEncoder
 }
 
 private[parquet4s] object TimeValueCodecs {

@@ -26,16 +26,19 @@ object TimestampFormat {
       implicit val sqlTimestampSchemaDef: TypedSchemaDef[Timestamp] =
         SchemaDef
           .primitive(INT64, required = false, logicalTypeAnnotation = Option(logicalTypeAnnotation))
+          .withMetadata(SchemaDef.Meta.Generated)
           .typed[java.sql.Timestamp]
 
       implicit val localDateTimeSchemaDef: TypedSchemaDef[LocalDateTime] =
         SchemaDef
           .primitive(INT64, required = false, logicalTypeAnnotation = Option(logicalTypeAnnotation))
+          .withMetadata(SchemaDef.Meta.Generated)
           .typed[LocalDateTime]
 
       implicit val instantSchemaDef: TypedSchemaDef[Instant] =
         SchemaDef
           .primitive(INT64, required = false, logicalTypeAnnotation = Option(logicalTypeAnnotation))
+          .withMetadata(SchemaDef.Meta.Generated)
           .typed[Instant]
 
       implicit def sqlTimestampEncoder: OptionalValueEncoder[Timestamp]
@@ -46,19 +49,19 @@ object TimestampFormat {
 
       implicit val sqlTimestampFilterCodec: FilterCodec[Timestamp, java.lang.Long, LongColumn] =
         FilterCodec[Timestamp, java.lang.Long, LongColumn](
-          encode = sqlTimestampEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Long]].value,
+          encode = sqlTimestampEncoder.encode(_, _).asInstanceOf[DateTimeValue].value,
           decode = (v, vcc) => ValueDecoder.sqlTimestampDecoder.decode(DateTimeValue(v, timestampFormat), vcc)
         )
 
       implicit val localDateTimeFilterCodec: FilterCodec[LocalDateTime, java.lang.Long, LongColumn] =
         FilterCodec[LocalDateTime, java.lang.Long, LongColumn](
-          encode = localDateTimeEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Long]].value,
+          encode = localDateTimeEncoder.encode(_, _).asInstanceOf[DateTimeValue].value,
           decode = (v, vcc) => ValueDecoder.localDateTimeDecoder.decode(DateTimeValue(v, timestampFormat), vcc)
         )
 
       implicit val instantFilterCodec: FilterCodec[Instant, java.lang.Long, LongColumn] =
         FilterCodec[Instant, java.lang.Long, LongColumn](
-          encode = instantEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Long]].value,
+          encode = instantEncoder.encode(_, _).asInstanceOf[DateTimeValue].value,
           decode = (v, vcc) => ValueDecoder.instantDecoder.decode(DateTimeValue(v, timestampFormat), vcc)
         )
     }
