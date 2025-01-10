@@ -11,7 +11,7 @@ import java.time.LocalDate
 import scala.collection.compat.immutable.LazyList
 import scala.util.Random
 
-class FilteringByListSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
+class FilteringByListItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
 
   case class Embedded(x: Int)
 

@@ -102,13 +102,16 @@ object SchemaDef {
 }
 
 object LogicalTypes {
-  val Int64Type: IntLogicalTypeAnnotation       = LogicalTypeAnnotation.intType(64, true)
-  val Int32Type: IntLogicalTypeAnnotation       = LogicalTypeAnnotation.intType(32, true)
-  val Int16Type: IntLogicalTypeAnnotation       = LogicalTypeAnnotation.intType(16, true)
-  val Int8Type: IntLogicalTypeAnnotation        = LogicalTypeAnnotation.intType(8, true)
-  val DecimalType: DecimalLogicalTypeAnnotation = LogicalTypeAnnotation.decimalType(Decimals.Scale, Decimals.Precision)
-  val StringType: StringLogicalTypeAnnotation   = LogicalTypeAnnotation.stringType()
-  val DateType: DateLogicalTypeAnnotation       = LogicalTypeAnnotation.dateType()
+  val Int64Type: IntLogicalTypeAnnotation = LogicalTypeAnnotation.intType(64, true)
+  val Int32Type: IntLogicalTypeAnnotation = LogicalTypeAnnotation.intType(32, true)
+  val Int16Type: IntLogicalTypeAnnotation = LogicalTypeAnnotation.intType(16, true)
+  val Int8Type: IntLogicalTypeAnnotation  = LogicalTypeAnnotation.intType(8, true)
+  val DefaultDecimalType: DecimalLogicalTypeAnnotation =
+    decimalType(DecimalFormat.Default.scale, DecimalFormat.Default.precision)
+  def decimalType(scale: Int, precision: Int): DecimalLogicalTypeAnnotation =
+    LogicalTypeAnnotation.decimalType(scale, precision)
+  val StringType: StringLogicalTypeAnnotation = LogicalTypeAnnotation.stringType()
+  val DateType: DateLogicalTypeAnnotation     = LogicalTypeAnnotation.dateType()
   val TimestampMillisType: TimestampLogicalTypeAnnotation = LogicalTypeAnnotation.timestampType(
     true,
     LogicalTypeAnnotation.TimeUnit.MILLIS
@@ -277,16 +280,7 @@ trait PrimitiveSchemaDefs {
       .withMetadata(SchemaDef.Meta.Generated)
       .typed[Byte]
 
-  implicit val decimalSchema: TypedSchemaDef[BigDecimal] =
-    SchemaDef
-      .primitive(
-        FIXED_LEN_BYTE_ARRAY,
-        required              = false,
-        logicalTypeAnnotation = Option(LogicalTypes.DecimalType),
-        length                = Some(Decimals.ByteArrayLength)
-      )
-      .withMetadata(SchemaDef.Meta.Generated)
-      .typed[BigDecimal]
+  implicit val decimalSchema: TypedSchemaDef[BigDecimal] = DecimalFormat.Default.Implicits.decimalSchema
 }
 
 trait TimeValueSchemaDefs {

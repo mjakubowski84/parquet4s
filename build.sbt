@@ -40,8 +40,7 @@ lazy val itSettings = Defaults.itSettings ++
       parallelExecution := false,
       testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
     )
-  ) ++
-  Project.inConfig(IntegrationTest)(BloopDefaults.configSettings)
+  ) ++ Project.inConfig(IntegrationTest)(BloopDefaults.configSettings)
 
 lazy val testReportSettings = Project.inConfig(Test)(
   Seq(
@@ -147,7 +146,7 @@ lazy val fs2 = (projectMatrix in file("fs2"))
       "org.typelevel" %% "cats-effect" % catsEffectVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Provided,
       "co.fs2" %% "fs2-io" % fs2Version % "it",
-      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.5.0" % "it"
+      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.6.0" % "it"
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
@@ -170,7 +169,7 @@ lazy val scalaPB = (projectMatrix in file("scalapb"))
       "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion,
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion % Test,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion % Test,
-      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.5.0" % Test
+      "org.typelevel" %% "cats-effect-testing-scalatest" % "1.6.0" % Test
     ),
     compileOrder := CompileOrder.JavaThenScala,
     Test / PB.targets := Seq(
@@ -212,10 +211,10 @@ lazy val examples = (projectMatrix in file("examples"))
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
       "org.apache.parquet" % "parquet-avro" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.8.1",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.9.0",
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.github.fd4s" %% "fs2-kafka" % "3.5.1",
+      "com.github.fd4s" %% "fs2-kafka" % "3.6.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(

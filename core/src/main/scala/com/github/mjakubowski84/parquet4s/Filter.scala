@@ -97,65 +97,65 @@ trait FilterOps {
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> provided value
     */
   def ===[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
-    Filter.eqFilter(this, in)
+    Filter.eqFilter(this, in)(encoder)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>not equal to</b> provided value
     */
   def !==[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
-    Filter.neqFilter(this, in)
+    Filter.neqFilter(this, in)(encoder)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>greater than</b> provided value
     */
   def >[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
-    Filter.gtFilter(this, in)
+    Filter.gtFilter(this, in)(encoder)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>greater than or equal to</b> provided value
     */
   def >=[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
-    Filter.gtEqFilter(this, in)
+    Filter.gtEqFilter(this, in)(encoder)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>less than</b> provided value
     */
   def <[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
-    Filter.ltFilter(this, in)
+    Filter.ltFilter(this, in)(encoder)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>less than or equal to</b> provided value
     */
   def <=[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
-    Filter.ltEqFilter(this, in)
+    Filter.ltEqFilter(this, in)(encoder)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> one of the provided values
     */
   def in[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: In, inx: In*)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
-    Filter.inFilter(this, Set(in) ++ inx.toSet)
+    Filter.inFilter(this, Set(in) ++ inx.toSet)(encoder)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>equal to</b> one of the provided values
     */
   def in[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](in: Iterable[In])(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
-    Filter.inFilter(this, in)
+    Filter.inFilter(this, in)(encoder)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, satisfy provided [[UDP]] predicate.
@@ -169,33 +169,33 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>null</b>
     */
-  def isNull[In](implicit codec: FilterCodec[In, ?, ?]): Filter =
-    Filter.isNullFilter(this)(codec)
+  def isNull[In](implicit encoder: FilterEncoder[In, ?, ?]): Filter =
+    Filter.isNullFilter(this)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>not null</b>
     */
-  def isNotNull[In](implicit codec: FilterCodec[In, ?, ?]): Filter =
-    Filter.isNotNullFilter(this)(codec)
+  def isNotNull[In](implicit encoder: FilterEncoder[In, ?, ?]): Filter =
+    Filter.isNotNullFilter(this)
 
 }
 
 object Filter {
 
   def eqFilter[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnPath: ColumnPath, in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
     new Filter {
       def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
-        FilterApi.eq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+        FilterApi.eq(encoder.columnFactory(columnPath), encoder.encode(in, valueCodecConfiguration))
     }
 
   def neqFilter[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnPath: ColumnPath, in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
     new Filter {
       def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
-        FilterApi.notEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+        FilterApi.notEq(encoder.columnFactory(columnPath), encoder.encode(in, valueCodecConfiguration))
     }
 
   def andFilter(left: Filter, right: Filter): Filter = new Filter {
@@ -214,45 +214,45 @@ object Filter {
   }
 
   def gtFilter[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
     new Filter {
       def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
-        FilterApi.gt(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+        FilterApi.gt(encoder.columnFactory(columnPath), encoder.encode(in, valueCodecConfiguration))
     }
 
   def gtEqFilter[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
     new Filter {
       def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
-        FilterApi.gtEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+        FilterApi.gtEq(encoder.columnFactory(columnPath), encoder.encode(in, valueCodecConfiguration))
     }
 
   def ltFilter[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
     new Filter {
       def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
-        FilterApi.lt(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+        FilterApi.lt(encoder.columnFactory(columnPath), encoder.encode(in, valueCodecConfiguration))
     }
 
   def ltEqFilter[In, V <: Comparable[V], C <: Column[V] & SupportsLtGt](columnPath: ColumnPath, in: In)(implicit
-      codec: FilterCodec[In, V, C]
+      encoder: FilterEncoder[In, V, C]
   ): Filter =
     new Filter {
       def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
-        FilterApi.ltEq(codec.columnFactory(columnPath), codec.encode(in, valueCodecConfiguration))
+        FilterApi.ltEq(encoder.columnFactory(columnPath), encoder.encode(in, valueCodecConfiguration))
     }
 
   def inFilter[In, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](columnPath: ColumnPath, in: Iterable[In])(
-      implicit codec: FilterCodec[In, V, C]
+      implicit encoder: FilterEncoder[In, V, C]
   ): Filter =
     new Filter {
       require(in.nonEmpty, "Cannot filter with an empty list of keys.")
       override def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate = {
-        val filterValues = in.map(codec.encode(_, valueCodecConfiguration)).toSet
-        FilterApi.userDefined(codec.columnFactory(columnPath), new InPredicate(filterValues))
+        val filterValues = in.map(encoder.encode(_, valueCodecConfiguration)).toSet
+        FilterApi.userDefined(encoder.columnFactory(columnPath), new InPredicate(filterValues))
       }
     }
 
@@ -278,16 +278,16 @@ object Filter {
       FilterCompat.NOOP
   }
 
-  def isNullFilter[In](columnPath: ColumnPath)(implicit codec: FilterCodec[In, ?, ?]): Filter =
+  def isNullFilter[In](columnPath: ColumnPath)(implicit encoder: FilterEncoder[In, ?, ?]): Filter =
     new Filter {
       def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
-        new Eq[codec.Value](
-          codec.columnFactory(columnPath).asInstanceOf[Column[codec.Value]],
-          null.asInstanceOf[codec.Value]
+        new Eq[encoder.columnFactory.Value](
+          encoder.columnFactory(columnPath).asInstanceOf[Column[encoder.columnFactory.Value]],
+          null.asInstanceOf[encoder.columnFactory.Value]
         )
     }
 
-  def isNotNullFilter[In](columnPath: ColumnPath)(implicit codec: FilterCodec[In, ?, ?]): Filter =
+  def isNotNullFilter[In](columnPath: ColumnPath)(implicit encoder: FilterEncoder[In, ?, ?]): Filter =
     notFilter(isNullFilter(columnPath))
 
 }
@@ -295,6 +295,10 @@ object Filter {
 /** Constructs instance of [[org.apache.parquet.filter2.predicate.Operators.Column]] af given column path and type.
   */
 trait ColumnFactory[V <: Comparable[V], C <: Column[V]] {
+
+  private[parquet4s] type Value  = V
+  private[parquet4s] type Column = C
+
   def apply(columnPath: ColumnPath): C
 }
 
@@ -312,13 +316,62 @@ object ColumnFactory {
   implicit val binaryColumnFactory: ColumnFactory[Binary, BinaryColumn]              = apply(FilterApi.binaryColumn)
 }
 
-trait FilterEncoder[-In, +V] {
+// TODO docs
+trait FilterEncoder[-In, V <: Comparable[V], C <: Column[V]] {
+
+  val columnFactory: ColumnFactory[V, C]
 
   /** Encodes user type to internal Parquet type.
     */
   val encode: (In, ValueCodecConfiguration) => V
 }
 
+private class FilterEncoderImpl[-In, V <: Comparable[V], C <: Column[V]](
+    val encode: (In, ValueCodecConfiguration) => V,
+    val columnFactory: ColumnFactory[V, C]
+) extends FilterEncoder[In, V, C]
+
+object FilterEncoder {
+
+  def apply[In, V <: Comparable[V], C <: Column[V]](encode: (In, ValueCodecConfiguration) => V)(implicit
+      columnFactory: ColumnFactory[V, C]
+  ): FilterEncoder[In, V, C] =
+    new FilterEncoderImpl(encode, columnFactory)
+
+  implicit val booleanEncoder: FilterEncoder[Boolean, java.lang.Boolean, BooleanColumn] =
+    apply[Boolean, java.lang.Boolean, BooleanColumn]((v, _) => v)
+  implicit val intEncoder: FilterEncoder[Int, java.lang.Integer, IntColumn] =
+    apply[Int, java.lang.Integer, IntColumn]((v, _) => v)
+  implicit val longEncoder: FilterEncoder[Long, java.lang.Long, LongColumn] =
+    apply[Long, java.lang.Long, LongColumn]((v, _) => v)
+  implicit val floatEncoder: FilterEncoder[Float, java.lang.Float, FloatColumn] =
+    apply[Float, java.lang.Float, FloatColumn]((v, _) => v)
+  implicit val doubleEncoder: FilterEncoder[Double, java.lang.Double, DoubleColumn] =
+    apply[Double, java.lang.Double, DoubleColumn]((v, _) => v)
+  implicit val shortEncoder: FilterEncoder[Short, java.lang.Integer, IntColumn] =
+    apply[Short, java.lang.Integer, IntColumn]((v, _) => v.toInt)
+  implicit val byteEncoder: FilterEncoder[Byte, java.lang.Integer, IntColumn] =
+    apply[Byte, java.lang.Integer, IntColumn]((v, _) => v.toInt)
+  implicit val charEncoder: FilterEncoder[Char, java.lang.Integer, IntColumn] =
+    apply[Char, java.lang.Integer, IntColumn]((v, _) => v.toInt)
+  implicit val byteArrayEncoder: FilterEncoder[Array[Byte], Binary, BinaryColumn] =
+    apply[Array[Byte], Binary, BinaryColumn]((v, _) => Binary.fromReusedByteArray(v))
+  implicit val stringEncoder: FilterEncoder[String, Binary, BinaryColumn] =
+    apply[String, Binary, BinaryColumn]((v, _) => Binary.fromString(v))
+  implicit val sqlDateEncoder: FilterEncoder[java.sql.Date, java.lang.Integer, IntColumn] =
+    apply[java.sql.Date, java.lang.Integer, IntColumn](
+      ValueEncoder.sqlDateEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Int]].value
+    )
+  implicit val localDateEncoder: FilterEncoder[java.time.LocalDate, java.lang.Integer, IntColumn] =
+    apply[java.time.LocalDate, java.lang.Integer, IntColumn](
+      ValueEncoder.localDateEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Int]].value
+    )
+  implicit val decimalEncoder: FilterEncoder[BigDecimal, Binary, BinaryColumn] =
+    DecimalFormat.Default.Implicits.decimalFilterEncoder
+
+}
+
+// TODO docs
 trait FilterDecoder[+In, -V] {
 
   /** Decodes user type from internal Parquet type.
@@ -326,6 +379,42 @@ trait FilterDecoder[+In, -V] {
   val decode: (V, ValueCodecConfiguration) => In
 }
 
+private class FilterDecoderImpl[+In, -V](val decode: (V, ValueCodecConfiguration) => In) extends FilterDecoder[In, V]
+
+object FilterDecoder {
+
+  def apply[In, V](decode: (V, ValueCodecConfiguration) => In): FilterDecoder[In, V] = new FilterDecoderImpl(decode)
+
+  implicit val booleanDecoder: FilterDecoder[Boolean, java.lang.Boolean] =
+    apply[Boolean, java.lang.Boolean]((v, _) => v)
+  implicit val intDecoder: FilterDecoder[Int, java.lang.Integer] =
+    apply[Int, java.lang.Integer]((v, _) => v)
+  implicit val longDecoder: FilterDecoder[Long, java.lang.Long] =
+    apply[Long, java.lang.Long]((v, _) => v)
+  implicit val floatDecoder: FilterDecoder[Float, java.lang.Float] =
+    apply[Float, java.lang.Float]((v, _) => v)
+  implicit val doubleDecoder: FilterDecoder[Double, java.lang.Double] =
+    apply[Double, java.lang.Double]((v, _) => v)
+  implicit val shortDecoder: FilterDecoder[Short, java.lang.Integer] =
+    apply[Short, java.lang.Integer]((v, _) => v.toShort)
+  implicit val byteDecoder: FilterDecoder[Byte, java.lang.Integer] =
+    apply[Byte, java.lang.Integer]((v, _) => v.toByte)
+  implicit val charDecoder: FilterDecoder[Char, java.lang.Integer] =
+    apply[Char, java.lang.Integer]((v, _) => v.toChar)
+  implicit val byteArrayDecoder: FilterDecoder[Array[Byte], Binary] =
+    apply[Array[Byte], Binary]((v, _) => v.getBytes)
+  implicit val stringDecoder: FilterDecoder[String, Binary] =
+    apply[String, Binary]((v, _) => v.toStringUsingUTF8)
+  implicit val sqlDateDecoder: FilterDecoder[java.sql.Date, java.lang.Integer] =
+    apply[java.sql.Date, java.lang.Integer]((v, vcc) => ValueDecoder.sqlDateDecoder.decode(IntValue(v), vcc))
+  implicit val localDateDecoder: FilterDecoder[java.time.LocalDate, java.lang.Integer] =
+    apply[java.time.LocalDate, java.lang.Integer]((v, vcc) => ValueDecoder.localDateDecoder.decode(IntValue(v), vcc))
+  implicit val decimalDecoder: FilterDecoder[BigDecimal, Binary] =
+    DecimalFormat.Default.Implicits.decimalFilterDecoder
+
+}
+
+// FIXME docs
 /** Decodes and encodes user type from/to internal Parquet type. Used during filtering.
   * @tparam In
   *   User type
@@ -334,13 +423,13 @@ trait FilterDecoder[+In, -V] {
   * @tparam C
   *   Column type
   */
-trait FilterCodec[In, V <: Comparable[V], C <: Column[V]] extends FilterEncoder[In, V] with FilterDecoder[In, V] {
+trait FilterCodec[In, V <: Comparable[V], C <: Column[V]] extends FilterEncoder[In, V, C] with FilterDecoder[In, V]
 
-  private[parquet4s] type Value  = V
-  private[parquet4s] type Column = C
-
-  def columnFactory: ColumnFactory[V, C]
-}
+private class FilterCodecImpl[In, V <: Comparable[V], C <: Column[V]](
+    override val encode: (In, ValueCodecConfiguration) => V,
+    override val decode: (V, ValueCodecConfiguration)  => In,
+    override val columnFactory: ColumnFactory[V, C]
+) extends FilterCodec[In, V, C]
 
 object FilterCodec {
 
@@ -350,48 +439,13 @@ object FilterCodec {
   )(implicit columnFactory: ColumnFactory[V, C]): FilterCodec[In, V, C] =
     new FilterCodecImpl(encode, decode, columnFactory)
 
-  implicit val booleanCodec: FilterCodec[Boolean, java.lang.Boolean, BooleanColumn] =
-    apply[Boolean, java.lang.Boolean, BooleanColumn]((v, _) => v, (v, _) => v)
-  implicit val intCodec: FilterCodec[Int, java.lang.Integer, IntColumn] =
-    apply[Int, java.lang.Integer, IntColumn]((v, _) => v, (v, _) => v)
-  implicit val longCodec: FilterCodec[Long, java.lang.Long, LongColumn] =
-    apply[Long, java.lang.Long, LongColumn]((v, _) => v, (v, _) => v)
-  implicit val floatCodec: FilterCodec[Float, java.lang.Float, FloatColumn] =
-    apply[Float, java.lang.Float, FloatColumn]((v, _) => v, (v, _) => v)
-  implicit val doubleCodec: FilterCodec[Double, java.lang.Double, DoubleColumn] =
-    apply[Double, java.lang.Double, DoubleColumn]((v, _) => v, (v, _) => v)
-  implicit val shortCodec: FilterCodec[Short, java.lang.Integer, IntColumn] =
-    apply[Short, java.lang.Integer, IntColumn]((v, _) => v.toInt, (v, _) => v.toShort)
-  implicit val byteCodec: FilterCodec[Byte, java.lang.Integer, IntColumn] =
-    apply[Byte, java.lang.Integer, IntColumn]((v, _) => v.toInt, (v, _) => v.toByte)
-  implicit val charCodec: FilterCodec[Char, java.lang.Integer, IntColumn] =
-    apply[Char, java.lang.Integer, IntColumn]((v, _) => v.toInt, (v, _) => v.toChar)
-  implicit val byteArrayCodec: FilterCodec[Array[Byte], Binary, BinaryColumn] =
-    apply[Array[Byte], Binary, BinaryColumn]((v, _) => Binary.fromReusedByteArray(v), (v, _) => v.getBytes)
-  implicit val stringCodec: FilterCodec[String, Binary, BinaryColumn] =
-    apply[String, Binary, BinaryColumn]((v, _) => Binary.fromString(v), (v, _) => v.toStringUsingUTF8)
-  implicit val sqlDateCodec: FilterCodec[java.sql.Date, java.lang.Integer, IntColumn] =
-    apply[java.sql.Date, java.lang.Integer, IntColumn](
-      ValueEncoder.sqlDateEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Int]].value,
-      (v, vcc) => ValueDecoder.sqlDateDecoder.decode(IntValue(v), vcc)
-    )
-  implicit val localDateCodec: FilterCodec[java.time.LocalDate, java.lang.Integer, IntColumn] =
-    apply[java.time.LocalDate, java.lang.Integer, IntColumn](
-      ValueEncoder.localDateEncoder.encode(_, _).asInstanceOf[PrimitiveValue[Int]].value,
-      (v, vcc) => ValueDecoder.localDateDecoder.decode(IntValue(v), vcc)
-    )
-  implicit val decimalCodec: FilterCodec[BigDecimal, Binary, BinaryColumn] =
-    apply[BigDecimal, Binary, BinaryColumn](
-      (v, _) => Decimals.binaryFromDecimal(v),
-      (v, _) => Decimals.decimalFromBinary(v)
-    )
-}
+  implicit def codec[In, V <: Comparable[V], C <: Column[V]](implicit
+      encoder: FilterEncoder[In, V, C],
+      decoder: FilterDecoder[In, V]
+  ): FilterCodec[In, V, C] =
+    apply(encoder.encode, decoder.decode)(encoder.columnFactory)
 
-private class FilterCodecImpl[In, V <: Comparable[V], C <: Column[V]](
-    override val encode: (In, ValueCodecConfiguration) => V,
-    override val decode: (V, ValueCodecConfiguration)  => In,
-    override val columnFactory: ColumnFactory[V, C]
-) extends FilterCodec[In, V, C]
+}
 
 /** Parquet library has its own implementation of `in` and `notIn` since version 1.12.0. However, still, even in version
   * 1.13.0 it has a bug - notIn and !in gives incorrect results. This custom implementation maybe is not optimal but

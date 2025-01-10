@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.std.UUIDGen
 import cats.effect.testing.scalatest.AsyncIOSpec
 import com.github.mjakubowski84.parquet4s.Fs2ParquetDfsItSpec.Data
-import com.github.mjakubowski84.parquet4s.testkit.ForAllMiniDfsCluster
+import com.github.mjakubowski84.parquet4s.testkit.AsyncForAllMiniDfsCluster
 import fs2.{Pipe, Stream}
 import org.scalatest.flatspec.AsyncFlatSpec
 
@@ -14,7 +14,7 @@ object Fs2ParquetDfsItSpec {
   case class Data(i: Long)
 }
 
-class Fs2ParquetDfsItSpec extends AsyncFlatSpec with AsyncIOSpec with ForAllMiniDfsCluster {
+class Fs2ParquetDfsItSpec extends AsyncFlatSpec with AsyncIOSpec with AsyncForAllMiniDfsCluster {
   private lazy val readOptions  = ParquetReader.Options(hadoopConf = hadoopConfiguration)
   private lazy val writeOptions = ParquetWriter.Options(hadoopConf = hadoopConfiguration)
 

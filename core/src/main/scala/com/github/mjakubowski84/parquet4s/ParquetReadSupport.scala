@@ -11,8 +11,10 @@ import org.apache.parquet.schema.LogicalTypeAnnotation.{
   TimestampLogicalTypeAnnotation
 }
 
-import java.math.MathContext
 import scala.jdk.CollectionConverters.*
+import java.math.BigInteger
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName
+import org.apache.parquet.io.ParquetDecodingException
 
 private[parquet4s] class ParquetReadSupport(
     projectedSchemaOpt: Option[MessageType],
@@ -58,12 +60,40 @@ abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](schema: 
     val fieldName = field.getName
 
     Option(field.getLogicalTypeAnnotation) match {
-      case Some(ann: DecimalLogicalTypeAnnotation) =>
-        new DecimalConverter(
-          name      = fieldName,
-          scale     = ann.getScale,
-          precision = ann.getPrecision
-        )
+      case Some(ann: DecimalLogicalTypeAnnotation) if field.isPrimitive =>
+        val primitiveType = field.asPrimitiveType
+        primitiveType.getPrimitiveTypeName match {
+          case PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY =>
+            new DecimalConverter(
+              name = fieldName,
+              format = new DecimalFormat.BinaryFormat(
+                scale           = ann.getScale(),
+                precision       = ann.getPrecision(),
+                byteArrayLength = primitiveType.getTypeLength(),
+                rescaleOnRead   = false // converter is not respomsible for rescaling
+              )
+            )
+          case PrimitiveTypeName.INT32 =>
+            new DecimalConverter(
+              name = fieldName,
+              format = new DecimalFormat.IntFormat(
+                scale         = ann.getScale(),
+                precision     = ann.getPrecision(),
+                rescaleOnRead = false // converter is not respomsible for rescaling
+              )
+            )
+          case PrimitiveTypeName.INT64 =>
+            new DecimalConverter(
+              name = fieldName,
+              format = new DecimalFormat.LongFormat(
+                scale         = ann.getScale(),
+                precision     = ann.getPrecision(),
+                rescaleOnRead = false // converter is not respomsible for rescaling
+              )
+            )
+          case other =>
+            throw new ParquetDecodingException(s"$other is unsupported as a decimal type")
+        }
       case Some(ann: TimestampLogicalTypeAnnotation) =>
         new DateTimeConverter(name = fieldName, timeUnit = ann.getUnit)
       case _ if field.isPrimitive =>
@@ -104,19 +134,16 @@ abstract private class ParquetRecordConverter[R <: ParquetRecord[?, R]](schema: 
       record = record.add(name, LongValue(value))
   }
 
-  private class DecimalConverter(name: String, scale: Int, precision: Int) extends ParquetPrimitiveConverter(name) {
-    private lazy val mathContext = new MathContext(precision)
-    private val shouldRescale    = scale != Decimals.Scale || precision != Decimals.Precision
+  private class DecimalConverter(name: String, format: DecimalFormat.Format) extends ParquetPrimitiveConverter(name) {
 
-    override def addBinary(value: Binary): Unit = {
-      val rescaled =
-        if (shouldRescale) Decimals.rescaleBinary(value, scale, mathContext)
-        else value
-      record = record.add(name, BinaryValue(rescaled))
-    }
+    override def addBinary(value: Binary): Unit =
+      record = record.add(name, DecimalValue(new BigInteger(value.getBytes()), format))
 
     override def addLong(value: Long): Unit =
-      record = record.add(name, BinaryValue(Decimals.binaryFromDecimal(BigDecimal(value, scale, mathContext))))
+      record = record.add(name, DecimalValue(BigInteger.valueOf(value), format))
+
+    override def addInt(value: Int): Unit =
+      record = record.add(name, DecimalValue(BigInteger.valueOf(value.toLong), format))
   }
 
   private class DateTimeConverter(name: String, timeUnit: LogicalTypeAnnotation.TimeUnit)

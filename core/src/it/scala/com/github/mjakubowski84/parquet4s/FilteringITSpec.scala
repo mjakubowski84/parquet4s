@@ -11,7 +11,7 @@ import scala.util.Random
 import scala.collection.compat.*
 import immutable.LazyList
 
-class FilteringSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
+class FilteringItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll with Inspectors {
 
   case class Embedded(x: Int)
   case class Data(
