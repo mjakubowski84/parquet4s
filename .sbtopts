@@ -1,5 +1,0 @@
--J-Xmx4G
--J-Xss2M
--J-Xms512m
--J-XX:+UseG1GC
--J-XX:MaxInlineLevel=20

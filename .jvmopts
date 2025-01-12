@@ -1,0 +1,5 @@
+-Xmx4G
+-Xss2M
+-Xms512m
+-XX:+UseG1GC
+-XX:MaxInlineLevel=20
