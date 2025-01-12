@@ -7,8 +7,6 @@
 
     <logger name="com.github.mjakubowski84.parquet4s" level="DEBUG"/>
     <logger name="org.apache.parquet" level="WARN"/>
-    <logger name="org.apache.spark" level="WARN"/>
-    <logger name="org.sparkproject.jetty" level="WARN"/>
     <logger name="org.apache.hadoop" level="WARN"/>
     <logger name="org.apache.htrace" level="WARN"/>
 

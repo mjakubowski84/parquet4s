@@ -75,7 +75,7 @@ lazy val core = (projectMatrix in file("core"))
       "org.mockito" % "mockito-core" % mockitoVersion % "test",
       "org.scalatest" %% "scalatest" % scalatestVersion % "test,it",
       "ch.qos.logback" % "logback-classic" % logbackVersion % "test,it",
-      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion % "test,it"
+      "org.slf4j" % "slf4j-reload4j" % slf4jVersion % "test,it"
     ),
     excludeDependencies ++= Seq(
       ExclusionRule("org.slf4j", "slf4j-log4j12")
@@ -97,7 +97,6 @@ lazy val core = (projectMatrix in file("core"))
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
-  .dependsOn(testkit % "it->compile")
 
 lazy val akkaPekko = (projectMatrix in file("akkaPekko"))
   .configs(IntegrationTest)
@@ -159,7 +158,7 @@ lazy val fs2 = (projectMatrix in file("fs2"))
   .settings(itSettings)
   .settings(publishSettings)
   .settings(testReportSettings)
-  .dependsOn(core % "compile->compile;test->test", testkit % "it->compile")
+  .dependsOn(core % "compile->compile;test->test;it->it")
 
 lazy val scalaPB = (projectMatrix in file("scalapb"))
   .configs(IntegrationTest)
@@ -186,24 +185,30 @@ lazy val scalaPB = (projectMatrix in file("scalapb"))
   )
   .dependsOn(core % "compile->compile;test->test", akkaPekko % "test->compile", fs2 % "test->compile")
 
-lazy val testkit = (projectMatrix in file("testkit"))
+lazy val s3Test = (projectMatrix in file("s3Test"))
+  .configs(IntegrationTest)
   .settings(
-    name := "parquet4s-testkit",
+    name := "parquet4s-s3-test",
     publish / skip := true,
     publishLocal / skip := true,
     libraryDependencies ++= Seq(
-      "org.scalatest" %% "scalatest" % scalatestVersion,
-      "org.apache.hadoop" % "hadoop-minicluster" % hadoopVersion,
-      // MiniDFSCluster leaks Mockito via NameNodeAdapter while hadoop-minicluster doesn't bring
-      // the dependency transitively. We have to add it explicitly to prevent ClassNotFoundException.
-      "org.mockito" % "mockito-core" % mockitoVersion,
-      "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "ch.qos.logback" % "logback-classic" % logbackVersion
+      "org.apache.hadoop" % "hadoop-client" % hadoopVersion % "it",
+      "org.apache.hadoop" % "hadoop-aws" % hadoopVersion % "it",
+      "org.scalatest" %% "scalatest" % scalatestVersion % "it",
+      "ch.qos.logback" % "logback-classic" % logbackVersion % "it",
+      "org.slf4j" % "slf4j-reload4j" % slf4jVersion % "it",
+      "com.dimafeng" %% "testcontainers-scala-scalatest" % testcontainersVersion % "it",
+      "com.dimafeng" %% "testcontainers-scala-localstack-v2" % testcontainersVersion % "it"
+    ),
+    excludeDependencies ++= Seq(
+      ExclusionRule("org.slf4j", "slf4j-log4j12")
     )
   )
-  .jvmPlatform(
-    scalaVersions = supportedScalaVersions
-  )
+  .settings(compilationSettings)
+  .settings(itSettings)
+  .settings(testReportSettings)
+  .jvmPlatform(scalaVersions = supportedScalaVersions)
+  .dependsOn(core)
 
 lazy val examples = (projectMatrix in file("examples"))
   .settings(
@@ -377,7 +382,7 @@ lazy val root = (projectMatrix in file("."))
     akkaPekko,
     fs2,
     scalaPB,
-    testkit,
+    s3Test,
     examples,
     coreBenchmarks,
     akkaPekkoBenchmarks,

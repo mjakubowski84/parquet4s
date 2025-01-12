@@ -2,17 +2,29 @@ version: 2.1
 
 executors:
   jdk:
-    docker:
-      - image: cimg/openjdk:8.0
-        auth:
-          username: $DOCKERHUB_USER
-          password: $DOCKERHUB_PASSWORD
+    machine:
+      image: ubuntu-2204:current
+        # auth:
+        #   username: $DOCKERHUB_USER
+        #   password: $DOCKERHUB_PASSWORD
     resource_class: large
     environment:
       TERM: dumb
     working_directory: /tmp
 
 commands:
+
+  setup:
+    steps:
+      - run: 
+          name: Install OpenJDK 8
+          command: |
+            sudo apt-get update && sudo apt-get install openjdk-8-jdk
+            sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/bin/java
+            sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+            java -version
+
+
   cache_dependencies:
     parameters:
       path:
@@ -85,6 +97,7 @@ jobs:
     executor:
       name: jdk
     steps:
+      - setup
       - run:
           name: Create workspace directory
           command: mkdir -p workspace/repo
@@ -114,6 +127,7 @@ jobs:
       project:
         type: string
     steps:
+      - setup
       - attach_workspace:
           at: workspace
       - download_cached_dependencies:
@@ -126,6 +140,7 @@ jobs:
     executor:
       name: jdk
     steps:
+      - setup
       - attach_workspace:
           at: workspace
       - download_cached_dependencies:
@@ -174,6 +189,11 @@ workflows:
       - test:
           name: test_scala_pb
           project: scalaPB
+          requires:
+            - build
+      - test:
+          name: test_s3
+          project: s3Test
           requires:
             - build
 
