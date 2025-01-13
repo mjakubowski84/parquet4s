@@ -108,7 +108,7 @@ class FilteringItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll w
       boundaryValue: T,
       field: Data => T,
       path: Path = filePath
-  )(implicit codec: FilterCodec[T, V, C]): Assertion = {
+  )(implicit encoder: FilterEncoder[T, V, C]): Assertion = {
     forExactly(halfSize, read(Col(columnName) < boundaryValue, path)) { dataRecord =>
       field(dataRecord) should be < boundaryValue
     }
@@ -198,17 +198,17 @@ class FilteringItSpec extends AnyFlatSpec with Matchers with BeforeAndAfterAll w
   }
 
   it should "filter by udp" in {
-    object IntDividesBy10 extends UDP[Int] {
-      private val Ten                        = 10
-      override def keep(value: Int): Boolean = value % Ten == 0
+    object IntDividesBy10 extends UDP[java.lang.Integer] {
+      private val Ten                                      = 10
+      override def keep(value: java.lang.Integer): Boolean = value % Ten == 0
       @inline
-      override def canDrop(statistics: FilterStatistics[Int]): Boolean = {
+      override def canDrop(statistics: FilterStatistics[java.lang.Integer]): Boolean = {
         val minMod = statistics.min % Ten
         val maxMod = statistics.max % Ten
         (statistics.max - statistics.min < Ten) && maxMod >= minMod
       }
-      override def inverseCanDrop(statistics: FilterStatistics[Int]): Boolean = !canDrop(statistics)
-      override val name: String                                               = "IntDividesBy10"
+      override def inverseCanDrop(statistics: FilterStatistics[java.lang.Integer]): Boolean = !canDrop(statistics)
+      override val name: String                                                             = "IntDividesBy10"
     }
 
     forExactly((dataSize / 10) + 1, read(Col("idx").udp(IntDividesBy10))) { dataRecord =>

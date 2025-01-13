@@ -6,6 +6,7 @@ import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.Operators.*
 import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate, Statistics, UserDefinedPredicate}
 import org.apache.parquet.io.api.Binary
+import scala.annotation.nowarn
 
 /** Provides filtering of Parquet records based on their index. Cannot be joined with other filters using boolean
   * algebra.
@@ -160,11 +161,11 @@ trait FilterOps {
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, satisfy provided [[UDP]] predicate.
     */
-  def udp[In, V <: Comparable[V], C <: Column[V]](udp: UDP[In])(implicit
-      ordering: Ordering[In],
-      codec: FilterCodec[In, V, C]
+  def udp[V <: Comparable[V], C <: Column[V]](udp: UDP[V])(implicit
+      ordering: Ordering[V],
+      columnFactory: ColumnFactory[V, C]
   ): Filter =
-    Filter.udpFilter[In, V, C](this, udp)
+    Filter.udpFilter[V, C](this, udp)
 
   /** @return
     *   Returns [[Filter]] that passes data that, in `this` column, is <b>null</b>
@@ -256,16 +257,13 @@ object Filter {
       }
     }
 
-  def udpFilter[In, V <: Comparable[V], C <: Column[V]](columnPath: ColumnPath, udp: UDP[In])(implicit
-      ordering: Ordering[In],
-      codec: FilterCodec[In, V, C]
+  def udpFilter[V <: Comparable[V], C <: Column[V]](columnPath: ColumnPath, udp: UDP[V])(implicit
+      ordering: Ordering[V],
+      columnFactory: ColumnFactory[V, C]
   ): Filter =
     new Filter {
       def toPredicate(valueCodecConfiguration: ValueCodecConfiguration): FilterPredicate =
-        FilterApi.userDefined(
-          codec.columnFactory(columnPath),
-          new UDPAdapter[In, V](udp, codec, valueCodecConfiguration)
-        )
+        FilterApi.userDefined(columnFactory(columnPath), new UDPAdapter[V](udp))
     }
 
   val noopFilter: Filter = new Filter {
@@ -371,7 +369,7 @@ object FilterEncoder {
 
 }
 
-// TODO docs
+@deprecated(message = "No longer in use by Parquet4s", since = "2.21.0")
 trait FilterDecoder[+In, -V] {
 
   /** Decodes user type from internal Parquet type.
@@ -379,60 +377,31 @@ trait FilterDecoder[+In, -V] {
   val decode: (V, ValueCodecConfiguration) => In
 }
 
+@nowarn
 private class FilterDecoderImpl[+In, -V](val decode: (V, ValueCodecConfiguration) => In) extends FilterDecoder[In, V]
 
+@nowarn
 object FilterDecoder {
 
+  @deprecated(message = "No longer in use by Parquet4s", since = "2.21.0")
   def apply[In, V](decode: (V, ValueCodecConfiguration) => In): FilterDecoder[In, V] = new FilterDecoderImpl(decode)
-
-  implicit val booleanDecoder: FilterDecoder[Boolean, java.lang.Boolean] =
-    apply[Boolean, java.lang.Boolean]((v, _) => v)
-  implicit val intDecoder: FilterDecoder[Int, java.lang.Integer] =
-    apply[Int, java.lang.Integer]((v, _) => v)
-  implicit val longDecoder: FilterDecoder[Long, java.lang.Long] =
-    apply[Long, java.lang.Long]((v, _) => v)
-  implicit val floatDecoder: FilterDecoder[Float, java.lang.Float] =
-    apply[Float, java.lang.Float]((v, _) => v)
-  implicit val doubleDecoder: FilterDecoder[Double, java.lang.Double] =
-    apply[Double, java.lang.Double]((v, _) => v)
-  implicit val shortDecoder: FilterDecoder[Short, java.lang.Integer] =
-    apply[Short, java.lang.Integer]((v, _) => v.toShort)
-  implicit val byteDecoder: FilterDecoder[Byte, java.lang.Integer] =
-    apply[Byte, java.lang.Integer]((v, _) => v.toByte)
-  implicit val charDecoder: FilterDecoder[Char, java.lang.Integer] =
-    apply[Char, java.lang.Integer]((v, _) => v.toChar)
-  implicit val byteArrayDecoder: FilterDecoder[Array[Byte], Binary] =
-    apply[Array[Byte], Binary]((v, _) => v.getBytes)
-  implicit val stringDecoder: FilterDecoder[String, Binary] =
-    apply[String, Binary]((v, _) => v.toStringUsingUTF8)
-  implicit val sqlDateDecoder: FilterDecoder[java.sql.Date, java.lang.Integer] =
-    apply[java.sql.Date, java.lang.Integer]((v, vcc) => ValueDecoder.sqlDateDecoder.decode(IntValue(v), vcc))
-  implicit val localDateDecoder: FilterDecoder[java.time.LocalDate, java.lang.Integer] =
-    apply[java.time.LocalDate, java.lang.Integer]((v, vcc) => ValueDecoder.localDateDecoder.decode(IntValue(v), vcc))
-  implicit val decimalDecoder: FilterDecoder[BigDecimal, Binary] =
-    DecimalFormat.Default.Implicits.decimalFilterDecoder
 
 }
 
-// FIXME docs
-/** Decodes and encodes user type from/to internal Parquet type. Used during filtering.
-  * @tparam In
-  *   User type
-  * @tparam V
-  *   Internal Parquet type
-  * @tparam C
-  *   Column type
-  */
+@deprecated(message = "No longer in use by Parquet4s", since = "2.21.0")
 trait FilterCodec[In, V <: Comparable[V], C <: Column[V]] extends FilterEncoder[In, V, C] with FilterDecoder[In, V]
 
+@nowarn
 private class FilterCodecImpl[In, V <: Comparable[V], C <: Column[V]](
     override val encode: (In, ValueCodecConfiguration) => V,
     override val decode: (V, ValueCodecConfiguration)  => In,
     override val columnFactory: ColumnFactory[V, C]
 ) extends FilterCodec[In, V, C]
 
+@nowarn
 object FilterCodec {
 
+  @deprecated(message = "No longer in use by Parquet4s", since = "2.21.0")
   def apply[In, V <: Comparable[V], C <: Column[V]](
       encode: (In, ValueCodecConfiguration) => V,
       decode: (V, ValueCodecConfiguration)  => In

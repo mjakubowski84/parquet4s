@@ -109,10 +109,6 @@ object DecimalFormat {
         }
       }
 
-    override val decimalFilterDecoderImpl: FilterDecoder[BigDecimal, Binary] =
-      new FilterDecoder[BigDecimal, Binary] {
-        val decode = (v, _) => bigDecimalFromBinary(v)
-      }
   }
 
   trait IntImplicits extends Implicits[java.lang.Integer, IntColumn] {
@@ -124,10 +120,6 @@ object DecimalFormat {
         val encode = (v, _) => rescale(v).bigDecimal.unscaledValue().intValue
       }
 
-    override val decimalFilterDecoderImpl: FilterDecoder[BigDecimal, java.lang.Integer] =
-      new FilterDecoder[BigDecimal, java.lang.Integer] {
-        val decode = (v, _) => BigDecimal(v.longValue, scale, mathContext)
-      }
   }
 
   trait LongImplicits extends Implicits[java.lang.Long, LongColumn] {
@@ -139,18 +131,12 @@ object DecimalFormat {
         val encode = (v, _) => rescale(v).bigDecimal.unscaledValue().longValue
       }
 
-    override val decimalFilterDecoderImpl: FilterDecoder[BigDecimal, java.lang.Long] =
-      new FilterDecoder[BigDecimal, java.lang.Long] {
-        val decode = (v, _) => BigDecimal(v, scale, mathContext)
-      }
   }
 
   trait Implicits[V <: Comparable[V], C <: Column[V]] {
     self: Format =>
 
     protected val decimalFilterEncoderImpl: FilterEncoder[BigDecimal, V, C]
-
-    protected val decimalFilterDecoderImpl: FilterDecoder[BigDecimal, V]
 
     object Implicits {
 
@@ -201,7 +187,6 @@ object DecimalFormat {
 
       implicit val decimalFilterEncoder: FilterEncoder[BigDecimal, V, C] = decimalFilterEncoderImpl
 
-      implicit val decimalFilterDecoder: FilterDecoder[BigDecimal, V] = decimalFilterDecoderImpl
     }
 
   }

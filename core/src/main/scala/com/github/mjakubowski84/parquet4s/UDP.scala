@@ -2,12 +2,14 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.filter2.predicate.{Statistics, UserDefinedPredicate}
 
-/** Extend this trait in order to build your custom filter.
+/** Extend this trait in order to build your custom filter. <br> <b> Please note! </b> Please use Java types supported
+  * by Parquet for V such as: java.lang.Integer, java.lang.Long, java.lang.Float, java.lang.Double or
+  * org.apache.parquet.io.api.Binary. Such types are used by Parquet internally for storing data.
   *
-  * @tparam In
+  * @tparam V
   *   Type of column custom filter refers to
   */
-trait UDP[In] {
+trait UDP[V] {
 
   /** Used to filter record by record.
     *
@@ -16,7 +18,7 @@ trait UDP[In] {
     * @return
     *   `true` if record containing given value should be kept
     */
-  def keep(value: In): Boolean
+  def keep(value: V): Boolean
 
   /** Used to drop a whole row group if collected statistics do not match your requirements.
     *
@@ -25,7 +27,7 @@ trait UDP[In] {
     * @return
     *   `true` if the whole row group can be omitted
     */
-  def canDrop(statistics: FilterStatistics[In]): Boolean
+  def canDrop(statistics: FilterStatistics[V]): Boolean
 
   /** It is an opposite of `canDrop`. There is a separate function for inverse comparison as the some types may require
     * quite a different logic for that. This function will be called when processing `not` predicates.
@@ -35,7 +37,7 @@ trait UDP[In] {
     * @return
     *   `true` if the whole row group can be omitted for inverse filter
     */
-  def inverseCanDrop(statistics: FilterStatistics[In]): Boolean
+  def inverseCanDrop(statistics: FilterStatistics[V]): Boolean
 
   /** @return
     *   name of the filter
@@ -45,25 +47,21 @@ trait UDP[In] {
 
 /** Row group statistics then can be used in [[UDP]] to drop unwanted data.
   * @param min
-  *   minimum value of `T` in a row group
+  *   minimum value of `V` in a row group
   * @param max
-  *   maximum value of `T` in a row group
+  *   maximum value of `V` in a row group
   * @param ordering
-  *   [[scala.Ordering]] of `T`
-  * @tparam T
+  *   [[scala.Ordering]] of `V`
+  * @tparam V
   *   user type of column
   */
-class FilterStatistics[T](val min: T, val max: T)(implicit val ordering: Ordering[T])
+class FilterStatistics[V](val min: V, val max: V)(implicit val ordering: Ordering[V])
 
-private[parquet4s] class UDPAdapter[In, V <: Comparable[V]](
-    udp: UDP[In],
-    decoder: FilterDecoder[In, V],
-    valueCodecConfiguration: ValueCodecConfiguration
-)(implicit ordering: Ordering[In])
+private[parquet4s] class UDPAdapter[V <: Comparable[V]](udp: UDP[V])(implicit ordering: Ordering[V])
     extends UserDefinedPredicate[V]
     with Serializable {
 
-  override def keep(value: V): Boolean = udp.keep(decoder.decode(value, valueCodecConfiguration))
+  override def keep(value: V): Boolean = udp.keep(value)
 
   override def canDrop(statistics: Statistics[V]): Boolean =
     udp.canDrop(convert(statistics))
@@ -73,8 +71,6 @@ private[parquet4s] class UDPAdapter[In, V <: Comparable[V]](
 
   override def toString: String = udp.name
 
-  private def convert(statistics: Statistics[V]) = new FilterStatistics[In](
-    decoder.decode(statistics.getMin, valueCodecConfiguration),
-    decoder.decode(statistics.getMax, valueCodecConfiguration)
-  )
+  private def convert(statistics: Statistics[V]) = new FilterStatistics[V](statistics.getMin, statistics.getMax)
+
 }

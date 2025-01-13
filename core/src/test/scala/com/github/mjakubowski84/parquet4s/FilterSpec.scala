@@ -164,11 +164,11 @@ class FilterSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "build udp" in {
-    object MyUDP extends UDP[Int] {
-      override def keep(value: Int): Boolean                                  = ???
-      override def canDrop(statistics: FilterStatistics[Int]): Boolean        = ???
-      override def inverseCanDrop(statistics: FilterStatistics[Int]): Boolean = ???
-      override def name: String                                               = "MyUDP"
+    object MyUDP extends UDP[java.lang.Integer] {
+      override def keep(value: java.lang.Integer): Boolean                                  = ???
+      override def canDrop(statistics: FilterStatistics[java.lang.Integer]): Boolean        = ???
+      override def inverseCanDrop(statistics: FilterStatistics[java.lang.Integer]): Boolean = ???
+      override def name: String                                                             = "MyUDP"
     }
     val predicate = Col("int").udp(MyUDP).toPredicate(valueCodecConfiguration)
     predicate.toString should be("userdefinedbyinstance(int, MyUDP)")
