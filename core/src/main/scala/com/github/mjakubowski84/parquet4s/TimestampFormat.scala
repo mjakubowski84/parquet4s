@@ -19,10 +19,7 @@ object TimestampFormat {
 
   object Implicits {
 
-    abstract protected class base(
-        logicalTypeAnnotation: TimestampLogicalTypeAnnotation,
-        timestampFormat: TimestampFormat.Format
-    ) {
+    abstract protected class base(logicalTypeAnnotation: TimestampLogicalTypeAnnotation) {
       implicit val sqlTimestampSchemaDef: TypedSchemaDef[Timestamp] =
         SchemaDef
           .primitive(INT64, required = false, logicalTypeAnnotation = Option(logicalTypeAnnotation))
@@ -47,26 +44,23 @@ object TimestampFormat {
 
       implicit def instantEncoder: OptionalValueEncoder[Instant]
 
-      implicit val sqlTimestampFilterCodec: FilterCodec[Timestamp, java.lang.Long, LongColumn] =
-        FilterCodec[Timestamp, java.lang.Long, LongColumn](
-          encode = sqlTimestampEncoder.encode(_, _).asInstanceOf[DateTimeValue].value,
-          decode = (v, vcc) => ValueDecoder.sqlTimestampDecoder.decode(DateTimeValue(v, timestampFormat), vcc)
+      implicit val sqlTimestampFilterEncoder: FilterEncoder[Timestamp, java.lang.Long, LongColumn] =
+        FilterEncoder[Timestamp, java.lang.Long, LongColumn](
+          encode = sqlTimestampEncoder.encode(_, _).asInstanceOf[DateTimeValue].value
         )
 
-      implicit val localDateTimeFilterCodec: FilterCodec[LocalDateTime, java.lang.Long, LongColumn] =
-        FilterCodec[LocalDateTime, java.lang.Long, LongColumn](
-          encode = localDateTimeEncoder.encode(_, _).asInstanceOf[DateTimeValue].value,
-          decode = (v, vcc) => ValueDecoder.localDateTimeDecoder.decode(DateTimeValue(v, timestampFormat), vcc)
+      implicit val localDateTimeFilterEncoder: FilterEncoder[LocalDateTime, java.lang.Long, LongColumn] =
+        FilterEncoder[LocalDateTime, java.lang.Long, LongColumn](
+          encode = localDateTimeEncoder.encode(_, _).asInstanceOf[DateTimeValue].value
         )
 
-      implicit val instantFilterCodec: FilterCodec[Instant, java.lang.Long, LongColumn] =
-        FilterCodec[Instant, java.lang.Long, LongColumn](
-          encode = instantEncoder.encode(_, _).asInstanceOf[DateTimeValue].value,
-          decode = (v, vcc) => ValueDecoder.instantDecoder.decode(DateTimeValue(v, timestampFormat), vcc)
+      implicit val instantFilterEncoder: FilterEncoder[Instant, java.lang.Long, LongColumn] =
+        FilterEncoder[Instant, java.lang.Long, LongColumn](
+          encode = instantEncoder.encode(_, _).asInstanceOf[DateTimeValue].value
         )
     }
 
-    object Millis extends base(LogicalTypes.TimestampMillisType, Int64Millis) {
+    object Millis extends base(LogicalTypes.TimestampMillisType) {
 
       implicit override val sqlTimestampEncoder: OptionalValueEncoder[Timestamp] = new OptionalValueEncoder[Timestamp] {
         def encodeNonNull(data: Timestamp, configuration: ValueCodecConfiguration): Value =
@@ -88,7 +82,7 @@ object TimestampFormat {
         }
     }
 
-    object Micros extends base(LogicalTypes.TimestampMicrosType, Int64Micros) {
+    object Micros extends base(LogicalTypes.TimestampMicrosType) {
 
       implicit override val sqlTimestampEncoder: OptionalValueEncoder[Timestamp] = new OptionalValueEncoder[Timestamp] {
         def encodeNonNull(data: Timestamp, configuration: ValueCodecConfiguration): Value = {
@@ -116,7 +110,7 @@ object TimestampFormat {
         }
     }
 
-    object Nanos extends base(LogicalTypes.TimestampNanosType, Int64Nanos) {
+    object Nanos extends base(LogicalTypes.TimestampNanosType) {
 
       implicit override val sqlTimestampEncoder: OptionalValueEncoder[Timestamp] = new OptionalValueEncoder[Timestamp] {
         def encodeNonNull(data: Timestamp, configuration: ValueCodecConfiguration): Value = {

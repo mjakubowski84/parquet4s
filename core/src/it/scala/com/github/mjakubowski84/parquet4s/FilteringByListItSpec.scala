@@ -83,7 +83,7 @@ class FilteringByListItSpec extends AnyFlatSpec with Matchers with BeforeAndAfte
   def genericFilterTest[T, V <: Comparable[V], C <: Column[V] & SupportsEqNotEq](
       columnName: String,
       field: Data => T
-  )(implicit codec: FilterCodec[T, V, C]): Assertion = {
+  )(implicit encoder: FilterEncoder[T, V, C]): Assertion = {
     val actual = ParquetReader.as[Data].filter(Col(columnName) in everyOtherDatum.map(field)).read(filePath)
     try actual.map(_.idx) should equal(everyOtherDatum.map(_.idx))
     finally actual.close()
@@ -93,7 +93,7 @@ class FilteringByListItSpec extends AnyFlatSpec with Matchers with BeforeAndAfte
       columnName: String,
       field: Data => T,
       values: Vector[T]
-  )(implicit codec: FilterCodec[T, V, C]): Assertion = {
+  )(implicit encoder: FilterEncoder[T, V, C]): Assertion = {
     val filteredRecords   = ParquetReader.as[Data].filter(Col(columnName) in values).read(filePath)
     val unfilteredRecords = ParquetReader.as[Data].read(filePath)
 
