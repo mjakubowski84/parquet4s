@@ -1,12 +1,12 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.TimeValueCodecs.*
 import org.apache.parquet.filter2.predicate.Operators.LongColumn
 import org.apache.parquet.schema.LogicalTypeAnnotation.TimestampLogicalTypeAnnotation
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.INT64
 
 import java.sql.Timestamp
 import java.time.{Instant, LocalDateTime, ZonedDateTime}
+import java.util.concurrent.TimeUnit
 
 object TimestampFormat {
 
@@ -16,6 +16,9 @@ object TimestampFormat {
   case object Int64Micros extends Format
   case object Int64Nanos extends Format
   case object Int96 extends Format
+
+  private val NanosPerMicro   = TimeUnit.MICROSECONDS.toNanos(1)
+  private val MicrosPerSecond = TimeUnit.SECONDS.toMicros(1)
 
   object Implicits {
 
