@@ -4,7 +4,7 @@ object DependecyVersions {
   val sparkVersion                 = "3.5.4"
   val hadoopVersion                = "3.4.1"
   val slf4jVersion                 = "2.0.16"
-  val logbackVersion               = "1.3.14" // stick to 1.3.x for JDK-8 compatibility
+  val logbackVersion               = "1.3.15" // stick to 1.3.x for JDK-8 compatibility
   val akkaVersion                  = "2.6.21" // non-licensed version
   val fs2Version                   = "3.11.0"
   val catsEffectVersion            = "3.5.7"
