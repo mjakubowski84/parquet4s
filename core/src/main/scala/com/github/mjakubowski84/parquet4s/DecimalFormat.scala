@@ -10,8 +10,14 @@ import java.math.BigInteger
 import org.apache.parquet.io.api.RecordConsumer
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName
 
+/** Contains factories for defining decimal formats including all type classes required for writing, reading and
+  * filtering by [[scala.math.BigDecimal]]. Defines a default format used by Parquet4s.
+  */
 object DecimalFormat {
 
+  /** Format used by Parquet4s by default when user doesn't provide their own one. Aligned with default Apache Spark
+    * format.
+    */
   val Default: BinaryFormat & BinaryImplicits = binaryFormat(
     scale           = 18,
     precision       = 38,
@@ -19,6 +25,17 @@ object DecimalFormat {
     rescaleOnRead   = true
   )
 
+  /** Creates format that stores decimal as a binary.
+    *
+    * @param scale
+    *   number of fraction digits
+    * @param precision
+    *   total number of digits
+    * @param byteArrayLength
+    *   binary size
+    * @param rescaleOnRead
+    *   should read decimal be rescaled to the provided format or should it stay in original source format
+    */
   def binaryFormat(
       scale: Int,
       precision: Int,
@@ -27,9 +44,27 @@ object DecimalFormat {
   ): BinaryFormat & BinaryImplicits =
     new BinaryFormat(scale, precision, byteArrayLength, rescaleOnRead) with BinaryImplicits
 
+  /** Creates format that stores decimal as an integer (INT32).
+    *
+    * @param scale
+    *   number of fraction digits
+    * @param precision
+    *   total number of digits
+    * @param rescaleOnRead
+    *   should read decimal be rescaled to the provided format or should it stay in original source format
+    */
   def intFormat(scale: Int, precision: Int, rescaleOnRead: Boolean): NumericFormat & IntImplicits =
     new IntFormat(scale, precision, rescaleOnRead) with IntImplicits
 
+  /** Creates format that stores decimal as a long (INT64).
+    *
+    * @param scale
+    *   number of fraction digits
+    * @param precision
+    *   total number of digits
+    * @param rescaleOnRead
+    *   should read decimal be rescaled to the provided format or should it stay in original source format
+    */
   def longFormat(scale: Int, precision: Int, rescaleOnRead: Boolean): NumericFormat & LongImplicits =
     new LongFormat(scale, precision, rescaleOnRead) with LongImplicits
 

@@ -314,9 +314,30 @@ object ColumnFactory {
   implicit val binaryColumnFactory: ColumnFactory[Binary, BinaryColumn]              = apply(FilterApi.binaryColumn)
 }
 
-// TODO docs
+/** Translates Parquet4s filter values <b><In</b> to types used by Parquet internally <b>V</b>. <b>V</b> has to be one
+  * of:
+  *   1. [[java.lang.Boolean]]
+  *   1. [[java.lang.Int]]
+  *   1. [[java.lang.Long]]
+  *   1. [[java.lang.Double]]
+  *   1. [[java.lang.Float]]
+  *   1. [[org.apache.parquet.io.api.Binary]]
+  *
+  * Implement this trait to support your type in Parquet4s filters. Check the factory defined in the companion object.
+  *
+  * @tparam In
+  *   Type used in filter predicate
+  *
+  * @tparam V
+  *   Type used internally by Parquet.
+  *
+  * @tparam C
+  *   Type of [[org.apache.parquet.filter2.predicate.Column]] that encodes <b>V</b>
+  */
 trait FilterEncoder[-In, V <: Comparable[V], C <: Column[V]] {
 
+  /** Creates column definition.
+    */
   val columnFactory: ColumnFactory[V, C]
 
   /** Encodes user type to internal Parquet type.
@@ -331,6 +352,13 @@ private class FilterEncoderImpl[-In, V <: Comparable[V], C <: Column[V]](
 
 object FilterEncoder {
 
+  /** Simplifies creation of [[FilterEncoder]].
+    *
+    * @param encode
+    *   encoding function
+    * @param columnFactory
+    *   implicit [[ColumnFactory]]
+    */
   def apply[In, V <: Comparable[V], C <: Column[V]](encode: (In, ValueCodecConfiguration) => V)(implicit
       columnFactory: ColumnFactory[V, C]
   ): FilterEncoder[In, V, C] =
@@ -369,7 +397,7 @@ object FilterEncoder {
 
 }
 
-@deprecated(message = "No longer in use by Parquet4s", since = "2.21.0")
+@deprecated(message = "No longer in use by Parquet4s. Check FilterEncoder.", since = "2.21.0")
 trait FilterDecoder[+In, -V] {
 
   /** Decodes user type from internal Parquet type.
@@ -383,12 +411,12 @@ private class FilterDecoderImpl[+In, -V](val decode: (V, ValueCodecConfiguration
 @nowarn
 object FilterDecoder {
 
-  @deprecated(message = "No longer in use by Parquet4s", since = "2.21.0")
+  @deprecated(message = "No longer in use by Parquet4s. Check FilterEncoder.", since = "2.21.0")
   def apply[In, V](decode: (V, ValueCodecConfiguration) => In): FilterDecoder[In, V] = new FilterDecoderImpl(decode)
 
 }
 
-@deprecated(message = "No longer in use by Parquet4s", since = "2.21.0")
+@deprecated(message = "No longer in use by Parquet4s. Check FilterEncoder.", since = "2.21.0")
 trait FilterCodec[In, V <: Comparable[V], C <: Column[V]] extends FilterEncoder[In, V, C] with FilterDecoder[In, V]
 
 @nowarn
@@ -401,7 +429,7 @@ private class FilterCodecImpl[In, V <: Comparable[V], C <: Column[V]](
 @nowarn
 object FilterCodec {
 
-  @deprecated(message = "No longer in use by Parquet4s", since = "2.21.0")
+  @deprecated(message = "No longer in use by Parquet4s. Check FilterEncoder.", since = "2.21.0")
   def apply[In, V <: Comparable[V], C <: Column[V]](
       encode: (In, ValueCodecConfiguration) => V,
       decode: (V, ValueCodecConfiguration)  => In

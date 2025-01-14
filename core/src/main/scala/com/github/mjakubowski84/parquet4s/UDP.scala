@@ -2,9 +2,14 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.filter2.predicate.{Statistics, UserDefinedPredicate}
 
-/** Extend this trait in order to build your custom filter. <br> <b> Please note! </b> Please use Java types supported
-  * by Parquet for V such as: java.lang.Integer, java.lang.Long, java.lang.Float, java.lang.Double or
-  * org.apache.parquet.io.api.Binary. Such types are used by Parquet internally for storing data.
+/** Extend this trait in order to build a non-standard filter. <br> <b> Please note! </b> When defining <b>V</b>, use Java
+  * types supported by Parquet such as:
+  *   1. [[java.lang.Boolean]]
+  *   1. [[java.lang.Int]]
+  *   1. [[java.lang.Long]]
+  *   1. [[java.lang.Double]]
+  *   1. [[java.lang.Float]]
+  *   1. [[org.apache.parquet.io.api.Binary]]
   *
   * @tparam V
   *   Type of column custom filter refers to
