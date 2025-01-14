@@ -332,7 +332,7 @@ object ColumnFactory {
   *   Type used internally by Parquet.
   *
   * @tparam C
-  *   Type of [[org.apache.parquet.filter2.predicate.Column]] that encodes <b>V</b>
+  *   Type of [[org.apache.parquet.filter2.predicate.Operators.Column]] that encodes <b>V</b>
   */
 trait FilterEncoder[-In, V <: Comparable[V], C <: Column[V]] {
 
