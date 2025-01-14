@@ -314,10 +314,10 @@ object ColumnFactory {
   implicit val binaryColumnFactory: ColumnFactory[Binary, BinaryColumn]              = apply(FilterApi.binaryColumn)
 }
 
-/** Translates Parquet4s filter values <b><In</b> to types used by Parquet internally <b>V</b>. <b>V</b> has to be one
+/** Translates Parquet4s filter values <b>In</b> to types used by Parquet internally <b>V</b>. <b>V</b> has to be one
   * of:
   *   1. [[java.lang.Boolean]]
-  *   1. [[java.lang.Int]]
+  *   1. [[java.lang.Integer]]
   *   1. [[java.lang.Long]]
   *   1. [[java.lang.Double]]
   *   1. [[java.lang.Float]]

@@ -2,10 +2,10 @@ package com.github.mjakubowski84.parquet4s
 
 import org.apache.parquet.filter2.predicate.{Statistics, UserDefinedPredicate}
 
-/** Extend this trait in order to build a non-standard filter. <br> <b> Please note! </b> When defining <b>V</b>, use
+/** Extend this trait in order to build a non-standard filter. <br> <b>Please note!</b> When defining <b>V</b>, use
   * Java types supported by Parquet such as:
   *   1. [[java.lang.Boolean]]
-  *   1. [[java.lang.Int]]
+  *   1. [[java.lang.Integer]]
   *   1. [[java.lang.Long]]
   *   1. [[java.lang.Double]]
   *   1. [[java.lang.Float]]
