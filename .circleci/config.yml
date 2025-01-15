@@ -3,7 +3,8 @@ version: 2.1
 executors:
   jdk:
     machine:
-      image: ubuntu-2204:current
+      image:
+        ubuntu-2204:current
         # auth:
         #   username: $DOCKERHUB_USER
         #   password: $DOCKERHUB_PASSWORD
@@ -13,17 +14,15 @@ executors:
     working_directory: /tmp
 
 commands:
-
   setup:
     steps:
-      - run: 
+      - run:
           name: Install OpenJDK 8
           command: |
             sudo apt-get update && sudo apt-get install openjdk-8-jdk
             sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/bin/java
             sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
             java -version
-
 
   cache_dependencies:
     parameters:
@@ -84,6 +83,8 @@ commands:
 
   setup_gpg:
     steps:
+      # install GPG
+      - run: sudo apt-get install gnupg
       # set required GPG_TTY
       - run: echo 'export GPG_TTY=$(tty)' >> $BASH_ENV
       # import public key
@@ -92,7 +93,6 @@ commands:
       - run: echo $GPG_PRIVATE_KEY | base64 --decode | gpg --import --batch --no-tty --yes
 
 jobs:
-
   build:
     executor:
       name: jdk
@@ -255,6 +255,16 @@ workflows:
               only: /^v.*/
             branches:
               ignore: /.*/
+      - test:
+          name: test_s3
+          project: s3Test
+          requires:
+            - build
+          filters:
+            tags:
+              only: /^v.*/
+            branches:
+              ignore: /.*/
       - release:
           requires:
             - test_core
@@ -262,6 +272,7 @@ workflows:
             - test_pekko
             - test_fs2
             - test_scala_pb
+            - test_s3
           filters:
             tags:
               only: /^v.*/
