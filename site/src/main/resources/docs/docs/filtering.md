@@ -25,31 +25,31 @@ ParquetReader
 
 You can construct filter predicates using `===`, `!==`, `>`, `>=`, `<`, `<=`, `in`, `isNull`, `isNotNull` and `udp` operators on columns containing primitive values. You can combine and modify predicates using `&&`, `||` and `!` operators. `in` looks for values in a list of keys, similar to SQL's `in` operator. Please mind that filtering on `java.sql.Timestamp` and `java.time.LocalDateTime` is not supported for `Int96` timestamps which is a default type used for timestamps. Consider a different timestamp [format]({% link docs/records_and_schema.md %}) for your data to enable filtering.
 
-For custom filtering by a column of type `T` implement `UDP[T]` trait and use `udp` operator.
+For custom filtering by a column of type `T` implement `UDP[T]` trait and use `udp` operator. Note that, when implementing `UDP[T]`, `T` has to be a Java type that Parquet uses internally for encoding columns. Please refer to ScalaDoc for more details.
 
 ```scala mdoc:compile-only
 import com.github.mjakubowski84.parquet4s.{Col, FilterStatistics, ParquetReader, Path, UDP}
 
 case class MyRecord(int: Int)
 
-object IntDividesBy10 extends UDP[Int] {
+object IntDividesBy10 extends UDP[java.lang.Integer] {
   private val Ten = 10
   
   // Called for each individual row that belongs to a row group that passed row group filtering.
-  override def keep(value: Int): Boolean = value % Ten == 0
+  override def keep(value: java.lang.Integer): Boolean = value % Ten == 0
   
   // Called for each row group.
   // It should contain a logic that eliminates a whole row group if statistics prove that it doesn't contain 
   // data matching the predicate.
   @inline
-  override def canDrop(statistics: FilterStatistics[Int]): Boolean = {
+  override def canDrop(statistics: FilterStatistics[java.lang.Integer]): Boolean = {
     val minMod = statistics.min % Ten
     val maxMod = statistics.max % Ten
     (statistics.max - statistics.min < Ten) && maxMod >= minMod
   }
   
   // Called for each row group for "not" predicates. The logic might be different than one in `canDrop`.
-  override def inverseCanDrop(statistics: FilterStatistics[Int]): Boolean = !canDrop(statistics)
+  override def inverseCanDrop(statistics: FilterStatistics[java.lang.Integer]): Boolean = !canDrop(statistics)
   
   // called by `toString`
   override val name: String = "IntDividesBy10"

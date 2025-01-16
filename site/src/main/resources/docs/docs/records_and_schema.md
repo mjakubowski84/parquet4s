@@ -24,28 +24,42 @@ If you do not wish to map the schema of your data to Scala case classes, then Pa
 
 ### Primitive types
 
-| Type                                  | Reading and Writing | Filtering |
-| :------------------------------------ | :-----------------: | :-------: |
-| Int                                   |      &#x2611;       | &#x2611;  |
-| Long                                  |      &#x2611;       | &#x2611;  |
-| Byte                                  |      &#x2611;       | &#x2611;  |
-| Short                                 |      &#x2611;       | &#x2611;  |
-| Boolean                               |      &#x2611;       | &#x2611;  |
-| Char                                  |      &#x2611;       | &#x2611;  |
-| Float                                 |      &#x2611;       | &#x2611;  |
-| Double                                |      &#x2611;       | &#x2611;  |
-| BigDecimal                            |      &#x2611;       | &#x2611;  |
-| java.time.LocalDateTime [*with INT96] |      &#x2611;       | &#x2612;  |
-| java.time.LocalDateTime [*with INT64] |      &#x2611;       | &#x2611;  |
-| java.time.Instant [*with INT96]       |      &#x2611;       | &#x2612;  |
-| java.time.Instant [*with INT64]       |      &#x2611;       | &#x2611;  |
-| java.time.LocalDate                   |      &#x2611;       | &#x2611;  |
-| java.sql.Timestamp [*with INT96]      |      &#x2611;       | &#x2612;  |
-| java.sql.Timestamp [*with INT64]      |      &#x2611;       | &#x2611;  |
-| java.sql.Date                         |      &#x2611;       | &#x2611;  |
-| Array[Byte]                           |      &#x2611;       | &#x2611;  |
+| Type                                    | Reading and Writing | Filtering |
+| :-------------------------------------- | :-----------------: | :-------: |
+| Int                                     |      &#x2611;       | &#x2611;  |
+| Long                                    |      &#x2611;       | &#x2611;  |
+| Byte                                    |      &#x2611;       | &#x2611;  |
+| Short                                   |      &#x2611;       | &#x2611;  |
+| Boolean                                 |      &#x2611;       | &#x2611;  |
+| Char                                    |      &#x2611;       | &#x2611;  |
+| Float                                   |      &#x2611;       | &#x2611;  |
+| Double                                  |      &#x2611;       | &#x2611;  |
+| BigDecimal with INT96 [^1]              |      &#x2611;       | &#x2611;  |
+| BigDecimal with INT64 [^1]              |      &#x2611;       | &#x2611;  |
+| BigDecimal with INT32 [^1]              |      &#x2611;       | &#x2611;  |
+| java.time.LocalDateTime with INT96 [^2] |      &#x2611;       | &#x2612;  |
+| java.time.LocalDateTime with INT64 [^2] |      &#x2611;       | &#x2611;  |
+| java.time.Instant with INT96 [^2]       |      &#x2611;       | &#x2612;  |
+| java.time.Instant with INT64 [^2]       |      &#x2611;       | &#x2611;  |
+| java.time.LocalDate                     |      &#x2611;       | &#x2611;  |
+| java.sql.Timestamp with INT96 [^2]      |      &#x2611;       | &#x2612;  |
+| java.sql.Timestamp with INT64 [^2]      |      &#x2611;       | &#x2611;  |
+| java.sql.Date                           |      &#x2611;       | &#x2611;  |
+| Array[Byte]                             |      &#x2611;       | &#x2611;  |
 
-*) You can change the default format of the timestamp column from INT96 to INT64 by importing type classes:
+[^1] You can change de default binary (INT96) format of decimal, as well as its scale and precision, with help of utilities available in `com.github.mjakubowski84.parquet4s.DecimalFormat`. For example, to create a decimal expressed as INT32 number with scale of 2 and precision 10:
+
+```scala mdoc:compile-only
+import com.github.mjakubowski84.parquet4s.DecimalFormat
+
+val MyDecimalFormat = DecimalFormat.intFormat(scale = 2, precision = 10, rescaleOnRead = false)
+// imported implicits override default type classes required for reading, filterig and writing data containing decimal values
+import MyDecimalFormat.Implicits._
+```
+
+Take note of `rescaleOnRead` flag. By default, during reading, Parquet4s rescales decimal values from original source format to one matching Parquet4s format. You can use the flag to change this behaviour and keep the decimals as they are stored in the source Parquet files.
+
+[^2] You can change the default format of the timestamp column from INT96 to INT64 by importing type classes:
 
 - INT64 micros format: `import com.github.mjakubowski84.parquet4s.TimestampFormat.Implicits.Micros._`
 - INT64 mills format: `import com.github.mjakubowski84.parquet4s.TimestampFormat.Implicits.Millis._`
@@ -114,18 +128,17 @@ implicit val customTypeSchema: TypedSchemaDef[CustomType] =
   ).typed[CustomType]
 ```
 
-In order to filter by a field of a custom type `T` you have to implement `FilterCodec[T]` type class.
+In order to filter by a field of a custom type `T` you have to implement `FilterEncoder[T]` type class.
 
 ```scala mdoc:compile-only
-import com.github.mjakubowski84.parquet4s.FilterCodec
+import com.github.mjakubowski84.parquet4s.FilterEncoder
 import org.apache.parquet.filter2.predicate.Operators.IntColumn
 
 case class CustomType(i: Int)
 
-implicit val customFilterCodec: FilterCodec[CustomType, java.lang.Integer, IntColumn] =
-  FilterCodec[CustomType, java.lang.Integer, IntColumn](
-    encode = (customType, _) => customType.i,
-    decode = (integer, _)    => CustomType(integer)
+implicit val customFilterEncoder: FilterEncoder[CustomType, java.lang.Integer, IntColumn] =
+  FilterEncoder[CustomType, java.lang.Integer, IntColumn](
+    encode = (customType, _) => customType.i
   )
 ```
 
