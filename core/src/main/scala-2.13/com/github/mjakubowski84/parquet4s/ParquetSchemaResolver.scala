@@ -44,7 +44,7 @@ object ParquetSchemaResolver {
 
   trait SchemaVisitor[V] extends Cursor.Visitor[TypedSchemaDefInvoker[V], Option[Type]] {
     override def onCompleted(cursor: Cursor, invoker: TypedSchemaDefInvoker[V]): Option[Type] =
-      throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
+      Option(invoker.schema(cursor.path.elements.last))
   }
 
   private val logger = LoggerFactory.getLogger(this.getClass)
@@ -61,6 +61,11 @@ object ParquetSchemaResolver {
     */
   def resolveSchema[T](implicit g: ParquetSchemaResolver[T]): MessageType =
     Message(g.schemaName, g.resolveSchema(Cursor.simple)*)
+
+  /** Finds a type at the given path
+    */
+  def findType[T](columnPath: ColumnPath)(implicit g: ParquetSchemaResolver[T]): Option[Type] =
+    g.resolveSchema(Cursor.following(columnPath)).headOption
 
   implicit val hnil: ParquetSchemaResolver[HNil] = _ => List.empty
 

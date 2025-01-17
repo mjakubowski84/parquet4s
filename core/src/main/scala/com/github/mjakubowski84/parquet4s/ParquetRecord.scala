@@ -141,13 +141,13 @@ object RowParquetRecord {
     new ParquetSchemaResolver[RowParquetRecord] {
       override def schemaName: Option[String] = Option(message.getName)
       override def resolveSchema(cursor: Cursor): List[Type] =
-        skipFields(cursor, message.getFields.asScala.toList)
+        applyCursor(cursor, message.getFields.asScala.toList)
 
-      private def skipFields(cursor: Cursor, fields: List[Type]): List[Type] =
+      private def applyCursor(cursor: Cursor, fields: List[Type]): List[Type] =
         fields.flatMap {
           case groupField: GroupType if groupField.getLogicalTypeAnnotation == null =>
             cursor.advanceByFieldName(groupField.getName).flatMap { newCursor =>
-              val fields = skipFields(newCursor, groupField.getFields.asScala.toList)
+              val fields = applyCursor(newCursor, groupField.getFields.asScala.toList)
               if (fields.isEmpty) None
               else
                 Some(

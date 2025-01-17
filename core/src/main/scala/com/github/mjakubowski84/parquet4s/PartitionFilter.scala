@@ -128,6 +128,28 @@ class PartitionView(partitions: List[(ColumnPath, Binary)]) {
     *   a value of given partion field
     */
   def value(columnPath: ColumnPath): Option[Binary] = partitionMap.get(columnPath)
+
+  /** @return
+    *   All partition values
+    */
+  def values: List[(ColumnPath, Binary)] = partitions
+
+  /** Removes partitions whose paths do not match the given predicate.
+    * @return
+    *   a new instance with partitions that match the given predicate
+    */
+  def filterPaths(predicate: ColumnPath => Boolean): PartitionView =
+    new PartitionView(partitions.filter { case (columnPath, _) => predicate(columnPath) })
+
+  /** @return
+    *   true if view doesn't contain any partitions
+    */
+  def isEmpty: Boolean = partitions.isEmpty
+
+  /** @return
+    *   true if view contains at least single partition
+    */
+  def nonEmpty: Boolean = partitions.nonEmpty
 }
 
 private class PartitionedPathImpl(
