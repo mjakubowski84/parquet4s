@@ -20,7 +20,7 @@ private[parquet4s] class LazyDelegateStats(
       else
         new FilteredFileStats(inputFile, vcc, projectionSchemaOpt, filter)
     partitionViewOpt match {
-      case Some(partitionView) if partitionView.schema.nonEmpty =>
+      case Some(partitionView) if partitionView.nonEmpty =>
         new PartitionedFileStats(fileStats, partitionView)
       case _ =>
         fileStats

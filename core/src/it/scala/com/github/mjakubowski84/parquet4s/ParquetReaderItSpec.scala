@@ -9,6 +9,8 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
 
   case class Partitioned(a: String, b: String, i: Int)
   case class I(i: Int)
+  case class NestedPartitioned(nested: Nested, i: Int)
+  case class Nested(b: String)
 
   before {
     clearTemp()
@@ -56,6 +58,75 @@ class ParquetReaderItSpec extends AnyFreeSpec with Matchers with TestUtils with 
           Partitioned(a = "a2", b = "b2", i = 4)
         )
     finally partitioned.close()
+  }
+
+  "Nested partition values should be set in read record and the projection shall be applied" in {
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/nested.b=b1/file.parquet"), Seq(I(1)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/nested.b=b2/file.parquet"), Seq(I(2)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/nested.b=b1/file.parquet"), Seq(I(3)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/nested.b=b2/file.parquet"), Seq(I(4)))
+
+    val partitioned = ParquetReader.projectedAs[NestedPartitioned].read(tempPath)
+    try
+      partitioned.toSeq should contain theSameElementsAs
+        Seq(
+          NestedPartitioned(Nested(b = "b1"), i = 1),
+          NestedPartitioned(Nested(b = "b2"), i = 2),
+          NestedPartitioned(Nested(b = "b1"), i = 3),
+          NestedPartitioned(Nested(b = "b2"), i = 4)
+        )
+    finally partitioned.close()
+  }
+
+  "Projection shall be applied to partition values when reading generic records" in {
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/nested.b=b1/file.parquet"), Seq(I(1)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/nested.b=b2/file.parquet"), Seq(I(2)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/nested.b=b1/file.parquet"), Seq(I(3)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/nested.b=b2/file.parquet"), Seq(I(4)))
+
+    val schema = ParquetSchemaResolver.resolveSchema[NestedPartitioned]
+
+    val partitioned = ParquetReader.projectedGeneric(schema).read(tempPath)
+    try
+      partitioned.toSeq should contain theSameElementsAs
+        Seq(
+          RowParquetRecord("nested" -> RowParquetRecord("b" -> "b1".value), "i" -> 1.value),
+          RowParquetRecord("nested" -> RowParquetRecord("b" -> "b2".value), "i" -> 2.value),
+          RowParquetRecord("nested" -> RowParquetRecord("b" -> "b1".value), "i" -> 3.value),
+          RowParquetRecord("nested" -> RowParquetRecord("b" -> "b2".value), "i" -> 4.value)
+        )
+    finally partitioned.close()
+  }
+
+  "Partition values shall be completyly skipped if projection doesn't include them" in {
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/b=b1/file.parquet"), Seq(I(1)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/b=b2/file.parquet"), Seq(I(2)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b1/file.parquet"), Seq(I(3)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b2/file.parquet"), Seq(I(4)))
+
+    val results = ParquetReader.projectedAs[I].read(tempPath)
+    try
+      results.toSeq should contain theSameElementsAs Seq(I(i = 1), I(i = 2), I(i = 3), I(i = 4))
+    finally results.close()
+  }
+
+  "Partition values shall be completyly skipped if projection with generic records doesn't include them" in {
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/b=b1/file.parquet"), Seq(I(1)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a1/b=b2/file.parquet"), Seq(I(2)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b1/file.parquet"), Seq(I(3)))
+    ParquetWriter.of[I].writeAndClose(Path(tempPath, "a=a2/b=b2/file.parquet"), Seq(I(4)))
+
+    val schema = ParquetSchemaResolver.resolveSchema[I]
+
+    val results = ParquetReader.projectedGeneric(schema).read(tempPath)
+    try
+      results.toSeq should contain theSameElementsAs Seq(
+        RowParquetRecord("i" -> 1.value),
+        RowParquetRecord("i" -> 2.value),
+        RowParquetRecord("i" -> 3.value),
+        RowParquetRecord("i" -> 4.value)
+      )
+    finally results.close()
   }
 
   "Partitions should be filtered" in {

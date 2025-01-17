@@ -309,9 +309,10 @@ object ParquetSource extends IOOps {
   ) =
     Source
       .unfoldResource[RowParquetRecord, Iterator[RowParquetRecord] & Closeable](
-        ParquetIterator.factory(inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder, options),
-        iterator => if (iterator.hasNext) Option(iterator.next()) else None,
-        _.close()
+        create =
+          ParquetIterator.factory(inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder, options),
+        read  = iterator => if (iterator.hasNext) Option(iterator.next()) else None,
+        close = _.close()
       )
 
   private def setPartitionValues(partitionedPath: PartitionedPath)(record: RowParquetRecord) =

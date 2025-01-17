@@ -126,18 +126,27 @@ object ParquetReader extends IOOps {
           throw exception
         case Right(partitionedDirectory) =>
           val projectedSchemaOpt = projectedSchemaResolverOpt.map(implicit resolver =>
-            ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema)
+            ParquetSchemaResolver.resolveSchema[T](partitionedDirectory.schema)
           )
+
           lazy val fallbackFilterCompat = filter.toNonPredicateFilterCompat
+
           val iterables = partitionedDirectory.paths.map { partitionedPath =>
-            singleIterable(
+            val partitionViewOpt = Option(projectedSchemaResolverOpt.fold(partitionedPath.view) { implicit resolver =>
+              partitionedPath.view.filterPaths(ParquetSchemaResolver.findType[T](_).nonEmpty)
+            }).filter(_.nonEmpty)
+
+            val iterable = singleIterable(
               inputFile               = partitionedPath.inputFile,
               valueCodecConfiguration = valueCodecConfiguration,
               projectedSchemaOpt      = projectedSchemaOpt,
               filterCompat            = partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(FilterCompat.get),
-              partitionViewOpt        = Option(partitionedPath.view),
+              partitionViewOpt        = partitionViewOpt,
               readerOptions           = readerOptions
-            ).appendTransformation(setPartitionValues(partitionedPath))
+            )
+            partitionViewOpt.fold(iterable)(partitionView =>
+              iterable.appendTransformation(setPartitionValues(partitionView))
+            )
           }
           new CompoundParquetIterable[T](iterables)
       }
@@ -161,11 +170,11 @@ object ParquetReader extends IOOps {
       )
     }
 
-    private def setPartitionValues(partitionedPath: PartitionedPath)(
+    private def setPartitionValues(partitionView: PartitionView)(
         record: RowParquetRecord
     ): Iterable[RowParquetRecord] =
       Option(
-        partitionedPath.partitions.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
+        partitionView.values.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
           currentRecord.updated(columnPath, BinaryValue(value))
         }
       )
@@ -275,25 +284,25 @@ object ParquetReader extends IOOps {
     projectedSchemaResolverOpt = Option(RowParquetRecord.genericParquetSchemaResolver(projectedSchema))
   )
 
-  // format: off
   /** Creates [[Builder]] of Parquet reader returning <i>projected</i> generic records. Due to projection, reader does
     * not attempt to read all existing columns of the file but applies enforced projection schema. Besides simple
-    * projection one can use aliases and extract values from nested fields - in a way similar to SQL.
-    * <br/> <br/>
+    * projection one can use aliases and extract values from nested fields - in a way similar to SQL. <br/> <br/>
     * @example
-    *   <pre> 
-    *projectedGeneric(
-    *  Col("foo").as[Int], // selects Int column "foo"
-    *  Col("bar.baz".as[String]), // selects String field "bar.baz", creates column "baz" wih a value of "baz"
-    *  Col("bar.baz".as[String].alias("bar_baz")) // selects String field "bar.baz", creates column "bar_baz" wih a value of "baz"
-    *)
-    *   </pre>  
+    *   ```scala
+    *   projectedGeneric(
+    *     // selects Int column "foo"
+    *     Col("foo").as[Int],
+    *     // selects String field "bar.baz", creates column "baz" wih a value of "baz"
+    *     Col("bar.baz".as[String]),
+    *     // selects String field "bar.baz", creates column "bar_baz" wih a value of "baz"
+    *     Col("bar.baz".as[String].alias("bar_baz"))
+    *   )
+    *   ```
     * @param col
     *   first column projection
     * @param cols
     *   next column projections
     */
-  // format: on  
   def projectedGeneric(col: TypedColumnPath[?], cols: TypedColumnPath[?]*): Builder[RowParquetRecord] = {
     val (fields, columnProjections) =
       (col +: cols.toVector).zipWithIndex

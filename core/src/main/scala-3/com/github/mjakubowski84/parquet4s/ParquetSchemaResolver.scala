@@ -38,9 +38,7 @@ object ParquetSchemaResolver:
 
   final abstract private[ParquetSchemaResolver] class Fields[Labels <: Tuple, Values <: Tuple]
 
-  trait SchemaVisitor[V] extends Cursor.Visitor[String, Option[Type]]:
-    override def onCompleted(cursor: Cursor, fieldName: String): Option[Type] =
-      throw new UnsupportedOperationException("Schema resolution cannot complete before all fields are processed.")
+  trait SchemaVisitor[V] extends Cursor.Visitor[String, Option[Type]]
 
   private val logger = LoggerFactory.getLogger(this.getClass)
 
@@ -56,6 +54,11 @@ object ParquetSchemaResolver:
     */
   def resolveSchema[T](using g: ParquetSchemaResolver[T]): MessageType =
     Message(g.schemaName, g.resolveSchema(Cursor.simple): _*)
+
+  /** Finds a type at the given path
+    */
+  def findType[T](columnPath: ColumnPath)(using g: ParquetSchemaResolver[T]): Option[Type] =
+    g.resolveSchema(Cursor.following(columnPath)).headOption
 
   given ParquetSchemaResolver[Fields[EmptyTuple, EmptyTuple]] with
     def resolveSchema(cursor: Cursor): List[Type] = List.empty
@@ -93,6 +96,9 @@ object ParquetSchemaResolver:
     def onActive(cursor: Cursor, fieldName: String): Option[Type] =
       Option(summon[TSD[V]](fieldName))
 
+    def onCompleted(cursor: Cursor, fieldName: String): Option[Type] =
+      Option(summon[TSD[V]](fieldName))
+
   /** Purpose of productSchemaVisitor is to filter product fields so that those that are used for partitioning are not
     * present in the final schema. It is only applied to products that are not nested in Options and collections - as
     * optional fields and elements of collections are not valid for partitioning.
@@ -109,5 +115,9 @@ object ParquetSchemaResolver:
               Option(schema(fieldName).asGroupType().withNewFields(fieldTypes*))
         case schema =>
           Option(schema(fieldName))
+
+    def onCompleted(cursor: Cursor, fieldName: String): Option[Type] =
+      // TODO shall we resolve member fields, too?
+      Option(summon[TSD[V]](fieldName))
 
 end ParquetSchemaResolver
