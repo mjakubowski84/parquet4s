@@ -348,6 +348,10 @@ object reader {
           F.catchNonFatal(FilterCompat.get(pathFilterPredicate))
         )
       )
+      partitionViewOpt <- Stream.eval(F.delay(Option(projectedSchemaResolverOpt.fold(partitionedPath.view) {
+        implicit resolver =>
+          partitionedPath.view.filterPaths(ParquetSchemaResolver.findType[T](_).nonEmpty)
+      }).filter(_.nonEmpty)))
       parquetIterator <- Stream.resource(
         parquetIteratorResource(
           inputFile           = partitionedPath.inputFile,
@@ -358,7 +362,7 @@ object reader {
           options             = options
         )
       )
-    } yield partitionedReaderStream[F](parquetIterator, partitionedPath, chunkSize)
+    } yield partitionedReaderStream[F](parquetIterator, partitionViewOpt, chunkSize)
   }
 
   private def readSingleFile[F[_], T](
@@ -390,20 +394,18 @@ object reader {
 
   private def partitionedReaderStream[F[_]](
       parquetIterator: Iterator[RowParquetRecord],
-      partitionedPath: PartitionedPath,
+      partitionViewOpt: Option[PartitionView],
       chunkSize: Int
   )(implicit F: Sync[F]): Stream[F, RowParquetRecord] = {
     val stream = Stream.fromBlockingIterator[F](parquetIterator, chunkSize)
-    if (partitionedPath.partitions.nonEmpty) {
+    partitionViewOpt.fold(stream) { partitionView =>
       stream.evalMapChunk { record =>
-        partitionedPath.partitions.foldLeft(F.pure(record)) { case (f, (columnPath, value)) =>
+        partitionView.values.foldLeft(F.pure(record)) { case (f, (columnPath, value)) =>
           f.flatMap { r =>
             F.catchNonFatal(r.updated(columnPath, BinaryValue(value)))
           }
         }
       }
-    } else {
-      stream
     }
   }
 
