@@ -239,11 +239,13 @@ object ParquetSource extends IOOps {
           partitionedDirectory => {
             val projectedSchemaOpt = projectedSchemaResolverOpt
               .map(implicit resolver => ParquetSchemaResolver.resolveSchema(partitionedDirectory.schema))
+
             val filteredPaths = Source.fromIterator(() => partitionedDirectory.paths.iterator)
 
             if (parallelism == 1) {
               filteredPaths.flatMapConcat(
                 createPartitionedSource(
+                  projectedSchemaResolverOpt,
                   projectedSchemaOpt,
                   columnProjections,
                   decoder,
@@ -255,6 +257,7 @@ object ParquetSource extends IOOps {
               filteredPaths.flatMapMerge(
                 breadth = parallelism,
                 createPartitionedSource(
+                  projectedSchemaResolverOpt,
                   projectedSchemaOpt,
                   columnProjections,
                   decoder,
@@ -281,42 +284,49 @@ object ParquetSource extends IOOps {
     recordSource.map(decode)
   }
 
-  private def createPartitionedSource(
+  private def createPartitionedSource[T](
+      projectedSchemaResolverOpt: Option[ParquetSchemaResolver[T]],
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
-      decoder: ParquetRecordDecoder[?],
+      metadataReader: MetadataReader,
       fallbackFilterCompat: => FilterCompat.Filter,
       options: ParquetReader.Options
   ): PartitionedPath => Source[RowParquetRecord, NotUsed] =
-    partitionedPath =>
-      createSource(
+    partitionedPath => {
+      val partitionViewOpt = Option(projectedSchemaResolverOpt.fold(partitionedPath.view) { implicit resolver =>
+        partitionedPath.view.filterPaths(ParquetSchemaResolver.findType[T](_).nonEmpty)
+      }).filter(_.nonEmpty)
+
+      val source = createSource(
         inputFile          = partitionedPath.inputFile,
         projectedSchemaOpt = projectedSchemaOpt,
         columnProjections  = columnProjections,
         filterCompat       = partitionedPath.filterPredicateOpt.fold(fallbackFilterCompat)(FilterCompat.get),
-        decoder            = decoder,
+        metadataReader     = metadataReader,
         options            = options
       )
-        .map(setPartitionValues(partitionedPath))
+
+      partitionViewOpt.fold(source)(partitionView => source.map(setPartitionValues(partitionView)))
+    }
 
   private def createSource(
       inputFile: InputFile,
       projectedSchemaOpt: Option[MessageType],
       columnProjections: Seq[ColumnProjection],
       filterCompat: FilterCompat.Filter,
-      decoder: ParquetRecordDecoder[?],
+      metadataReader: MetadataReader,
       options: ParquetReader.Options
   ) =
     Source
       .unfoldResource[RowParquetRecord, Iterator[RowParquetRecord] & Closeable](
-        create =
-          ParquetIterator.factory(inputFile, projectedSchemaOpt, columnProjections, filterCompat, decoder, options),
+        create = ParquetIterator
+          .factory(inputFile, projectedSchemaOpt, columnProjections, filterCompat, metadataReader, options),
         read  = iterator => if (iterator.hasNext) Option(iterator.next()) else None,
         close = _.close()
       )
 
-  private def setPartitionValues(partitionedPath: PartitionedPath)(record: RowParquetRecord) =
-    partitionedPath.partitions.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
+  private def setPartitionValues(partitionView: PartitionView)(record: RowParquetRecord) =
+    partitionView.values.foldLeft(record) { case (currentRecord, (columnPath, value)) =>
       currentRecord.updated(columnPath, BinaryValue(value))
     }
 
