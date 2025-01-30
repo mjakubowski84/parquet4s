@@ -9,6 +9,7 @@ import org.scalatest.matchers.should.Matchers
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.TimeZone
+import java.util.concurrent.TimeUnit
 
 class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
 
@@ -16,7 +17,7 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
     BinaryValue {
       val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
       // tz offset is expressed in millis while time in Parquet is expressed in nanos
-      buf.putLong(-timeZone.getRawOffset * TimeValueCodecs.NanosPerMilli + timeInNanos)
+      buf.putLong(-timeZone.getRawOffset * TimeUnit.MILLISECONDS.toNanos(1) + timeInNanos)
       buf.putInt(epochDays + TimeValueCodecs.JulianDayOfEpoch)
       buf.array()
     }
