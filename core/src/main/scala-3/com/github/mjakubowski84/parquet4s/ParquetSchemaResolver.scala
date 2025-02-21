@@ -9,6 +9,7 @@ import scala.deriving.Mirror
 import scala.language.higherKinds
 import scala.reflect.ClassTag
 import scala.util.NotGiven
+import scala.util.Try
 
 /** Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
   * @tparam T
@@ -58,7 +59,18 @@ object ParquetSchemaResolver:
   /** Finds a type at the given path
     */
   def findType[T](columnPath: ColumnPath)(using g: ParquetSchemaResolver[T]): Option[Type] =
-    g.resolveSchema(Cursor.following(columnPath)).headOption
+    leafType(
+      g.resolveSchema(Cursor.following(columnPath)).headOption,
+      if (columnPath.isEmpty) Seq.empty else columnPath.elements.tail
+    )
+
+  private def leafType(typeOpt: Option[Type], pathElements: Seq[String]): Option[Type] =
+    typeOpt match {
+      case Some(group: GroupType) if pathElements.nonEmpty =>
+        leafType(Try(group.getType(pathElements.head)).toOption, pathElements.tail)
+      case _ =>
+        typeOpt
+    }
 
   given ParquetSchemaResolver[Fields[EmptyTuple, EmptyTuple]] with
     def resolveSchema(cursor: Cursor): List[Type] = List.empty
@@ -117,7 +129,6 @@ object ParquetSchemaResolver:
           Option(schema(fieldName))
 
     def onCompleted(cursor: Cursor, fieldName: String): Option[Type] =
-      // TODO shall we resolve member fields, too?
       Option(summon[TSD[V]](fieldName))
 
 end ParquetSchemaResolver

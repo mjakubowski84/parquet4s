@@ -3,6 +3,7 @@ package com.github.mjakubowski84.parquet4s
 import com.github.mjakubowski84.parquet4s.TypedSchemaDef as TSD
 import org.apache.parquet.schema.*
 import org.slf4j.LoggerFactory
+import scala.util.Try
 import shapeless.*
 import shapeless.labelled.*
 
@@ -44,7 +45,7 @@ object ParquetSchemaResolver {
 
   trait SchemaVisitor[V] extends Cursor.Visitor[TypedSchemaDefInvoker[V], Option[Type]] {
     override def onCompleted(cursor: Cursor, invoker: TypedSchemaDefInvoker[V]): Option[Type] =
-      Option(invoker.schema(cursor.path.elements.last))
+      Option(invoker())
   }
 
   private val logger = LoggerFactory.getLogger(this.getClass)
@@ -65,7 +66,18 @@ object ParquetSchemaResolver {
   /** Finds a type at the given path
     */
   def findType[T](columnPath: ColumnPath)(implicit g: ParquetSchemaResolver[T]): Option[Type] =
-    g.resolveSchema(Cursor.following(columnPath)).headOption
+    leafType(
+      g.resolveSchema(Cursor.following(columnPath)).headOption,
+      if (columnPath.isEmpty) Seq.empty else columnPath.elements.tail
+    )
+
+  private def leafType(typeOpt: Option[Type], pathElements: Seq[String]): Option[Type] =
+    typeOpt match {
+      case Some(group: GroupType) if pathElements.nonEmpty =>
+        leafType(Try(group.getType(pathElements.head)).toOption, pathElements.tail)
+      case _ =>
+        typeOpt
+    }
 
   implicit val hnil: ParquetSchemaResolver[HNil] = _ => List.empty
 

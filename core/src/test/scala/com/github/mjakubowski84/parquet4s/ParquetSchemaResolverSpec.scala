@@ -1,7 +1,7 @@
 package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.LogicalTypes.*
-import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.resolveSchema
+import com.github.mjakubowski84.parquet4s.ParquetSchemaResolver.{resolveSchema, findType}
 import com.github.mjakubowski84.parquet4s.TestCases.*
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.*
 import org.apache.parquet.schema.Type.Repetition.*
@@ -267,6 +267,35 @@ class ParquetSchemaResolverSpec extends AnyFlatSpec with Matchers {
   it should "use default schema name when processing a class that JVM treats as malformed" in {
     val resolved = resolveSchema[ParquetSchemaResolverSpec.Malformed.Clazz]
     resolved.getName should be(Message.DefaultName)
+  }
+
+  "findType" should "find a field" in {
+    findType[Primitives](Col("int")) should be(Some(Types.primitive(INT32, REQUIRED).as(Int32Type).named("int")))
+  }
+
+  it should "process empty class" in {
+    findType[Empty](Col("")) should be(None)
+    findType[Empty](Col("invalid")) should be(None)
+  }
+
+  it should "handle invalid paths" in {
+    findType[Primitives](Col("invalid")) should be(None)
+    findType[Primitives](Col("")) should be(None)
+  }
+
+  it should "find a nested field" in {
+    findType[ContainsNestedClass](Col("nested.int")) should be(Some(Types.required(INT32).as(Int32Type).named("int")))
+  }
+
+  it should "provide complex type result" in {
+    findType[ContainsNestedClass](Col("nested")) should be(
+      Some(
+        Types
+          .optionalGroup()
+          .addField(Types.required(INT32).as(Int32Type).named("int"))
+          .named("nested")
+      )
+    )
   }
 
 }
