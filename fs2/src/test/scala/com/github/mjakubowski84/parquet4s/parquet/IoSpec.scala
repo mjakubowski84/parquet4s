@@ -7,15 +7,14 @@ import org.scalatest.matchers.should.Matchers
 
 class IoSpec extends AnyFlatSpec with Matchers with Inside with PartitionTestUtils {
 
-  "PartitionRegexp" should "match valid partition names and values" in {
+  "PartitionRegexp" should "match valid partition names and values" in
     forAll(ValidPartitionsTable) { case (name, value) =>
       inside(s"$name=$value") { case io.PartitionRegexp(`name`, `value`) =>
         succeed
       }
     }
-  }
 
-  it should "not match invalid partition names and values" in {
+  it should "not match invalid partition names and values" in
     forAll(InvalidPartitionsTable) { case (name, value) =>
       s"$name=$value" match {
         case io.PartitionRegexp(capturedName, capturedValue) =>
@@ -27,6 +26,5 @@ class IoSpec extends AnyFlatSpec with Matchers with Inside with PartitionTestUti
           succeed
       }
     }
-  }
 
 }

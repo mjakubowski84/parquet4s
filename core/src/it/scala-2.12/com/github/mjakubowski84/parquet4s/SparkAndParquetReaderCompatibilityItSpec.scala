@@ -27,9 +27,8 @@ class SparkAndParquetReaderCompatibilityItSpec extends AnyFreeSpec with Matchers
       }
     }
 
-  "ParquetReader should be able to read file saved by Spark if the file contains" - {
+  "ParquetReader should be able to read file saved by Spark if the file contains" -
     CompatibilityTestCases.cases(Spark, Reader).foreach(runTestCase)
-  }
 
   "ParquetReader should read data partitioned by Spark" in {
     import sparkSession.implicits.*

@@ -26,8 +26,7 @@ class ParquetWriterAndParquetReaderCompatibilityItSpec
       finally parquetIterable.close()
     }
 
-  "Spark should be able to read file saved by ParquetWriter if the file contains" - {
+  "Spark should be able to read file saved by ParquetWriter if the file contains" -
     CompatibilityTestCases.cases(Writer, Reader).foreach(runTestCase)
-  }
 
 }

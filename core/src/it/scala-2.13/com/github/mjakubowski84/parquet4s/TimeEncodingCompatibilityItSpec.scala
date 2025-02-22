@@ -46,7 +46,7 @@ abstract class TimeEncodingCompatibilityItSpec
     finally parquetIterable.close()
   }
 
-  "For time zone of" - {
+  "For time zone of" -
     timeZones.foreach { timeZone =>
       val data = TimePrimitives(timestamp = localDateTimeToTimestamp(newYearMidnight, timeZone), date = newYear)
       timeZone.getDisplayName - {
@@ -60,6 +60,5 @@ abstract class TimeEncodingCompatibilityItSpec
         }
       }
     }
-  }
 
 }
