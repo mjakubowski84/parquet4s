@@ -28,7 +28,7 @@ class S3ItSpec extends AnyFlatSpec with Matchers with TestContainerForAll {
   override def afterContainersStart(containers: LocalStackV2Container): Unit =
     containers.execInContainer("awslocal", "s3api", "create-bucket", "--bucket", bucket)
 
-  "Parquet4s" should "write and read data to/from S3" in {
+  "Parquet4s" should "write and read data to/from S3" in
     withContainers { s3Container =>
       val configuration = new Configuration()
 
@@ -43,6 +43,5 @@ class S3ItSpec extends AnyFlatSpec with Matchers with TestContainerForAll {
         _.toSeq should be(data)
       }
     }
-  }
 
 }

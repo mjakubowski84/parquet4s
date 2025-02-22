@@ -19,8 +19,7 @@ class SparkAndParquetReaderCompatibilityItSpec extends AnyFreeSpec with Matchers
       finally parquetIterable.close()
     }
 
-  "ParquetReader should be able to read file saved by Spark if the file contains" - {
+  "ParquetReader should be able to read file saved by Spark if the file contains" -
     CompatibilityTestCases.cases(Spark, Reader).foreach(runTestCase)
-  }
 
 }

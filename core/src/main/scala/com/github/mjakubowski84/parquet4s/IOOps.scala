@@ -150,13 +150,12 @@ trait IOOps {
         // non-empty node dir
         // early removes paths which do not match filter predicate
         filterPredicateOpt
-          .fold(partitionedDirs.map { case (path, partition) => path -> (partitions :+ partition) }) {
-            filterPredicate =>
-              PartitionFilter.filterPartitionPaths(
-                filterPredicate  = filterPredicate,
-                commonPartitions = partitions,
-                partitionedPaths = partitionedDirs
-              )
+          .fold(partitionedDirs.map { case (path, partition) => path -> (partitions :+ partition) }) { filterPredicate =>
+            PartitionFilter.filterPartitionPaths(
+              filterPredicate  = filterPredicate,
+              commonPartitions = partitions,
+              partitionedPaths = partitionedDirs
+            )
           }
           .map { case (subPath, partitions) =>
             listPartitionedDirectory(fs, configuration, subPath, partitions, filterPredicateOpt)

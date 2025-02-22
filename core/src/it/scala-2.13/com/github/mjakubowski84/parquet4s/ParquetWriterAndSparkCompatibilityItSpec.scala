@@ -18,8 +18,7 @@ class ParquetWriterAndSparkCompatibilityItSpec extends AnyFreeSpec with Matchers
       readFromTemp(testCase.typeTag) should contain theSameElementsAs testCase.data
     }
 
-  "Spark should be able to read file saved by ParquetWriter if the file contains" - {
+  "Spark should be able to read file saved by ParquetWriter if the file contains" -
     CompatibilityTestCases.cases(Writer, Spark).foreach(runTestCase)
-  }
 
 }

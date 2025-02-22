@@ -249,9 +249,8 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "throw exception when encountered null-value as a key" in {
-    a[DecodingException] should be thrownBy {
+    a[DecodingException] should be thrownBy
       decode[ContainsMapOfPrimitives](RowParquetRecord("map" -> MapParquetRecord(NullValue -> 1.value)))
-    }
   }
 
   it should "decode record containing map of optional primitives" in {

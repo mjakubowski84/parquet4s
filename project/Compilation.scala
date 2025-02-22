@@ -4,7 +4,7 @@ import sbt.CrossVersion
 object Compilation {
 
   lazy val compilationSettings = Seq(
-    scalacOptions ++= {
+    scalacOptions ++=
       Seq(
         "-encoding",
         "UTF-8",
@@ -60,7 +60,6 @@ object Compilation {
             )
         }
       }
-    }
   )
 
 }

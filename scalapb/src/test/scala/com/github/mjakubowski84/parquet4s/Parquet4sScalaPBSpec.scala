@@ -26,13 +26,11 @@ class Parquet4sScalaPBSpec extends AnyFlatSpec with Matchers {
     testWithData(i => Data(abc = Data.ABC.fromValue(i % 3)))
   }
 
-  it should "work with message types" in {
+  it should "work with message types" in
     testWithData(i => Data(inner = Some(Data.Inner(i.toString))))
-  }
 
-  it should "work with unrecognized enum values" in {
+  it should "work with unrecognized enum values" in
     testWithData(i => Data(abc = Data.ABC.fromValue(i % 5)))
-  }
 
   it should "work with map types" in {
     testWithData(i => Data(map = Map("original" -> i, "doubled" -> 2 * i)))

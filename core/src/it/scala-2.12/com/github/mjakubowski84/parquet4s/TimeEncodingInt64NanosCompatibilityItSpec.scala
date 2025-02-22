@@ -38,7 +38,7 @@ class TimeEncodingInt64NanosCompatibilityItSpec extends AnyFreeSpec with Matcher
     finally parquetIterable.close()
   }
 
-  "Parquet4s should read data written with time zone of" - {
+  "Parquet4s should read data written with time zone of" -
     timeZones.foreach { timeZone =>
       val data = TimePrimitives(timestamp = localDateTimeToTimestamp(newYearMidnight, timeZone), date = newYear)
       timeZone.getDisplayName in {
@@ -46,6 +46,5 @@ class TimeEncodingInt64NanosCompatibilityItSpec extends AnyFreeSpec with Matcher
         readWithParquet4S(timeZone) should be(data)
       }
     }
-  }
 
 }
