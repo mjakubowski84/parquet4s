@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory
 
 import scala.annotation.implicitNotFound
 import scala.deriving.Mirror
+import scala.jdk.CollectionConverters.*
 import scala.language.higherKinds
 import scala.reflect.ClassTag
 import scala.util.NotGiven
@@ -115,20 +116,39 @@ object ParquetSchemaResolver:
     * present in the final schema. It is only applied to products that are not nested in Options and collections - as
     * optional fields and elements of collections are not valid for partitioning.
     */
-  given productSchemaVisitor[V <: Product: ParquetSchemaResolver: TSD]: SchemaVisitor[V] with
+  given productSchemaVisitor[V <: Product: TSD]: SchemaVisitor[V] with
     def onActive(cursor: Cursor, fieldName: String): Option[Type] =
       summon[TSD[V]] match
-        // override fields only in generated groups (records), custom ones provided by users are not processed
-        case schema if schema.isGroup && schema.metadata.contains(SchemaDef.Meta.Generated) =>
-          summon[ParquetSchemaResolver[V]].resolveSchema(cursor) match
+        case schema if schema.isGroup =>
+          val groupType = schema(fieldName).asGroupType()
+          applyCursor(cursor, groupType) match {
             case Nil =>
               None
-            case fieldTypes =>
-              Option(schema(fieldName).asGroupType().withNewFields(fieldTypes*))
+            case filteredFields =>
+              Option(groupType.withNewFields(filteredFields*))
+          }
         case schema =>
           Option(schema(fieldName))
 
     def onCompleted(cursor: Cursor, fieldName: String): Option[Type] =
       Option(summon[TSD[V]](fieldName))
+
+  private[parquet4s] def applyCursor(cursor: Cursor, group: GroupType): List[Type] =
+    val fields = group.getFields.asScala.toList
+    fields.flatMap {
+      case groupField: GroupType if groupField.getLogicalTypeAnnotation == null =>
+        cursor.advanceByFieldName(groupField.getName).flatMap { newCursor =>
+          val fields = applyCursor(newCursor, groupField)
+          if (fields.isEmpty) None
+          else
+            Some(
+              SchemaDef
+                .group(fields*)
+                .withRequired(groupField.getRepetition == Type.Repetition.REQUIRED)(groupField.getName)
+            )
+        }
+      case field =>
+        cursor.advanceByFieldName(field.getName).map(_ => field)
+    }
 
 end ParquetSchemaResolver

@@ -8,6 +8,7 @@ import shapeless.*
 import shapeless.labelled.*
 
 import scala.annotation.{implicitNotFound, nowarn}
+import scala.jdk.CollectionConverters.*
 import scala.reflect.ClassTag
 
 /** Type class that allows to build schema of Parquet file out from regular Scala type, typically case class.
@@ -124,18 +125,37 @@ object ParquetSchemaResolver {
     * present in final schema. It is only applied to products that are not nested in Options and collections as optional
     * fields and elements of collections are not valid for partitioning.
     */
-  implicit def productSchemaVisitor[V](implicit resolver: ParquetSchemaResolver[V]): SchemaVisitor[V] =
+  implicit def productSchemaVisitor[V]: SchemaVisitor[V] =
     (cursor: Cursor, invoker: TypedSchemaDefInvoker[V]) =>
-      // override fields only in generated groups (records), custom ones provided by users are not processed
-      if (invoker.schema.isGroup && invoker.schema.metadata.contains(SchemaDef.Meta.Generated)) {
-        resolver.resolveSchema(cursor) match {
+      if (invoker.schema.isGroup) {
+        val groupType = invoker.apply().asGroupType()
+        applyCursor(cursor, groupType) match {
           case Nil =>
             None
-          case fieldTypes =>
-            Option(invoker().asGroupType().withNewFields(fieldTypes*))
+          case filteredFields =>
+            Option(groupType.withNewFields(filteredFields*))
         }
       } else {
         Option(invoker())
       }
+
+  private[parquet4s] def applyCursor(cursor: Cursor, group: GroupType): List[Type] = {
+    val fields = group.getFields.asScala.toList
+    fields.flatMap {
+      case groupField: GroupType if groupField.getLogicalTypeAnnotation == null =>
+        cursor.advanceByFieldName(groupField.getName).flatMap { newCursor =>
+          val fields = applyCursor(newCursor, groupField)
+          if (fields.isEmpty) None
+          else
+            Some(
+              SchemaDef
+                .group(fields*)
+                .withRequired(groupField.getRepetition == Type.Repetition.REQUIRED)(groupField.getName)
+            )
+        }
+      case field =>
+        cursor.advanceByFieldName(field.getName).map(_ => field)
+    }
+  }
 
 }

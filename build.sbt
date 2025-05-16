@@ -6,8 +6,8 @@ import bloop.integrations.sbt.BloopDefaults
 import sbt.util
 
 lazy val twoTwelve              = "2.12.20"
-lazy val twoThirteen            = "2.13.15"
-lazy val three                  = "3.3.4"
+lazy val twoThirteen            = "2.13.16"
+lazy val three                  = "3.3.6"
 lazy val supportedScalaVersions = Seq(twoTwelve, twoThirteen, three)
 
 val akkaLib  = ActorLibCross("-akka", "-akka")
@@ -38,7 +38,15 @@ lazy val itSettings = Defaults.itSettings ++
     Seq(
       fork := true,
       parallelExecution := false,
-      testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value)
+      testOptions += Tests.Argument("-u", "target/junit/" + scalaBinaryVersion.value),
+      javaOptions ++= {
+        if (sys.props("java.version").startsWith("1.8")) Seq.empty
+        else
+          Seq(
+            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+            "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED"
+          )
+      }
     )
   ) ++ Project.inConfig(IntegrationTest)(BloopDefaults.configSettings)
 
@@ -216,10 +224,10 @@ lazy val examples = (projectMatrix in file("examples"))
       "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
       "org.apache.parquet" % "parquet-protobuf" % parquetVersion,
       "org.apache.parquet" % "parquet-avro" % parquetVersion,
-      "io.github.embeddedkafka" %% "embedded-kafka" % "3.9.0",
+      "io.github.embeddedkafka" %% "embedded-kafka" % "3.9.0", // 4.+ doesn't support 2.12
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.github.fd4s" %% "fs2-kafka" % "3.6.0",
+      "com.github.fd4s" %% "fs2-kafka" % "3.7.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(

@@ -8,7 +8,8 @@ object Compilation {
       Seq(
         "-encoding",
         "UTF-8",
-        "-release:8",
+        "-release",
+        "8",
         "-feature",
         "-language:implicitConversions",
         "-language:higherKinds",
