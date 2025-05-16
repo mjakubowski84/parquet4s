@@ -460,10 +460,13 @@ object rotatingWriter {
 
   private object RecordWriter {
 
+    // TODO use UUIDGen.randomUUID to create UUID, because randomUUID might be blocking
     private def newFileName(options: ParquetWriter.Options): String = {
       val compressionExtension = options.compressionCodecName.getExtension
       UUID.randomUUID().toString + compressionExtension + ".parquet"
     }
+
+    // TODO use resources with Fiber.background instead of Fiber.start
 
     def apply[F[_], T, W, R](
         basePath: Path,

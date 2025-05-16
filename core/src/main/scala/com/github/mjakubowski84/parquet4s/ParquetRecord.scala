@@ -2,12 +2,10 @@ package com.github.mjakubowski84.parquet4s
 
 import com.github.mjakubowski84.parquet4s.compat.MapCompat
 import org.apache.parquet.io.api.RecordConsumer
-import org.apache.parquet.schema.Type.Repetition
-import org.apache.parquet.schema.{GroupType, MessageType, Type}
+import org.apache.parquet.schema.{MessageType, Type}
 
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.jdk.CollectionConverters.*
 
 /** Special type of [[Value]] that represents a record in Parquet file. Mutable and <b>NOT</b> thread-safe. A record is
   * a complex type of data that contains series of other value entries inside.
@@ -139,26 +137,8 @@ object RowParquetRecord {
 
   implicit def genericParquetSchemaResolver(implicit message: MessageType): ParquetSchemaResolver[RowParquetRecord] =
     new ParquetSchemaResolver[RowParquetRecord] {
-      override def schemaName: Option[String] = Option(message.getName)
-      override def resolveSchema(cursor: Cursor): List[Type] =
-        applyCursor(cursor, message.getFields.asScala.toList)
-
-      private def applyCursor(cursor: Cursor, fields: List[Type]): List[Type] =
-        fields.flatMap {
-          case groupField: GroupType if groupField.getLogicalTypeAnnotation == null =>
-            cursor.advanceByFieldName(groupField.getName).flatMap { newCursor =>
-              val fields = applyCursor(newCursor, groupField.getFields.asScala.toList)
-              if (fields.isEmpty) None
-              else
-                Some(
-                  SchemaDef
-                    .group(fields*)
-                    .withRequired(groupField.getRepetition == Repetition.REQUIRED)(groupField.getName)
-                )
-            }
-          case field =>
-            cursor.advanceByFieldName(field.getName).map(_ => field)
-        }
+      override def schemaName: Option[String]                = Option(message.getName)
+      override def resolveSchema(cursor: Cursor): List[Type] = ParquetSchemaResolver.applyCursor(cursor, message)
     }
 
 }

@@ -86,9 +86,9 @@ class CustomTypeITSpec extends AnyFlatSpec with Matchers with BeforeAndAfter wit
 
   val typed = Set(
     Data(
-      new SimpleClass("simple"),
-      CaseClass("case"),
-      ComplexCaseClass(1, 2)
+      a = new SimpleClass("simple"),
+      b = CaseClass("case"),
+      c = ComplexCaseClass(x = 1, y = 2)
     )
   )
   val generic = Set(
