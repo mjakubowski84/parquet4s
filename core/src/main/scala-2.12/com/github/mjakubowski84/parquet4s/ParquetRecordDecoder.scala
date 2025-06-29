@@ -61,7 +61,7 @@ object ParquetRecordDecoder {
           case NonFatal(cause) =>
             throw DecodingException(s"Failed to decode field $fieldName of record: $record", cause)
         }
-      
+
       field[FieldName](decodedFieldValue) :: tailDecoder.decode(record, configuration)
     }
 
