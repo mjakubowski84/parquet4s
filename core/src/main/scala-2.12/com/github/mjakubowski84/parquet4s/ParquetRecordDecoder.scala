@@ -55,18 +55,14 @@ object ParquetRecordDecoder {
   ): ParquetRecordDecoder[FieldType[FieldName, Head] :: Tail] =
     (record: RowParquetRecord, configuration: ValueCodecConfiguration) => {
       val fieldName = witness.value.name
-      val decodedFieldOpt =
-        try record.get[Head](fieldName, configuration)
+      val decodedFieldValue =
+        try headDecoder.decode(record.get(fieldName).getOrElse(NullValue), configuration)
         catch {
           case NonFatal(cause) =>
             throw DecodingException(s"Failed to decode field $fieldName of record: $record", cause)
         }
-      decodedFieldOpt match {
-        case Some(decodedFieldValue) =>
-          field[FieldName](decodedFieldValue) :: tailDecoder.decode(record, configuration)
-        case None =>
-          throw DecodingException(s"Missing required field $fieldName in a record: $record")
-      }
+      
+      field[FieldName](decodedFieldValue) :: tailDecoder.decode(record, configuration)
     }
 
   implicit def genericDecoder[A, R](implicit
