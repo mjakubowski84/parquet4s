@@ -52,17 +52,12 @@ object ParquetRecordDecoder:
   ): ParquetRecordDecoder[Fields[L *: LT, V *: VT]] with
     def decode(record: RowParquetRecord, configuration: ValueCodecConfiguration): Fields[L *: LT, V *: VT] =
       val fieldName = summon[ValueOf[L]].value
-      val decodedFieldOpt =
-        try record.get[V](fieldName, configuration)
+      val decodedFieldValue =
+        try summon[ValueDecoder[V]].decode(record.get(fieldName).getOrElse(NullValue), configuration)
         catch
           case NonFatal(cause) =>
             throw DecodingException(s"Failed to decode field $fieldName of record: $record", cause)
-
-      decodedFieldOpt match
-        case Some(decodedFieldValue) =>
-          Fields(decodedFieldValue *: tailDecoder.decode(record, configuration).values)
-        case None =>
-          throw DecodingException(s"Missing required field $fieldName in a record: $record")
+      Fields(decodedFieldValue *: tailDecoder.decode(record, configuration).values)
 
   given derived[P <: Product](using
       mirror: Mirror.ProductOf[P],
