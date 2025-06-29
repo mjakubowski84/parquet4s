@@ -227,7 +227,7 @@ lazy val examples = (projectMatrix in file("examples"))
       "io.github.embeddedkafka" %% "embedded-kafka" % "3.9.0", // 4.+ doesn't support 2.12
       "ch.qos.logback" % "logback-classic" % logbackVersion,
       "org.slf4j" % "log4j-over-slf4j" % slf4jVersion,
-      "com.github.fd4s" %% "fs2-kafka" % "3.7.0",
+      "com.github.fd4s" %% "fs2-kafka" % "3.8.0",
       "co.fs2" %% "fs2-io" % fs2Version
     ),
     excludeDependencies ++= Seq(
