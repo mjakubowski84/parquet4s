@@ -167,13 +167,13 @@ class ParquetRecordDecoderSpec extends AnyFlatSpec with Matchers {
     decode[ContainsOption](RowParquetRecord.emptyWithSchema("optional")) should be(ContainsOption(None))
   }
 
-  it should "let's see 1" in {
+  it should "decode missing nullable field as null" in {
     case class MySchema(a: String, b: String)
 
     decode[MySchema](RowParquetRecord("a" -> "foo".value)) should be(MySchema("foo", null))
   }
 
-  it should "let's see 2" in {
+  it should "decode missing optional field as None" in {
     case class MySchema(a: String, bOpt: Option[String])
 
     decode[MySchema](RowParquetRecord("a" -> "foo".value)) should be(MySchema("foo", None))
