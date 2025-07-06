@@ -5,24 +5,6 @@ object Releasing {
 
   lazy val publishSettings: Seq[Def.Setting[_]] =
     Seq(
-      credentials ++= Seq(
-        Credentials(
-          realm = "Central Portal",
-          host  = "central.sonatype.com",
-          userName = sys.env.getOrElse(
-            "SONATYPE_USERNAME", {
-              streams.value.log.warn("Undefined environment variable: SONATYPE_USERNAME")
-              "UNDEFINED"
-            }
-          ),
-          passwd = sys.env.getOrElse(
-            "SONATYPE_PASSWORD", {
-              streams.value.log.warn("Undefined environment variable: SONATYPE_PASSWORD")
-              "UNDEFINED"
-            }
-          )
-        )
-      ),
       licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT")),
       homepage := Some(url("https://mjakubowski84.github.io/parquet4s/")),
       scmInfo := Some(
