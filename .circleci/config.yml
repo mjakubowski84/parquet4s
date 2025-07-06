@@ -152,7 +152,7 @@ jobs:
           working_directory: workspace/repo
       - run:
           name: Release on Sonatype
-          command: cat /dev/null | sbt sonatypeReleaseAll
+          command: cat /dev/null | sbt sonaRelease
           working_directory: workspace/repo
       - cache_dependencies:
           path: workspace/repo

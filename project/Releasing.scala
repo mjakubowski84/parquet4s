@@ -1,7 +1,5 @@
 import sbt.Keys._
 import sbt.{Credentials, Def, Developer, IntegrationTest, Opts, ScmInfo, Test, url}
-import xerial.sbt.Sonatype._
-import xerial.sbt.Sonatype.autoImport.{sonatypeProfileName, sonatypeProjectHosting}
 
 object Releasing {
 
@@ -9,8 +7,8 @@ object Releasing {
     Seq(
       credentials ++= Seq(
         Credentials(
-          realm = "Sonatype Nexus Repository Manager",
-          host  = "oss.sonatype.org",
+          realm = "Sonatype Central",
+          host  = "central.sonatype.com",
           userName = sys.env.getOrElse(
             "SONATYPE_USERNAME", {
               streams.value.log.warn("Undefined environment variable: SONATYPE_USERNAME")
@@ -26,17 +24,13 @@ object Releasing {
         )
       ),
       licenses := Seq("MIT" -> url("https://opensource.org/licenses/MIT")),
-      homepage := Some(url("https://github.com/mjakubowski84/parquet4s")),
+      homepage := Some(url("https://mjakubowski84.github.io/parquet4s/")),
       scmInfo := Some(
         ScmInfo(
           browseUrl  = url("https://github.com/mjakubowski84/parquet4s"),
           connection = "scm:git@github.com:mjakubowski84/parquet4s.git"
         )
       ),
-      sonatypeProjectHosting := Some(
-        GitHubHosting(user = "mjakubowski84", repository = "parquet4s", email = "mjakubowski84@gmail.com")
-      ),
-      sonatypeProfileName := "com.github.mjakubowski84",
       developers := List(
         Developer(
           id    = "mjakubowski84",
@@ -46,12 +40,13 @@ object Releasing {
         )
       ),
       publishMavenStyle := true,
-      publishTo := Some(
+      pomIncludeRepository := { _ => false },
+      publishTo := {
         if (isSnapshot.value)
-          Opts.resolver.mavenLocalFile
+          Some(Opts.resolver.mavenLocalFile)
         else
-          Opts.resolver.sonatypeStaging
-      ),
+          localStaging.value
+      },
       Test / publishArtifact := false,
       IntegrationTest / publishArtifact := false
     ) ++ (if (sys.env contains "SONATYPE_USERNAME") Signing.signingSettings else Seq.empty)
