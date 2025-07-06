@@ -7,7 +7,7 @@ object Releasing {
     Seq(
       credentials ++= Seq(
         Credentials(
-          realm = "Sonatype Central",
+          realm = "Central Portal",
           host  = "central.sonatype.com",
           userName = sys.env.getOrElse(
             "SONATYPE_USERNAME", {
