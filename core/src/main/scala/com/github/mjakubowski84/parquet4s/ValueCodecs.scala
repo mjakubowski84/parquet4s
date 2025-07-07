@@ -1,11 +1,6 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.TimeValueCodecs.{
-  instantToLocalDateTime,
-  localDateTimeToInstant,
-  localDateTimeToTimestamp,
-  timestampToLocalDateTime
-}
+import com.github.mjakubowski84.parquet4s.TimeValueCodecs.{localDateTimeToTimestamp, timestampToLocalDateTime}
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.sql.{Date, Timestamp}
@@ -188,6 +183,16 @@ private[parquet4s] object TimeValueCodecs {
         LocalDateTime.ofInstant(Instant.ofEpochSecond(seconds, nanos), timeZone.toZoneId)
     }
 
+  def decodeInstant(value: Value): Instant =
+    value match {
+      case BinaryValue(binary) =>
+        val buf     = ByteBuffer.wrap(binary.getBytes).order(ByteOrder.LITTLE_ENDIAN)
+        val seconds = buf.getLong
+        val nanos   = buf.getInt.toLong
+
+        Instant.ofEpochSecond(seconds, nanos)
+    }
+
   def encodeLocalDateTime(data: LocalDateTime, timeZone: TimeZone): Value = BinaryValue {
     val date = data.toLocalDate
     val time = data.toLocalTime
@@ -206,18 +211,22 @@ private[parquet4s] object TimeValueCodecs {
     buf.array()
   }
 
+  def encodeInstant(instant: Instant): Value = BinaryValue {
+    val seconds = instant.getEpochSecond
+    val nanos   = instant.getNano
+
+    val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
+    buf.putLong(seconds)
+    buf.putInt(nanos)
+    buf.array()
+  }
+
   def decodeLocalDate(value: Value): LocalDate =
     value match {
       case IntValue(epochDay) => LocalDate.ofEpochDay(epochDay.toLong)
     }
 
   def encodeLocalDate(data: LocalDate): Value = IntValue(data.toEpochDay.toInt)
-
-  def localDateTimeToInstant(dateTime: LocalDateTime, timeZone: TimeZone): Instant =
-    ZonedDateTime.of(dateTime, timeZone.toZoneId).toInstant
-
-  def instantToLocalDateTime(instant: Instant, timeZone: TimeZone): LocalDateTime =
-    LocalDateTime.ofInstant(instant, timeZone.toZoneId)
 
   def localDateTimeToTimestamp(dateTime: LocalDateTime, timeZone: TimeZone): Timestamp =
     Timestamp.from(ZonedDateTime.of(dateTime, timeZone.toZoneId).toInstant)
@@ -234,10 +243,8 @@ trait TimeValueDecoders {
   }
 
   implicit val instantDecoder: OptionalValueDecoder[Instant] = new OptionalValueDecoder[Instant] {
-    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Instant = {
-      val timeZone = configuration.timeZone
-      localDateTimeToInstant(TimeValueCodecs.decodeLocalDateTime(value, timeZone), timeZone)
-    }
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Instant =
+      TimeValueCodecs.decodeInstant(value)
   }
 
   implicit val sqlTimestampDecoder: OptionalValueDecoder[java.sql.Timestamp] = new OptionalValueDecoder[Timestamp] {
@@ -267,10 +274,8 @@ trait TimeValueEncoders {
   }
 
   implicit val instantEncoder: OptionalValueEncoder[Instant] = new OptionalValueEncoder[Instant] {
-    def encodeNonNull(data: Instant, configuration: ValueCodecConfiguration): Value = {
-      val timeZone = configuration.timeZone
-      TimeValueCodecs.encodeLocalDateTime(instantToLocalDateTime(data, timeZone), timeZone)
-    }
+    def encodeNonNull(data: Instant, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeInstant(data)
   }
 
   implicit val sqlTimestampEncoder: OptionalValueEncoder[java.sql.Timestamp] = new OptionalValueEncoder[Timestamp] {
