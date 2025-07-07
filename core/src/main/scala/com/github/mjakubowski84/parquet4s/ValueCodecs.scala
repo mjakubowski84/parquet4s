@@ -191,6 +191,21 @@ private[parquet4s] object TimeValueCodecs {
         val nanos   = buf.getInt.toLong
 
         Instant.ofEpochSecond(seconds, nanos)
+
+      case DateTimeValue(value, TimestampFormat.Int64Millis) =>
+        Instant.ofEpochMilli(value)
+
+      case DateTimeValue(value, TimestampFormat.Int64Micros) =>
+        val seconds = value / MicrosPerSecond
+        val micros  = value % MicrosPerSecond
+        val nanos   = micros * NanosPerMicro
+        Instant.ofEpochSecond(seconds, nanos)
+
+      case DateTimeValue(value, TimestampFormat.Int64Nanos) =>
+        val seconds = value / NanosPerSecond
+        val nanos   = value % NanosPerSecond
+        Instant.ofEpochSecond(seconds, nanos)
+
     }
 
   def encodeLocalDateTime(data: LocalDateTime, timeZone: TimeZone): Value = BinaryValue {
