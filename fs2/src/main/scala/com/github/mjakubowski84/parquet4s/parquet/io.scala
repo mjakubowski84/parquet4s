@@ -128,7 +128,9 @@ private[parquet] object io {
       F: Sync[F]
   ): Stream[F, Either[Seq[Path], Seq[PartitionedPath]]] =
     Stream
-      .evalSeq(F.blocking(fs.listStatus(path.toHadoop, HiddenFileFilter.INSTANCE).toVector))
+      .evalSeq(
+        F.blocking(fs.listStatus(path.toHadoop, HiddenFileFilter.INSTANCE).toVector.sortBy(_.getPath().getName()))
+      )
       .fold[StatusAccumulator](Empty) {
         case (Empty, status) if status.isDirectory =>
           matchPartition(status).fold[StatusAccumulator](Empty)(Dirs.apply)
