@@ -1,16 +1,13 @@
 package com.github.mjakubowski84.parquet4s
 
-import com.github.mjakubowski84.parquet4s.TimeValueCodecs.{
-  instantToLocalDateTime,
-  localDateTimeToInstant,
-  localDateTimeToTimestamp,
-  timestampToLocalDateTime
-}
+import com.github.mjakubowski84.parquet4s.TimeValueCodecs.{instantToLocalDateTime, localDateTimeToInstant}
 
 import java.nio.{ByteBuffer, ByteOrder}
 import java.sql.{Date, Timestamp}
 import java.time.*
 import java.util.TimeZone
+import java.util.concurrent.TimeUnit
+
 import scala.annotation.nowarn
 import scala.collection.compat.*
 import scala.reflect.ClassTag
@@ -131,79 +128,47 @@ trait PrimitiveValueEncoders {
 }
 
 private[parquet4s] object TimeValueCodecs {
-  val JulianDayOfEpoch      = 2440588
-  val MillisPerSecond       = 1000L
-  val MicrosPerMilli        = 1000L
-  val NanosPerMicro         = 1000L
-  val MicrosPerSecond: Long = MicrosPerMilli * MillisPerSecond
-  val NanosPerMilli: Long   = NanosPerMicro * MicrosPerMilli
-  val NanosPerSecond: Long  = NanosPerMilli * MillisPerSecond
-  val NanosPerDay           = 86400000000000L
+  val JulianDayOfEpoch        = 2440588
+  private val NanosPerMicro   = TimeUnit.MICROSECONDS.toNanos(1)
+  private val MicrosPerSecond = TimeUnit.SECONDS.toMicros(1)
+  private val NanosPerSecond  = TimeUnit.SECONDS.toNanos(1)
+  private val SecondsPerDay   = TimeUnit.DAYS.toSeconds(1)
 
-  def decodeLocalDateTime(value: Value, timeZone: TimeZone): LocalDateTime =
+  def decodeInstant(value: Value): Instant =
     value match {
       case BinaryValue(binary) =>
-        val buf              = ByteBuffer.wrap(binary.getBytes).order(ByteOrder.LITTLE_ENDIAN)
-        val fixedTimeInNanos = buf.getLong
-        val julianDay        = buf.getInt
+        val buf        = ByteBuffer.wrap(binary.getBytes).order(ByteOrder.LITTLE_ENDIAN)
+        val nanos      = buf.getLong
+        val julianDays = buf.getInt
 
-        val date = LocalDate.ofEpochDay((julianDay - JulianDayOfEpoch).toLong)
-
-        val fixedTimeInMillis = Math.floorDiv(fixedTimeInNanos, NanosPerMilli)
-        val nanosLeft         = Math.floorMod(fixedTimeInNanos, NanosPerMilli)
-        val timeInMillis      = fixedTimeInMillis + timeZone.getRawOffset
-        val timeInNanos       = (timeInMillis * NanosPerMilli) + nanosLeft
-
-        if (timeInNanos >= NanosPerDay) {
-          /*
-           * original value was encoded with time zone WEST to one that we read it with
-           * and we experience a day flip due to difference in time zone offset
-           */
-          val time = LocalTime.ofNanoOfDay(timeInNanos - NanosPerDay)
-          LocalDateTime.of(date.plusDays(1), time)
-        } else if (timeInNanos < 0) {
-          /*
-           * original value was encoded with time zone EAST to one that we read it with
-           * and we experience a day flip due to difference in time zone offset
-           */
-          val time = LocalTime.ofNanoOfDay(timeInNanos + NanosPerDay)
-          LocalDateTime.of(date.minusDays(1), time)
-        } else {
-          val time = LocalTime.ofNanoOfDay(timeInNanos)
-          LocalDateTime.of(date, time)
-        }
+        Instant.ofEpochSecond((julianDays - JulianDayOfEpoch) * SecondsPerDay, nanos)
 
       case DateTimeValue(value, TimestampFormat.Int64Millis) =>
-        LocalDateTime.ofInstant(Instant.ofEpochMilli(value), timeZone.toZoneId)
+        Instant.ofEpochMilli(value)
 
       case DateTimeValue(value, TimestampFormat.Int64Micros) =>
         val seconds = value / MicrosPerSecond
         val micros  = value % MicrosPerSecond
         val nanos   = micros * NanosPerMicro
-        LocalDateTime.ofInstant(Instant.ofEpochSecond(seconds, nanos), timeZone.toZoneId)
+        Instant.ofEpochSecond(seconds, nanos)
 
       case DateTimeValue(value, TimestampFormat.Int64Nanos) =>
         val seconds = value / NanosPerSecond
         val nanos   = value % NanosPerSecond
-        LocalDateTime.ofInstant(Instant.ofEpochSecond(seconds, nanos), timeZone.toZoneId)
+        Instant.ofEpochSecond(seconds, nanos)
     }
 
-  def encodeLocalDateTime(data: LocalDateTime, timeZone: TimeZone): Value = BinaryValue {
-    val date = data.toLocalDate
-    val time = data.toLocalTime
+  def encodeInstant(instant: Instant): Value = BinaryValue {
+    val julianSec  = instant.getEpochSecond + JulianDayOfEpoch * SecondsPerDay
+    val julianDays = julianSec / SecondsPerDay
+    val nanos      = TimeUnit.SECONDS.toNanos(julianSec % SecondsPerDay) + instant.getNano
 
-    val julianDay = JulianDayOfEpoch + date.toEpochDay.toInt
-
-    val timeInNanos       = time.toNanoOfDay
-    val timeInMillis      = Math.floorDiv(timeInNanos, NanosPerMilli)
-    val nanosLeft         = Math.floorMod(timeInNanos, NanosPerMilli)
-    val fixedTimeInMillis = timeInMillis - timeZone.getRawOffset
-    val fixedTimeInNanos  = fixedTimeInMillis * NanosPerMilli + nanosLeft
-
-    val buf = ByteBuffer.allocate(12).order(ByteOrder.LITTLE_ENDIAN)
-    buf.putLong(fixedTimeInNanos)
-    buf.putInt(julianDay)
-    buf.array()
+    ByteBuffer
+      .allocate(12)
+      .order(ByteOrder.LITTLE_ENDIAN)
+      .putLong(nanos)
+      .putInt(julianDays.toInt)
+      .array()
   }
 
   def decodeLocalDate(value: Value): LocalDate =
@@ -221,30 +186,23 @@ private[parquet4s] object TimeValueCodecs {
 
   def localDateTimeToTimestamp(dateTime: LocalDateTime, timeZone: TimeZone): Timestamp =
     Timestamp.from(ZonedDateTime.of(dateTime, timeZone.toZoneId).toInstant)
-
-  def timestampToLocalDateTime(timestamp: Timestamp, timeZone: TimeZone): LocalDateTime =
-    LocalDateTime.ofInstant(timestamp.toInstant, timeZone.toZoneId)
 }
 
 trait TimeValueDecoders {
 
   implicit val localDateTimeDecoder: OptionalValueDecoder[LocalDateTime] = new OptionalValueDecoder[LocalDateTime] {
     def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): LocalDateTime =
-      TimeValueCodecs.decodeLocalDateTime(value, configuration.timeZone)
+      instantToLocalDateTime(TimeValueCodecs.decodeInstant(value), configuration.timeZone)
   }
 
   implicit val instantDecoder: OptionalValueDecoder[Instant] = new OptionalValueDecoder[Instant] {
-    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Instant = {
-      val timeZone = configuration.timeZone
-      localDateTimeToInstant(TimeValueCodecs.decodeLocalDateTime(value, timeZone), timeZone)
-    }
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Instant =
+      TimeValueCodecs.decodeInstant(value)
   }
 
   implicit val sqlTimestampDecoder: OptionalValueDecoder[java.sql.Timestamp] = new OptionalValueDecoder[Timestamp] {
-    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Timestamp = {
-      val timeZone = configuration.timeZone
-      localDateTimeToTimestamp(TimeValueCodecs.decodeLocalDateTime(value, timeZone), timeZone)
-    }
+    def decodeNonNull(value: Value, configuration: ValueCodecConfiguration): Timestamp =
+      Timestamp.from(TimeValueCodecs.decodeInstant(value))
   }
 
   implicit val localDateDecoder: OptionalValueDecoder[LocalDate] = new OptionalValueDecoder[LocalDate] {
@@ -263,21 +221,17 @@ trait TimeValueEncoders {
 
   implicit val localDateTimeEncoder: OptionalValueEncoder[LocalDateTime] = new OptionalValueEncoder[LocalDateTime] {
     def encodeNonNull(data: LocalDateTime, configuration: ValueCodecConfiguration): Value =
-      TimeValueCodecs.encodeLocalDateTime(data, configuration.timeZone)
+      TimeValueCodecs.encodeInstant(localDateTimeToInstant(data, configuration.timeZone))
   }
 
   implicit val instantEncoder: OptionalValueEncoder[Instant] = new OptionalValueEncoder[Instant] {
-    def encodeNonNull(data: Instant, configuration: ValueCodecConfiguration): Value = {
-      val timeZone = configuration.timeZone
-      TimeValueCodecs.encodeLocalDateTime(instantToLocalDateTime(data, timeZone), timeZone)
-    }
+    def encodeNonNull(data: Instant, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeInstant(data)
   }
 
   implicit val sqlTimestampEncoder: OptionalValueEncoder[java.sql.Timestamp] = new OptionalValueEncoder[Timestamp] {
-    def encodeNonNull(data: Timestamp, configuration: ValueCodecConfiguration): Value = {
-      val timeZone = configuration.timeZone
-      TimeValueCodecs.encodeLocalDateTime(timestampToLocalDateTime(data, timeZone), timeZone)
-    }
+    def encodeNonNull(data: Timestamp, configuration: ValueCodecConfiguration): Value =
+      TimeValueCodecs.encodeInstant(data.toInstant)
   }
 
   implicit val localDateEncoder: OptionalValueEncoder[LocalDate] = new OptionalValueEncoder[LocalDate] {
