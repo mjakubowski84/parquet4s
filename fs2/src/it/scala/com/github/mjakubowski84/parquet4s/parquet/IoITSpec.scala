@@ -176,7 +176,7 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       dir        <- io.listPartitionedDirectory[IO](basePath, writeOptions.hadoopConf, logger, Filter.noopFilter, vcc)
     } yield {
       dir.schema should be(List(Col("x"), Col("y"), Col("z")))
-      dir.paths should contain theSameElementsAs Vector(
+      dir.paths.toVector should contain theSameElementsInOrderAs Vector(
         PartitionedPath(partition1, configuration, List(Col("x") -> "1", Col("y") -> "a", Col("z") -> "0_9"), None),
         PartitionedPath(partition2, configuration, List(Col("x") -> "1", Col("y") -> "b", Col("z") -> "1_0"), None),
         PartitionedPath(partition3, configuration, List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1_1"), None),
@@ -249,7 +249,7 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       logger    <- Stream.eval(logger[IO](getClass))
       directory <- io.listPartitionedDirectory[IO](basePath, writeOptions.hadoopConf, logger, filter, vcc)
     } yield {
-      directory.paths should contain theSameElementsAs (
+      directory.paths.toSeq should contain theSameElementsInOrderAs (
         Seq(
           PartitionedPath(
             file1,
@@ -287,7 +287,7 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       logger    <- Stream.eval(logger[IO](getClass))
       directory <- io.listPartitionedDirectory[IO](basePath, writeOptions.hadoopConf, logger, filter, vcc)
     } yield {
-      directory.paths should contain theSameElementsAs (
+      directory.paths.toSeq should contain theSameElementsInOrderAs (
         Seq(
           PartitionedPath(
             path               = file1,
@@ -318,14 +318,14 @@ class IoITSpec extends AsyncFlatSpec with AsyncIOSpec with Matchers {
       logger    <- Stream.eval(logger[IO](getClass))
       directory <- io.listPartitionedDirectory[IO](basePath, writeOptions.hadoopConf, logger, filter, vcc)
     } yield {
-      directory.paths should contain theSameElementsAs (Seq(
+      directory.paths.toSeq should contain theSameElementsInOrderAs Seq(
         PartitionedPath(
           path               = file2,
           configuration      = configuration,
           partitions         = List(Col("x") -> "1", Col("y") -> "11", Col("z") -> "101"),
           filterPredicateOpt = None
         )
-      ))
+      )
       directory.schema should be(List(Col("x"), Col("y"), Col("z")))
     }
     testStream.compile.lastOrError

@@ -179,7 +179,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     fileSystem.createNewFile(path4.toHadoop)
 
     val dir = listPartitionedDirectory(tempPath, configuration, Filter.noopFilter, vcc).value
-    dir.paths should contain theSameElementsAs List(
+    dir.paths.toList should contain theSameElementsInOrderAs List(
       PartitionedPath(
         path               = path1,
         configuration      = configuration,
@@ -239,12 +239,14 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val filter = Col("x") === "1" && Col("z") === "1"
 
     val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
-    dir.paths should contain theSameElementsAs List(
-      PartitionedPath(
-        path               = path3,
-        configuration      = configuration,
-        partitions         = List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1"),
-        filterPredicateOpt = None // no predicate is left for filter the file
+    dir.paths.toList should be(
+      List(
+        PartitionedPath(
+          path               = path3,
+          configuration      = configuration,
+          partitions         = List(Col("x") -> "1", Col("y") -> "c", Col("z") -> "1"),
+          filterPredicateOpt = None // no predicate is left for filter the file
+        )
       )
     )
     dir.schema should be(List(Col("x"), Col("y"), Col("z")))
@@ -281,7 +283,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val filterPredicate = filter.toPredicate(vcc)
 
     val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
-    dir.paths should contain theSameElementsAs List(
+    dir.paths.toList should contain theSameElementsInOrderAs List(
       PartitionedPath(
         path               = path1,
         configuration      = configuration,
@@ -324,7 +326,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val rewrittenPredicate = (Col("b") === "X").toPredicate(vcc)
 
     val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
-    dir.paths should contain theSameElementsAs List(
+    dir.paths.toList should contain theSameElementsInOrderAs List(
       PartitionedPath(
         path               = path1,
         configuration      = configuration,
@@ -357,7 +359,7 @@ class IOOpsITSpec extends AnyFlatSpec with Matchers with IOOps with TestUtils wi
     val filterPredicate = filter.toPredicate(vcc)
 
     val dir = listPartitionedDirectory(tempPath, configuration, filter, vcc).value
-    dir.paths should contain theSameElementsAs (
+    dir.paths.toList should contain theSameElementsInOrderAs (
       Seq(
         PartitionedPath(
           path               = path1,

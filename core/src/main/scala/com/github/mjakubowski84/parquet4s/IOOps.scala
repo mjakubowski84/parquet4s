@@ -119,6 +119,7 @@ trait IOOps {
     val (dirs, files) = fs
       .listStatus(path.toHadoop, HiddenFileFilter.INSTANCE)
       .toVector
+      .sortBy(_.getPath().getName())
       .partition(_.isDirectory)
     if (dirs.nonEmpty && files.nonEmpty)
       Left(Vector(path)) // path is invalid because it contains both dirs and files
