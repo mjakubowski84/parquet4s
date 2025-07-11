@@ -2,13 +2,16 @@ package com.github.mjakubowski84.parquet4s
 
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.Inspectors
 
 import java.sql.Timestamp
 import java.time.{Instant, LocalDateTime}
 import java.util.TimeZone
 
-class TimestampFormatSpec extends AnyFlatSpec with Matchers {
+class TimestampFormatSpec extends AnyFlatSpec with Matchers with Inspectors {
   private val defaultConfiguration = ValueCodecConfiguration(TimeZone.getTimeZone("Africa/Nairobi"))
+
+  private val timeZones = Seq("GMT-1:00", "UTC", "GMT+1:00").map(TimeZone.getTimeZone)
 
   behavior of "TimestampFormat.Implicits.Millis"
 
@@ -31,6 +34,44 @@ class TimestampFormatSpec extends AnyFlatSpec with Matchers {
     val timestamp        = Timestamp.from(Instant.ofEpochMilli(1234567L))
     val decodedTimestamp = codec(timestamp)
     decodedTimestamp should be(timestamp)
+  }
+
+  it should "decode previously saved instant as other time type" in {
+    val instantEncoder       = TimestampFormat.Implicits.Millis.instantEncoder
+    val timestampDecoder     = implicitly[ValueDecoder[Timestamp]]
+    val localDateTimeDecoder = implicitly[ValueDecoder[LocalDateTime]]
+
+    val instant = Instant.parse("2024-01-01T12:00:00.101Z")
+
+    timeZones.foreach { timeZone =>
+      val vcc = defaultConfiguration.copy(timeZone = timeZone)
+
+      val dateTimeValue        = instantEncoder.encode(instant, vcc)
+      val decodedTimestamp     = timestampDecoder.decode(dateTimeValue, vcc)
+      val decodedLocalDateTime = localDateTimeDecoder.decode(dateTimeValue, vcc)
+
+      decodedTimestamp should be(Timestamp.from(instant))
+      decodedLocalDateTime should be(LocalDateTime.ofInstant(instant, vcc.timeZone.toZoneId))
+    }
+  }
+
+  it should "decode instant from other encoded types" in {
+    val instantDecoder       = implicitly[ValueDecoder[Instant]]
+    val timestampEncoder     = TimestampFormat.Implicits.Millis.sqlTimestampEncoder
+    val localDateTimeEncoder = TimestampFormat.Implicits.Millis.localDateTimeEncoder
+
+    val instant = Instant.parse("2024-01-01T12:00:00.101Z")
+
+    timeZones.foreach { timeZone =>
+      val vcc = defaultConfiguration.copy(timeZone = timeZone)
+
+      val encodedTimestamp = timestampEncoder.encode(Timestamp.from(instant), vcc)
+      val encodedLocalDateTime =
+        localDateTimeEncoder.encode(LocalDateTime.ofInstant(instant, vcc.timeZone.toZoneId), vcc)
+
+      instantDecoder.decode(encodedTimestamp, vcc) should be(instant)
+      instantDecoder.decode(encodedLocalDateTime, vcc) should be(instant)
+    }
   }
 
   behavior of "TimestampFormat.Implicits.Micros"
