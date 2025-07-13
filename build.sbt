@@ -16,8 +16,8 @@ val pekkoLib = ActorLibCross("-pekko", "-pekko")
 ThisBuild / organization := "com.github.mjakubowski84"
 ThisBuild / organizationName := "mjakubowski84"
 ThisBuild / organizationHomepage := Some(url("https://github.com/mjakubowski84"))
-ThisBuild / version := "2.23.0"
-ThisBuild / isSnapshot := false
+ThisBuild / version := "2.24.0-SNAPSHOT"
+ThisBuild / isSnapshot := true
 ThisBuild / scalaVersion := twoThirteen
 
 ThisBuild / javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -374,7 +374,7 @@ lazy val documentation = (projectMatrix in file("site"))
   .jvmPlatform(
     scalaVersions = Seq(twoThirteen),
     settings = Def.settings(
-      name := "documentation"
+      name := "Parquet4s"
     )
   )
   .enablePlugins(MicrositesPlugin)
